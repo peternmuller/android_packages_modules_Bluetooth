@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
-/*
- * Generated mock file from original source file
- *   Functions generated:1
- */
+#pragma once
 
-#include "stack/crypto_toolbox/crypto_toolbox.h"
-#include "test/common/mock_functions.h"
+#ifndef TARGET_FLOSS
 
-namespace crypto_toolbox {
-Octet16 aes_cmac(const Octet16& key, const uint8_t* input, uint16_t length) {
-  inc_func_call_count(__func__);
-  Octet16 octet16;
-  return octet16;
-}
-}  // namespace crypto_toolbox
+#include <a2dp.sysprop.h>
+#include <avrcp.sysprop.h>
+#include <ble.sysprop.h>
+#include <bta.sysprop.h>
+#include <hfp.sysprop.h>
+#include <pan.sysprop.h>
+
+#define GET_SYSPROP(namespace, prop, default) \
+  android::sysprop::bluetooth::namespace ::prop().value_or(default)
+
+#else
+
+#define GET_SYSPROP(namespace, prop, default) default
+
+#endif

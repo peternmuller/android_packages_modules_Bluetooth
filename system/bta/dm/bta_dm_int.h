@@ -34,6 +34,7 @@
 #include "bta/sys/bta_sys.h"
 #include "stack/btm/neighbor_inquiry.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/sdp_status.h"
 #include "stack/sdp/sdp_discovery_db.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
@@ -477,9 +478,6 @@ extern tBTA_DM_CB bta_dm_cb;
 
 /* DM control block for ACL management */
 extern tBTA_DM_ACL_CB bta_dm_acl_cb;
-
-/* DM search control block */
-extern tBTA_DM_SEARCH_CB bta_dm_search_cb;
 
 /* DI control block */
 extern tBTA_DM_DI_CB bta_dm_di_cb;
