@@ -19,6 +19,7 @@ package android.bluetooth;
 import android.annotation.SuppressLint;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -488,7 +489,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
     }
 
     @Override
-    public boolean equals(@NonNull Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o instanceof BluetoothLeAudioCodecConfig) {
             BluetoothLeAudioCodecConfig other = (BluetoothLeAudioCodecConfig) o;
             return (other.getCodecType() == mCodecType

@@ -831,6 +831,15 @@ public class LeAudioService extends ProfileService {
      * @param broadcastSettings broadcast settings for this broadcast source
      */
     public void createBroadcast(BluetoothLeBroadcastSettings broadcastSettings) {
+        if (mBroadcastDescriptors.size() >= getMaximumNumberOfBroadcasts()) {
+            Log.w(
+                    TAG,
+                    "createBroadcast reached maximum allowed broadcasts number: "
+                            + getMaximumNumberOfBroadcasts());
+            notifyBroadcastStartFailed(null, BluetoothStatusCodes.ERROR_LOCAL_NOT_ENOUGH_RESOURCES);
+            return;
+        }
+
         if (mLeAudioBroadcasterNativeInterface == null) {
             Log.w(TAG, "Native interface not available.");
             return;
@@ -1250,7 +1259,9 @@ public class LeAudioService extends ProfileService {
             volumeControlService.setGroupActive(getGroupId(mExposedActiveDevice), false);
         }
 
-        volumeControlService.setGroupActive(getGroupId(device), true);
+        if (device != null) {
+            volumeControlService.setGroupActive(getGroupId(device), true);
+        }
     }
 
     /**
@@ -1545,11 +1556,17 @@ public class LeAudioService extends ProfileService {
                             + ", device: "
                             + device
                             + ", hasFallbackDevice: "
-                            + hasFallbackDevice);
+                            + hasFallbackDevice
+                            + ", mExposedActiveDevice: "
+                            + mExposedActiveDevice);
         }
 
-        if (groupId == currentlyActiveGroupId) {
-            if (groupId != LE_AUDIO_GROUP_ID_INVALID) {
+        LeAudioGroupDescriptor groupDescriptor = getGroupDescriptor(currentlyActiveGroupId);
+        if (groupDescriptor != null && groupId == currentlyActiveGroupId) {
+            /* Make sure active group is already exposed to audio framework.
+             * If not, lets wait for it and don't sent additional intent.
+             */
+            if (groupDescriptor.mCurrentLeadDevice == mExposedActiveDevice) {
                 Log.w(
                         TAG,
                         "group is already active: device="
@@ -1568,8 +1585,7 @@ public class LeAudioService extends ProfileService {
                 || hasFallbackDevice) {
             Log.i(TAG, "Remember that device has FallbackDevice when become inactive active");
 
-            LeAudioGroupDescriptor descriptor = getGroupDescriptor(currentlyActiveGroupId);
-            descriptor.mHasFallbackDeviceWhenGettingInactive = true;
+            groupDescriptor.mHasFallbackDeviceWhenGettingInactive = true;
         }
 
         if (!mLeAudioNativeIsInitialized) {

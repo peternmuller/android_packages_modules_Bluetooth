@@ -258,7 +258,6 @@ cc_library_static {
 cc_test {
     name: "net_test_btif",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -341,7 +340,6 @@ cc_test {
 cc_test {
     name: "net_test_btif_profile_queue",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -374,7 +372,6 @@ cc_test {
 cc_test {
     name: "net_test_btif_avrcp_audio_track",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -410,7 +407,6 @@ cc_test {
 cc_test {
     name: "net_test_btif_rc",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -462,7 +458,6 @@ cc_test {
 cc_test {
     name: "net_test_btif_config_cache",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -505,7 +500,6 @@ cc_test {
 cc_test {
     name: "net_test_btif_hf_client_service",
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -540,7 +534,6 @@ cc_test {
     name: "net_test_btif_hh",
     host_supported: true,
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
@@ -679,7 +672,6 @@ cc_test {
     name: "net_test_btif_stack",
     host_supported: true,
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "fluoride_defaults",
         "mts_defaults",
     ],
