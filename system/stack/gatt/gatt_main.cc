@@ -34,6 +34,7 @@
 #include "l2c_api.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
+#include "osi/include/properties.h"
 #include "stack/btm/btm_ble_int.h"
 #include "stack/btm/btm_dev.h"
 #include "stack/btm/btm_sec.h"
@@ -122,8 +123,11 @@ void gatt_init(void) {
 
   L2CA_RegisterFixedChannel(L2CAP_ATT_CID, &fixed_reg);
 
+  bool gatt_over_br_is_disabled =
+      osi_property_get_bool("bluetooth.gatt_over_bredr.disabled", false);
   /* Now, register with L2CAP for ATT PSM over BR/EDR */
-  if (!L2CA_Register2(BT_PSM_ATT, dyn_info, false /* enable_snoop */, nullptr,
+  if (!gatt_over_br_is_disabled &&
+      !L2CA_Register2(BT_PSM_ATT, dyn_info, false /* enable_snoop */, nullptr,
                       GATT_MAX_MTU_SIZE, 0, BTM_SEC_NONE)) {
     LOG(ERROR) << "ATT Dynamic Registration failed";
   }
@@ -579,6 +583,30 @@ void gatt_notify_conn_update(const RawAddress& remote, uint16_t interval,
       uint16_t conn_id = GATT_CREATE_CONN_ID(p_tcb->tcb_idx, p_reg->gatt_if);
       (*p_reg->app_cb.p_conn_update_cb)(p_reg->gatt_if, conn_id, interval,
                                         latency, timeout,
+                                        static_cast<tGATT_STATUS>(status));
+    }
+  }
+}
+
+void gatt_notify_subrate_change(uint16_t handle, uint16_t subrate_factor,
+                                uint16_t latency, uint16_t cont_num,
+                                uint16_t timeout, uint8_t status) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(handle);
+  if (!p_dev_rec) {
+    LOG_WARN("No Device Found!");
+    return;
+  }
+
+  tGATT_TCB* p_tcb =
+      gatt_find_tcb_by_addr(p_dev_rec->ble.pseudo_addr, BT_TRANSPORT_LE);
+  if (!p_tcb) return;
+
+  for (int i = 0; i < GATT_MAX_APPS; i++) {
+    tGATT_REG* p_reg = &gatt_cb.cl_rcb[i];
+    if (p_reg->in_use && p_reg->app_cb.p_subrate_chg_cb) {
+      uint16_t conn_id = GATT_CREATE_CONN_ID(p_tcb->tcb_idx, p_reg->gatt_if);
+      (*p_reg->app_cb.p_subrate_chg_cb)(p_reg->gatt_if, conn_id, subrate_factor,
+                                        latency, cont_num, timeout,
                                         static_cast<tGATT_STATUS>(status));
     }
   }

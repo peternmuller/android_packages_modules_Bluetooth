@@ -2615,6 +2615,9 @@ static void bta_dm_acl_down(const RawAddress& bd_addr,
       memset(&bta_dm_cb.device_list.peer_device[clear_index], 0,
              sizeof(bta_dm_cb.device_list.peer_device[clear_index]));
     }
+
+    device->conn_state = BTA_DM_NOT_CONNECTED;
+
     break;
   }
   if (bta_dm_cb.device_list.count) bta_dm_cb.device_list.count--;
@@ -4376,6 +4379,23 @@ void bta_dm_process_delete_key_RC_to_unpair(const RawAddress& bd_addr)
         },
     };
     bta_dm_cb.p_sec_cback(BTA_DM_REPORT_BONDING_EVT, &param);
+}
+
+/*******************************************************************************
+ *
+ * Function         bta_dm_ble_subrate_request
+ *
+ * Description      This function requests BLE subrate procedure.
+ *
+ * Parameters:
+ *
+ ******************************************************************************/
+void bta_dm_ble_subrate_request(const RawAddress& bd_addr, uint16_t subrate_min,
+                                uint16_t subrate_max, uint16_t max_latency,
+                                uint16_t cont_num, uint16_t timeout) {
+    // Logging done in l2c_ble.cc
+    L2CA_SubrateRequest(bd_addr, subrate_min, subrate_max, max_latency,
+                        cont_num, timeout);
 }
 
 namespace bluetooth {

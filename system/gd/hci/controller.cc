@@ -29,6 +29,8 @@
 namespace bluetooth {
 namespace hci {
 
+constexpr uint8_t kMinEncryptionKeySize = 7;  // #define MIN_ENCRYPTION_KEY_SIZE 7
+
 using os::Handler;
 
 struct Controller::impl {
@@ -70,6 +72,12 @@ struct Controller::impl {
 
     hci_->EnqueueCommand(ReadBufferSizeBuilder::Create(),
                          handler->BindOnceOn(this, &Controller::impl::read_buffer_size_complete_handler));
+
+    if (common::init_flags::set_min_encryption_is_enabled() && is_supported(OpCode::SET_MIN_ENCRYPTION_KEY_SIZE)) {
+      hci_->EnqueueCommand(
+          SetMinEncryptionKeySizeBuilder::Create(kMinEncryptionKeySize),
+          handler->BindOnceOn(this, &Controller::impl::set_min_encryption_key_size_handler));
+    }
 
     if (is_supported(OpCode::LE_READ_BUFFER_SIZE_V2)) {
       hci_->EnqueueCommand(
@@ -153,6 +161,14 @@ struct Controller::impl {
     if (is_supported(OpCode::LE_SET_HOST_FEATURE) && module_.SupportsBleConnectedIsochronousStreamCentral()) {
       hci_->EnqueueCommand(
           LeSetHostFeatureBuilder::Create(LeHostFeatureBits::CONNECTED_ISO_STREAM_HOST_SUPPORT, Enable::ENABLED),
+          handler->BindOnceOn(this, &Controller::impl::le_set_host_feature_handler));
+    }
+
+    if (common::init_flags::subrating_is_enabled() && is_supported(OpCode::LE_SET_HOST_FEATURE) &&
+        module_.SupportsBleConnectionSubrating()) {
+      hci_->EnqueueCommand(
+          LeSetHostFeatureBuilder::Create(
+              LeHostFeatureBits::CONNECTION_SUBRATING_HOST_SUPPORT, Enable::ENABLED),
           handler->BindOnceOn(this, &Controller::impl::le_set_host_feature_handler));
     }
 
@@ -319,6 +335,13 @@ struct Controller::impl {
       acl_buffers_ -= le_buffer_size_.total_num_le_packets_;
       le_buffer_size_.le_data_packet_length_ = acl_buffer_length_;
     }
+  }
+
+  void set_min_encryption_key_size_handler(CommandCompleteView view) {
+    auto complete_view = SetMinEncryptionKeySizeCompleteView::Create(view);
+    ASSERT(complete_view.IsValid());
+    ErrorCode status = complete_view.GetStatus();
+    ASSERT_LOG(status == ErrorCode::SUCCESS, "Status 0x%02hhx, %s", status, ErrorCodeText(status).c_str());
   }
 
   void le_read_buffer_size_v2_handler(CommandCompleteView view) {
@@ -1035,6 +1058,9 @@ LOCAL_LE_FEATURE_ACCESSOR(SupportsBleIsochronousChannelsHostSupport, 32)
 LOCAL_LE_FEATURE_ACCESSOR(SupportsBlePowerControlRequest, 33)
 LOCAL_LE_FEATURE_ACCESSOR(SupportsBlePowerChangeIndication, 34)
 LOCAL_LE_FEATURE_ACCESSOR(SupportsBlePathLossMonitoring, 35)
+LOCAL_LE_FEATURE_ACCESSOR(SupportsBlePeriodicAdvertisingAdi, 36)
+LOCAL_LE_FEATURE_ACCESSOR(SupportsBleConnectionSubrating, 37)
+LOCAL_LE_FEATURE_ACCESSOR(SupportsBleConnectionSubratingHost, 38)
 
 uint64_t Controller::GetLocalFeatures(uint8_t page_number) const {
   if (page_number < impl_->extended_lmp_features_array_.size()) {

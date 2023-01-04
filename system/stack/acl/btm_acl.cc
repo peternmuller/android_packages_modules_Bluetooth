@@ -641,20 +641,6 @@ void btm_acl_encrypt_change(uint16_t handle, uint8_t status,
     return;
   }
 
-  /* if we are trying to drop encryption on an encrypted connection, drop the
-   * connection */
-  if (p->is_encrypted && !encr_enable) {
-    LOG(ERROR) << __func__
-               << " attempting to decrypt encrypted connection, disconnecting. "
-                  "handle: "
-               << loghex(handle);
-
-    acl_disconnect_from_handle(handle, HCI_ERR_HOST_REJECT_SECURITY,
-                               "stack::btu::btu_hcif::read_drop_encryption "
-                               "Connection Already Encrypted");
-    return;
-  }
-
   p->is_encrypted = encr_enable;
 
   /* Process Role Switch if active */
@@ -1814,7 +1800,7 @@ void btm_read_tx_power_timeout(UNUSED_ATTR void* data) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_read_tx_power_complete(uint8_t* p, bool is_ble) {
+void btm_read_tx_power_complete(uint8_t* p, uint16_t evt_len, bool is_ble) {
   tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_tx_power_cmpl_cb;
   tBTM_TX_POWER_RESULT result;
 
@@ -1823,6 +1809,10 @@ void btm_read_tx_power_complete(uint8_t* p, bool is_ble) {
 
   /* If there was a registered callback, call it */
   if (p_cb) {
+    if (evt_len < 1) {
+      goto err_out;
+    }
+
     STREAM_TO_UINT8(result.hci_status, p);
 
     if (result.hci_status == HCI_SUCCESS) {
@@ -1830,6 +1820,11 @@ void btm_read_tx_power_complete(uint8_t* p, bool is_ble) {
 
       if (!is_ble) {
         uint16_t handle;
+
+        if (evt_len < 4) {
+          goto err_out;
+        }
+
         STREAM_TO_UINT16(handle, p);
         STREAM_TO_UINT8(result.tx_power, p);
 
@@ -1838,6 +1833,10 @@ void btm_read_tx_power_complete(uint8_t* p, bool is_ble) {
           result.rem_bda = p_acl_cb->remote_addr;
         }
       } else {
+        if (evt_len < 2) {
+          goto err_out;
+        }
+
         STREAM_TO_UINT8(result.tx_power, p);
         result.rem_bda = btm_cb.devcb.read_tx_pwr_addr;
       }
@@ -1851,6 +1850,11 @@ void btm_read_tx_power_complete(uint8_t* p, bool is_ble) {
 
     (*p_cb)(&result);
   }
+
+  return;
+
+ err_out:
+  LOG_ERROR("Bogus event packet, too short");
 }
 
 /*******************************************************************************
@@ -1880,7 +1884,7 @@ void btm_read_rssi_timeout(UNUSED_ATTR void* data) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_read_rssi_complete(uint8_t* p) {
+void btm_read_rssi_complete(uint8_t* p, uint16_t evt_len) {
   tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_rssi_cmpl_cb;
   tBTM_RSSI_RESULT result;
 
@@ -1889,11 +1893,19 @@ void btm_read_rssi_complete(uint8_t* p) {
 
   /* If there was a registered callback, call it */
   if (p_cb) {
+    if (evt_len < 1) {
+      goto err_out;
+    }
+
     STREAM_TO_UINT8(result.hci_status, p);
     result.status = BTM_ERR_PROCESSING;
 
     if (result.hci_status == HCI_SUCCESS) {
       uint16_t handle;
+
+      if (evt_len < 4) {
+        goto err_out;
+      }
       STREAM_TO_UINT16(handle, p);
 
       STREAM_TO_UINT8(result.rssi, p);
@@ -1909,6 +1921,11 @@ void btm_read_rssi_complete(uint8_t* p) {
     }
     (*p_cb)(&result);
   }
+
+  return;
+
+ err_out:
+  LOG_ERROR("Bogus event packet, too short");
 }
 
 /*******************************************************************************
@@ -2043,7 +2060,7 @@ void btm_read_link_quality_timeout(UNUSED_ATTR void* data) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_read_link_quality_complete(uint8_t* p) {
+void btm_read_link_quality_complete(uint8_t* p, uint16_t evt_len) {
   tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_link_qual_cmpl_cb;
   tBTM_LINK_QUALITY_RESULT result;
 
@@ -2052,11 +2069,19 @@ void btm_read_link_quality_complete(uint8_t* p) {
 
   /* If there was a registered callback, call it */
   if (p_cb) {
+    if (evt_len < 1) {
+      goto err_out;
+    }
+
     STREAM_TO_UINT8(result.hci_status, p);
 
     if (result.hci_status == HCI_SUCCESS) {
       uint16_t handle;
       result.status = BTM_SUCCESS;
+
+      if (evt_len < 4) {
+        goto err_out;
+      }
 
       STREAM_TO_UINT16(handle, p);
 
@@ -2076,6 +2101,11 @@ void btm_read_link_quality_complete(uint8_t* p) {
 
     (*p_cb)(&result);
   }
+
+  return;
+
+err_out:
+  LOG_ERROR("Bogus Link Quality event packet, size: %d", evt_len);
 }
 
 /*******************************************************************************
@@ -2311,6 +2341,35 @@ bool acl_peer_supports_sniff_subrating(const RawAddress& remote_bda) {
         "incomplete");
   }
   return HCI_SNIFF_SUB_RATE_SUPPORTED(p_acl->peer_lmp_feature_pages[0]);
+}
+
+bool acl_peer_supports_ble_connection_subrating(const RawAddress& remote_bda) {
+  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_BR_EDR);
+  if (p_acl == nullptr) {
+    LOG_WARN("Unable to find active acl");
+    return false;
+  }
+  if (!p_acl->peer_le_features_valid) {
+    LOG_WARN(
+        "Checking remote features but remote feature read is "
+        "incomplete");
+  }
+  return HCI_LE_CONN_SUBRATING_SUPPORT(p_acl->peer_le_features);
+}
+
+bool acl_peer_supports_ble_connection_subrating_host(
+    const RawAddress& remote_bda) {
+  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_BR_EDR);
+  if (p_acl == nullptr) {
+    LOG_WARN("Unable to find active acl");
+    return false;
+  }
+  if (!p_acl->peer_le_features_valid) {
+    LOG_WARN(
+        "Checking remote features but remote feature read is "
+        "incomplete");
+  }
+  return HCI_LE_CONN_SUBRATING_HOST_SUPPORT(p_acl->peer_le_features);
 }
 
 /*******************************************************************************

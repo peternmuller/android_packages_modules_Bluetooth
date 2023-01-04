@@ -74,6 +74,10 @@ static void bta_gattc_phy_update_cback(tGATT_IF gatt_if, uint16_t conn_id,
 static void bta_gattc_conn_update_cback(tGATT_IF gatt_if, uint16_t conn_id,
                                         uint16_t interval, uint16_t latency,
                                         uint16_t timeout, tGATT_STATUS status);
+static void bta_gattc_subrate_chg_cback(tGATT_IF gatt_if, uint16_t conn_id,
+                                        uint16_t subrate_factor,
+                                        uint16_t latency, uint16_t cont_num,
+                                        uint16_t timeout, tGATT_STATUS status);
 static void bta_gattc_init_bk_conn(const tBTA_GATTC_API_OPEN* p_data,
                                    tBTA_GATTC_RCB* p_clreg);
 
@@ -87,6 +91,7 @@ static tGATT_CBACK bta_gattc_cl_cback = {
     .p_congestion_cb = bta_gattc_cong_cback,
     .p_phy_update_cb = bta_gattc_phy_update_cback,
     .p_conn_update_cb = bta_gattc_conn_update_cback,
+    .p_subrate_chg_cb = bta_gattc_subrate_chg_cback,
 };
 
 /* opcode(tGATTC_OPTYPE) order has to be comply with internal event order */
@@ -637,6 +642,18 @@ void bta_gattc_close(tBTA_GATTC_CLCB* p_clcb, const tBTA_GATTC_DATA* p_data) {
         p_clreg->notif_reg[i].remote_bda == p_clcb->bda) {
       p_clreg->notif_reg[i].app_disconnected = true;
     }
+  }
+
+  if (p_data->hdr.event == BTA_GATTC_INT_DISCONN_EVT) {
+    /* Since link has been disconnected by and it is possible that here are
+     * already some new p_clcb created for the background connect, the number of
+     * p_srcb->num_clcb is NOT 0. This will prevent p_srcb to be cleared inside
+     * the bta_gattc_clcb_dealloc.
+     *
+     * In this point of time, we know that link does not exist, so let's make
+     * sure the connection state, mtu and database is cleared.
+     */
+    bta_gattc_server_disconnected(p_clcb->p_srcb);
   }
 
   bta_gattc_clcb_dealloc(p_clcb);
@@ -1573,4 +1590,25 @@ static void bta_gattc_conn_update_cback(tGATT_IF gatt_if, uint16_t conn_id,
   cb_data.conn_update.timeout = timeout;
   cb_data.conn_update.status = status;
   (*p_clreg->p_cback)(BTA_GATTC_CONN_UPDATE_EVT, &cb_data);
+}
+
+static void bta_gattc_subrate_chg_cback(tGATT_IF gatt_if, uint16_t conn_id,
+                                        uint16_t subrate_factor,
+                                        uint16_t latency, uint16_t cont_num,
+                                        uint16_t timeout, tGATT_STATUS status) {
+  tBTA_GATTC_RCB* p_clreg = bta_gattc_cl_get_regcb(gatt_if);
+
+  if (!p_clreg || !p_clreg->p_cback) {
+    LOG(ERROR) << __func__ << ": client_if=" << gatt_if << " not found";
+    return;
+  }
+
+  tBTA_GATTC cb_data;
+  cb_data.subrate_chg.conn_id = conn_id;
+  cb_data.subrate_chg.subrate_factor = subrate_factor;
+  cb_data.subrate_chg.latency = latency;
+  cb_data.subrate_chg.cont_num = cont_num;
+  cb_data.subrate_chg.timeout = timeout;
+  cb_data.subrate_chg.status = status;
+  (*p_clreg->p_cback)(BTA_GATTC_SUBRATE_CHG_EVT, &cb_data);
 }
