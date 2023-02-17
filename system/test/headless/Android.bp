@@ -24,6 +24,22 @@ genrule {
   ],
 }
 
+filegroup {
+    name: "TestHeadlessModules",
+    srcs: [
+          "connect/connect.cc",
+          "discovery/discovery.cc",
+          "dumpsys/dumpsys.cc",
+          "nop/nop.cc",
+          "pairing/pairing.cc",
+          "read/name.cc",
+          "read/read.cc",
+          "scan/scan.cc",
+          "sdp/sdp.cc",
+          "sdp/sdp_db.cc",
+     ],
+}
+
 cc_binary {
     name: "bt_headless",
     defaults: [
@@ -39,23 +55,16 @@ cc_binary {
         "HeadlessBuildTimestamp",
     ],
     srcs: [
+        ":TestHeadlessModules",
         "bt_property.cc",
-        "connect/connect.cc",
         "get_options.cc",
+        "handler.cc",
         "headless.cc",
         "log.cc",
         "main.cc",
         "messenger.cc",
-        "pairing/pairing.cc",
+        "property.cc",
         "util.cc",
-        "discovery/discovery.cc",
-        "dumpsys/dumpsys.cc",
-        "scan/scan.cc",
-        "sdp/sdp.cc",
-        "sdp/sdp_db.cc",
-        "nop/nop.cc",
-        "read/read.cc",
-        "read/name.cc",
     ],
     include_dirs: [
         "packages/modules/Bluetooth/system",
@@ -110,7 +119,7 @@ cc_binary {
         "android.hardware.bluetooth@1.1",
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
-        "android.hardware.bluetooth.audio-V2-ndk",
+        "android.hardware.bluetooth.audio-V3-ndk",
         "android.system.suspend-V1-ndk",
         "libaaudio",
         "libbase",

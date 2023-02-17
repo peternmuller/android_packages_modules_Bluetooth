@@ -19,7 +19,7 @@
 #ifndef GATT_INT_H
 #define GATT_INT_H
 
-#include <base/bind.h>
+#include <base/functional/bind.h>
 #include <base/strings/stringprintf.h>
 #include <string.h>
 
@@ -93,6 +93,10 @@ typedef struct {
   bool is_link_key_known;
   bool is_link_key_authed;
   bool is_encrypted;
+  // whether we connected to the peer, or if it
+  // connected to a discoverable advertisement (affects
+  // GAP permissions)
+  bool can_read_discoverable_characteristics;
 } tGATT_SEC_FLAG;
 
 /* Find Information Response Type
@@ -259,20 +263,14 @@ inline std::string gatt_channel_state_text(const tGATT_CH_STATE& state) {
 }
 #undef CASE_RETURN_TEXT
 
+// If you change these values make sure to look at b/262219144 before.
+// Some platform rely on this to never changes
 #define GATT_GATT_START_HANDLE 1
 #define GATT_GAP_START_HANDLE 20
 #define GATT_GMCS_START_HANDLE 40
 #define GATT_GTBS_START_HANDLE 90
 #define GATT_TMAS_START_HANDLE 130
 #define GATT_APP_START_HANDLE 134
-
-#ifndef GATT_DEFAULT_START_HANDLE
-#define GATT_DEFAULT_START_HANDLE GATT_GATT_START_HANDLE
-#endif
-
-#ifndef GATT_LAST_HANDLE
-#define GATT_LAST_HANDLE 0xFFFF
-#endif
 
 typedef struct hdl_cfg {
   uint16_t gatt_start_hdl;
@@ -452,6 +450,7 @@ typedef struct {
   tGATT_APPL_INFO cb_info;
 
   tGATT_HDL_CFG hdl_cfg;
+  bool over_br_enabled;
 } tGATT_CB;
 
 #define GATT_SIZE_OF_SRV_CHG_HNDL_RANGE 4
@@ -597,7 +596,6 @@ extern uint16_t gatt_tcb_get_att_cid(tGATT_TCB& tcb, bool eatt_support);
 extern uint16_t gatt_tcb_get_payload_size_tx(tGATT_TCB& tcb, uint16_t cid);
 extern uint16_t gatt_tcb_get_payload_size_rx(tGATT_TCB& tcb, uint16_t cid);
 extern void gatt_clcb_invalidate(tGATT_TCB* p_tcb, const tGATT_CLCB* p_clcb);
-extern void gatt_clcb_dealloc(tGATT_CLCB* p_clcb);
 
 extern void gatt_sr_copy_prep_cnt_to_cback_cnt(tGATT_TCB& p_tcb);
 extern bool gatt_sr_is_cback_cnt_zero(tGATT_TCB& p_tcb);

@@ -573,7 +573,7 @@ void smp_proc_pair_cmd(tSMP_CB* p_cb, tSMP_INT_DATA* p_data) {
       p_cb->local_i_key = p_cb->peer_i_key;
       p_cb->local_r_key = p_cb->peer_r_key;
 
-      p_cb->cb_evt = SMP_SEC_REQUEST_EVT;
+      p_cb->cb_evt =  SMP_IO_CAP_REQ_EVT;
     } else /* update local i/r key according to pairing request */
     {
       /* pairing started with this side (peripheral) sending Security Request */
@@ -1044,7 +1044,7 @@ void smp_proc_id_addr(tSMP_CB* p_cb, tSMP_INT_DATA* p_data) {
   tBTM_LE_KEY_VALUE pid_key = {
       .pid_key = {},
   };
-  ;
+
   STREAM_TO_UINT8(pid_key.pid_key.identity_addr_type, p);
   STREAM_TO_BDADDR(pid_key.pid_key.identity_addr, p);
   pid_key.pid_key.irk = p_cb->tk;
@@ -2014,7 +2014,7 @@ void smp_link_encrypted(const RawAddress& bda, uint8_t encr_enable) {
 
   if (smp_cb.pairing_bda == bda) {
     LOG_DEBUG("SMP encryption enable:%hhu device:%s", encr_enable,
-              PRIVATE_ADDRESS(bda));
+              ADDRESS_TO_LOGGABLE_CSTR(bda));
 
     /* encryption completed with STK, remember the key size now, could be
      * overwritten when key exchange happens                                 */
@@ -2032,7 +2032,7 @@ void smp_link_encrypted(const RawAddress& bda, uint8_t encr_enable) {
   } else {
     LOG_WARN(
         "SMP state machine busy so skipping encryption enable:%hhu device:%s",
-        encr_enable, PRIVATE_ADDRESS(bda));
+        encr_enable, ADDRESS_TO_LOGGABLE_CSTR(bda));
   }
 }
 

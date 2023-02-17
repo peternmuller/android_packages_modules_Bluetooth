@@ -226,7 +226,7 @@ btif_hf_client_cb_t* btif_hf_client_get_cb_by_handle(uint16_t handle) {
  *
  ******************************************************************************/
 btif_hf_client_cb_t* btif_hf_client_get_cb_by_bda(const RawAddress& bd_addr) {
-  VLOG(1) << __func__ << " incoming addr " << bd_addr;
+  VLOG(1) << __func__ << " incoming addr " << ADDRESS_TO_LOGGABLE_CSTR(bd_addr);
 
   for (int i = 0; i < HF_CLIENT_MAX_DEVICES; i++) {
     // Block is valid only if it is allocated i.e. state is not DISCONNECTED
@@ -313,9 +313,7 @@ static bt_status_t connect_int(RawAddress* bd_addr, uint16_t uuid) {
    * The handle is valid until we have called BTA_HfClientClose or the LL
    * has notified us of channel close due to remote closing, error etc.
    */
-  BTA_HfClientOpen(cb->peer_bda, &cb->handle);
-
-  return BT_STATUS_SUCCESS;
+  return BTA_HfClientOpen(cb->peer_bda, &cb->handle);
 }
 
 static bt_status_t connect(const RawAddress* bd_addr) {
@@ -874,6 +872,7 @@ static void btif_hf_client_upstreams_evt(uint16_t event, char* p_param) {
         cb->state = BTHF_CLIENT_CONNECTION_STATE_CONNECTED;
         cb->peer_feat = 0;
         cb->chld_feat = 0;
+        cb->handle = p_data->open.handle;
       } else if (cb->state == BTHF_CLIENT_CONNECTION_STATE_CONNECTING) {
         cb->state = BTHF_CLIENT_CONNECTION_STATE_DISCONNECTED;
       } else {
@@ -919,6 +918,22 @@ static void btif_hf_client_upstreams_evt(uint16_t event, char* p_param) {
       cb->peer_bda = RawAddress::kAny;
       cb->peer_feat = 0;
       cb->chld_feat = 0;
+      cb->handle = 0;
+
+      /* Clean up any btif_hf_client_cb for the same disconnected bd_addr.
+       * when there is an Incoming hf_client connection is in progress and
+       * at the same time, outgoing hf_client connection is initiated then
+       * due to race condition two btif_hf_client_cb is created. This creates
+       * problem for successive connections
+       */
+      while ((cb = btif_hf_client_get_cb_by_bda(p_data->bd_addr)) != NULL) {
+        cb->state = BTHF_CLIENT_CONNECTION_STATE_DISCONNECTED;
+        cb->peer_bda = RawAddress::kAny;
+        cb->peer_feat = 0;
+        cb->chld_feat = 0;
+        cb->handle = 0;
+      }
+
       btif_queue_advance();
       break;
 

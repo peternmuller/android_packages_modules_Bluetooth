@@ -189,12 +189,14 @@ cc_test {
     test_suites: ["device-tests"],
     srcs: [
         ":TestMockStackBtm",
+        ":TestCommonLogMsg",
         ":TestCommonMockFunctions",
-        "test/bta_hf_client_test.cc",
-        "test/bta_dm_cust_uuid_test.cc",
         "test/bta_dip_test.cc",
-        "test/gatt/database_builder_test.cc",
+        "test/bta_dm_cust_uuid_test.cc",
+        "test/bta_hf_client_add_record_test.cc",
+        "test/bta_hf_client_test.cc",
         "test/gatt/database_builder_sample_device_test.cc",
+        "test/gatt/database_builder_test.cc",
         "test/gatt/database_test.cc",
     ],
     shared_libs: [
@@ -202,7 +204,6 @@ cc_test {
         "android.hardware.bluetooth.audio@2.1",
         "libcrypto",
         "liblog",
-        "libprotobuf-cpp-lite",
     ],
     static_libs: [
         "crypto_toolbox_for_tests",
@@ -236,6 +237,7 @@ cc_test {
 	":TestMockDevice",
 	":TestMockStack",
 	":TestMockBtif",
+        ":TestCommonLogMsg",
         "test/bta_hf_client_security_test.cc",
     ],
     shared_libs: [
@@ -277,6 +279,7 @@ cc_test {
         ":OsiCompatSources",
         ":TestCommonLogMsg",
         ":TestCommonMainHandler",
+        ":TestCommonMockFunctions",
         ":TestMockBtif",
         ":TestMockDevice",
         ":TestMockMainShim",
@@ -320,15 +323,16 @@ cc_test {
         "test/bta_dm_test.cc",
         "test/bta_gatt_test.cc",
         "test/bta_pan_test.cc",
+        "test/bta_sdp_test.cc",
     ],
     shared_libs: [
         "libbase",
         "libcrypto",
         "liblog",
-        "libprotobuf-cpp-lite",
     ],
     static_libs: [
         "libbluetooth-types",
+        "libbtdevice",
         "libbt-common",
         "libbt-protos-lite",
         "libbtcore",
@@ -340,39 +344,6 @@ cc_test {
         cfi: true,
         misc_undefined: ["bounds"],
     },
-}
-
-// bta hf client add record tests for target
-cc_test {
-    name: "net_test_hf_client_add_record",
-    defaults: [
-        "fluoride_defaults",
-        "mts_defaults",
-    ],
-    test_suites: ["device-tests"],
-    include_dirs: [
-        "packages/modules/Bluetooth/system",
-        "packages/modules/Bluetooth/system/gd",
-        "packages/modules/Bluetooth/system/bta/include",
-        "packages/modules/Bluetooth/system/bta/sys",
-        "packages/modules/Bluetooth/system/btif/include",
-        "packages/modules/Bluetooth/system/internal_include",
-        "packages/modules/Bluetooth/system/stack/include",
-        "packages/modules/Bluetooth/system/utils/include",
-    ],
-    srcs: [
-        "test/bta_hf_client_add_record_test.cc",
-    ],
-    header_libs: ["libbluetooth_headers"],
-    shared_libs: [
-        "libcutils",
-        "liblog",
-    ],
-    static_libs: [
-        "libbluetooth-types",
-        "libosi",
-    ],
-    cflags: ["-DBUILDCFG"],
 }
 
 // csis unit tests for host
@@ -394,6 +365,7 @@ cc_test {
         "packages/modules/Bluetooth/system/osi/include",
     ],
     srcs : [
+        ":TestCommonMockFunctions",
         ":TestMockBtif",
         ":TestMockMainShimLeScanning",
         "csis/csis_client.cc",
@@ -407,7 +379,6 @@ cc_test {
         "test/common/btm_api_mock.cc",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [
@@ -444,12 +415,12 @@ cc_test {
         "packages/modules/Bluetooth/system/bta/include",
     ],
     srcs : [
+        ":TestCommonMockFunctions",
         ":TestMockBtif",
         "groups/groups_test.cc",
         "groups/groups.cc",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [
@@ -489,6 +460,7 @@ cc_test {
         "packages/modules/Bluetooth/system/stack/include",
     ],
     srcs : [
+        ":TestCommonMockFunctions",
         ":TestMockOsi",
         "gatt/database.cc",
         "gatt/database_builder.cc",
@@ -502,7 +474,6 @@ cc_test {
         "vc/vc_test.cc",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [
@@ -622,8 +593,9 @@ cc_test {
         "packages/modules/Bluetooth/system/stack/include",
     ],
     srcs : [
-        ":TestStubOsi",
+        ":TestCommonMockFunctions",
         ":TestMockBtaLeAudioHalVerifier",
+        ":TestStubOsi",
         "test/common/bta_gatt_api_mock.cc",
         "test/common/bta_gatt_queue_mock.cc",
         "test/common/btm_api_mock.cc",
@@ -633,6 +605,7 @@ cc_test {
         "le_audio/client_parser.cc",
         "le_audio/client_parser_test.cc",
         "le_audio/content_control_id_keeper.cc",
+        "le_audio/content_control_id_keeper_test.cc",
         "le_audio/devices.cc",
         "le_audio/devices_test.cc",
         "le_audio/le_audio_set_configuration_provider_json.cc",
@@ -659,7 +632,6 @@ cc_test {
         "LeAudioSetConfigSchemas_h",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
         "liblog",  // __android_log_print
         "android.hardware.bluetooth.audio@2.0",
@@ -696,8 +668,9 @@ cc_test {
         "packages/modules/Bluetooth/system/stack/include",
     ],
     srcs : [
-        ":TestStubOsi",
+        ":TestCommonMockFunctions",
         ":TestMockBtaLeAudioHalVerifier",
+        ":TestStubOsi",
         "gatt/database.cc",
         "gatt/database_builder.cc",
         "le_audio/client.cc",
@@ -726,7 +699,6 @@ cc_test {
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
         "libhidlbase",
-        "libprotobuf-cpp-lite",
         "libcrypto",
         "liblog",
         "libfmq",
@@ -755,7 +727,7 @@ cc_test {
         android: {
             shared_libs: [
                 "libbinder_ndk",
-                "android.hardware.bluetooth.audio-V2-ndk",
+                "android.hardware.bluetooth.audio-V3-ndk",
             ],
         },
     },
@@ -798,10 +770,10 @@ cc_test {
         "le_audio/le_audio_types.cc",
         "le_audio/mock_iso_manager.cc",
         "le_audio/mock_codec_manager.cc",
+        ":TestCommonMockFunctions",
         ":TestCommonStackConfig",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [
@@ -854,10 +826,10 @@ cc_test {
         "le_audio/mock_iso_manager.cc",
         "test/common/mock_controller.cc",
         "le_audio/mock_codec_manager.cc",
+        ":TestCommonMockFunctions",
         ":TestCommonStackConfig",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
         "libfmq",
         "libbinder_ndk",
@@ -877,7 +849,7 @@ cc_test {
         android: {
             shared_libs: [
                 "libbinder_ndk",
-                "android.hardware.bluetooth.audio-V2-ndk",
+                "android.hardware.bluetooth.audio-V3-ndk",
             ],
         },
     },
@@ -925,9 +897,10 @@ cc_test {
         "test/common/btm_api_mock.cc",
         "test/common/mock_controller.cc",
         "test/common/mock_csis_client.cc",
+        ":TestCommonMockFunctions",
+        ":TestStubOsi",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [
@@ -967,6 +940,7 @@ cc_test {
     ],
     srcs : [
         ":TestMockMainShim",
+        ":TestCommonLogMsg",
         ":TestCommonMainHandler",
         ":TestCommonMockFunctions",
         ":TestMockBtaGatt",
@@ -990,7 +964,6 @@ cc_test {
         "test/bta_hh_test.cc",
     ],
     shared_libs: [
-        "libprotobuf-cpp-lite",
         "libcrypto",
     ],
     static_libs : [

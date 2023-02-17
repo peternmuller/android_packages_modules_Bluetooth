@@ -31,6 +31,8 @@ cc_defaults {
         "-Werror",
         // there are too many unused parameters in all the code.
         "-Wno-unused-parameter",
+        // http://b/264549607
+        "-Wno-deprecated-builtins",
     ],
     include_dirs: [
         "packages/modules/Bluetooth/system/gd",
@@ -163,7 +165,6 @@ fluoride_defaults {
     shared_libs: [
         "libcrypto",
         "liblog",
-        "libprotobuf-cpp-lite",
     ],
     static_libs: [
         "libbt-common",
@@ -229,7 +230,7 @@ fluoride_defaults {
             shared_libs: [
                 "android.hardware.bluetooth.audio@2.0",
                 "android.hardware.bluetooth.audio@2.1",
-                "android.hardware.bluetooth.audio-V2-ndk",
+                "android.hardware.bluetooth.audio-V3-ndk",
                 "android.hardware.bluetooth@1.0",
                 "android.hardware.bluetooth@1.1",
                 "android.system.suspend-V1-ndk",

@@ -46,9 +46,9 @@ class ScriptedBeacon : public Beacon {
     return "scripted_beacon " + config_file_;
   }
 
-  void TimerTick() override;
-
-  void IncomingPacket(model::packets::LinkLayerPacketView packet_view) override;
+  void Tick() override;
+  void ReceiveLinkLayerPacket(model::packets::LinkLayerPacketView packet_view,
+                              Phy::Type type, int8_t rssi) override;
 
  private:
   static bool registered_;

@@ -150,6 +150,14 @@ public final class BluetoothGatt implements BluetoothProfile {
     public static final int CONNECTION_PRIORITY_LOW_POWER = 2;
 
     /**
+     * Connection parameter update - Request the priority preferred for Digital Car Key for a
+     * lower latency connection. This connection parameter will consume more power than
+     * {@link BluetoothGatt#CONNECTION_PRIORITY_BALANCED}, so it is recommended that apps do not use
+     * this unless it specifically fits their use case.
+     */
+    public static final int CONNECTION_PRIORITY_DCK = 3;
+
+    /**
      * Connection subrate request - Balanced.
      *
      * @hide
@@ -850,11 +858,12 @@ public final class BluetoothGatt implements BluetoothProfile {
     /**
      * Close this Bluetooth GATT client.
      *
-     * Application should call this method as early as possible after it is done with
-     * this GATT client.
+     * <p>Application should call this method as early as possible after it is done with this GATT
+     * client.
      */
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+    @Override
     public void close() {
         if (DBG) Log.d(TAG, "close()");
 

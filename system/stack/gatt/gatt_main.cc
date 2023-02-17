@@ -32,9 +32,11 @@
 #include "gd/common/init_flags.h"
 #include "internal_include/stack_config.h"
 #include "l2c_api.h"
+#include "main/shim/acl_api.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
 #include "osi/include/properties.h"
+#include "stack/arbiter/acl_arbiter.h"
 #include "stack/btm/btm_ble_int.h"
 #include "stack/btm/btm_dev.h"
 #include "stack/btm/btm_sec.h"
@@ -123,10 +125,10 @@ void gatt_init(void) {
 
   L2CA_RegisterFixedChannel(L2CAP_ATT_CID, &fixed_reg);
 
-  bool gatt_over_br_is_disabled =
-      osi_property_get_bool("bluetooth.gatt_over_bredr.disabled", false);
+  gatt_cb.over_br_enabled =
+      osi_property_get_bool("bluetooth.gatt.over_bredr.enabled", true);
   /* Now, register with L2CAP for ATT PSM over BR/EDR */
-  if (!gatt_over_br_is_disabled &&
+  if (gatt_cb.over_br_enabled &&
       !L2CA_Register2(BT_PSM_ATT, dyn_info, false /* enable_snoop */, nullptr,
                       GATT_MAX_MTU_SIZE, 0, BTM_SEC_NONE)) {
     LOG(ERROR) << "ATT Dynamic Registration failed";
@@ -268,7 +270,7 @@ bool gatt_disconnect(tGATT_TCB* p_tcb) {
   tGATT_CH_STATE ch_state = gatt_get_ch_state(p_tcb);
   if (ch_state == GATT_CH_CLOSING) {
     LOG_DEBUG("Device already in closing state peer:%s",
-              PRIVATE_ADDRESS(p_tcb->peer_bda));
+              ADDRESS_TO_LOGGABLE_CSTR(p_tcb->peer_bda));
     VLOG(1) << __func__ << " already in closing state";
     return true;
   }
@@ -286,7 +288,7 @@ bool gatt_disconnect(tGATT_TCB* p_tcb) {
             "acceptlist "
             "gatt_if:%hhu peer:%s",
             static_cast<uint8_t>(CONN_MGR_ID_L2CAP),
-            PRIVATE_ADDRESS(p_tcb->peer_bda));
+            ADDRESS_TO_LOGGABLE_CSTR(p_tcb->peer_bda));
       }
       gatt_cleanup_upon_disc(p_tcb->peer_bda, GATT_CONN_TERMINATE_LOCAL_HOST,
                              p_tcb->transport);
@@ -471,7 +473,8 @@ static void gatt_le_connect_cback(uint16_t chan, const RawAddress& bd_addr,
     return;
   }
 
-  VLOG(1) << "GATT   ATT protocol channel with BDA: " << bd_addr << " is "
+  VLOG(1) << "GATT   ATT protocol channel with BDA: "
+          << ADDRESS_TO_LOGGABLE_STR(bd_addr) << " is "
           << ((connected) ? "connected" : "disconnected");
 
   p_srv_chg_clt = gatt_is_bda_in_the_srv_chg_clt_list(bd_addr);
@@ -483,6 +486,9 @@ static void gatt_le_connect_cback(uint16_t chan, const RawAddress& bd_addr,
   }
 
   if (!connected) {
+    if (p_tcb != nullptr) {
+      bluetooth::shim::arbiter::GetArbiter().OnLeDisconnect(p_tcb->tcb_idx);
+    }
     gatt_cleanup_upon_disc(bd_addr, static_cast<tGATT_DISCONN_REASON>(reason),
                            transport);
     return;
@@ -519,6 +525,14 @@ static void gatt_le_connect_cback(uint16_t chan, const RawAddress& bd_addr,
     if (check_srv_chg) {
       gatt_chk_srv_chg(p_srv_chg_clt);
     }
+  }
+
+  auto advertising_set =
+      bluetooth::shim::ACL_GetAdvertisingSetConnectedTo(bd_addr);
+
+  if (advertising_set.has_value()) {
+    bluetooth::shim::arbiter::GetArbiter().OnLeConnect(p_tcb->tcb_idx,
+                                                       advertising_set.value());
   }
 
   if (stack_config_get_interface()->get_pts_connect_eatt_before_encryption()) {
@@ -644,7 +658,12 @@ static void gatt_le_data_ind(uint16_t chan, const RawAddress& bd_addr,
   /* Find CCB based on bd addr */
   tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bd_addr, BT_TRANSPORT_LE);
   if (p_tcb) {
-    if (gatt_get_ch_state(p_tcb) < GATT_CH_OPEN) {
+    auto decision = bluetooth::shim::arbiter::GetArbiter().InterceptAttPacket(
+        p_tcb->tcb_idx, p_buf);
+
+    if (decision == bluetooth::shim::arbiter::InterceptAction::DROP) {
+      // do nothing, just free it at the end
+    } else if (gatt_get_ch_state(p_tcb) < GATT_CH_OPEN) {
       LOG(WARNING) << "ATT - Ignored L2CAP data while in state: "
                    << +gatt_get_ch_state(p_tcb);
     } else
@@ -933,20 +952,28 @@ void gatt_add_a_bonded_dev_for_srv_chg(const RawAddress& bda) {
 /** This function is called to send a service chnaged indication to the
  * specified bd address */
 void gatt_send_srv_chg_ind(const RawAddress& peer_bda) {
+  static const uint16_t sGATT_DEFAULT_START_HANDLE =
+      (uint16_t)osi_property_get_int32(
+          "bluetooth.gatt.default_start_handle_for_srvc_change.value",
+          GATT_GATT_START_HANDLE);
+  static const uint16_t sGATT_LAST_HANDLE = (uint16_t)osi_property_get_int32(
+      "bluetooth.gatt.last_handle_for_srvc_change.value", 0xFFFF);
+
   VLOG(1) << __func__;
 
   if (!gatt_cb.handle_of_h_r) return;
 
   uint16_t conn_id = gatt_profile_find_conn_id_by_bd_addr(peer_bda);
   if (conn_id == GATT_INVALID_CONN_ID) {
-    LOG(ERROR) << "Unable to find conn_id for " << peer_bda;
+    LOG(ERROR) << "Unable to find conn_id for "
+               << ADDRESS_TO_LOGGABLE_STR(peer_bda);
     return;
   }
 
   uint8_t handle_range[GATT_SIZE_OF_SRV_CHG_HNDL_RANGE];
   uint8_t* p = handle_range;
-  UINT16_TO_STREAM(p, GATT_DEFAULT_START_HANDLE);
-  UINT16_TO_STREAM(p, GATT_LAST_HANDLE);
+  UINT16_TO_STREAM(p, sGATT_DEFAULT_START_HANDLE);
+  UINT16_TO_STREAM(p, sGATT_LAST_HANDLE);
   GATTS_HandleValueIndication(conn_id, gatt_cb.handle_of_h_r,
                               GATT_SIZE_OF_SRV_CHG_HNDL_RANGE, handle_range);
 }

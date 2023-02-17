@@ -27,15 +27,13 @@
 #include <map>
 #include <string>
 
-extern std::map<std::string, int> mock_function_count_map;
-
 // Original included files, if any
 // NOTE: Since this is a mock file with mock definitions some number of
 //       include files may not be required.  The include-what-you-use
 //       still applies, but crafting proper inclusion is out of scope
 //       for this effort.  This compilation unit may compile as-is, or
 //       may need attention to prune from (or add to ) the inclusion set.
-#include <base/bind.h>
+#include <base/functional/bind.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -48,6 +46,7 @@ extern std::map<std::string, int> mock_function_count_map;
 #include "osi/include/allocator.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_octets.h"
+#include "test/common/mock_functions.h"
 #include "types/raw_address.h"
 
 // Mocked compile conditionals, if any
@@ -142,21 +141,6 @@ struct btsnd_hcic_big_term_sync {
 };
 extern struct btsnd_hcic_big_term_sync btsnd_hcic_big_term_sync;
 
-// Name: btsnd_hcic_ble_add_acceptlist
-// Params: uint8_t addr_type, const RawAddress& bda,
-// base::OnceCallback<void(uint8_t*, uint16_t Return: void
-struct btsnd_hcic_ble_add_acceptlist {
-  std::function<void(uint8_t, const RawAddress&,
-                     base::OnceCallback<void(uint8_t*, uint16_t)>)>
-      body{[](uint8_t addr_type, const RawAddress& bda,
-              base::OnceCallback<void(uint8_t*, uint16_t)> cb) {}};
-  void operator()(uint8_t addr_type, const RawAddress& bda,
-                  base::OnceCallback<void(uint8_t*, uint16_t)> cb) {
-    body(addr_type, bda, std::move(cb));
-  };
-};
-extern struct btsnd_hcic_ble_add_acceptlist btsnd_hcic_ble_add_acceptlist;
-
 // Name: btsnd_hcic_ble_add_device_resolving_list
 // Params: uint8_t addr_type_peer, const RawAddress& bda_peer, const Octet16&
 // irk_peer, const Octet16& irk_local Return: void
@@ -172,18 +156,6 @@ struct btsnd_hcic_ble_add_device_resolving_list {
 };
 extern struct btsnd_hcic_ble_add_device_resolving_list
     btsnd_hcic_ble_add_device_resolving_list;
-
-// Name: btsnd_hcic_ble_clear_acceptlist
-// Params: base::OnceCallback<void(uint8_t*, uint16_t
-// Return: void
-struct btsnd_hcic_ble_clear_acceptlist {
-  std::function<void(base::OnceCallback<void(uint8_t*, uint16_t)>)> body{
-      [](base::OnceCallback<void(uint8_t*, uint16_t)> cb) {}};
-  void operator()(base::OnceCallback<void(uint8_t*, uint16_t)> cb) {
-    body(std::move(cb));
-  };
-};
-extern struct btsnd_hcic_ble_clear_acceptlist btsnd_hcic_ble_clear_acceptlist;
 
 // Name: btsnd_hcic_ble_clear_resolving_list
 // Params: void
@@ -492,32 +464,6 @@ struct btsnd_hcic_ble_read_resolvable_addr_peer {
 };
 extern struct btsnd_hcic_ble_read_resolvable_addr_peer
     btsnd_hcic_ble_read_resolvable_addr_peer;
-
-// Name: btsnd_hcic_ble_receiver_test
-// Params: uint8_t rx_freq
-// Return: void
-struct btsnd_hcic_ble_receiver_test {
-  std::function<void(uint8_t rx_freq)> body{[](uint8_t rx_freq) {}};
-  void operator()(uint8_t rx_freq) { body(rx_freq); };
-};
-extern struct btsnd_hcic_ble_receiver_test btsnd_hcic_ble_receiver_test;
-
-// Name: btsnd_hcic_ble_remove_from_acceptlist
-// Params: tBLE_ADDR_TYPE addr_type, const RawAddress& bda,
-// base::OnceCallback<void(uint8_t*, uint16_t Return: void
-struct btsnd_hcic_ble_remove_from_acceptlist {
-  std::function<void(tBLE_ADDR_TYPE, const RawAddress&,
-                     base::OnceCallback<void(uint8_t*, uint16_t)>)>
-      body{[](tBLE_ADDR_TYPE addr_type, const RawAddress& bda,
-              base::OnceCallback<void(uint8_t*, uint16_t)> cb) {}};
-  void operator()(tBLE_ADDR_TYPE addr_type, const RawAddress& bda,
-                  base::OnceCallback<void(uint8_t*, uint16_t)> cb) {
-    body(addr_type, bda, std::move(cb));
-  };
-};
-extern struct btsnd_hcic_ble_remove_from_acceptlist
-    btsnd_hcic_ble_remove_from_acceptlist;
-
 // Name: btsnd_hcic_ble_rm_device_resolving_list
 // Params: uint8_t addr_type_peer, const RawAddress& bda_peer
 // Return: void
@@ -774,27 +720,6 @@ struct btsnd_hcic_ble_start_enc {
   };
 };
 extern struct btsnd_hcic_ble_start_enc btsnd_hcic_ble_start_enc;
-
-// Name: btsnd_hcic_ble_test_end
-// Params: void
-// Return: void
-struct btsnd_hcic_ble_test_end {
-  std::function<void(void)> body{[](void) {}};
-  void operator()(void) { body(); };
-};
-extern struct btsnd_hcic_ble_test_end btsnd_hcic_ble_test_end;
-
-// Name: btsnd_hcic_ble_transmitter_test
-// Params: uint8_t tx_freq, uint8_t test_data_len, uint8_t payload
-// Return: void
-struct btsnd_hcic_ble_transmitter_test {
-  std::function<void(uint8_t tx_freq, uint8_t test_data_len, uint8_t payload)>
-      body{[](uint8_t tx_freq, uint8_t test_data_len, uint8_t payload) {}};
-  void operator()(uint8_t tx_freq, uint8_t test_data_len, uint8_t payload) {
-    body(tx_freq, test_data_len, payload);
-  };
-};
-extern struct btsnd_hcic_ble_transmitter_test btsnd_hcic_ble_transmitter_test;
 
 // Name: btsnd_hcic_ble_upd_ll_conn_params
 // Params: uint16_t handle, uint16_t conn_int_min, uint16_t conn_int_max,

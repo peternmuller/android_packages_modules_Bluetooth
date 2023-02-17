@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2016 The Linux Foundation
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +24,7 @@
 #include <sys/types.h>
 
 #include "avrcp/avrcp.h"
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "bluetooth/uuid.h"
 #include "bt_transport.h"
 #include "raw_address.h"
@@ -182,6 +183,8 @@ typedef enum {
   BT_CONN_DIRECTION_OUTGOING,
   BT_CONN_DIRECTION_INCOMING
 } bt_conn_direction_t;
+
+constexpr uint16_t INVALID_ACL_HANDLE = 0xFFFF;
 
 /** Bluetooth SDP service record */
 typedef struct {
@@ -368,6 +371,21 @@ typedef enum {
    * Data Type - bt_vendor_product_info_t.
    */
   BT_PROPERTY_VENDOR_PRODUCT_INFO,
+  BT_PROPERTY_WL_MEDIA_PLAYERS_LIST,
+
+  /**
+   * Description - ASHA capability.
+   * Access mode - GET.
+   * Data Type - int16_t.
+   */
+  BT_PROPERTY_REMOTE_ASHA_CAPABILITY,
+
+  /**
+   * Description - ASHA truncated HiSyncID.
+   * Access mode - GET.
+   * Data Type - uint32_t.
+   */
+  BT_PROPERTY_REMOTE_ASHA_TRUNCATED_HISYNCID,
 
   BT_PROPERTY_REMOTE_DEVICE_TIMESTAMP = 0xFF,
 } bt_property_type_t;
@@ -495,12 +513,10 @@ typedef void (*le_address_associate_callback)(RawAddress* main_bd_addr,
                                               RawAddress* secondary_bd_addr);
 
 /** Bluetooth ACL connection state changed callback */
-typedef void (*acl_state_changed_callback)(bt_status_t status,
-                                           RawAddress* remote_bd_addr,
-                                           bt_acl_state_t state,
-                                           int transport_link_type,
-                                           bt_hci_error_code_t hci_reason,
-                                           bt_conn_direction_t direction);
+typedef void (*acl_state_changed_callback)(
+    bt_status_t status, RawAddress* remote_bd_addr, bt_acl_state_t state,
+    int transport_link_type, bt_hci_error_code_t hci_reason,
+    bt_conn_direction_t direction, uint16_t acl_handle);
 
 /** Bluetooth link quality report callback */
 typedef void (*link_quality_report_callback)(
@@ -522,18 +538,6 @@ typedef enum { ASSOCIATE_JVM, DISASSOCIATE_JVM } bt_cb_thread_evt;
 /* Callback that is invoked by the callback thread to allow upper layer to
  * attach/detach to/from the JVM */
 typedef void (*callback_thread_event)(bt_cb_thread_evt evt);
-
-/** Bluetooth Test Mode Callback */
-/* Receive any HCI event from controller. Must be in DUT Mode for this callback
- * to be received */
-typedef void (*dut_mode_recv_callback)(uint16_t opcode, uint8_t* buf,
-                                       uint8_t len);
-
-/* LE Test mode callbacks
- * This callback shall be invoked whenever the le_tx_test, le_rx_test or
- * le_test_end is invoked The num_packets is valid only for le_test_end command
- */
-typedef void (*le_test_mode_callback)(bt_status_t status, uint16_t num_packets);
 
 /** Callback invoked when energy details are obtained */
 /* Ctrl_state-Current controller state-Active-1,scan-2,or idle-3 state as
@@ -569,8 +573,6 @@ typedef struct {
   le_address_associate_callback le_address_associate_cb;
   acl_state_changed_callback acl_state_changed_cb;
   callback_thread_event thread_evt_cb;
-  dut_mode_recv_callback dut_mode_recv_cb;
-  le_test_mode_callback le_test_mode_cb;
   energy_info_callback energy_info_cb;
   link_quality_report_callback link_quality_report_cb;
   generate_local_oob_data_callback generate_local_oob_data_cb;
@@ -686,6 +688,9 @@ typedef struct {
   /** Create Bluetooth Bonding */
   int (*create_bond)(const RawAddress* bd_addr, int transport);
 
+  /** Create Bluetooth Bonding over le transport */
+  int (*create_bond_le)(const RawAddress* bd_addr, uint8_t addr_type);
+
   /** Create Bluetooth Bond using out of band data */
   int (*create_bond_out_of_band)(const RawAddress* bd_addr, int transport,
                                  const bt_oob_data_t* p192_data,
@@ -719,18 +724,6 @@ typedef struct {
 
   /** Get Bluetooth profile interface */
   const void* (*get_profile_interface)(const char* profile_id);
-
-  /** Bluetooth Test Mode APIs - Bluetooth must be enabled for these APIs */
-  /* Configure DUT Mode - Use this mode to enter/exit DUT mode */
-  int (*dut_mode_configure)(uint8_t enable);
-
-  /* Send any test HCI (vendor-specific) command to the controller. Must be in
-   * DUT Mode */
-  int (*dut_mode_send)(uint16_t opcode, uint8_t* buf, uint8_t len);
-  /** BLE Test Mode APIs */
-  /* opcode MUST be one of: LE_Receiver_Test, LE_Transmitter_Test, LE_Test_End
-   */
-  int (*le_test_mode)(uint16_t opcode, uint8_t* buf, uint8_t len);
 
   /** Sets the OS call-out functions that bluedroid needs for alarms and wake
    * locks. This should be called immediately after a successful |init|.
@@ -895,6 +888,26 @@ typedef struct {
    */
   void (*metadata_changed)(const RawAddress& remote_bd_addr, int key,
                            std::vector<uint8_t> value);
+
+  /** interop match address */
+  bool (*interop_match_addr)(const char* feature_name, const RawAddress* addr);
+
+  /** interop match name */
+  bool (*interop_match_name)(const char* feature_name, const char* name);
+
+  /** interop match address or name */
+  bool (*interop_match_addr_or_name)(const char* feature_name,
+                                     const RawAddress* addr);
+
+  /** add or remove address entry to interop database */
+  void (*interop_database_add_remove_addr)(bool do_add,
+                                           const char* feature_name,
+                                           const RawAddress* addr, int length);
+
+  /** add or remove name entry to interop database */
+  void (*interop_database_add_remove_name)(bool do_add,
+                                           const char* feature_name,
+                                           const char* name);
 
 } bt_interface_t;
 

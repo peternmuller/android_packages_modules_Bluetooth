@@ -71,6 +71,7 @@ class LinkLayerController {
 
   LinkLayerController(const Address& address,
                       const ControllerProperties& properties);
+  ~LinkLayerController();
 
   ErrorCode SendCommandToRemoteByAddress(
       OpCode opcode, bluetooth::packet::PacketView<true> args,
@@ -141,24 +142,22 @@ class LinkLayerController {
  private:
   void SendDisconnectionCompleteEvent(uint16_t handle, ErrorCode reason);
 
-  void IncomingPacketWithRssi(model::packets::LinkLayerPacketView incoming,
-                              uint8_t rssi);
-
  public:
   const Address& GetAddress() const;
 
-  void IncomingPacket(model::packets::LinkLayerPacketView incoming);
+  void IncomingPacket(model::packets::LinkLayerPacketView incoming,
+                      int8_t rssi);
 
-  void TimerTick();
+  void Tick();
 
   void Close();
 
   AsyncTaskId ScheduleTask(std::chrono::milliseconds delay_ms,
-                           const TaskCallback& task_callback);
+                           TaskCallback task_callback);
 
   AsyncTaskId SchedulePeriodicTask(std::chrono::milliseconds delay_ms,
                                    std::chrono::milliseconds period_ms,
-                                   const TaskCallback& task_callback);
+                                   TaskCallback task_callback);
 
   void CancelScheduledTask(AsyncTaskId task_id);
 
@@ -180,18 +179,18 @@ class LinkLayerController {
           send_iso);
 
   void RegisterRemoteChannel(
-      const std::function<void(
-          std::shared_ptr<model::packets::LinkLayerPacketBuilder>, Phy::Type)>&
-          send_to_remote);
+      const std::function<
+          void(std::shared_ptr<model::packets::LinkLayerPacketBuilder>,
+               Phy::Type, int8_t)>& send_to_remote);
 
   // Set the callbacks for scheduling tasks.
   void RegisterTaskScheduler(
-      std::function<AsyncTaskId(std::chrono::milliseconds, const TaskCallback&)>
+      std::function<AsyncTaskId(std::chrono::milliseconds, TaskCallback)>
           task_scheduler);
 
   void RegisterPeriodicTaskScheduler(
       std::function<AsyncTaskId(std::chrono::milliseconds,
-                                std::chrono::milliseconds, const TaskCallback&)>
+                                std::chrono::milliseconds, TaskCallback)>
           periodic_task_scheduler);
 
   void RegisterTaskCancel(std::function<void(AsyncTaskId)> cancel);
@@ -542,12 +541,11 @@ class LinkLayerController {
 
  protected:
   void SendLinkLayerPacket(
-      std::unique_ptr<model::packets::LinkLayerPacketBuilder> packet);
+      std::unique_ptr<model::packets::LinkLayerPacketBuilder> packet,
+      int8_t tx_power = 0);
   void SendLeLinkLayerPacket(
-      std::unique_ptr<model::packets::LinkLayerPacketBuilder> packet);
-  void SendLeLinkLayerPacketWithRssi(
-      Address source_address, Address destination_address, uint8_t rssi,
-      std::unique_ptr<model::packets::LinkLayerPacketBuilder> packet);
+      std::unique_ptr<model::packets::LinkLayerPacketBuilder> packet,
+      int8_t tx_power = 0);
 
   void IncomingAclPacket(model::packets::LinkLayerPacketView incoming);
   void IncomingScoPacket(model::packets::LinkLayerPacketView incoming);
@@ -887,10 +885,10 @@ class LinkLayerController {
   AclConnectionHandler connections_;
 
   // Callbacks to schedule tasks.
-  std::function<AsyncTaskId(std::chrono::milliseconds, const TaskCallback&)>
+  std::function<AsyncTaskId(std::chrono::milliseconds, TaskCallback)>
       schedule_task_;
   std::function<AsyncTaskId(std::chrono::milliseconds,
-                            std::chrono::milliseconds, const TaskCallback&)>
+                            std::chrono::milliseconds, TaskCallback)>
       schedule_periodic_task_;
   std::function<void(AsyncTaskId)> cancel_task_;
 
@@ -903,7 +901,7 @@ class LinkLayerController {
 
   // Callback to send packets to remote devices.
   std::function<void(std::shared_ptr<model::packets::LinkLayerPacketBuilder>,
-                     Phy::Type phy_type)>
+                     Phy::Type phy_type, int8_t tx_power)>
       send_to_remote_;
 
   uint32_t oob_id_{1};

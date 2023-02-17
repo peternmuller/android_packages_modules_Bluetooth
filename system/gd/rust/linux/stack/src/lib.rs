@@ -11,6 +11,7 @@ pub mod bluetooth;
 pub mod bluetooth_admin;
 pub mod bluetooth_adv;
 pub mod bluetooth_gatt;
+pub mod bluetooth_logging;
 pub mod bluetooth_media;
 pub mod callbacks;
 pub mod socket_manager;
@@ -88,6 +89,7 @@ pub enum Message {
     SuspendCallbackDisconnected(u32),
     SuspendReady(i32),
     ResumeReady(i32),
+    AudioReconnectOnResumeComplete,
 
     // Scanner related
     ScannerCallbackDisconnected(u32),
@@ -265,6 +267,10 @@ impl Stack {
 
                 Message::ResumeReady(suspend_id) => {
                     suspend.lock().unwrap().resume_ready(suspend_id);
+                }
+
+                Message::AudioReconnectOnResumeComplete => {
+                    suspend.lock().unwrap().audio_reconnect_complete();
                 }
 
                 Message::ScannerCallbackDisconnected(id) => {

@@ -100,11 +100,13 @@ void HciSniffer::RegisterCallbacks(PacketCallback command_callback,
       close_callback);
 }
 
-void HciSniffer::TimerTick() { transport_->TimerTick(); }
+void HciSniffer::Tick() { transport_->Tick(); }
 
 void HciSniffer::Close() {
   transport_->Close();
-  output_->flush();
+  if (output_ != nullptr) {
+    output_->flush();
+  }
 }
 
 void HciSniffer::SendEvent(const std::vector<uint8_t>& packet) {

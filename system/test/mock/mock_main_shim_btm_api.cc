@@ -23,15 +23,14 @@
 #include <map>
 #include <string>
 
-extern std::map<std::string, int> mock_function_count_map;
-
-#include <base/bind.h>
-#include <base/callback.h>
+#include <base/functional/bind.h>
+#include <base/functional/callback.h>
 
 #include "main/shim/btm_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_octets.h"
 #include "stack/include/btm_ble_api_types.h"
+#include "test/common/mock_functions.h"
 #include "types/bluetooth/uuid.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -272,10 +271,6 @@ void bluetooth::shim::BTM_BleReadPhy(
     base::Callback<void(uint8_t tx_phy, uint8_t rx_phy, uint8_t status)> cb) {
   mock_function_count_map[__func__]++;
 }
-void bluetooth::shim::BTM_BleReceiverTest(uint8_t rx_freq,
-                                          tBTM_CMPL_CB* p_cmd_cmpl_cback) {
-  mock_function_count_map[__func__]++;
-}
 void bluetooth::shim::BTM_BleSecureConnectionOobDataReply(
     const RawAddress& bd_addr, uint8_t* p_c, uint8_t* p_r) {
   mock_function_count_map[__func__]++;
@@ -293,15 +288,6 @@ void bluetooth::shim::BTM_BleSetPrefConnParams(const RawAddress& bd_addr,
                                                uint16_t max_conn_int,
                                                uint16_t peripheral_latency,
                                                uint16_t supervision_tout) {
-  mock_function_count_map[__func__]++;
-}
-void bluetooth::shim::BTM_BleTestEnd(tBTM_CMPL_CB* p_cmd_cmpl_cback) {
-  mock_function_count_map[__func__]++;
-}
-void bluetooth::shim::BTM_BleTransmitterTest(uint8_t tx_freq,
-                                             uint8_t test_data_len,
-                                             uint8_t packet_payload,
-                                             tBTM_CMPL_CB* p_cmd_cmpl_cback) {
   mock_function_count_map[__func__]++;
 }
 void bluetooth::shim::BTM_BleUpdateAdvFilterPolicy(tBTM_BLE_AFP adv_policy) {

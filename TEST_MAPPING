@@ -46,16 +46,19 @@
       "name": "net_test_device"
     },
     {
+      "name": "net_test_device_iot_config"
+    },
+    {
       "name": "net_test_gatt_conn_multiplexing"
     },
     {
       "name": "net_test_hci"
     },
     {
-      "name": "net_test_hf_client_add_record"
+      "name": "net_test_stack"
     },
     {
-      "name": "net_test_stack"
+      "name": "net_test_stack_a2dp_codecs_native"
     },
     {
       "name": "net_test_stack_ad_parser"
@@ -108,9 +111,6 @@
     },
     {
       "name": "bluetooth_vc_test"
-    },
-    {
-      "name": "bluetoothtbd_test"
     },
     {
       "name": "bt_host_test_bta"
@@ -193,10 +193,9 @@
     {
       "name": "net_test_stack_l2cap"
     },
-    // b/255042467
-    //{
-    //  "name": "net_test_stack_rfcomm"
-    //},
+    {
+      "name": "net_test_stack_rfcomm"
+    },
     {
       "name": "net_test_stack_sdp"
     },

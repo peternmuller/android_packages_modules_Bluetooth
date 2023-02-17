@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include <base/bind.h>
+#include <base/functional/bind.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -29,8 +29,7 @@
 #include "csis_types.h"
 #include "gatt/database_builder.h"
 #include "hardware/bt_gatt_types.h"
-
-std::map<std::string, int> mock_function_count_map;
+#include "test/common/mock_functions.h"
 
 namespace bluetooth {
 namespace csis {
@@ -327,7 +326,7 @@ class CsisClientTest : public ::testing::Test {
 
  protected:
   void SetUp(void) override {
-    mock_function_count_map.clear();
+    reset_mock_function_count_map();
     bluetooth::manager::SetMockBtmInterface(&btm_interface);
     dm::SetMockBtaDmInterface(&dm_interface);
     gatt::SetMockBtaGattInterface(&gatt_interface);
@@ -1034,23 +1033,22 @@ TEST_F(CsisMultiClientTest, test_discover_multiple_instances) {
 TEST_F(CsisClientTest, test_storage_calls) {
   SetSampleDatabaseCsis(1, 1);
 
-  ASSERT_EQ(0,
-            mock_function_count_map["btif_storage_load_bonded_csis_devices"]);
+  ASSERT_EQ(0, get_func_call_count("btif_storage_load_bonded_csis_devices"));
   TestAppRegister();
-  ASSERT_EQ(1,
-            mock_function_count_map["btif_storage_load_bonded_csis_devices"]);
+  ASSERT_EQ(1, get_func_call_count("btif_storage_load_bonded_csis_devices"));
 
-  ASSERT_EQ(0, mock_function_count_map["btif_storage_update_csis_info"]);
-  ASSERT_EQ(0, mock_function_count_map["btif_storage_set_csis_autoconnect"]);
+  ASSERT_EQ(0, get_func_call_count("btif_storage_update_csis_info"));
+  ASSERT_EQ(0, get_func_call_count("btif_storage_set_csis_autoconnect"));
   TestConnect(test_address);
   InjectConnectedEvent(test_address, 1);
   GetSearchCompleteEvent(1);
-  ASSERT_EQ(1, mock_function_count_map["btif_storage_set_csis_autoconnect"]);
-  ASSERT_EQ(1, mock_function_count_map["btif_storage_update_csis_info"]);
+  ASSERT_EQ(1, get_func_call_count("btif_storage_set_csis_autoconnect"));
+  ASSERT_EQ(1, get_func_call_count("btif_storage_update_csis_info"));
 
-  ASSERT_EQ(0, mock_function_count_map["btif_storage_remove_csis_device"]);
+  ASSERT_EQ(0, get_func_call_count("btif_storage_remove_csis_device"));
   CsisClient::Get()->RemoveDevice(test_address);
-  ASSERT_EQ(1, mock_function_count_map["btif_storage_remove_csis_device"]);
+  /* It is 0 because btif_csis_client.cc calls that */
+  ASSERT_EQ(0, get_func_call_count("btif_storage_remove_csis_device"));
 
   TestAppUnregister();
 }
@@ -1121,6 +1119,42 @@ TEST_F(CsisClientTest, test_storage_content) {
   ASSERT_EQ(2, CsisClient::Get()->GetGroupId(
                    GetTestAddress(4), bluetooth::Uuid::From16Bit(0x0000)));
 
+  TestAppUnregister();
+}
+
+TEST_F(CsisClientTest, test_database_out_of_sync) {
+  auto test_address = GetTestAddress(0);
+  auto conn_id = 1;
+
+  TestAppRegister();
+  SetSampleDatabaseCsis(conn_id, 1);
+  TestConnect(test_address);
+  InjectConnectedEvent(test_address, conn_id);
+  GetSearchCompleteEvent(conn_id);
+  ASSERT_EQ(1, CsisClient::Get()->GetGroupId(
+                   test_address, bluetooth::Uuid::From16Bit(0x0000)));
+
+  // Simulated database changed on the remote side.
+  ON_CALL(gatt_queue, WriteCharacteristic(_, _, _, _, _, _))
+      .WillByDefault(
+          Invoke([this](uint16_t conn_id, uint16_t handle,
+                        std::vector<uint8_t> value, tGATT_WRITE_TYPE write_type,
+                        GATT_WRITE_OP_CB cb, void* cb_data) {
+            auto* svc = gatt::FindService(services_map[conn_id], handle);
+            if (svc == nullptr) return;
+
+            tGATT_STATUS status = GATT_DATABASE_OUT_OF_SYNC;
+            if (cb)
+              cb(conn_id, status, handle, value.size(), value.data(), cb_data);
+          }));
+
+  ON_CALL(gatt_interface, ServiceSearchRequest(_, _)).WillByDefault(Return());
+  EXPECT_CALL(gatt_interface, ServiceSearchRequest(_, _));
+  CsisClient::Get()->LockGroup(
+      1, true,
+      base::BindOnce([](int group_id, bool locked, CsisGroupLockStatus status) {
+        csis_lock_callback_mock->CsisGroupLockCb(group_id, locked, status);
+      }));
   TestAppUnregister();
 }
 

@@ -39,6 +39,7 @@ import android.util.Log;
 import com.android.bluetooth.BluetoothMethodProxy;
 import com.android.bluetooth.DeviceWorkArounds;
 import com.android.bluetooth.SignedLongLong;
+import com.android.bluetooth.Utils;
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
 import com.android.bluetooth.map.BluetoothMapbMessageMime.MimePart;
 import com.android.bluetooth.mapapi.BluetoothMapContract;
@@ -221,7 +222,8 @@ public class BluetoothMapContent {
     };
 
     /* CONVO LISTING projections and column indexes */
-    private static final String[] MMS_SMS_THREAD_PROJECTION = {
+    @VisibleForTesting
+    static final String[] MMS_SMS_THREAD_PROJECTION = {
             Threads._ID,
             Threads.DATE,
             Threads.SNIPPET,
@@ -1266,9 +1268,15 @@ public class BluetoothMapContent {
         }
 
         // Fix Subject Display issue with HONDA Carkit - Ignore subject Mask.
-        if (DeviceWorkArounds.addressStartsWith(BluetoothMapService.getRemoteDevice().getAddress(),
-                    DeviceWorkArounds.HONDA_CARKIT)
-                || (ap.getParameterMask() & MASK_SUBJECT) != 0) {
+        boolean isHondaCarkit;
+        if (Utils.isInstrumentationTestMode()) {
+            isHondaCarkit = false;
+        } else {
+            isHondaCarkit = DeviceWorkArounds.addressStartsWith(
+                    BluetoothMapService.getRemoteDevice().getAddress(),
+                    DeviceWorkArounds.HONDA_CARKIT);
+        }
+        if (isHondaCarkit || (ap.getParameterMask() & MASK_SUBJECT) != 0) {
             if (fi.mMsgType == FilterInfo.TYPE_SMS) {
                 subject = c.getString(fi.mSmsColSubject);
             } else if (fi.mMsgType == FilterInfo.TYPE_MMS) {
@@ -2176,7 +2184,8 @@ public class BluetoothMapContent {
                     if (D) {
                         Log.d(TAG, "msgType: " + fi.mMsgType + " where: " + where);
                     }
-                    smsCursor = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null,
+                    smsCursor = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                            Sms.CONTENT_URI, SMS_PROJECTION, where, null,
                             Sms.DATE + " DESC" + limit);
                     if (smsCursor != null) {
                         BluetoothMapMessageListingElement e = null;
@@ -2218,7 +2227,8 @@ public class BluetoothMapContent {
                     if (D) {
                         Log.d(TAG, "msgType: " + fi.mMsgType + " where: " + where);
                     }
-                    mmsCursor = mResolver.query(Mms.CONTENT_URI, MMS_PROJECTION, where, null,
+                    mmsCursor = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                            Mms.CONTENT_URI, MMS_PROJECTION, where, null,
                             Mms.DATE + " DESC" + limit);
                     if (mmsCursor != null) {
                         BluetoothMapMessageListingElement e = null;
@@ -2261,10 +2271,9 @@ public class BluetoothMapContent {
                         Log.d(TAG, "msgType: " + fi.mMsgType + " where: " + where);
                     }
                     Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                    emailCursor =
-                            mResolver.query(contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION,
-                                    where, null,
-                                    BluetoothMapContract.MessageColumns.DATE + " DESC" + limit);
+                    emailCursor = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                            contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION, where, null,
+                            BluetoothMapContract.MessageColumns.DATE + " DESC" + limit);
                     if (emailCursor != null) {
                         BluetoothMapMessageListingElement e = null;
                         // store column index so we dont have to look them up anymore (optimization)
@@ -2304,8 +2313,8 @@ public class BluetoothMapContent {
                 }
 
                 Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                imCursor = mResolver.query(contentUri,
-                        BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
+                imCursor = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
                         BluetoothMapContract.MessageColumns.DATE + " DESC" + limit);
                 if (imCursor != null) {
                     BluetoothMapMessageListingElement e = null;
@@ -2413,8 +2422,8 @@ public class BluetoothMapContent {
         if (smsSelected(fi, ap) && folderElement.hasSmsMmsContent()) {
             fi.mMsgType = FilterInfo.TYPE_SMS;
             String where = setWhereFilter(folderElement, fi, ap);
-            Cursor c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null,
-                    Sms.DATE + " DESC");
+            Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                    Sms.CONTENT_URI, SMS_PROJECTION, where, null, Sms.DATE + " DESC");
             try {
                 if (c != null) {
                     cnt = c.getCount();
@@ -2429,8 +2438,8 @@ public class BluetoothMapContent {
         if (mmsSelected(ap) && folderElement.hasSmsMmsContent()) {
             fi.mMsgType = FilterInfo.TYPE_MMS;
             String where = setWhereFilter(folderElement, fi, ap);
-            Cursor c = mResolver.query(Mms.CONTENT_URI, MMS_PROJECTION, where, null,
-                    Mms.DATE + " DESC");
+            Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                    Mms.CONTENT_URI, MMS_PROJECTION, where, null, Mms.DATE + " DESC");
             try {
                 if (c != null) {
                     cnt += c.getCount();
@@ -2447,8 +2456,9 @@ public class BluetoothMapContent {
             String where = setWhereFilter(folderElement, fi, ap);
             if (!where.isEmpty()) {
                 Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                Cursor c = mResolver.query(contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION,
-                        where, null, BluetoothMapContract.MessageColumns.DATE + " DESC");
+                Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION, where, null,
+                        BluetoothMapContract.MessageColumns.DATE + " DESC");
                 try {
                     if (c != null) {
                         cnt += c.getCount();
@@ -2466,8 +2476,8 @@ public class BluetoothMapContent {
             String where = setWhereFilter(folderElement, fi, ap);
             if (!where.isEmpty()) {
                 Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                Cursor c = mResolver.query(contentUri,
-                        BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
+                Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
                         BluetoothMapContract.MessageColumns.DATE + " DESC");
                 try {
                     if (c != null) {
@@ -2509,8 +2519,8 @@ public class BluetoothMapContent {
             String where = setWhereFilterFolderType(folderElement, fi);
             where += " AND " + Sms.READ + "=0 ";
             where += setWhereFilterPeriod(ap, fi);
-            Cursor c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null,
-                    Sms.DATE + " DESC");
+            Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                    Sms.CONTENT_URI, SMS_PROJECTION, where, null, Sms.DATE + " DESC");
             try {
                 if (c != null) {
                     cnt = c.getCount();
@@ -2527,8 +2537,8 @@ public class BluetoothMapContent {
             String where = setWhereFilterFolderType(folderElement, fi);
             where += " AND " + Mms.READ + "=0 ";
             where += setWhereFilterPeriod(ap, fi);
-            Cursor c = mResolver.query(Mms.CONTENT_URI, MMS_PROJECTION, where, null,
-                    Sms.DATE + " DESC");
+            Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                    Mms.CONTENT_URI, MMS_PROJECTION, where, null, Sms.DATE + " DESC");
             try {
                 if (c != null) {
                     cnt += c.getCount();
@@ -2548,8 +2558,9 @@ public class BluetoothMapContent {
                 where += " AND " + BluetoothMapContract.MessageColumns.FLAG_READ + "=0 ";
                 where += setWhereFilterPeriod(ap, fi);
                 Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                Cursor c = mResolver.query(contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION,
-                        where, null, BluetoothMapContract.MessageColumns.DATE + " DESC");
+                Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_MESSAGE_PROJECTION, where, null,
+                        BluetoothMapContract.MessageColumns.DATE + " DESC");
                 try {
                     if (c != null) {
                         cnt += c.getCount();
@@ -2569,8 +2580,8 @@ public class BluetoothMapContent {
                 where += " AND " + BluetoothMapContract.MessageColumns.FLAG_READ + "=0 ";
                 where += setWhereFilterPeriod(ap, fi);
                 Uri contentUri = Uri.parse(mBaseUri + BluetoothMapContract.TABLE_MESSAGE);
-                Cursor c = mResolver.query(contentUri,
-                        BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
+                Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_INSTANT_MESSAGE_PROJECTION, where, null,
                         BluetoothMapContract.MessageColumns.DATE + " DESC");
                 try {
                     if (c != null) {
@@ -2680,7 +2691,8 @@ public class BluetoothMapContent {
                 }
                 // TODO: Optimize: Reduce projection based on convo parameter mask
                 smsMmsCursor =
-                        mResolver.query(uri, MMS_SMS_THREAD_PROJECTION, selection.toString(), null,
+                        BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver, uri,
+                                MMS_SMS_THREAD_PROJECTION, selection.toString(), null,
                                 sortOrder.toString());
                 if (smsMmsCursor != null) {
                     // store column index so we don't have to look them up anymore (optimization)
@@ -2741,13 +2753,12 @@ public class BluetoothMapContent {
                     Log.v(TAG, "URI with parameters: " + contentUri.toString());
                 }
                 // TODO: Optimize: Reduce projection based on convo parameter mask
-                imEmailCursor =
-                        mResolver.query(contentUri, BluetoothMapContract.BT_CONVERSATION_PROJECTION,
-                                null, null,
-                                BluetoothMapContract.ConversationColumns.LAST_THREAD_ACTIVITY
-                                        + " DESC, "
-                                        + BluetoothMapContract.ConversationColumns.THREAD_ID
-                                        + " ASC");
+                imEmailCursor = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        contentUri, BluetoothMapContract.BT_CONVERSATION_PROJECTION, null, null,
+                        BluetoothMapContract.ConversationColumns.LAST_THREAD_ACTIVITY
+                                + " DESC, "
+                                + BluetoothMapContract.ConversationColumns.THREAD_ID
+                                + " ASC");
                 if (imEmailCursor != null) {
                     BluetoothMapConvoListingElement e = null;
                     // store column index so we don't have to look them up anymore (optimization)
@@ -3493,7 +3504,8 @@ public class BluetoothMapContent {
         String orderBy = Contacts._ID + " ASC";
 
         // Get the contact _ID and name
-        p = mResolver.query(uri, projection, selection, null, orderBy);
+        p = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver, uri, projection,
+                selection, null, orderBy);
         try {
             if (p != null && p.moveToFirst()) {
                 contactId = p.getString(p.getColumnIndex(Contacts._ID));
@@ -3507,7 +3519,8 @@ public class BluetoothMapContent {
             Cursor q = null;
             // Fetch the contact e-mail addresses
             try {
-                q = mResolver.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,
+                q = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,
                         ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
                         new String[]{contactId}, null);
                 if (q != null && q.moveToFirst()) {
@@ -3616,14 +3629,16 @@ public class BluetoothMapContent {
         return message.encode();
     }
 
-    private void extractMmsAddresses(long id, BluetoothMapbMessageMime message) {
+    @VisibleForTesting
+    void extractMmsAddresses(long id, BluetoothMapbMessageMime message) {
         final String[] projection = null;
         String selection = new String(Mms.Addr.MSG_ID + "=" + id);
         String uriStr = new String(Mms.CONTENT_URI + "/" + id + "/addr");
         Uri uriAddress = Uri.parse(uriStr);
         String contactName = null;
 
-        Cursor c = mResolver.query(uriAddress, projection, selection, null, null);
+        Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver, uriAddress,
+                projection, selection, null, null);
         try {
             if (c.moveToFirst()) {
                 do {
@@ -3698,13 +3713,15 @@ public class BluetoothMapContent {
      * @param id the content provider ID of the message
      * @param message the bMessage object to add the information to
      */
-    private void extractMmsParts(long id, BluetoothMapbMessageMime message) {
+    @VisibleForTesting
+    void extractMmsParts(long id, BluetoothMapbMessageMime message) {
         final String[] projection = null;
         String selection = new String(Mms.Part.MSG_ID + "=" + id);
         String uriStr = new String(Mms.CONTENT_URI + "/" + id + "/part");
         Uri uriAddress = Uri.parse(uriStr);
         BluetoothMapbMessageMime.MimePart part;
-        Cursor c = mResolver.query(uriAddress, projection, selection, null, null);
+        Cursor c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver, uriAddress,
+                projection, selection, null, null);
         try {
             if (c.moveToFirst()) {
                 do {

@@ -433,6 +433,15 @@ public final class BluetoothGattServer implements BluetoothProfile {
     }
 
     /**
+     * Get the identifier of the BluetoothGattServer, or 0 if it is closed
+     *
+     * @hide
+     */
+    public int getServerIf() {
+        return mServerIf;
+    }
+
+    /**
      * Returns a characteristic with given handle.
      *
      * @hide
@@ -469,11 +478,12 @@ public final class BluetoothGattServer implements BluetoothProfile {
     /**
      * Close this GATT server instance.
      *
-     * Application should call this method as early as possible after it is done with
-     * this GATT server.
+     * <p>Application should call this method as early as possible after it is done with this GATT
+     * server.
      */
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+    @Override
     public void close() {
         if (DBG) Log.d(TAG, "close()");
         unregisterCallback();

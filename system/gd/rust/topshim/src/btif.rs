@@ -766,6 +766,7 @@ impl Hash for RawAddress {
     }
 }
 
+// TODO (b/264603574): Handling address hiding in rust logging statements
 impl ToString for RawAddress {
     fn to_string(&self) -> String {
         String::from(format!(
@@ -838,11 +839,17 @@ pub enum BaseCallbacks {
     BondState(BtStatus, RawAddress, BtBondState, i32),
     AddressConsolidate(RawAddress, RawAddress),
     LeAddressAssociate(RawAddress, RawAddress),
-    AclState(BtStatus, RawAddress, BtAclState, BtTransport, BtHciErrorCode, BtConnectionDirection),
+    AclState(
+        BtStatus,
+        RawAddress,
+        BtAclState,
+        BtTransport,
+        BtHciErrorCode,
+        BtConnectionDirection,
+        u16,
+    ),
     // Unimplemented so far:
     // thread_evt_cb
-    // dut_mode_recv_cb
-    // le_test_mode_cb
     // energy_info_cb
     // link_quality_report_cb
     // switch_buffer_size_cb
@@ -901,7 +908,7 @@ cb_variant!(BaseCb, le_address_associate_cb -> BaseCallbacks::LeAddressAssociate
 });
 
 cb_variant!(BaseCb, acl_state_cb -> BaseCallbacks::AclState,
-u32 -> BtStatus, *mut RawAddress, bindings::bt_acl_state_t -> BtAclState, i32 -> BtTransport, bindings::bt_hci_error_code_t -> BtHciErrorCode, bindings::bt_conn_direction_t -> BtConnectionDirection, {
+u32 -> BtStatus, *mut RawAddress, bindings::bt_acl_state_t -> BtAclState, i32 -> BtTransport, bindings::bt_hci_error_code_t -> BtHciErrorCode, bindings::bt_conn_direction_t -> BtConnectionDirection, u16 -> u16, {
     let _1 = unsafe { *(_1 as *const RawAddress) };
 });
 
@@ -1021,8 +1028,6 @@ impl BluetoothInterface {
             le_address_associate_cb: Some(le_address_associate_cb),
             acl_state_changed_cb: Some(acl_state_cb),
             thread_evt_cb: None,
-            dut_mode_recv_cb: None,
-            le_test_mode_cb: None,
             energy_info_cb: None,
             link_quality_report_cb: None,
             generate_local_oob_data_cb: Some(generate_local_oob_data_cb),

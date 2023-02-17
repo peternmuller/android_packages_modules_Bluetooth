@@ -25,7 +25,7 @@
 
 #define LOG_TAG "bt_bta_gattc"
 
-#include <base/bind.h>
+#include <base/functional/bind.h>
 #include <base/logging.h>
 #include <base/strings/stringprintf.h>
 
@@ -36,6 +36,7 @@
 #include "btif/include/core_callbacks.h"
 #include "btif/include/stack_manager.h"
 #include "device/include/controller.h"
+#include "device/include/interop.h"
 #include "main/shim/dumpsys.h"
 #include "osi/include/allocator.h"
 #include "osi/include/log.h"
@@ -248,7 +249,7 @@ void bta_gattc_deregister(tBTA_GATTC_RCB* p_clreg) {
   for (uint8_t i = 0; i < accept_list_size; i++) {
     if (!bta_gattc_cb.bg_track[i].in_use) continue;
 
-    if (bta_gattc_cb.bg_track[i].cif_mask & (1 << (p_clreg->client_if - 1))) {
+    if (bta_gattc_cb.bg_track[i].cif_mask & ((tBTA_GATTC_CIF_MASK)1 << (p_clreg->client_if - 1))) {
       bta_gattc_mark_bg_conn(p_clreg->client_if,
                              bta_gattc_cb.bg_track[i].remote_bda, false);
       GATT_CancelConnect(p_clreg->client_if,
@@ -449,7 +450,7 @@ static void bta_gattc_init_bk_conn(const tBTA_GATTC_API_OPEN* p_data,
       p_data->client_if, p_data->remote_bda, BT_TRANSPORT_LE);
   if (!p_clcb) {
     LOG_WARN("Unable to find connection link for device:%s",
-             PRIVATE_ADDRESS(p_data->remote_bda));
+             ADDRESS_TO_LOGGABLE_CSTR(p_data->remote_bda));
     return;
   }
 
@@ -812,6 +813,18 @@ void bta_gattc_start_discover(tBTA_GATTC_CLCB* p_clcb,
         LOG_WARN(
             " Device LMP version 0x%02x < Bluetooth 5.1. Ignore database cache "
             "read.",
+            lmp_version);
+        p_clcb->p_srcb->srvc_hdl_db_hash = false;
+      }
+
+      // Some LMP 5.2 devices also don't support robust caching. This workaround
+      // conditionally disables the feature based on a combination of LMP
+      // version and OUI prefix.
+      if (lmp_version < 0x0c &&
+          interop_match_addr(INTEROP_DISABLE_ROBUST_CACHING, &p_clcb->bda)) {
+        LOG_WARN(
+            "Device LMP version 0x%02x <= Bluetooth 5.2 and MAC addr on "
+            "interop list, skipping robust caching",
             lmp_version);
         p_clcb->p_srcb->srvc_hdl_db_hash = false;
       }
@@ -1252,13 +1265,13 @@ static void bta_gattc_conn_cback(tGATT_IF gattc_if, const RawAddress& bdaddr,
                                  tBT_TRANSPORT transport) {
   if (connected) {
     LOG_INFO("Connected client_if:%hhu addr:%s, transport:%s reason:%s",
-             gattc_if, PRIVATE_ADDRESS(bdaddr),
+             gattc_if, ADDRESS_TO_LOGGABLE_CSTR(bdaddr),
              bt_transport_text(transport).c_str(),
              gatt_disconnection_reason_text(reason).c_str());
     btif_debug_conn_state(bdaddr, BTIF_DEBUG_CONNECTED, GATT_CONN_OK);
   } else {
     LOG_INFO("Disconnected att_id:%hhu addr:%s, transport:%s reason:%s",
-             gattc_if, PRIVATE_ADDRESS(bdaddr),
+             gattc_if, ADDRESS_TO_LOGGABLE_CSTR(bdaddr),
              bt_transport_text(transport).c_str(),
              gatt_disconnection_reason_text(reason).c_str());
     btif_debug_conn_state(bdaddr, BTIF_DEBUG_DISCONNECTED, GATT_CONN_OK);

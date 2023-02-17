@@ -50,19 +50,53 @@ rust_test_host {
     data: [
         ":rustfmt",
         ":rustfmt.toml",
-        "tests/generated/generate_chunk_read_8bit.rs",
-        "tests/generated/generate_chunk_read_16bit_be.rs",
-        "tests/generated/generate_chunk_read_16bit_le.rs",
-        "tests/generated/generate_chunk_read_24bit_be.rs",
-        "tests/generated/generate_chunk_read_24bit_le.rs",
-        "tests/generated/generate_chunk_read_multiple_fields.rs",
-        "tests/generated/packet_decl_complex_big_endian.rs",
-        "tests/generated/packet_decl_complex_little_endian.rs",
+        "tests/generated/packet_decl_8bit_enum_array_big_endian.rs",
+        "tests/generated/packet_decl_8bit_enum_array_little_endian.rs",
+        "tests/generated/packet_decl_8bit_enum_big_endian.rs",
+        "tests/generated/packet_decl_8bit_enum_little_endian.rs",
+        "tests/generated/packet_decl_8bit_scalar_array_big_endian.rs",
+        "tests/generated/packet_decl_8bit_scalar_array_little_endian.rs",
+        "tests/generated/packet_decl_8bit_scalar_big_endian.rs",
+        "tests/generated/packet_decl_8bit_scalar_little_endian.rs",
+        "tests/generated/packet_decl_24bit_enum_array_big_endian.rs",
+        "tests/generated/packet_decl_24bit_enum_array_little_endian.rs",
+        "tests/generated/packet_decl_24bit_enum_big_endian.rs",
+        "tests/generated/packet_decl_24bit_enum_little_endian.rs",
+        "tests/generated/packet_decl_24bit_scalar_array_big_endian.rs",
+        "tests/generated/packet_decl_24bit_scalar_array_little_endian.rs",
+        "tests/generated/packet_decl_24bit_scalar_big_endian.rs",
+        "tests/generated/packet_decl_24bit_scalar_little_endian.rs",
+        "tests/generated/packet_decl_64bit_enum_array_big_endian.rs",
+        "tests/generated/packet_decl_64bit_enum_array_little_endian.rs",
+        "tests/generated/packet_decl_64bit_enum_big_endian.rs",
+        "tests/generated/packet_decl_64bit_enum_little_endian.rs",
+        "tests/generated/packet_decl_64bit_scalar_array_big_endian.rs",
+        "tests/generated/packet_decl_64bit_scalar_array_little_endian.rs",
+        "tests/generated/packet_decl_64bit_scalar_big_endian.rs",
+        "tests/generated/packet_decl_64bit_scalar_little_endian.rs",
+        "tests/generated/packet_decl_array_dynamic_count_big_endian.rs",
+        "tests/generated/packet_decl_array_dynamic_count_little_endian.rs",
+        "tests/generated/packet_decl_array_dynamic_size_big_endian.rs",
+        "tests/generated/packet_decl_array_dynamic_size_little_endian.rs",
+        "tests/generated/packet_decl_array_unknown_element_width_dynamic_count_big_endian.rs",
+        "tests/generated/packet_decl_array_unknown_element_width_dynamic_count_little_endian.rs",
+        "tests/generated/packet_decl_array_unknown_element_width_dynamic_size_big_endian.rs",
+        "tests/generated/packet_decl_array_unknown_element_width_dynamic_size_little_endian.rs",
+        "tests/generated/packet_decl_complex_scalars_big_endian.rs",
+        "tests/generated/packet_decl_complex_scalars_little_endian.rs",
         "tests/generated/packet_decl_empty_big_endian.rs",
         "tests/generated/packet_decl_empty_little_endian.rs",
-        "tests/generated/packet_decl_simple_big_endian.rs",
-        "tests/generated/packet_decl_simple_little_endian.rs",
+        "tests/generated/packet_decl_mask_scalar_value_big_endian.rs",
+        "tests/generated/packet_decl_mask_scalar_value_little_endian.rs",
+        "tests/generated/packet_decl_mixed_scalars_enums_big_endian.rs",
+        "tests/generated/packet_decl_mixed_scalars_enums_little_endian.rs",
+        "tests/generated/packet_decl_reserved_field_big_endian.rs",
+        "tests/generated/packet_decl_reserved_field_little_endian.rs",
+        "tests/generated/packet_decl_simple_scalars_big_endian.rs",
+        "tests/generated/packet_decl_simple_scalars_little_endian.rs",
         "tests/generated/preamble.rs",
+        "tests/generated/struct_decl_complex_scalars_big_endian.rs",
+        "tests/generated/struct_decl_complex_scalars_little_endian.rs",
     ],
 }
 
@@ -94,13 +128,18 @@ genrule {
 
 rust_defaults {
     name: "pdl_backend_defaults",
+    features: ["serde"],
     rustlibs: [
         "libbytes",
         "libnum_traits",
+        "libserde",
         "libtempfile",
         "libthiserror",
     ],
-    proc_macros: ["libnum_derive"],
+    proc_macros: [
+        "libnum_derive",
+        "libserde_derive",
+    ],
 }
 
 rust_library_host {
@@ -165,6 +204,7 @@ rust_test_host {
     rustlibs: [
         "libnum_traits",
         "libpdl_le_backend",
+        "libserde_json",
     ],
 }
 
@@ -175,6 +215,7 @@ rust_test_host {
     rustlibs: [
         "libnum_traits",
         "libpdl_be_backend",
+        "libserde_json",
     ],
 }
 
@@ -267,4 +308,45 @@ python_test_host {
         ":pdl",
         ":pypdl",
     ],
+}
+
+// Defaults for the rust_noalloc backend
+genrule_defaults {
+    name: "pdl_rust_noalloc_generator_defaults",
+    cmd: "set -o pipefail;" +
+        " $(location :pdl) --output-format rust_no_alloc $(in) |" +
+        " $(location :rustfmt) > $(out)",
+    tools: [
+        ":pdl",
+        ":rustfmt",
+    ],
+}
+
+// Generate the rust_noalloc backend srcs against the little-endian test vectors
+genrule {
+    name: "pdl_rust_noalloc_le_test_backend_srcs",
+    defaults: ["pdl_rust_noalloc_generator_defaults"],
+    srcs: ["tests/canonical/le_rust_noalloc_test_file.pdl"],
+    out: ["_packets.rs"],
+}
+
+// Generate the rust_noalloc test harness srcs for the supplied test vectors
+genrule {
+    name: "pdl_rust_noalloc_le_test_gen_harness",
+    cmd: "set -o pipefail;" +
+        " $(location :pdl) $(in) --output-format rust_no_alloc_test" +
+        " > $(out)",
+    srcs: ["tests/canonical/le_rust_noalloc_test_file.pdl"],
+    out: ["test_rust_noalloc_parser.rs"],
+    tools: [":pdl"],
+}
+
+// The test target for rust_noalloc
+rust_test_host {
+    name: "pdl_rust_noalloc_le_test",
+    srcs: [
+        ":pdl_rust_noalloc_le_test_gen_harness",
+        ":pdl_rust_noalloc_le_test_backend_srcs",
+    ],
+    test_suites: ["general-tests"],
 }

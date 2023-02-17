@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::slice::SliceIndex;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::bt_adv::AdvSet;
 use crate::bt_gatt::AuthReq;
@@ -9,7 +10,8 @@ use crate::callbacks::{BtGattCallback, BtGattServerCallback};
 use crate::ClientContext;
 use crate::{console_red, console_yellow, print_error, print_info};
 use bt_topshim::btif::{BtConnectionState, BtStatus, BtTransport};
-use bt_topshim::profiles::gatt::LePhy;
+use bt_topshim::profiles::hid_host::BthhReportType;
+use bt_topshim::profiles::{gatt::LePhy, ProfileConnectionState};
 use btstack::bluetooth::{BluetoothDevice, IBluetooth, IBluetoothQA};
 use btstack::bluetooth_gatt::{GattWriteType, IBluetoothGatt, ScanSettings, ScanType};
 use btstack::socket_manager::{IBluetoothSocketManager, SocketResult};
@@ -62,6 +64,21 @@ pub struct CommandOption {
 pub(crate) struct CommandHandler {
     context: Arc<Mutex<ClientContext>>,
     command_options: HashMap<String, CommandOption>,
+}
+
+/// Define what to do when a socket connects. Mainly for qualification purposes.
+/// Specifically, after a socket is connected/accepted, we will do
+/// (1) send a chunk of data every |send_interval| time until |num_frame| chunks has been sent.
+/// (2) wait another |disconnect_delay| time. any incoming data will be dumpted during this time.
+/// (3) disconnect the socket.
+#[derive(Copy, Clone)]
+pub struct SocketSchedule {
+    /// Number of times to send data
+    pub num_frame: u32,
+    /// Time interval between each sending
+    pub send_interval: Duration,
+    /// Extra time after the last sending. Any incoming data will be printed during this time.
+    pub disconnect_delay: Duration,
 }
 
 struct DisplayList<T>(Vec<T>);
@@ -196,6 +213,8 @@ fn build_commands() -> HashMap<String, CommandOption> {
                 String::from("advertise <on|off|ext>"),
                 String::from("advertise set-interval <ms>"),
                 String::from("advertise set-scan-rsp <enable|disable>"),
+                String::from("advertise set-raw-data <raw-adv-data> <adv-id>"),
+                String::from("advertise set-connectable <on|off> <adv-id>"),
             ],
             description: String::from("Advertising utilities."),
             function_pointer: CommandHandler::cmd_advertise,
@@ -205,11 +224,25 @@ fn build_commands() -> HashMap<String, CommandOption> {
         String::from("socket"),
         CommandOption {
             rules: vec![
-                String::from("socket test"),
-                String::from("socket connect <addr> <l2cap|rfcomm> <psm|uuid>"),
+                String::from("socket listen <auth-required>"),
+                String::from("socket connect <address> <l2cap|rfcomm> <psm|uuid> <auth-required>"),
+                String::from("socket disconnect <socket_id>"),
+                String::from("socket set-on-connect-schedule <send|resend|dump>"),
             ],
             description: String::from("Socket manager utilities."),
             function_pointer: CommandHandler::cmd_socket,
+        },
+    );
+    command_options.insert(
+        String::from("hid"),
+        CommandOption {
+            rules: vec![
+                String::from("hid get-report <address> <Input|Output|Feature> <report_id>"),
+                String::from("hid set-report <address> <Input|Output|Feature> <report_value>"),
+                String::from("hid send-data <address> <data>"),
+            ],
+            description: String::from("Socket manager utilities."),
+            function_pointer: CommandHandler::cmd_hid,
         },
     );
     command_options.insert(
@@ -271,9 +304,9 @@ impl CommandHandler {
     }
 
     /// Entry point for command and arguments
-    pub fn process_cmd_line(&mut self, command: &String, args: &Vec<String>) {
+    pub fn process_cmd_line(&mut self, command: &str, args: &Vec<String>) {
         // Ignore empty line
-        match &command[..] {
+        match command {
             "" => {}
             _ => match self.command_options.get(command) {
                 Some(cmd) => {
@@ -296,11 +329,15 @@ impl CommandHandler {
         };
     }
 
+    fn lock_context(&self) -> std::sync::MutexGuard<ClientContext> {
+        self.context.lock().unwrap()
+    }
+
     // Common message for when the adapter isn't ready
     fn adapter_not_ready(&self) -> CommandError {
         format!(
             "Default adapter {} is not enabled. Enable the adapter before using this command.",
-            self.context.lock().unwrap().default_adapter
+            self.lock_context().default_adapter
         )
         .into()
     }
@@ -357,38 +394,38 @@ impl CommandHandler {
     }
 
     fn cmd_adapter(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().manager_dbus.get_floss_enabled() {
+        if !self.lock_context().manager_dbus.get_floss_enabled() {
             return Err("Floss is not enabled. First run, `floss enable`".into());
         }
 
-        let default_adapter = self.context.lock().unwrap().default_adapter;
+        let default_adapter = self.lock_context().default_adapter;
 
         let command = get_arg(args, 0)?;
 
         match &command[..] {
             "enable" => {
-                if self.context.lock().unwrap().is_restricted {
+                if self.lock_context().is_restricted {
                     return Err("You are not allowed to toggle adapter power".into());
                 }
-                self.context.lock().unwrap().manager_dbus.start(default_adapter);
+                self.lock_context().manager_dbus.start(default_adapter);
             }
             "disable" => {
-                if self.context.lock().unwrap().is_restricted {
+                if self.lock_context().is_restricted {
                     return Err("You are not allowed to toggle adapter power".into());
                 }
-                self.context.lock().unwrap().manager_dbus.stop(default_adapter);
+                self.lock_context().manager_dbus.stop(default_adapter);
             }
             "show" => {
-                if !self.context.lock().unwrap().adapter_ready {
+                if !self.lock_context().adapter_ready {
                     return Err(self.adapter_not_ready());
                 }
 
-                let enabled = self.context.lock().unwrap().enabled;
-                let address = match self.context.lock().unwrap().adapter_address.as_ref() {
+                let enabled = self.lock_context().enabled;
+                let address = match self.lock_context().adapter_address.as_ref() {
                     Some(x) => x.clone(),
                     None => String::from(""),
                 };
-                let context = self.context.lock().unwrap();
+                let context = self.lock_context();
                 let adapter_dbus = context.adapter_dbus.as_ref().unwrap();
                 let qa_dbus = context.qa_dbus.as_ref().unwrap();
                 let name = adapter_dbus.get_name();
@@ -401,10 +438,16 @@ impl CommandHandler {
                 let le_ext_adv_supported = adapter_dbus.is_le_extended_advertising_supported();
                 let wbs_supported = adapter_dbus.is_wbs_supported();
                 let supported_profiles = UuidHelper::get_supported_profiles();
-                let connected_profiles: Vec<Profile> = supported_profiles
+                let connected_profiles: Vec<(Profile, ProfileConnectionState)> = supported_profiles
                     .iter()
-                    .filter(|&&prof| adapter_dbus.get_profile_connection_state(prof) > 0)
-                    .cloned()
+                    .map(|&prof| {
+                        if let Some(uuid) = UuidHelper::get_profile_uuid(&prof) {
+                            (prof, adapter_dbus.get_profile_connection_state(uuid.clone()))
+                        } else {
+                            (prof, ProfileConnectionState::Disconnected)
+                        }
+                    })
+                    .filter(|(_prof, state)| state != &ProfileConnectionState::Disconnected)
                     .collect();
                 print_info!("Address: {}", address);
                 print_info!("Name: {}", name);
@@ -430,9 +473,7 @@ impl CommandHandler {
             "discoverable" => match &get_arg(args, 1)?[..] {
                 "on" => {
                     let discoverable = self
-                        .context
-                        .lock()
-                        .unwrap()
+                        .lock_context()
                         .adapter_dbus
                         .as_mut()
                         .unwrap()
@@ -444,9 +485,7 @@ impl CommandHandler {
                 }
                 "off" => {
                     let discoverable = self
-                        .context
-                        .lock()
-                        .unwrap()
+                        .lock_context()
                         .adapter_dbus
                         .as_mut()
                         .unwrap()
@@ -460,38 +499,18 @@ impl CommandHandler {
             },
             "connectable" => match &get_arg(args, 1)?[..] {
                 "on" => {
-                    let ret = self
-                        .context
-                        .lock()
-                        .unwrap()
-                        .qa_dbus
-                        .as_mut()
-                        .unwrap()
-                        .set_connectable(true);
+                    let ret = self.lock_context().qa_dbus.as_mut().unwrap().set_connectable(true);
                     print_info!("Set connectable on {}", if ret { "succeeded" } else { "failed" });
                 }
                 "off" => {
-                    let ret = self
-                        .context
-                        .lock()
-                        .unwrap()
-                        .qa_dbus
-                        .as_mut()
-                        .unwrap()
-                        .set_connectable(false);
+                    let ret = self.lock_context().qa_dbus.as_mut().unwrap().set_connectable(false);
                     print_info!("Set connectable off {}", if ret { "succeeded" } else { "failed" });
                 }
                 other => println!("Invalid argument for adapter connectable '{}'", other),
             },
             "set-name" => {
                 if let Some(name) = args.get(1) {
-                    self.context
-                        .lock()
-                        .unwrap()
-                        .adapter_dbus
-                        .as_ref()
-                        .unwrap()
-                        .set_name(name.to_string());
+                    self.lock_context().adapter_dbus.as_ref().unwrap().set_name(name.to_string());
                 } else {
                     println!("usage: adapter set-name <name>");
                 }
@@ -504,17 +523,17 @@ impl CommandHandler {
     }
 
     fn cmd_get_address(&mut self, _args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
-        let address = self.context.lock().unwrap().update_adapter_address();
+        let address = self.lock_context().update_adapter_address();
         print_info!("Local address = {}", &address);
         Ok(())
     }
 
     fn cmd_discovery(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -522,10 +541,10 @@ impl CommandHandler {
 
         match &command[..] {
             "start" => {
-                self.context.lock().unwrap().adapter_dbus.as_ref().unwrap().start_discovery();
+                self.lock_context().adapter_dbus.as_ref().unwrap().start_discovery();
             }
             "stop" => {
-                self.context.lock().unwrap().adapter_dbus.as_ref().unwrap().cancel_discovery();
+                self.lock_context().adapter_dbus.as_ref().unwrap().cancel_discovery();
             }
             _ => return Err(CommandError::InvalidArgs),
         }
@@ -534,7 +553,7 @@ impl CommandHandler {
     }
 
     fn cmd_bond(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -547,8 +566,7 @@ impl CommandHandler {
                     name: String::from("Classic Device"),
                 };
 
-                let bonding_attempt =
-                    &self.context.lock().unwrap().bonding_attempt.as_ref().cloned();
+                let bonding_attempt = &self.lock_context().bonding_attempt.as_ref().cloned();
 
                 if bonding_attempt.is_some() {
                     return Err(format!(
@@ -559,16 +577,14 @@ impl CommandHandler {
                 }
 
                 let success = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .adapter_dbus
                     .as_ref()
                     .unwrap()
                     .create_bond(device.clone(), BtTransport::Auto);
 
                 if success {
-                    self.context.lock().unwrap().bonding_attempt = Some(device);
+                    self.lock_context().bonding_attempt = Some(device);
                 }
             }
             "remove" => {
@@ -577,7 +593,7 @@ impl CommandHandler {
                     name: String::from("Classic Device"),
                 };
 
-                self.context.lock().unwrap().adapter_dbus.as_ref().unwrap().remove_bond(device);
+                self.lock_context().adapter_dbus.as_ref().unwrap().remove_bond(device);
             }
             "cancel" => {
                 let device = BluetoothDevice {
@@ -585,13 +601,7 @@ impl CommandHandler {
                     name: String::from("Classic Device"),
                 };
 
-                self.context
-                    .lock()
-                    .unwrap()
-                    .adapter_dbus
-                    .as_ref()
-                    .unwrap()
-                    .cancel_bond_process(device);
+                self.lock_context().adapter_dbus.as_ref().unwrap().cancel_bond_process(device);
             }
             other => {
                 println!("Invalid argument '{}'", other);
@@ -602,7 +612,7 @@ impl CommandHandler {
     }
 
     fn cmd_device(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -616,9 +626,7 @@ impl CommandHandler {
                 };
 
                 let success = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .adapter_dbus
                     .as_mut()
                     .unwrap()
@@ -637,9 +645,7 @@ impl CommandHandler {
                 };
 
                 let success = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .adapter_dbus
                     .as_mut()
                     .unwrap()
@@ -668,7 +674,7 @@ impl CommandHandler {
                     uuids,
                     wake_allowed,
                 ) = {
-                    let ctx = self.context.lock().unwrap();
+                    let ctx = self.lock_context();
                     let adapter = ctx.adapter_dbus.as_ref().unwrap();
 
                     let name = adapter.get_remote_name(device.clone());
@@ -724,9 +730,7 @@ impl CommandHandler {
                     name: String::from(""),
                 };
                 let old_alias = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .adapter_dbus
                     .as_ref()
                     .unwrap()
@@ -737,9 +741,7 @@ impl CommandHandler {
                     old_alias,
                     new_alias
                 );
-                self.context
-                    .lock()
-                    .unwrap()
+                self.lock_context()
                     .adapter_dbus
                     .as_mut()
                     .unwrap()
@@ -758,9 +760,7 @@ impl CommandHandler {
                     }
                 };
 
-                self.context
-                    .lock()
-                    .unwrap()
+                self.lock_context()
                     .adapter_dbus
                     .as_mut()
                     .unwrap()
@@ -780,7 +780,7 @@ impl CommandHandler {
                     }
                 };
 
-                self.context.lock().unwrap().adapter_dbus.as_mut().unwrap().set_pin(
+                self.lock_context().adapter_dbus.as_mut().unwrap().set_pin(
                     device.clone(),
                     accept,
                     pin,
@@ -800,7 +800,7 @@ impl CommandHandler {
                     }
                 };
 
-                self.context.lock().unwrap().adapter_dbus.as_mut().unwrap().set_passkey(
+                self.lock_context().adapter_dbus.as_mut().unwrap().set_passkey(
                     device.clone(),
                     accept,
                     passkey,
@@ -819,15 +819,15 @@ impl CommandHandler {
 
         match &command[..] {
             "enable" => {
-                self.context.lock().unwrap().manager_dbus.set_floss_enabled(true);
+                self.lock_context().manager_dbus.set_floss_enabled(true);
             }
             "disable" => {
-                self.context.lock().unwrap().manager_dbus.set_floss_enabled(false);
+                self.lock_context().manager_dbus.set_floss_enabled(false);
             }
             "show" => {
                 print_info!(
                     "Floss enabled: {}",
-                    self.context.lock().unwrap().manager_dbus.get_floss_enabled()
+                    self.lock_context().manager_dbus.get_floss_enabled()
                 );
             }
             _ => return Err(CommandError::InvalidArgs),
@@ -837,7 +837,7 @@ impl CommandHandler {
     }
 
     fn cmd_gatt(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -845,10 +845,10 @@ impl CommandHandler {
 
         match &command[..] {
             "register-client" => {
-                let dbus_connection = self.context.lock().unwrap().dbus_connection.clone();
-                let dbus_crossroads = self.context.lock().unwrap().dbus_crossroads.clone();
+                let dbus_connection = self.lock_context().dbus_connection.clone();
+                let dbus_crossroads = self.lock_context().dbus_crossroads.clone();
 
-                self.context.lock().unwrap().gatt_dbus.as_mut().unwrap().register_client(
+                self.lock_context().gatt_dbus.as_mut().unwrap().register_client(
                     String::from(GATT_CLIENT_APP_UUID),
                     Box::new(BtGattCallback::new(
                         String::from("/org/chromium/bluetooth/client/bluetooth_gatt_callback"),
@@ -861,22 +861,19 @@ impl CommandHandler {
             }
             "client-connect" => {
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
 
                 let addr = String::from(get_arg(args, 1)?);
-                let is_direct = self.context.lock().unwrap().gatt_client_context.is_connect_direct;
-                let transport = self.context.lock().unwrap().gatt_client_context.connect_transport;
-                let oppurtunistic =
-                    self.context.lock().unwrap().gatt_client_context.connect_opportunistic;
-                let phy = self.context.lock().unwrap().gatt_client_context.connect_phy;
+                let is_direct = self.lock_context().gatt_client_context.is_connect_direct;
+                let transport = self.lock_context().gatt_client_context.connect_transport;
+                let oppurtunistic = self.lock_context().gatt_client_context.connect_opportunistic;
+                let phy = self.lock_context().gatt_client_context.connect_phy;
 
                 println!("Initiating GATT client connect. client_id: {}, addr: {}, is_direct: {}, transport: {:?}, oppurtunistic: {}, phy: {:?}", client_id, addr, is_direct, transport, oppurtunistic, phy);
-                self.context.lock().unwrap().gatt_dbus.as_ref().unwrap().client_connect(
+                self.lock_context().gatt_dbus.as_ref().unwrap().client_connect(
                     client_id,
                     addr,
                     is_direct,
@@ -887,62 +884,36 @@ impl CommandHandler {
             }
             "client-disconnect" => {
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
 
                 let addr = String::from(get_arg(args, 1)?);
-                self.context
-                    .lock()
-                    .unwrap()
-                    .gatt_dbus
-                    .as_ref()
-                    .unwrap()
-                    .client_disconnect(client_id, addr);
+                self.lock_context().gatt_dbus.as_ref().unwrap().client_disconnect(client_id, addr);
             }
             "client-read-phy" => {
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
                 let addr = String::from(get_arg(args, 1)?);
-                self.context
-                    .lock()
-                    .unwrap()
-                    .gatt_dbus
-                    .as_mut()
-                    .unwrap()
-                    .client_read_phy(client_id, addr);
+                self.lock_context().gatt_dbus.as_mut().unwrap().client_read_phy(client_id, addr);
             }
             "client-discover-services" => {
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
 
                 let addr = String::from(get_arg(args, 1)?);
-                self.context
-                    .lock()
-                    .unwrap()
-                    .gatt_dbus
-                    .as_ref()
-                    .unwrap()
-                    .discover_services(client_id, addr);
+                self.lock_context().gatt_dbus.as_ref().unwrap().discover_services(client_id, addr);
             }
             "configure-mtu" => {
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
@@ -951,20 +922,14 @@ impl CommandHandler {
                 let mtu =
                     String::from(get_arg(args, 2)?).parse::<i32>().or(Err("Failed parsing mtu"))?;
 
-                self.context
-                    .lock()
-                    .unwrap()
-                    .gatt_dbus
-                    .as_ref()
-                    .unwrap()
-                    .configure_mtu(client_id, addr, mtu)
+                self.lock_context().gatt_dbus.as_ref().unwrap().configure_mtu(client_id, addr, mtu)
             }
             "set-direct-connect" => {
                 let is_direct = String::from(get_arg(args, 1)?)
                     .parse::<bool>()
                     .or(Err("Failed to parse is_direct"))?;
 
-                self.context.lock().unwrap().gatt_client_context.is_connect_direct = is_direct;
+                self.lock_context().gatt_client_context.is_connect_direct = is_direct;
             }
             "set-connect-transport" => {
                 let transport = match &get_arg(args, 1)?[..] {
@@ -975,15 +940,14 @@ impl CommandHandler {
                         return Err("Failed to parse transport".into());
                     }
                 };
-                self.context.lock().unwrap().gatt_client_context.connect_transport = transport;
+                self.lock_context().gatt_client_context.connect_transport = transport;
             }
             "set-connect-opportunistic" => {
                 let opportunistic = String::from(get_arg(args, 1)?)
                     .parse::<bool>()
                     .or(Err("Failed to parse opportunistic"))?;
 
-                self.context.lock().unwrap().gatt_client_context.connect_opportunistic =
-                    opportunistic;
+                self.lock_context().gatt_client_context.connect_opportunistic = opportunistic;
             }
             "set-connect-phy" => {
                 let phy = match &get_arg(args, 1)?[..] {
@@ -995,7 +959,7 @@ impl CommandHandler {
                     }
                 };
 
-                self.context.lock().unwrap().gatt_client_context.connect_phy = phy;
+                self.lock_context().gatt_client_context.connect_phy = phy;
             }
             "set-auth-req" => {
                 let flag = match &get_arg(args, 1)?[..] {
@@ -1014,11 +978,8 @@ impl CommandHandler {
                     }
                 };
 
-                self.context.lock().unwrap().gatt_client_context.auth_req.set(flag, enable);
-                println!(
-                    "AuthReq: {:?}",
-                    self.context.lock().unwrap().gatt_client_context.auth_req
-                );
+                self.lock_context().gatt_client_context.auth_req.set(flag, enable);
+                println!("AuthReq: {:?}", self.lock_context().gatt_client_context.auth_req);
             }
             "write-characteristic" => {
                 let addr = String::from(get_arg(args, 1)?);
@@ -1038,18 +999,14 @@ impl CommandHandler {
                 let value = hex::decode(&get_arg(args, 4)?).or(Err("Failed to parse value"))?;
 
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
 
-                let auth_req = self.context.lock().unwrap().gatt_client_context.get_auth_req_bits();
+                let auth_req = self.lock_context().gatt_client_context.get_auth_req_bits();
 
-                self.context
-                    .lock()
-                    .unwrap()
+                self.lock_context()
                     .gatt_dbus
                     .as_ref()
                     .unwrap()
@@ -1061,28 +1018,24 @@ impl CommandHandler {
                     .parse::<i32>()
                     .or(Err("Failed to parse handle"))?;
                 let client_id = self
-                    .context
-                    .lock()
-                    .unwrap()
+                    .lock_context()
                     .gatt_client_context
                     .client_id
                     .ok_or("GATT client is not yet registered.")?;
 
-                let auth_req = self.context.lock().unwrap().gatt_client_context.get_auth_req_bits();
+                let auth_req = self.lock_context().gatt_client_context.get_auth_req_bits();
 
-                self.context
-                    .lock()
-                    .unwrap()
+                self.lock_context()
                     .gatt_dbus
                     .as_ref()
                     .unwrap()
                     .read_characteristic(client_id, addr, handle, auth_req);
             }
             "register-server" => {
-                let dbus_connection = self.context.lock().unwrap().dbus_connection.clone();
-                let dbus_crossroads = self.context.lock().unwrap().dbus_crossroads.clone();
+                let dbus_connection = self.lock_context().dbus_connection.clone();
+                let dbus_crossroads = self.lock_context().dbus_crossroads.clone();
 
-                self.context.lock().unwrap().gatt_dbus.as_mut().unwrap().register_server(
+                self.lock_context().gatt_dbus.as_mut().unwrap().register_server(
                     String::from(GATT_SERVER_APP_UUID),
                     Box::new(BtGattServerCallback::new(
                         String::from(
@@ -1101,7 +1054,7 @@ impl CommandHandler {
     }
 
     fn cmd_le_scan(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -1109,63 +1062,55 @@ impl CommandHandler {
 
         match &command[..] {
             "register-scanner" => {
-                let scanner_callback_id = self.context.lock().unwrap().scanner_callback_id;
-                if let Some(id) = scanner_callback_id {
-                    let uuid = self
-                        .context
-                        .lock()
-                        .unwrap()
-                        .gatt_dbus
-                        .as_mut()
-                        .unwrap()
-                        .register_scanner(id);
-                    print_info!("Scanner to be registered with UUID = {}", UuidWrapper(&uuid));
-                } else {
-                    print_error!("Cannot register scanner before registering scanner callback");
-                }
+                let scanner_callback_id = self
+                    .lock_context()
+                    .scanner_callback_id
+                    .ok_or("Cannot register scanner before registering scanner callback")?;
+
+                let uuid = self
+                    .lock_context()
+                    .gatt_dbus
+                    .as_mut()
+                    .unwrap()
+                    .register_scanner(scanner_callback_id);
+
+                print_info!("Scanner to be registered with UUID = {}", UuidWrapper(&uuid));
             }
             "unregister-scanner" => {
-                let scanner_id = String::from(get_arg(args, 1)?).parse::<u8>();
+                let scanner_id = String::from(get_arg(args, 1)?)
+                    .parse::<u8>()
+                    .or(Err("Failed parsing scanner id"))?;
 
-                if let Ok(id) = scanner_id {
-                    self.context.lock().unwrap().gatt_dbus.as_mut().unwrap().unregister_scanner(id);
-                } else {
-                    return Err("Failed parsing scanner id".into());
-                }
+                self.lock_context().gatt_dbus.as_mut().unwrap().unregister_scanner(scanner_id);
             }
             "start-scan" => {
-                let scanner_id = String::from(get_arg(args, 1)?).parse::<u8>();
+                let scanner_id = String::from(get_arg(args, 1)?)
+                    .parse::<u8>()
+                    .or(Err("Failed parsing scanner id"))?;
 
-                if let Ok(id) = scanner_id {
-                    self.context.lock().unwrap().gatt_dbus.as_mut().unwrap().start_scan(
-                        id,
-                        // TODO(b/254870159): Construct real settings and filters depending on
-                        // command line options.
-                        ScanSettings { interval: 0, window: 0, scan_type: ScanType::Active },
-                        Some(btstack::bluetooth_gatt::ScanFilter {
-                            rssi_high_threshold: 0,
-                            rssi_low_threshold: 0,
-                            rssi_low_timeout: 0,
-                            rssi_sampling_period: 0,
-                            condition: btstack::bluetooth_gatt::ScanFilterCondition::Patterns(
-                                vec![],
-                            ),
-                        }),
-                    );
-                    self.context.lock().unwrap().active_scanner_ids.insert(id);
-                } else {
-                    return Err("Failed parsing scanner id".into());
-                }
+                self.lock_context().gatt_dbus.as_mut().unwrap().start_scan(
+                    scanner_id,
+                    // TODO(b/254870159): Construct real settings and filters depending on
+                    // command line options.
+                    ScanSettings { interval: 0, window: 0, scan_type: ScanType::Active },
+                    Some(btstack::bluetooth_gatt::ScanFilter {
+                        rssi_high_threshold: 0,
+                        rssi_low_threshold: 0,
+                        rssi_low_timeout: 0,
+                        rssi_sampling_period: 0,
+                        condition: btstack::bluetooth_gatt::ScanFilterCondition::Patterns(vec![]),
+                    }),
+                );
+
+                self.lock_context().active_scanner_ids.insert(scanner_id);
             }
             "stop-scan" => {
-                let scanner_id = String::from(get_arg(args, 1)?).parse::<u8>();
+                let scanner_id = String::from(get_arg(args, 1)?)
+                    .parse::<u8>()
+                    .or(Err("Failed parsing scanner id"))?;
 
-                if let Ok(id) = scanner_id {
-                    self.context.lock().unwrap().gatt_dbus.as_mut().unwrap().stop_scan(id);
-                    self.context.lock().unwrap().active_scanner_ids.remove(&id);
-                } else {
-                    return Err("Failed parsing scanner id".into());
-                }
+                self.lock_context().gatt_dbus.as_mut().unwrap().stop_scan(scanner_id);
+                self.lock_context().active_scanner_ids.remove(&scanner_id);
             }
             _ => return Err(CommandError::InvalidArgs),
         }
@@ -1176,15 +1121,15 @@ impl CommandHandler {
     // TODO(b/233128828): More options will be implemented to test BLE advertising.
     // Such as setting advertising parameters, starting multiple advertising sets, etc.
     fn cmd_advertise(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
-        if self.context.lock().unwrap().advertiser_callback_id == None {
+        if self.lock_context().advertiser_callback_id == None {
             return Err("No advertiser callback registered".into());
         }
 
-        let callback_id = self.context.lock().unwrap().advertiser_callback_id.clone().unwrap();
+        let callback_id = self.lock_context().advertiser_callback_id.clone().unwrap();
 
         let command = get_arg(args, 0)?;
 
@@ -1209,7 +1154,7 @@ impl CommandHandler {
                 }
                 let interval = ms.unwrap() * 8 / 5; // in 0.625 ms.
 
-                let mut context = self.context.lock().unwrap();
+                let mut context = self.lock_context();
                 context.adv_sets.iter_mut().for_each(|(_, s)| s.params.interval = interval);
 
                 // To avoid borrowing context as mutable from an immutable borrow.
@@ -1225,6 +1170,40 @@ impl CommandHandler {
                     context.gatt_dbus.as_mut().unwrap().set_advertising_parameters(adv_id, params);
                 }
             }
+            "set-connectable" => {
+                let connectable = match &get_arg(args, 1)?[..] {
+                    "on" => true,
+                    "off" => false,
+                    _ => false,
+                };
+
+                let adv_id = String::from(get_arg(args, 2)?)
+                    .parse::<i32>()
+                    .or(Err("Failed parsing adv_id"))?;
+
+                let mut context = self.context.lock().unwrap();
+
+                let advs: Vec<(_, _)> = context
+                    .adv_sets
+                    .iter_mut()
+                    .filter_map(|(_, s)| {
+                        if !(s.adv_id.map_or(false, |id| id == adv_id)) {
+                            return None;
+                        }
+                        s.params.connectable = connectable;
+                        Some((s.params.clone(), s.data.clone()))
+                    })
+                    .collect();
+
+                for (params, data) in advs {
+                    print_info!("Setting advertising parameters for {}", adv_id);
+                    context.gatt_dbus.as_mut().unwrap().set_advertising_parameters(adv_id, params);
+
+                    // renew the flags
+                    print_info!("Setting advertising data for {}", adv_id);
+                    context.gatt_dbus.as_mut().unwrap().set_advertising_data(adv_id, data);
+                }
+            }
             "set-scan-rsp" => {
                 let enable = match &get_arg(args, 1)?[..] {
                     "enable" => true,
@@ -1232,7 +1211,7 @@ impl CommandHandler {
                     _ => false,
                 };
 
-                let mut context = self.context.lock().unwrap();
+                let mut context = self.lock_context();
                 context.adv_sets.iter_mut().for_each(|(_, s)| s.params.scannable = enable);
 
                 let advs: Vec<(_, _, _)> = context
@@ -1250,6 +1229,26 @@ impl CommandHandler {
                     context.gatt_dbus.as_mut().unwrap().set_advertising_parameters(adv_id, params);
                 }
             }
+            "set-raw-data" => {
+                let data = hex::decode(get_arg(args, 1)?).or(Err("Failed parsing data"))?;
+
+                let adv_id = String::from(get_arg(args, 2)?)
+                    .parse::<i32>()
+                    .or(Err("Failed parsing adv_id"))?;
+
+                let mut context = self.context.lock().unwrap();
+                if context
+                    .adv_sets
+                    .iter()
+                    .find(|(_, s)| s.adv_id.map_or(false, |id| id == adv_id))
+                    .is_none()
+                {
+                    return Err("Failed to find advertising set".into());
+                }
+
+                print_info!("Setting advertising data for {}", adv_id);
+                context.gatt_dbus.as_mut().unwrap().set_raw_adv_data(adv_id, data);
+            }
             _ => return Err(CommandError::InvalidArgs),
         }
 
@@ -1257,11 +1256,11 @@ impl CommandHandler {
     }
 
     fn cmd_socket(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
-        let callback_id = match self.context.lock().unwrap().socket_manager_callback_id.clone() {
+        let callback_id = match self.lock_context().socket_manager_callback_id.clone() {
             Some(id) => id,
             None => {
                 return Err("No socket manager callback registered.".into());
@@ -1271,15 +1270,44 @@ impl CommandHandler {
         let command = get_arg(args, 0)?;
 
         match &command[..] {
-            "test" => {
-                let SocketResult { status, id } = self
-                    .context
-                    .lock()
-                    .unwrap()
-                    .socket_manager_dbus
-                    .as_mut()
-                    .unwrap()
-                    .listen_using_l2cap_channel(callback_id);
+            "set-on-connect-schedule" => {
+                let schedule = match &get_arg(args, 1)?[..] {
+                    "send" => SocketSchedule {
+                        num_frame: 1,
+                        send_interval: Duration::from_millis(0),
+                        disconnect_delay: Duration::from_secs(30),
+                    },
+                    "resend" => SocketSchedule {
+                        num_frame: 3,
+                        send_interval: Duration::from_millis(100),
+                        disconnect_delay: Duration::from_secs(30),
+                    },
+                    "dump" => SocketSchedule {
+                        num_frame: 0,
+                        send_interval: Duration::from_millis(0),
+                        disconnect_delay: Duration::from_secs(30),
+                    },
+                    _ => {
+                        return Err("Failed to parse schedule".into());
+                    }
+                };
+
+                self.context.lock().unwrap().socket_test_schedule = Some(schedule);
+            }
+            "listen" => {
+                let auth_required = String::from(get_arg(args, 1)?)
+                    .parse::<bool>()
+                    .or(Err("Failed to parse auth-required"))?;
+
+                let SocketResult { status, id } = {
+                    let mut context_proxy = self.context.lock().unwrap();
+                    let proxy = context_proxy.socket_manager_dbus.as_mut().unwrap();
+                    if auth_required {
+                        proxy.listen_using_l2cap_channel(callback_id)
+                    } else {
+                        proxy.listen_using_insecure_l2cap_channel(callback_id)
+                    }
+                };
 
                 if status != BtStatus::Success {
                     return Err(format!(
@@ -1298,53 +1326,62 @@ impl CommandHandler {
                     name: String::from("Socket Connect Device"),
                 };
 
-                let SocketResult { status, id } = match &sock_type[0..] {
-                    "l2cap" => {
-                        let psm = match psm_or_uuid.clone().parse::<i32>() {
-                            Ok(v) => v,
-                            Err(e) => {
-                                return Err(CommandError::Failed(format!(
-                                    "Bad PSM given. Error={}",
-                                    e
-                                )));
-                            }
-                        };
+                let auth_required = String::from(get_arg(args, 4)?)
+                    .parse::<bool>()
+                    .or(Err("Failed to parse auth-required"))?;
 
-                        self.context
-                            .lock()
-                            .unwrap()
-                            .socket_manager_dbus
-                            .as_mut()
-                            .unwrap()
-                            .create_insecure_l2cap_channel(callback_id, device, psm)
-                    }
-                    "rfcomm" => {
-                        let uuid = match UuidHelper::parse_string(psm_or_uuid.clone()) {
-                            Some(uu) => uu,
-                            None => {
-                                return Err(CommandError::Failed(format!(
-                                    "Could not parse given uuid."
-                                )));
-                            }
-                        };
+                let SocketResult { status, id } = {
+                    let mut context_proxy = self.context.lock().unwrap();
+                    let proxy = context_proxy.socket_manager_dbus.as_mut().unwrap();
 
-                        self.context
-                            .lock()
-                            .unwrap()
-                            .socket_manager_dbus
-                            .as_mut()
-                            .unwrap()
-                            .create_insecure_rfcomm_socket_to_service_record(
-                                callback_id,
-                                device,
-                                uuid,
-                            )
-                    }
-                    _ => {
-                        return Err(CommandError::Failed(format!(
-                            "Unknown socket type: {}",
-                            sock_type
-                        )));
+                    match &sock_type[0..] {
+                        "l2cap" => {
+                            let psm = match psm_or_uuid.clone().parse::<i32>() {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    return Err(CommandError::Failed(format!(
+                                        "Bad PSM given. Error={}",
+                                        e
+                                    )));
+                                }
+                            };
+
+                            if auth_required {
+                                proxy.create_l2cap_channel(callback_id, device, psm)
+                            } else {
+                                proxy.create_insecure_l2cap_channel(callback_id, device, psm)
+                            }
+                        }
+                        "rfcomm" => {
+                            let uuid = match UuidHelper::parse_string(psm_or_uuid.clone()) {
+                                Some(uu) => uu,
+                                None => {
+                                    return Err(CommandError::Failed(format!(
+                                        "Could not parse given uuid."
+                                    )));
+                                }
+                            };
+
+                            if auth_required {
+                                proxy.create_rfcomm_socket_to_service_record(
+                                    callback_id,
+                                    device,
+                                    uuid,
+                                )
+                            } else {
+                                proxy.create_insecure_rfcomm_socket_to_service_record(
+                                    callback_id,
+                                    device,
+                                    uuid,
+                                )
+                            }
+                        }
+                        _ => {
+                            return Err(CommandError::Failed(format!(
+                                "Unknown socket type: {}",
+                                sock_type
+                            )));
+                        }
                     }
                 };
 
@@ -1363,13 +1400,71 @@ impl CommandHandler {
         Ok(())
     }
 
+    fn cmd_hid(&mut self, args: &Vec<String>) -> CommandResult {
+        if !self.context.lock().unwrap().adapter_ready {
+            return Err(self.adapter_not_ready());
+        }
+
+        let command = get_arg(args, 0)?;
+
+        match &command[..] {
+            "get-report" => {
+                let addr = String::from(get_arg(args, 1)?);
+                let report_type = match &get_arg(args, 2)?[..] {
+                    "Input" => BthhReportType::InputReport,
+                    "Output" => BthhReportType::OutputReport,
+                    "Feature" => BthhReportType::FeatureReport,
+                    _ => {
+                        return Err("Failed to parse report type".into());
+                    }
+                };
+                let report_id = String::from(get_arg(args, 3)?)
+                    .parse::<u8>()
+                    .or(Err("Failed parsing report_id"))?;
+
+                self.context.lock().unwrap().qa_dbus.as_mut().unwrap().get_hid_report(
+                    addr,
+                    report_type,
+                    report_id,
+                );
+            }
+            "set-report" => {
+                let addr = String::from(get_arg(args, 1)?);
+                let report_type = match &get_arg(args, 2)?[..] {
+                    "Input" => BthhReportType::InputReport,
+                    "Output" => BthhReportType::OutputReport,
+                    "Feature" => BthhReportType::FeatureReport,
+                    _ => {
+                        return Err("Failed to parse report type".into());
+                    }
+                };
+                let report_value = String::from(get_arg(args, 3)?);
+
+                self.context.lock().unwrap().qa_dbus.as_mut().unwrap().set_hid_report(
+                    addr,
+                    report_type,
+                    report_value,
+                );
+            }
+            "send-data" => {
+                let addr = String::from(get_arg(args, 1)?);
+                let data = String::from(get_arg(args, 2)?);
+
+                self.context.lock().unwrap().qa_dbus.as_mut().unwrap().send_hid_data(addr, data);
+            }
+            _ => return Err(CommandError::InvalidArgs),
+        };
+
+        Ok(())
+    }
+
     /// Get the list of rules of supported commands
     pub fn get_command_rule_list(&self) -> Vec<String> {
         self.command_options.values().flat_map(|cmd| cmd.rules.clone()).collect()
     }
 
     fn cmd_list_devices(&mut self, args: &Vec<String>) -> CommandResult {
-        if !self.context.lock().unwrap().adapter_ready {
+        if !self.lock_context().adapter_ready {
             return Err(self.adapter_not_ready());
         }
 
@@ -1378,34 +1473,22 @@ impl CommandHandler {
         match &command[..] {
             "bonded" => {
                 print_info!("Known bonded devices:");
-                let devices = self
-                    .context
-                    .lock()
-                    .unwrap()
-                    .adapter_dbus
-                    .as_ref()
-                    .unwrap()
-                    .get_bonded_devices();
+                let devices =
+                    self.lock_context().adapter_dbus.as_ref().unwrap().get_bonded_devices();
                 for device in devices.iter() {
                     print_info!("[{:17}] {}", device.address, device.name);
                 }
             }
             "found" => {
                 print_info!("Devices found in most recent discovery session:");
-                for (key, val) in self.context.lock().unwrap().found_devices.iter() {
+                for (key, val) in self.lock_context().found_devices.iter() {
                     print_info!("[{:17}] {}", key, val.name);
                 }
             }
             "connected" => {
                 print_info!("Connected devices:");
-                let devices = self
-                    .context
-                    .lock()
-                    .unwrap()
-                    .adapter_dbus
-                    .as_ref()
-                    .unwrap()
-                    .get_connected_devices();
+                let devices =
+                    self.lock_context().adapter_dbus.as_ref().unwrap().get_connected_devices();
                 for device in devices.iter() {
                     print_info!("[{:17}] {}", device.address, device.name);
                 }

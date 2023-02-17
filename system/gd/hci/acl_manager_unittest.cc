@@ -320,8 +320,9 @@ class TestHciLayer : public HciLayer {
  private:
   void Notify() {
     if (hci_command_promise_ != nullptr) {
-      hci_command_promise_->set_value();
-      hci_command_promise_.reset();
+      std::promise<void>* prom = hci_command_promise_.release();
+      prom->set_value();
+      delete prom;
     }
   }
 
@@ -372,8 +373,9 @@ class MockLeConnectionCallbacks : public LeConnectionCallbacks {
   void OnLeConnectSuccess(AddressWithType address_with_type, std::unique_ptr<LeAclConnection> connection) override {
     le_connections_.push_back(std::move(connection));
     if (le_connection_promise_ != nullptr) {
-      le_connection_promise_->set_value();
-      le_connection_promise_.reset();
+      std::promise<void>* prom = le_connection_promise_.release();
+      prom->set_value();
+      delete prom;
     }
   }
   MOCK_METHOD(void, OnLeConnectFail, (AddressWithType, ErrorCode reason, bool locally_initiated), (override));
@@ -719,7 +721,6 @@ class AclManagerWithLeConnectionTest : public AclManagerWithCallbacksTest {
         void(hci::ErrorCode hci_status, uint8_t version, uint16_t manufacturer_name, uint16_t sub_version));
     MOCK_METHOD2(OnLeReadRemoteFeaturesComplete, void(hci::ErrorCode hci_status, uint64_t features));
     MOCK_METHOD3(OnPhyUpdate, void(hci::ErrorCode hci_status, uint8_t tx_phy, uint8_t rx_phy));
-    MOCK_METHOD1(OnLocalAddressUpdate, void(AddressWithType address_with_type));
     MOCK_METHOD5(
         OnLeSubrateChange,
         void(

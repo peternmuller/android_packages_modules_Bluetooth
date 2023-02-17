@@ -101,7 +101,7 @@ impl BluetoothServerSocket {
         BluetoothServerSocket {
             id: 0,
             sock_type: SocketType::Rfcomm,
-            flags: flags,
+            flags,
             psm: None,
             channel: Some(DYNAMIC_CHANNEL),
             name: Some(name),
@@ -198,7 +198,7 @@ impl BluetoothSocket {
             id: 0,
             remote_device: device,
             sock_type: SocketType::L2cap,
-            flags: flags,
+            flags,
             fd: None,
             port: psm,
             uuid: None,
@@ -212,7 +212,7 @@ impl BluetoothSocket {
             id: 0,
             remote_device: device,
             sock_type: SocketType::Rfcomm,
-            flags: flags,
+            flags,
             fd: None,
             port: -1,
             uuid: Some(uuid),
@@ -820,7 +820,7 @@ impl BluetoothSocketManager {
                                         }
 
                                         Err(e) => {
-                                            if e == nix::Error::Sys(nix::errno::Errno::EAGAIN) {
+                                            if e == nix::errno::Errno::EAGAIN {
                                                 Err(std::io::Error::new(
                                                     std::io::ErrorKind::WouldBlock,
                                                     "Recvfrom is readable but would block on read",

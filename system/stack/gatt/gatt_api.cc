@@ -304,7 +304,7 @@ tGATT_STATUS GATTS_AddService(tGATT_IF gatt_if, btgatt_db_element_t* service,
   elem.type = list.asgn_range.is_primary ? GATT_UUID_PRI_SERVICE
                                          : GATT_UUID_SEC_SERVICE;
 
-  if (elem.type == GATT_UUID_PRI_SERVICE) {
+  if (elem.type == GATT_UUID_PRI_SERVICE && gatt_cb.over_br_enabled) {
     Uuid* p_uuid = gatts_get_service_uuid(elem.p_db);
     if (*p_uuid != Uuid::From16Bit(UUID_SERVCLASS_GMCS_SERVER) &&
         *p_uuid != Uuid::From16Bit(UUID_SERVCLASS_GTBS_SERVER)) {
@@ -1305,7 +1305,7 @@ bool GATT_Connect(tGATT_IF gatt_if, const RawAddress& bd_addr,
       ret = false;
     } else {
       LOG_DEBUG("Adding to background connect to device:%s",
-                PRIVATE_ADDRESS(bd_addr));
+                ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
       if (connection_type == BTM_BLE_BKG_CONNECT_ALLOW_LIST) {
         ret = connection_manager::background_connect_add(gatt_if, bd_addr);
       } else {

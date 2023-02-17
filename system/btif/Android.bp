@@ -115,6 +115,7 @@ cc_library_static {
         "src/btif_hf_client.cc",
         "src/btif_hh.cc",
         "src/btif_hd.cc",
+        "src/btif_iot_config.cc",
         "src/btif_le_audio.cc",
         "src/btif_le_audio_broadcaster.cc",
         "src/btif_pan.cc",
@@ -196,6 +197,7 @@ cc_library_static {
         "src/btif_gatt_server.cc",
         "src/btif_gatt_test.cc",
         "src/btif_gatt_util.cc",
+        "src/btif_iot_config.cc",
         "src/btif_metrics_logging.cc",
         "src/btif_profile_queue.cc",
         "src/btif_sdp.cc",
@@ -270,7 +272,6 @@ cc_test {
         "libcrypto",
         "libfmq",
         "libhidlbase",
-        "libprotobuf-cpp-lite",
         "libprocessgroup",
     ],
     static_libs: [
@@ -297,6 +298,7 @@ cc_test {
         "liblc3",
         "libopus",
         "libosi",
+        "libprotobuf-cpp-lite",
         "libudrv-uipc",
    ],
     whole_static_libs: [
@@ -307,7 +309,7 @@ cc_test {
         android: {
             shared_libs: [
                 "libbinder_ndk",
-                "android.hardware.bluetooth.audio-V2-ndk",
+                "android.hardware.bluetooth.audio-V3-ndk",
                 "libPlatformProperties",
             ],
         },
@@ -362,6 +364,7 @@ cc_test {
     },
     include_dirs: btifCommonIncludes,
     srcs: [
+        ":TestCommonLogMsg",
         "test/btif_rc_test.cc",
     ],
     header_libs: ["libbluetooth_headers"],
@@ -369,7 +372,6 @@ cc_test {
         "libcrypto",
         "libcutils",
         "liblog",
-        "libprotobuf-cpp-lite",
     ],
     static_libs: [
         "libbluetooth-types",
@@ -436,6 +438,7 @@ cc_test {
     test_suites: ["device-tests"],
     include_dirs: btifCommonIncludes,
     srcs: [
+        ":TestCommonLogMsg",
         "test/btif_hf_client_service_test.cc",
     ],
     header_libs: ["libbluetooth_headers"],
@@ -561,7 +564,7 @@ cc_test {
           android: {
               shared_libs: [
                   "libbinder_ndk",
-                  "android.hardware.bluetooth.audio-V2-ndk",
+                  "android.hardware.bluetooth.audio-V3-ndk",
               ],
           },
       },
@@ -669,6 +672,7 @@ cc_test {
           "libbt-sbc-encoder",
           "libbtif",
           "libbtif-core",
+          "libbt-stack-core",
           "libbtdevice",
           "lib-bt-packets",
           "lib-bt-packets-avrcp",
@@ -682,7 +686,7 @@ cc_test {
           android: {
               shared_libs: [
                   "libbinder_ndk",
-                  "android.hardware.bluetooth.audio-V2-ndk",
+                  "android.hardware.bluetooth.audio-V3-ndk",
               ],
           },
       },

@@ -26,11 +26,11 @@
 #define BTA_API_H
 
 #include <base/strings/stringprintf.h>
+#include <base/functional/callback.h>
 
 #include <cstdint>
 #include <vector>
 
-#include "base/callback.h"
 #include "bt_target.h"  // Must be first to define build configuration
 #include "osi/include/log.h"
 #include "stack/include/bt_octets.h"
@@ -336,6 +336,7 @@ typedef struct {
 typedef struct {
   RawAddress bd_addr; /* BD address peer device. */
   tBT_TRANSPORT transport_link_type;
+  uint16_t acl_handle;
 } tBTA_DM_LINK_UP;
 
 /* Structure associated with BTA_DM_LINK_UP_FAILED_EVT */
@@ -715,18 +716,6 @@ enum {
  ****************************************************************************/
 
 void BTA_dm_init();
-
-/*******************************************************************************
- *
- * Function         BTA_EnableTestMode
- *
- * Description      Enables bluetooth device under test mode
- *
- *
- * Returns          tBTA_STATUS
- *
- ******************************************************************************/
-extern void BTA_EnableTestMode(void);
 
 /*******************************************************************************
  *

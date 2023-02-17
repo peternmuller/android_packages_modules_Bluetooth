@@ -19,15 +19,13 @@
  *   Functions generated:16
  */
 
-#include <map>
-#include <string>
-
-extern std::map<std::string, int> mock_function_count_map;
-
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <map>
+#include <string>
 
 #include "btm_api.h"
 #include "device/include/controller.h"
@@ -37,6 +35,7 @@ extern std::map<std::string, int> mock_function_count_map;
 #include "stack/btm/btm_dev.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_octets.h"
+#include "test/common/mock_functions.h"
 #include "types/raw_address.h"
 
 #ifndef UNUSED_ATTR
@@ -107,5 +106,14 @@ void btm_consolidate_dev(tBTM_SEC_DEV_REC* p_target_rec) {
   mock_function_count_map[__func__]++;
 }
 void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
+  mock_function_count_map[__func__]++;
+}
+void btm_dev_consolidate_existing_connections(const RawAddress& bd_addr) {
+  mock_function_count_map[__func__]++;
+}
+void BTM_SecDump(const std::string& label) {
+  mock_function_count_map[__func__]++;
+}
+void BTM_SecDumpDev(const RawAddress& bd_addr) {
   mock_function_count_map[__func__]++;
 }

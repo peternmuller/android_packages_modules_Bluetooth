@@ -170,6 +170,9 @@ cc_defaults {
                 "libutils",
                 "libstatslog_bt",
             ],
+            whole_static_libs: [
+                "android.hardware.bluetooth-V1-ndk",
+            ],
         },
     },
     srcs: [
@@ -431,6 +434,7 @@ cc_test {
     sanitize: {
         address: true,
     },
+    min_sdk_version: "Tiramisu",
 }
 
 cc_test {
@@ -485,6 +489,7 @@ cc_test {
             ],
         },
     },
+    min_sdk_version: "30",
 }
 
 cc_defaults {
@@ -612,6 +617,7 @@ genrule {
         "l2cap/l2cap_packets.h",
         "security/smp_packets.h",
     ],
+    visibility: ["//visibility:public"],
 }
 
 genrule {

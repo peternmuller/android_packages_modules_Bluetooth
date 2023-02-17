@@ -28,7 +28,7 @@
 #include "hci/address.h"
 #include "hci/hci_packets.h"
 #include "link_layer_controller.h"
-#include "model/controller/vendor/csr.h"
+#include "model/controller/vendor_commands/csr.h"
 #include "model/devices/device.h"
 #include "model/setup/async_manager.h"
 #ifndef ROOTCANAL_LMP
@@ -51,7 +51,9 @@ using ::bluetooth::hci::CommandView;
 // the controller's default constructor. Be sure to name your method after the
 // corresponding Bluetooth command in the Core Specification with the prefix
 // "Hci" to distinguish it as a controller command.
-class DualModeController : public Device {
+class DualModeController
+    : public Device,
+      public std::enable_shared_from_this<DualModeController> {
   static constexpr uint16_t kSecurityManagerNumKeys = 15;
 
  public:
@@ -64,10 +66,11 @@ class DualModeController : public Device {
   // Device methods.
   virtual std::string GetTypeString() const override;
 
-  virtual void IncomingPacket(
-      model::packets::LinkLayerPacketView incoming) override;
+  virtual void ReceiveLinkLayerPacket(
+      model::packets::LinkLayerPacketView incoming, Phy::Type type,
+      int8_t rssi) override;
 
-  virtual void TimerTick() override;
+  virtual void Tick() override;
   virtual void Close() override;
 
   // Route commands and data from the stack.
@@ -78,12 +81,12 @@ class DualModeController : public Device {
 
   // Set the callbacks for scheduling tasks.
   void RegisterTaskScheduler(
-      std::function<AsyncTaskId(std::chrono::milliseconds, const TaskCallback&)>
+      std::function<AsyncTaskId(std::chrono::milliseconds, TaskCallback)>
           task_scheduler);
 
   void RegisterPeriodicTaskScheduler(
       std::function<AsyncTaskId(std::chrono::milliseconds,
-                                std::chrono::milliseconds, const TaskCallback&)>
+                                std::chrono::milliseconds, TaskCallback)>
           periodic_task_scheduler);
 
   void RegisterTaskCancel(std::function<void(AsyncTaskId)> cancel);
@@ -409,7 +412,7 @@ class DualModeController : public Device {
   void ReadLocalExtendedFeatures(CommandView command);
 
   // 7.4.8
-  void ReadLocalSupportedCodecs(CommandView command);
+  void ReadLocalSupportedCodecsV1(CommandView command);
 
   // Status Parameters Commands
   // Bluetooth Core Specification Version 4.2 Volume 2 Part E 7.5
@@ -432,8 +435,9 @@ class DualModeController : public Device {
   // 7.8.1
   void LeSetEventMask(CommandView command);
 
-  // 7.8.2
-  void LeReadBufferSize(CommandView command);
+  // 7.8.2 and 7.8.93
+  void LeReadBufferSizeV1(CommandView command);
+  void LeReadBufferSizeV2(CommandView command);
 
   // 7.8.3
   void LeReadLocalSupportedFeatures(CommandView command);
@@ -576,9 +580,6 @@ class DualModeController : public Device {
   // 7.8.77
   void LeSetPrivacyMode(CommandView command);
 
-  // 7.8.93 (moved to 7.8.2)
-  void LeReadBufferSizeV2(CommandView command);
-
   // 7.8.96 - 7.8.110
   void LeReadIsoTxSync(CommandView command);
   void LeSetCigParameters(CommandView command);
@@ -597,14 +598,17 @@ class DualModeController : public Device {
   // 7.8.115
   void LeSetHostFeature(CommandView command);
 
+  // Required commands for handshaking with hci driver
+  void ReadClassOfDevice(CommandView command);
+  void ReadVoiceSetting(CommandView command);
+  void ReadConnectionAcceptTimeout(CommandView command);
+  void WriteConnectionAcceptTimeout(CommandView command);
+
   // Vendor-specific Commands
 
-  void LeVendorSleepMode(CommandView command);
-  void LeVendorCap(CommandView command);
-  void LeVendorMultiAdv(CommandView command);
-  void LeVendor155(CommandView command);
-  void LeVendor157(CommandView command);
+  void LeGetVendorCapabilities(CommandView command);
   void LeEnergyInfo(CommandView command);
+  void LeMultiAdv(CommandView command);
   void LeAdvertisingFilter(CommandView command);
   void LeExtendedScanParams(CommandView command);
 
@@ -616,12 +620,6 @@ class DualModeController : public Device {
   void CsrWriteVarid(CsrVarid varid, std::vector<uint8_t> const& value);
   void CsrReadPskey(CsrPskey pskey, std::vector<uint8_t>& value);
   void CsrWritePskey(CsrPskey pskey, std::vector<uint8_t> const& value);
-
-  // Required commands for handshaking with hci driver
-  void ReadClassOfDevice(CommandView command);
-  void ReadVoiceSetting(CommandView command);
-  void ReadConnectionAcceptTimeout(CommandView command);
-  void WriteConnectionAcceptTimeout(CommandView command);
 
   void SetTimerPeriod(std::chrono::milliseconds new_period);
   void StartTimer();
@@ -637,7 +635,8 @@ class DualModeController : public Device {
  private:
   // Send a HCI_Command_Complete event for the specified op_code with
   // the error code UNKNOWN_OPCODE.
-  void SendCommandCompleteUnknownOpCodeEvent(uint16_t op_code) const;
+  void SendCommandCompleteUnknownOpCodeEvent(
+      bluetooth::hci::OpCode op_code) const;
 
   // Callbacks to send packets back to the HCI.
   std::function<void(std::shared_ptr<bluetooth::hci::AclBuilder>)> send_acl_;
@@ -646,17 +645,23 @@ class DualModeController : public Device {
   std::function<void(std::shared_ptr<bluetooth::hci::ScoBuilder>)> send_sco_;
   std::function<void(std::shared_ptr<bluetooth::hci::IsoBuilder>)> send_iso_;
 
-  // Map supported opcodes to the function implementing the handler
-  // for the associated command. The map should be a subset of the
-  // supported_command field in the properties_ object.
-  std::unordered_map<bluetooth::hci::OpCode,
-                     std::function<void(bluetooth::hci::CommandView)>>
-      active_hci_commands_;
-
   // Loopback mode (Vol 4, Part E § 7.6.1).
   // The local loopback mode is used to pass the android Vendor Test Suite
   // with RootCanal.
   bluetooth::hci::LoopbackMode loopback_mode_;
+
+  // Map command opcodes to the corresponding bit index in the
+  // supported command mask.
+  static const std::unordered_map<OpCode, OpCodeIndex>
+      hci_command_op_code_to_index_;
+
+  // Map all implemented opcodes to the function implementing the handler
+  // for the associated command. The map should be a subset of the
+  // supported_command field in the properties_ object. Commands
+  // that are supported but not implemented will raise a fatal assert.
+  using CommandHandler =
+      std::function<void(DualModeController*, bluetooth::hci::CommandView)>;
+  static const std::unordered_map<OpCode, CommandHandler> hci_command_handlers_;
 
 #ifndef ROOTCANAL_LMP
   SecurityManager security_manager_;

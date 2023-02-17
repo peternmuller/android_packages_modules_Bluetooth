@@ -37,11 +37,12 @@ import static android.Manifest.permission.BLUETOOTH_CONNECT;
 import static android.Manifest.permission.BLUETOOTH_PRIVILEGED;
 
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothAudioPolicy;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadsetClient;
 import android.bluetooth.BluetoothHeadsetClient.NetworkServiceState;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothSinkAudioPolicy;
+import android.bluetooth.BluetoothStatusCodes;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.hfp.BluetoothHfpProtoEnums;
 import android.content.Intent;
@@ -53,6 +54,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.util.Pair;
 
@@ -63,6 +65,7 @@ import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.MetricsLogger;
 import com.android.bluetooth.btservice.ProfileService;
+import com.android.bluetooth.hfp.HeadsetService;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IState;
 import com.android.internal.util.State;
@@ -147,6 +150,7 @@ public class HeadsetClientStateMachine extends StateMachine {
     private long mClccTimer = 0;
 
     private final HeadsetClientService mService;
+    private final HeadsetService mHeadsetService;
 
     // Set of calls that represent the accurate state of calls that exists on AG and the calls that
     // are currently in process of being notified to the AG from HF.
@@ -185,7 +189,7 @@ public class HeadsetClientStateMachine extends StateMachine {
     private static final int CALL_AUDIO_POLICY_FEATURE_ID = 1;
 
     public int mAudioPolicyRemoteSupported;
-    private BluetoothAudioPolicy mHsClientAudioPolicy;
+    private BluetoothSinkAudioPolicy mHsClientAudioPolicy;
 
     private boolean mAudioWbs;
     private int mVoiceRecognitionActive;
@@ -381,7 +385,8 @@ public class HeadsetClientStateMachine extends StateMachine {
         Intent intent = new Intent(BluetoothHeadsetClient.ACTION_CALL_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         intent.putExtra(BluetoothHeadsetClient.EXTRA_CALL, c);
-        mService.sendBroadcast(intent, BLUETOOTH_CONNECT, Utils.getTempAllowlistBroadcastOptions());
+        Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
+                Utils.getTempAllowlistBroadcastOptions());
         HfpClientConnectionService.onCallChanged(c.getDevice(), c);
     }
 
@@ -539,7 +544,12 @@ public class HeadsetClientStateMachine extends StateMachine {
         }
 
         if (mCalls.size() > 0) {
-            if (mService.getResources().getBoolean(R.bool.hfp_clcc_poll_during_call)) {
+            // Continue polling even if not enabled until the new outgoing call is associated with
+            // a valid call on the phone. The polling would at most continue until
+            // OUTGOING_TIMEOUT_MILLI. This handles the potential scenario where the phone creates
+            // and terminates a call before the first QUERY_CURRENT_CALLS completes.
+            if (mService.getResources().getBoolean(R.bool.hfp_clcc_poll_during_call)
+                    || (mCalls.containsKey(HF_ORIGINATED_CALL_ID))) {
                 sendMessageDelayed(QUERY_CURRENT_CALLS,
                         mService.getResources().getInteger(
                         R.integer.hfp_clcc_poll_interval_during_call));
@@ -854,12 +864,13 @@ public class HeadsetClientStateMachine extends StateMachine {
         return (bitfield & mask) == mask;
     }
 
-    HeadsetClientStateMachine(HeadsetClientService context, Looper looper,
-                              NativeInterface nativeInterface) {
+    HeadsetClientStateMachine(HeadsetClientService context, HeadsetService headsetService,
+                              Looper looper, NativeInterface nativeInterface) {
         super(TAG, looper);
         mService = context;
         mNativeInterface = nativeInterface;
         mAudioManager = mService.getAudioManager();
+        mHeadsetService = headsetService;
 
         mVendorProcessor = new VendorCommandResponseProcessor(mService, mNativeInterface);
 
@@ -871,7 +882,7 @@ public class HeadsetClientStateMachine extends StateMachine {
         mAudioRouteAllowed = context.getResources().getBoolean(
             R.bool.headset_client_initial_audio_route_allowed);
 
-        mHsClientAudioPolicy = new BluetoothAudioPolicy.Builder().build();
+        mHsClientAudioPolicy = new BluetoothSinkAudioPolicy.Builder().build();
 
         mIndicatorNetworkState = HeadsetClientHalConstants.NETWORK_STATE_NOT_AVAILABLE;
         mIndicatorNetworkType = HeadsetClientHalConstants.SERVICE_TYPE_HOME;
@@ -903,11 +914,12 @@ public class HeadsetClientStateMachine extends StateMachine {
         setInitialState(mDisconnected);
     }
 
-    static HeadsetClientStateMachine make(HeadsetClientService context, Looper looper,
-                                          NativeInterface nativeInterface) {
+    static HeadsetClientStateMachine make(HeadsetClientService context,
+                                          HeadsetService headsetService,
+                                          Looper looper, NativeInterface nativeInterface) {
         logD("make");
-        HeadsetClientStateMachine hfcsm = new HeadsetClientStateMachine(context, looper,
-                                                                        nativeInterface);
+        HeadsetClientStateMachine hfcsm = new HeadsetClientStateMachine(context, headsetService,
+                                                                        looper, nativeInterface);
         hfcsm.start();
         return hfcsm;
     }
@@ -1015,6 +1027,9 @@ public class HeadsetClientStateMachine extends StateMachine {
             } else if (mPrevState != null) { // null is the default state before Disconnected
                 Log.e(TAG, "Disconnected: Illegal state transition from " + mPrevState.getName()
                         + " to Disconnected, mCurrentDevice=" + mCurrentDevice);
+            }
+            if (mHeadsetService != null && mCurrentDevice != null) {
+                mHeadsetService.updateInbandRinging(mCurrentDevice, false);
             }
             mCurrentDevice = null;
         }
@@ -1303,6 +1318,9 @@ public class HeadsetClientStateMachine extends StateMachine {
             if (mPrevState == mConnecting) {
                 broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
                         BluetoothProfile.STATE_CONNECTING);
+                if (mHeadsetService != null) {
+                    mHeadsetService.updateInbandRinging(mCurrentDevice, true);
+                }
                 MetricsLogger.logProfileConnectionEvent(
                         BluetoothMetricsProto.ProfileId.HEADSET_CLIENT);
             } else if (mPrevState != mAudioOn) {
@@ -1516,7 +1534,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             }
 
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             sendNetworkStateChangedIntent(event.device);
 
@@ -1536,7 +1554,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_NETWORK_ROAMING,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             sendNetworkStateChangedIntent(event.device);
                             break;
@@ -1547,7 +1565,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_NETWORK_SIGNAL_STRENGTH,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             sendNetworkStateChangedIntent(event.device);
                             break;
@@ -1558,7 +1576,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_BATTERY_LEVEL,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             break;
                         case StackEvent.EVENT_TYPE_OPERATOR_NAME:
@@ -1568,7 +1586,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_OPERATOR_NAME,
                                     event.valueString);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             sendNetworkStateChangedIntent(event.device);
                             break;
@@ -1597,8 +1615,11 @@ public class HeadsetClientStateMachine extends StateMachine {
                             if (event.valueInt == HeadsetClientHalConstants.VOLUME_TYPE_SPK) {
                                 mCommandedSpeakerVolume = hfToAmVol(event.valueInt2);
                                 logD("AM volume set to " + mCommandedSpeakerVolume);
+                                boolean show_volume = SystemProperties
+                                        .getBoolean("bluetooth.hfp_volume_control.enabled", true);
                                 mAudioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL,
-                                        +mCommandedSpeakerVolume, AudioManager.FLAG_SHOW_UI);
+                                        +mCommandedSpeakerVolume,
+                                        show_volume ? AudioManager.FLAG_SHOW_UI : 0);
                             } else if (event.valueInt
                                     == HeadsetClientHalConstants.VOLUME_TYPE_MIC) {
                                 mAudioManager.setMicrophoneMute(event.valueInt2 == 0);
@@ -1652,7 +1673,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_SUBSCRIBER_INFO,
                                     mSubscriberInfo);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             break;
                         case StackEvent.EVENT_TYPE_IN_BAND_RINGTONE:
@@ -1661,7 +1682,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_IN_BAND_RING,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+                            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                                     Utils.getTempAllowlistBroadcastOptions());
                             logD(event.device.toString() + "onInBandRing" + event.valueInt);
                             break;
@@ -1696,7 +1717,7 @@ public class HeadsetClientStateMachine extends StateMachine {
             Intent intent = new Intent(BluetoothHeadsetClient.ACTION_AG_EVENT);
             intent.putExtra(BluetoothHeadsetClient.EXTRA_VOICE_RECOGNITION, newState);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-            mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+            Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                     Utils.getTempAllowlistBroadcastOptions());
         }
 
@@ -1965,7 +1986,7 @@ public class HeadsetClientStateMachine extends StateMachine {
             intent.putExtra(BluetoothHeadsetClient.EXTRA_AUDIO_WBS, mAudioWbs);
         }
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-        mService.sendBroadcast(intent, BLUETOOTH_CONNECT,
+        Utils.sendBroadcast(mService, intent, BLUETOOTH_CONNECT,
                 Utils.getTempAllowlistBroadcastOptions());
 
         logD("Audio state " + device + ": " + prevState + "->" + newState);
@@ -2143,13 +2164,13 @@ public class HeadsetClientStateMachine extends StateMachine {
         mAudioRouteAllowed = allowed;
 
         int establishPolicy = allowed
-                ? BluetoothAudioPolicy.POLICY_ALLOWED :
-                BluetoothAudioPolicy.POLICY_NOT_ALLOWED;
+                ? BluetoothSinkAudioPolicy.POLICY_ALLOWED :
+                BluetoothSinkAudioPolicy.POLICY_NOT_ALLOWED;
 
         /*
          * Backward compatibility for mAudioRouteAllowed
          */
-        setAudioPolicy(new BluetoothAudioPolicy.Builder(mHsClientAudioPolicy)
+        setAudioPolicy(new BluetoothSinkAudioPolicy.Builder(mHsClientAudioPolicy)
                 .setCallEstablishPolicy(establishPolicy).build());
     }
 
@@ -2157,26 +2178,26 @@ public class HeadsetClientStateMachine extends StateMachine {
         return mAudioRouteAllowed;
     }
 
-    private String createMaskString(BluetoothAudioPolicy policies) {
+    private String createMaskString(BluetoothSinkAudioPolicy policies) {
         StringBuilder mask = new StringBuilder();
         mask.append(Integer.toString(CALL_AUDIO_POLICY_FEATURE_ID));
         mask.append("," + policies.getCallEstablishPolicy());
-        mask.append("," + policies.getConnectingTimePolicy());
+        mask.append("," + policies.getActiveDevicePolicyAfterConnection());
         mask.append("," + policies.getInBandRingtonePolicy());
         return mask.toString();
     }
 
     /**
-     * sets the {@link BluetoothAudioPolicy} object device and send to the remote
+     * sets the {@link BluetoothSinkAudioPolicy} object device and send to the remote
      * device using Android specific AT commands.
      *
      * @param policies to be set policies
      */
-    public void setAudioPolicy(BluetoothAudioPolicy policies) {
+    public void setAudioPolicy(BluetoothSinkAudioPolicy policies) {
         logD("setAudioPolicy: " + policies);
         mHsClientAudioPolicy = policies;
 
-        if (mAudioPolicyRemoteSupported != BluetoothAudioPolicy.FEATURE_SUPPORTED_BY_REMOTE) {
+        if (mAudioPolicyRemoteSupported != BluetoothStatusCodes.FEATURE_SUPPORTED) {
             Log.e(TAG, "Audio Policy feature not supported!");
             return;
         }
@@ -2204,9 +2225,9 @@ public class HeadsetClientStateMachine extends StateMachine {
      */
     public void setAudioPolicyRemoteSupported(boolean supported) {
         if (supported) {
-            mAudioPolicyRemoteSupported = BluetoothAudioPolicy.FEATURE_SUPPORTED_BY_REMOTE;
+            mAudioPolicyRemoteSupported = BluetoothStatusCodes.FEATURE_SUPPORTED;
         } else {
-            mAudioPolicyRemoteSupported = BluetoothAudioPolicy.FEATURE_NOT_SUPPORTED_BY_REMOTE;
+            mAudioPolicyRemoteSupported = BluetoothStatusCodes.FEATURE_NOT_SUPPORTED;
         }
     }
 

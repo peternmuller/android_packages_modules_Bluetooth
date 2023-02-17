@@ -145,7 +145,8 @@ public class BluetoothMapContentObserver {
     boolean mObserverRegistered = false;
     @VisibleForTesting
     BluetoothMapAccountItem mAccount;
-    private String mAuthority = null;
+    @VisibleForTesting
+    String mAuthority = null;
 
     // Default supported feature bit mask is 0x1f
     private int mMapSupportedFeatures = BluetoothMapUtils.MAP_FEATURE_DEFAULT_BITMASK;
@@ -1262,7 +1263,8 @@ public class BluetoothMapContentObserver {
         }
     }
 
-    private void initMsgList() throws RemoteException {
+    @VisibleForTesting
+    void initMsgList() throws RemoteException {
         if (V) {
             Log.d(TAG, "initMsgList");
         }
@@ -1276,7 +1278,8 @@ public class BluetoothMapContentObserver {
 
             Cursor c;
             try {
-                c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION_SHORT, null, null, null);
+                c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        Sms.CONTENT_URI, SMS_PROJECTION_SHORT, null, null, null);
             } catch (SQLiteException e) {
                 Log.e(TAG, "Failed to initialize the list of messages: " + e.toString());
                 return;
@@ -1307,7 +1310,8 @@ public class BluetoothMapContentObserver {
 
             HashMap<Long, Msg> msgListMms = new HashMap<Long, Msg>();
 
-            c = mResolver.query(Mms.CONTENT_URI, MMS_PROJECTION_SHORT, null, null, null);
+            c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver, Mms.CONTENT_URI,
+                    MMS_PROJECTION_SHORT, null, null, null);
             try {
                 if (c != null && c.moveToFirst()) {
                     do {
@@ -1417,7 +1421,8 @@ public class BluetoothMapContentObserver {
         }
     }
 
-    private void handleMsgListChangesSms() {
+    @VisibleForTesting
+    void handleMsgListChangesSms() {
         if (V) {
             Log.d(TAG, "handleMsgListChangesSms");
         }
@@ -1428,9 +1433,11 @@ public class BluetoothMapContentObserver {
         Cursor c;
         synchronized (getMsgListSms()) {
             if (mMapEventReportVersion == BluetoothMapUtils.MAP_EVENT_REPORT_V10) {
-                c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION_SHORT, null, null, null);
+                c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        Sms.CONTENT_URI, SMS_PROJECTION_SHORT, null, null, null);
             } else {
-                c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION_SHORT_EXT, null, null, null);
+                c = BluetoothMethodProxy.getInstance().contentResolverQuery(mResolver,
+                        Sms.CONTENT_URI, SMS_PROJECTION_SHORT_EXT, null, null, null);
             }
             try {
                 if (c != null && c.moveToFirst()) {
@@ -1963,7 +1970,8 @@ public class BluetoothMapContentObserver {
         }
     }
 
-    private void handleContactListChanges(Uri uri) {
+    @VisibleForTesting
+    void handleContactListChanges(Uri uri) {
         if (uri.getAuthority().equals(mAuthority)) {
             try {
                 if (V) {

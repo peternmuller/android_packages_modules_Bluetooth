@@ -17,11 +17,13 @@
 #include "main/shim/entry.h"
 
 #include "gd/btaa/activity_attribution.h"
+#include "gd/hal/snoop_logger.h"
 #include "gd/hci/controller.h"
 #include "gd/hci/hci_layer.h"
 #include "gd/hci/le_advertising_manager.h"
 #include "gd/hci/le_scanning_manager.h"
 #include "gd/hci/msft.h"
+#include "gd/hci/remote_name_request.h"
 #include "gd/hci/vendor_specific_event_manager.h"
 #include "gd/metrics/counter_metrics.h"
 #include "gd/neighbor/connectability.h"
@@ -96,6 +98,12 @@ neighbor::PageModule* GetPage() {
       ->GetInstance<neighbor::PageModule>();
 }
 
+hci::RemoteNameRequestModule* GetRemoteNameRequest() {
+  return Stack::GetInstance()
+      ->GetStackManager()
+      ->GetInstance<hci::RemoteNameRequestModule>();
+}
+
 hci::LeScanningManager* GetScanning() {
   return Stack::GetInstance()
       ->GetStackManager()
@@ -106,6 +114,12 @@ security::SecurityModule* GetSecurityModule() {
   return Stack::GetInstance()
       ->GetStackManager()
       ->GetInstance<security::SecurityModule>();
+}
+
+hal::SnoopLogger* GetSnoopLogger() {
+  return Stack::GetInstance()
+      ->GetStackManager()
+      ->GetInstance<hal::SnoopLogger>();
 }
 
 storage::StorageModule* GetStorage() {

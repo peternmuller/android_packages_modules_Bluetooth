@@ -27,7 +27,7 @@
 #define LOG_TAG "bt_btif_gattc"
 
 #include <base/at_exit.h>
-#include <base/bind.h>
+#include <base/functional/bind.h>
 #include <base/logging.h>
 #include <base/threading/thread.h>
 #include <errno.h>
@@ -351,7 +351,7 @@ static bt_status_t btif_gattc_open(int client_if, const RawAddress& bd_addr,
 
 void btif_gattc_close_impl(int client_if, RawAddress address, int conn_id) {
   LOG_INFO("client_if=%d, conn_id=%d, address=%s", client_if, conn_id,
-           PRIVATE_ADDRESS(address));
+           ADDRESS_TO_LOGGABLE_CSTR(address));
   // Disconnect established connections
   if (conn_id != 0) {
     BTA_GATTC_Close(conn_id);
