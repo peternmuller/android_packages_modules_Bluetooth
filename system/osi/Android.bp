@@ -80,13 +80,13 @@ cc_library_static {
         "-DLIB_OSI_INTERNAL",
     ],
     min_sdk_version: "Tiramisu",
-    apex_available: [
-        "//apex_available:platform",
-    ],
     header_libs: ["libbluetooth_headers"],
     static_libs: [
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
+    ],
+    apex_available: [
+        "com.android.btservices",
     ],
 }
 

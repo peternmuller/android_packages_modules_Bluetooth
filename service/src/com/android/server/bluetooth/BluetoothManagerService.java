@@ -957,7 +957,7 @@ class BluetoothManagerService {
             throws RemoteException, TimeoutException {
         if (mBluetooth == null) return;
         final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
-        //mBluetooth.onBrEdrDown(attributionSource, recv);
+        mBluetooth.stopBle(attributionSource, recv);
         recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
     }
 
@@ -966,7 +966,7 @@ class BluetoothManagerService {
             throws RemoteException, TimeoutException {
         if (mBluetooth == null) return;
         final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
-        //mBluetooth.onLeServiceUp(attributionSource, recv);
+        mBluetooth.startBrEdr(attributionSource, recv);
         recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
     }
 

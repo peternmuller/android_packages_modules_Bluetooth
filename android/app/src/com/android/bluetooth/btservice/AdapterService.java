@@ -68,6 +68,7 @@ import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothActivityEnergyInfoListener;
 import android.bluetooth.IBluetoothCallback;
 import android.bluetooth.IBluetoothConnectionCallback;
+import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothMetadataListener;
 import android.bluetooth.IBluetoothOobDataCallback;
 import android.bluetooth.IBluetoothPreferredAudioProfilesCallback;
@@ -163,6 +164,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -376,6 +378,7 @@ public class AdapterService extends Service {
     private CsipSetCoordinatorService mCsipSetCoordinatorService;
     private LeAudioService mLeAudioService;
     private BassClientService mBassClientService;
+	private IBluetoothGatt mBluetoothGatt;
     private BatteryService mBatteryService;
     private BluetoothQualityReportNativeInterface mBluetoothQualityReportNativeInterface;
 
@@ -4355,6 +4358,10 @@ public class AdapterService extends Service {
             return service.getLeMaximumAdvertisingDataLength();
         }
 
+	@Override
+	public void getEncKeyMaterialValue(SynchronousResultReceiver receiver) {
+	}
+
         @Override
         public void isActivityAndEnergyReportingSupported(SynchronousResultReceiver receiver) {
             try {
@@ -5221,20 +5228,20 @@ public class AdapterService extends Service {
 
         @Override
         public void getBluetoothGatt(SynchronousResultReceiver receiver) {
-            try {
-                receiver.send(getBluetoothGatt());
-            } catch (RuntimeException e) {
-                receiver.propagateException(e);
-            }
+          //  try {
+          //      receiver.send(getBluetoothGatt());
+          //  } catch (RuntimeException e) {
+         //       receiver.propagateException(e);
+         //   }
         }
 
-        private IBinder getBluetoothGatt() {
-            AdapterService service = getService();
-            if (service == null) {
-                return null;
-            }
-            return service.getBluetoothGatt();
-        }
+        //private IBinder getBluetoothGatt() {
+          //  AdapterService service = getService();
+           // if (service == null) {
+           //     return null;
+          //  }
+         //   return service.getBluetoothGatt();
+      //  }
 
         @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
         @Override
@@ -6890,16 +6897,30 @@ public class AdapterService extends Service {
         return BluetoothStatusCodes.FEATURE_NOT_SUPPORTED;
     }
 
+        IBluetoothGatt getBluetoothGatt() {
+        return mBluetoothGatt;
+    }
+
+    void unregAllGattClient(AttributionSource source) {
+        //if (mBluetoothGatt != null) {
+        //    try {
+        //        mBluetoothGatt.unregAll(source);
+        //    } catch (RemoteException e) {
+        //        Log.e(TAG, "Unable to disconnect all apps.", e);
+        //    }
+        //}
+    }
+
     /**
      * Notify the UID and package name of the app, and the address of associated active device
      *
      * @param source The attribution source that starts the activity
      * @param deviceAddress The address of the active device associated with the app
      */
-    public void notifyActivityAttributionInfo(AttributionSource source, String deviceAddress) {
-        mActivityAttributionService.notifyActivityAttributionInfo(
-                source.getUid(), source.getPackageName(), deviceAddress);
-    }
+  //  public void notifyActivityAttributionInfo(AttributionSource source, String deviceAddress) {
+  //      mActivityAttributionService.notifyActivityAttributionInfo(
+  //              source.getUid(), source.getPackageName(), deviceAddress);
+  //  }
 
     boolean isMediaProfileConnected() {
         if (mA2dpService != null && mA2dpService.getConnectedDevices().size() > 0) {
@@ -6932,11 +6953,11 @@ public class AdapterService extends Service {
      * BluetoothProfile}.
      */
     public void notifyProfileConnectionStateChangeToGatt(int profile, int fromState, int toState) {
-        if (mGattService == null) {
-            Log.w(TAG, "GATT Service is not running!");
-            return;
-        }
-        mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
+  //      if (mGattService == null) {
+  //          Log.w(TAG, "GATT Service is not running!");
+  //          return;
+  //      }
+  //      mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
     }
 
     /**

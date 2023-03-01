@@ -24,8 +24,7 @@ import android.compat.annotation.EnabledSince;
  */
 public class ChangeIds {
     /**
-     * Starting with {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE}, BLUETOOTH_CONNECT
-     * permission is enforced in getProfileConnectionState
+     * { Redacted }
      */
     @ChangeId
     @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE)

@@ -122,3 +122,9 @@ java_api_contribution {
         "//build/orchestrator/apis",
     ],
 }
+
+platform_compat_config
+{
+    name: "framework-bluetooth-compat-config",
+    src: ":framework-bluetooth",
+}
