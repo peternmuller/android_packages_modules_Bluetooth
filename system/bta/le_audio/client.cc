@@ -1002,7 +1002,7 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void GroupSetActive(const int group_id) override {
-    DLOG(INFO) << __func__ << " group_id: " << group_id;
+    LOG_INFO(" group_id: %d", group_id);
 
     if (group_id == bluetooth::groups::kGroupUnknown) {
       if (active_group_id_ == bluetooth::groups::kGroupUnknown) {
@@ -1010,6 +1010,7 @@ class LeAudioClientImpl : public LeAudioClient {
         return;
       }
 
+      LOG_INFO("Active group_id changed %d -> %d", active_group_id_, group_id);
       auto group_id_to_close = active_group_id_;
       active_group_id_ = bluetooth::groups::kGroupUnknown;
 
@@ -1093,6 +1094,7 @@ class LeAudioClientImpl : public LeAudioClient {
       callbacks_->OnGroupStatus(active_group_id_, GroupStatus::INACTIVE);
     }
 
+    LOG_INFO("Active group_id changed %d -> %d", active_group_id_, group_id);
     active_group_id_ = group_id;
     callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
   }
@@ -1364,8 +1366,6 @@ class LeAudioClientImpl : public LeAudioClient {
 
     BtaGattQueue::Clean(leAudioDevice->conn_id_);
     BTA_GATTC_Close(leAudioDevice->conn_id_);
-    leAudioDevice->conn_id_ = GATT_INVALID_CONN_ID;
-    leAudioDevice->mtu_ = 0;
 
     /* Remote in bad state, force ACL Disconnection. */
     if (acl_force_disconnect) {
@@ -3292,9 +3292,11 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void OnLocalAudioSourceSuspend() {
-    LOG_INFO("IN: audio_receiver_state_: %s,  audio_sender_state_: %s",
-             ToString(audio_receiver_state_).c_str(),
-             ToString(audio_sender_state_).c_str());
+    LOG_INFO(
+        "active group_id: %d, IN: audio_receiver_state_: %s, "
+        "audio_sender_state_: %s",
+        active_group_id_, ToString(audio_receiver_state_).c_str(),
+        ToString(audio_sender_state_).c_str());
 
     /* Note: This callback is from audio hal driver.
      * Bluetooth peer is a Sink for Audio Framework.
@@ -3329,9 +3331,11 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void OnLocalAudioSourceResume() {
-    LOG_INFO("IN: audio_receiver_state_: %s,  audio_sender_state_: %s",
-             ToString(audio_receiver_state_).c_str(),
-             ToString(audio_sender_state_).c_str());
+    LOG_INFO(
+        "active group_id: %d, IN: audio_receiver_state_: %s, "
+        "audio_sender_state_: %s",
+        active_group_id_, ToString(audio_receiver_state_).c_str(),
+        ToString(audio_sender_state_).c_str());
     /* Note: This callback is from audio hal driver.
      * Bluetooth peer is a Sink for Audio Framework.
      * e.g. Peer is a speaker
@@ -3438,9 +3442,11 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void OnLocalAudioSinkSuspend() {
-    LOG_INFO("IN: audio_receiver_state_: %s,  audio_sender_state_: %s",
-             ToString(audio_receiver_state_).c_str(),
-             ToString(audio_sender_state_).c_str());
+    LOG_INFO(
+        "active group_id: %d, IN: audio_receiver_state_: %s, "
+        "audio_sender_state_: %s",
+        active_group_id_, ToString(audio_receiver_state_).c_str(),
+        ToString(audio_sender_state_).c_str());
 
     StartVbcCloseTimeout();
 
@@ -3483,9 +3489,11 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void OnLocalAudioSinkResume() {
-    LOG_INFO("IN: audio_receiver_state_: %s,  audio_sender_state_: %s",
-             ToString(audio_receiver_state_).c_str(),
-             ToString(audio_sender_state_).c_str());
+    LOG_INFO(
+        "active group_id: %d IN: audio_receiver_state_: %s, "
+        "audio_sender_state_: %s",
+        active_group_id_, ToString(audio_receiver_state_).c_str(),
+        ToString(audio_sender_state_).c_str());
     /* Stop the VBC close watchdog if needed */
     StopVbcCloseTimeout();
 
@@ -3755,25 +3763,6 @@ class LeAudioClientImpl : public LeAudioClient {
     metadata_context_types_.sink =
         ChooseMetadataContextType(metadata_context_types_.sink);
 
-    /* Mixed contexts in the voiceback channel scenarios can confuse the remote
-     * on how to configure each channel. We should align both direction
-     * metadata.
-     */
-    auto non_mixing_contexts = LeAudioContextType::GAME |
-                               LeAudioContextType::LIVE |
-                               LeAudioContextType::CONVERSATIONAL |
-                               LeAudioContextType::VOICEASSISTANTS;
-    if (metadata_context_types_.sink.test_any(non_mixing_contexts)) {
-      if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
-        LOG_DEBUG("Aligning remote source metadata to add the sink context");
-        metadata_context_types_.source =
-            metadata_context_types_.source | metadata_context_types_.sink;
-      } else {
-        LOG_DEBUG("Replacing remote source metadata to match the sink context");
-        metadata_context_types_.source = metadata_context_types_.sink;
-      }
-    }
-
     ReconfigureOrUpdateRemoteSink(group);
   }
 
@@ -3807,6 +3796,24 @@ class LeAudioClientImpl : public LeAudioClient {
     /* Start with only this direction context metadata */
     auto configuration_context_candidates = metadata_context_types_.sink;
 
+    /* Mixed contexts in the voiceback channel scenarios can confuse the remote
+     * on how to configure each channel. We should align both direction
+     * metadata.
+     */
+    auto bidir_contexts = LeAudioContextType::GAME | LeAudioContextType::LIVE |
+                          LeAudioContextType::CONVERSATIONAL |
+                          LeAudioContextType::VOICEASSISTANTS;
+    if (metadata_context_types_.sink.test_any(bidir_contexts)) {
+      if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
+        LOG_DEBUG("Aligning remote source metadata to add the sink context");
+        metadata_context_types_.source =
+            metadata_context_types_.source | metadata_context_types_.sink;
+      } else {
+        LOG_DEBUG("Replacing remote source metadata to match the sink context");
+        metadata_context_types_.source = metadata_context_types_.sink;
+      }
+    }
+
     /* If the local sink is started, ready to start or any direction is
      * reconfiguring when the remote sink configuration is active, then take
      * into the account current context type for this direction when
@@ -3823,13 +3830,18 @@ class LeAudioClientImpl : public LeAudioClient {
         (audio_receiver_state_ == AudioState::READY_TO_START)) {
       LOG_DEBUG("Other direction is streaming. Taking its contexts %s",
                 ToString(metadata_context_types_.source).c_str());
-
-      // If current direction has no valid context take the other direction
-      // context
-      if (metadata_context_types_.sink.none()) {
-        if (metadata_context_types_.source.any()) {
+      // If current direction has no valid context or we are in the
+      // bidirectional scenario, take the other direction context
+      if ((metadata_context_types_.sink.none() &&
+           metadata_context_types_.source.any()) ||
+          metadata_context_types_.source.test_any(bidir_contexts)) {
+        if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
+          LOG_DEBUG("Aligning remote sink metadata to add the source context");
+          metadata_context_types_.sink =
+              metadata_context_types_.sink | metadata_context_types_.source;
+        } else {
           LOG_DEBUG(
-              "Aligning remote sink metadata to match the source context");
+              "Replacing remote sink metadata to match the source context");
           metadata_context_types_.sink = metadata_context_types_.source;
         }
       }
@@ -3991,7 +4003,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Make sure we have CONVERSATIONAL when in a call */
     if (in_call_) {
-      LOG_DEBUG(" In Call preference used.");
+      LOG_INFO(" In Call preference used.");
       metadata_context_types_.sink |=
           AudioContexts(LeAudioContextType::CONVERSATIONAL);
       metadata_context_types_.source |=
@@ -4000,25 +4012,6 @@ class LeAudioClientImpl : public LeAudioClient {
 
     metadata_context_types_.source =
         ChooseMetadataContextType(metadata_context_types_.source);
-
-    /* Mixed contexts in the voiceback channel scenarios can confuse the remote
-     * on how to configure each channel. We should align both direction
-     * metadata.
-     */
-    auto non_mixing_contexts = LeAudioContextType::GAME |
-                               LeAudioContextType::LIVE |
-                               LeAudioContextType::CONVERSATIONAL |
-                               LeAudioContextType::VOICEASSISTANTS;
-    if (metadata_context_types_.source.test_any(non_mixing_contexts)) {
-      if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
-        LOG_DEBUG("Aligning remote sink metadata to add the source context");
-        metadata_context_types_.sink =
-            metadata_context_types_.sink | metadata_context_types_.source;
-      } else {
-        LOG_DEBUG("Replacing remote sink metadata to match the source context");
-        metadata_context_types_.sink = metadata_context_types_.source;
-      }
-    }
 
     /* Reconfigure or update only if the stream is already started
      * otherwise wait for the local sink to resume.
@@ -4055,6 +4048,24 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Start with only this direction context metadata */
     auto configuration_context_candidates = metadata_context_types_.source;
+
+    /* Mixed contexts in the voiceback channel scenarios can confuse the remote
+     * on how to configure each channel. We should align both direction
+     * metadata.
+     */
+    auto bidir_contexts = LeAudioContextType::GAME | LeAudioContextType::LIVE |
+                          LeAudioContextType::CONVERSATIONAL |
+                          LeAudioContextType::VOICEASSISTANTS;
+    if (metadata_context_types_.source.test_any(bidir_contexts)) {
+      if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
+        LOG_DEBUG("Aligning remote sink metadata to add the source context");
+        metadata_context_types_.sink =
+            metadata_context_types_.sink | metadata_context_types_.source;
+      } else {
+        LOG_DEBUG("Replacing remote sink metadata to match the source context");
+        metadata_context_types_.sink = metadata_context_types_.source;
+      }
+    }
 
     /* If the local source is started, ready to start or any direction is
      * reconfiguring when the remote sink configuration is active, then take
@@ -4445,10 +4456,12 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void OnStateMachineStatusReportCb(int group_id, GroupStreamStatus status) {
-    LOG_INFO("status: %d , audio_sender_state %s, audio_receiver_state %s",
-             static_cast<int>(status),
-             bluetooth::common::ToString(audio_sender_state_).c_str(),
-             bluetooth::common::ToString(audio_receiver_state_).c_str());
+    LOG_INFO(
+        "status: %d ,  group_id: %d, audio_sender_state %s, "
+        "audio_receiver_state %s",
+        static_cast<int>(status), group_id,
+        bluetooth::common::ToString(audio_sender_state_).c_str(),
+        bluetooth::common::ToString(audio_receiver_state_).c_str());
     LeAudioDeviceGroup* group = aseGroups_.FindById(group_id);
     switch (status) {
       case GroupStreamStatus::STREAMING:
