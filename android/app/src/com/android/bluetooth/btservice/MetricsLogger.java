@@ -265,7 +265,7 @@ public class MetricsLogger {
     }
 
     protected boolean logSanitizedBluetoothDeviceName(int metricId, String deviceName) {
-        if (!mBloomFilterInitialized) {
+        if (!mBloomFilterInitialized || deviceName == null) {
             return false;
         }
 
