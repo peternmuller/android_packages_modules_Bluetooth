@@ -2506,40 +2506,6 @@ packet WriteInquiryResponseTransmitPowerLevelComplete : CommandComplete (command
   status : ErrorCode,
 }
 
-packet ReadDefaultErroneousDataReporting : Command (op_code = READ_DEFAULT_ERRONEOUS_DATA_REPORTING) {
-}
-
-test ReadDefaultErroneousDataReporting {
-  "\x5a\x0c\x00",
-}
-
-packet ReadDefaultErroneousDataReportingComplete : CommandComplete (command_op_code = READ_DEFAULT_ERRONEOUS_DATA_REPORTING) {
-  status : ErrorCode,
-  erroneous_data_reporting : Enable,
-}
-
-test ReadDefaultErroneousDataReportingComplete {
-  "\x0e\x05\x02\x5a\x0c\x00\x00", // status success, Erroneous data reporting disabled
-  "\x0e\x05\x02\x5a\x0c\x00\x01", // status success, Erroneous data reporting enabled
-}
-
-packet WriteDefaultErroneousDataReporting : Command (op_code = WRITE_DEFAULT_ERRONEOUS_DATA_REPORTING) {
-  erroneous_data_reporting : Enable,
-}
-
-test WriteDefaultErroneousDataReporting {
-  "\x5b\x0c\x01\x00", // disable Erroneous Data reporting
-  "\x5b\x0c\x01\x01", // enable Erroneous Data reporting
-}
-
-packet WriteDefaultErroneousDataReportingComplete : CommandComplete (command_op_code = WRITE_DEFAULT_ERRONEOUS_DATA_REPORTING) {
-  status : ErrorCode,
-}
-
-test WriteDefaultErroneousDataReportingComplete {
-  "\x0e\x04\x01\x5b\x0c\x00", // status success
-}
-
 enum KeypressNotificationType : 8 {
   ENTRY_STARTED = 0,
   DIGIT_ENTERED = 1,
@@ -4212,7 +4178,7 @@ struct PeriodicAdvertisingOptions {
   _reserved_: 5,
 }
 
-enum AdvertisingAddressType : 8 {
+enum AdvertiserAddressType : 8 {
   PUBLIC_DEVICE_OR_IDENTITY_ADDRESS = 0x00,
   RANDOM_DEVICE_OR_IDENTITY_ADDRESS = 0x01,
 }
@@ -4220,7 +4186,7 @@ enum AdvertisingAddressType : 8 {
 packet LePeriodicAdvertisingCreateSync : LeScanningCommand (op_code = LE_PERIODIC_ADVERTISING_CREATE_SYNC) {
   options : PeriodicAdvertisingOptions,
   advertising_sid : 8,
-  advertiser_address_type : AdvertisingAddressType,
+  advertiser_address_type : AdvertiserAddressType,
   advertiser_address : Address,
   skip : 16,
   sync_timeout : 16,
@@ -4247,7 +4213,7 @@ packet LePeriodicAdvertisingTerminateSyncComplete : CommandComplete (command_op_
 }
 
 packet LeAddDeviceToPeriodicAdvertiserList : LeScanningCommand (op_code = LE_ADD_DEVICE_TO_PERIODIC_ADVERTISER_LIST) {
-  advertiser_address_type : AdvertisingAddressType,
+  advertiser_address_type : AdvertiserAddressType,
   advertiser_address : Address,
   advertising_sid : 8,
 }
@@ -4257,7 +4223,7 @@ packet LeAddDeviceToPeriodicAdvertiserListComplete : CommandComplete (command_op
 }
 
 packet LeRemoveDeviceFromPeriodicAdvertiserList : LeScanningCommand (op_code = LE_REMOVE_DEVICE_FROM_PERIODIC_ADVERTISER_LIST) {
-  advertiser_address_type : AdvertisingAddressType,
+  advertiser_address_type : AdvertiserAddressType,
   advertiser_address : Address,
   advertising_sid : 8,
 }
