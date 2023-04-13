@@ -508,15 +508,17 @@ class DualModeController : public Device {
   // 7.8.35
   void LeWriteSuggestedDefaultDataLength(CommandView command);
 
-  // 7.8.38 - 7.8.41
+  // 7.8.38
   void LeAddDeviceToResolvingList(CommandView command);
-  void LeRemoveDeviceFromResolvingList(CommandView command);
-  void LeClearResolvingList(CommandView command);
-  void LeReadResolvingListSize(CommandView command);
 
-  // 7.8.42 - 7.8.43
-  void LeReadPeerResolvableAddress(CommandView command);
-  void LeReadLocalResolvableAddress(CommandView command);
+  // 7.8.39
+  void LeRemoveDeviceFromResolvingList(CommandView command);
+
+  // 7.8.40
+  void LeClearResolvingList(CommandView command);
+
+  // 7.8.41
+  void LeReadResolvingListSize(CommandView command);
 
   // 7.8.44
   void LeSetAddressResolutionEnable(CommandView command);
