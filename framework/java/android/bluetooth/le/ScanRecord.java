@@ -363,9 +363,6 @@ public final class ScanRecord {
     // Transport Discovery data.
     private final TransportDiscoveryData mTransportDiscoveryData;
 
-    // Transport Discovery data.
-    private final byte[] mTDSData;
-
     // Group Identifier Data
     private final byte[] mGroupIdentifierData;
 
@@ -470,14 +467,6 @@ public final class ScanRecord {
 
     /**
      * @hide
-     * Returns Transport Discovery data
-     */
-    public byte[] getTDSData() {
-        return mTDSData;
-    }
-
-    /**
-     * @hide
      * Returns Group Identifier data
      */
     public byte[] getGroupIdentifierData() {
@@ -519,7 +508,6 @@ public final class ScanRecord {
             String localName,
             Map<Integer, byte[]> advertisingDataMap,
             TransportDiscoveryData transportDiscoveryData,
-            byte[] tdsData,
             byte[] groupIdentifierData,
             byte[] bytes) {
         mServiceSolicitationUuids = serviceSolicitationUuids;
@@ -531,7 +519,6 @@ public final class ScanRecord {
         mTxPowerLevel = txPowerLevel;
         mAdvertisingDataMap = advertisingDataMap;
         mTransportDiscoveryData = transportDiscoveryData;
-        mTDSData = tdsData;
         mGroupIdentifierData = groupIdentifierData;
         mBytes = bytes;
     }
@@ -565,8 +552,6 @@ public final class ScanRecord {
         HashMap<Integer, byte[]> advertisingDataMap = new HashMap<Integer, byte[]>();
 
         TransportDiscoveryData transportDiscoveryData = null;
-
-        byte[] tdsData = null;
         byte[] groupIdentifierData = null;
 
         try {
@@ -681,7 +666,6 @@ public final class ScanRecord {
                                 extractBytes(scanRecord, currentPos - 1, dataLength + 1);
                         transportDiscoveryData =
                                 new TransportDiscoveryData(transportDiscoveryDataBytes);
-                        tdsData = extractBytes(scanRecord, currentPos, dataLength);
                         break;
 
                     default:
@@ -707,7 +691,6 @@ public final class ScanRecord {
                     localName,
                     advertisingDataMap,
                     transportDiscoveryData,
-                    tdsData,
                     groupIdentifierData,
                     scanRecord);
         } catch (Exception e) {
@@ -723,7 +706,6 @@ public final class ScanRecord {
                     Integer.MIN_VALUE,
                     null,
                     advertisingDataMap,
-                    null,
                     null,
                     null,
                     scanRecord);
@@ -748,8 +730,6 @@ public final class ScanRecord {
                 + mDeviceName
                 + ", mTransportDiscoveryData="
                 + mTransportDiscoveryData
-                + ", mTDSData="
-                + BluetoothLeUtils.toString(mTDSData)
                 +"]";
     }
 
