@@ -1201,16 +1201,20 @@ public class LeAudioService extends ProfileService {
                 byte[] addressBytes = Utils.getBytesFromAddress(address);
                 BluetoothDevice device = mAdapterService.getDeviceFromByte(addressBytes);
 
-                /* Don't expose already exposed active device */
-                if (device.equals(mExposedActiveDevice)) {
-                    return;
-                }
-
                 if (DBG) {
                     Log.d(TAG, " onAudioDevicesAdded: " + device + ", device type: "
                             + deviceInfo.getType() + ", isSink: " + deviceInfo.isSink()
                             + " isSource: " + deviceInfo.isSource());
                 }
+
+                /* Don't expose already exposed active device */
+                if (device.equals(mExposedActiveDevice)) {
+                    if (DBG) {
+                        Log.d(TAG, " onAudioDevicesAdded: " + device + " is already exposed");
+                    }
+                    return;
+                }
+
 
                 if ((deviceInfo.isSink() && !device.equals(mActiveAudioOutDevice))
                         || (deviceInfo.isSource() && !device.equals(mActiveAudioInDevice))) {
@@ -2345,6 +2349,27 @@ public class LeAudioService extends ProfileService {
             return;
         }
         mLeAudioNativeInterface.setInCall(inCall);
+    }
+
+    /**
+     * Sends the preferred audio profiles for a dual mode audio device to the native stack.
+     *
+     * @param groupId is the group id of the device which had a preference change
+     * @param isOutputPreferenceLeAudio {@code true} if {@link BluetoothProfile#LE_AUDIO} is
+     * preferred for {@link BluetoothAdapter#AUDIO_MODE_OUTPUT_ONLY}, {@code false} if it is
+     * {@link BluetoothProfile#A2DP}
+     * @param isDuplexPreferenceLeAudio {@code true} if {@link BluetoothProfile#LE_AUDIO} is
+     * preferred for {@link BluetoothAdapter#AUDIO_MODE_DUPLEX}, {@code false} if it is
+     * {@link BluetoothProfile#HEADSET}
+     */
+    public void sendAudioProfilePreferencesToNative(int groupId, boolean isOutputPreferenceLeAudio,
+            boolean isDuplexPreferenceLeAudio) {
+        if (!mLeAudioNativeIsInitialized) {
+            Log.e(TAG, "Le Audio not initialized properly.");
+            return;
+        }
+        mLeAudioNativeInterface.sendAudioProfilePreferences(groupId, isOutputPreferenceLeAudio,
+                isDuplexPreferenceLeAudio);
     }
 
     /**
@@ -3632,6 +3657,7 @@ public class LeAudioService extends ProfileService {
         ProfileService.println(sb, "  currentlyActiveGroupId: " + getActiveGroupId());
         ProfileService.println(sb, "  mActiveAudioOutDevice: " + mActiveAudioOutDevice);
         ProfileService.println(sb, "  mActiveAudioInDevice: " + mActiveAudioInDevice);
+        ProfileService.println(sb, "  mExposedActiveDevice: " + mExposedActiveDevice);
         ProfileService.println(sb, "  mHfpHandoverDevice:" + mHfpHandoverDevice);
         ProfileService.println(sb, "  mLeAudioIsInbandRingtoneSupported:"
                                 + mLeAudioInbandRingtoneSupportedByPlatform);
