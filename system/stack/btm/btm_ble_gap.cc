@@ -465,12 +465,6 @@ inline bool BTM_LE_STATES_SUPPORTED(const uint8_t* x, uint8_t bit_num) {
 
 void BTM_BleOpportunisticObserve(bool enable,
                                  tBTM_INQ_RESULTS_CB* p_results_cb) {
-  if (bluetooth::shim::is_gd_shim_enabled()) {
-    bluetooth::shim::BTM_BleOpportunisticObserve(enable, p_results_cb);
-    // NOTE: passthrough, no return here. GD would send the results back to BTM,
-    // and it needs the callbacks set properly.
-  }
-
   if (enable) {
     btm_cb.ble_ctr_cb.p_opportunistic_obs_results_cb = p_results_cb;
   } else {
@@ -480,12 +474,6 @@ void BTM_BleOpportunisticObserve(bool enable,
 
 void BTM_BleTargetAnnouncementObserve(bool enable,
                                       tBTM_INQ_RESULTS_CB* p_results_cb) {
-  if (bluetooth::shim::is_gd_shim_enabled()) {
-    bluetooth::shim::BTM_BleTargetAnnouncementObserve(enable, p_results_cb);
-    // NOTE: passthrough, no return here. GD would send the results back to BTM,
-    // and it needs the callbacks set properly.
-  }
-
   if (enable) {
     btm_cb.ble_ctr_cb.p_target_announcement_obs_results_cb = p_results_cb;
   } else {
@@ -511,11 +499,6 @@ void BTM_BleTargetAnnouncementObserve(bool enable,
 tBTM_STATUS BTM_BleObserve(bool start, uint8_t duration,
                            tBTM_INQ_RESULTS_CB* p_results_cb,
                            tBTM_CMPL_CB* p_cmpl_cb) {
-  if (bluetooth::shim::is_gd_shim_enabled()) {
-    return bluetooth::shim::BTM_BleObserve(start, duration, p_results_cb,
-                                           p_cmpl_cb);
-  }
-
   tBTM_BLE_INQ_CB* p_inq = &btm_cb.ble_ctr_cb.inq_var;
   tBTM_STATUS status = BTM_WRONG_MODE;
 
@@ -878,9 +861,6 @@ bool BTM_BleConfigPrivacy(bool privacy_mode) {
  *
  ******************************************************************************/
 uint8_t BTM_BleMaxMultiAdvInstanceCount(void) {
-  if (bluetooth::shim::is_gd_shim_enabled()) {
-    return bluetooth::shim::BTM_BleMaxMultiAdvInstanceCount();
-  }
   return btm_cb.cmn_ble_vsc_cb.adv_inst_max < BTM_BLE_MULTI_ADV_MAX
              ? btm_cb.cmn_ble_vsc_cb.adv_inst_max
              : BTM_BLE_MULTI_ADV_MAX;
@@ -896,9 +876,6 @@ uint8_t BTM_BleMaxMultiAdvInstanceCount(void) {
  *
  ******************************************************************************/
 bool BTM_BleLocalPrivacyEnabled(void) {
-  if (bluetooth::shim::is_gd_shim_enabled()) {
-    return bluetooth::shim::BTM_BleLocalPrivacyEnabled();
-  }
   return (btm_cb.ble_ctr_cb.privacy_mode != BTM_PRIVACY_NONE);
 }
 
@@ -2402,6 +2379,42 @@ static void btm_ble_appearance_to_cod(uint16_t appearance, uint8_t* dev_class) {
   };
 }
 
+bool btm_ble_get_appearance_as_cod(std::vector<uint8_t> const& data,
+                                   DEV_CLASS dev_class) {
+  /* Check to see the BLE device has the Appearance UUID in the advertising
+   * data. If it does then try to convert the appearance value to a class of
+   * device value Fluoride can use. Otherwise fall back to trying to infer if
+   * it is a HID device based on the service class.
+   */
+  uint8_t len;
+  const uint8_t* p_uuid16 = AdvertiseDataParser::GetFieldByType(
+      data, BTM_BLE_AD_TYPE_APPEARANCE, &len);
+  if (p_uuid16 && len == 2) {
+    btm_ble_appearance_to_cod((uint16_t)p_uuid16[0] | (p_uuid16[1] << 8),
+                              dev_class);
+    return true;
+  }
+
+  p_uuid16 = AdvertiseDataParser::GetFieldByType(
+      data, BTM_BLE_AD_TYPE_16SRV_CMPL, &len);
+  if (p_uuid16 == NULL) {
+    return false;
+  }
+
+  for (uint8_t i = 0; i + 2 <= len; i = i + 2) {
+    /* if this BLE device supports HID over LE, set HID Major in class of
+     * device */
+    if ((p_uuid16[i] | (p_uuid16[i + 1] << 8)) == UUID_SERVCLASS_LE_HID) {
+      dev_class[0] = 0;
+      dev_class[1] = BTM_COD_MAJOR_PERIPHERAL;
+      dev_class[2] = 0;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Update adv packet information into inquiry result.
  */
@@ -2450,35 +2463,7 @@ void btm_ble_update_inq_result(tINQ_DB_ENT* p_i, uint8_t addr_type,
       p_cur->flag = *p_flag;
     }
 
-    /* Check to see the BLE device has the Appearance UUID in the advertising
-     * data.  If it does
-     * then try to convert the appearance value to a class of device value
-     * Bluedroid can use.
-     * Otherwise fall back to trying to infer if it is a HID device based on the
-     * service class.
-     */
-    const uint8_t* p_uuid16 = AdvertiseDataParser::GetFieldByType(
-        data, BTM_BLE_AD_TYPE_APPEARANCE, &len);
-    if (p_uuid16 && len == 2) {
-      btm_ble_appearance_to_cod((uint16_t)p_uuid16[0] | (p_uuid16[1] << 8),
-                                p_cur->dev_class);
-    } else {
-      p_uuid16 = AdvertiseDataParser::GetFieldByType(
-          data, BTM_BLE_AD_TYPE_16SRV_CMPL, &len);
-      if (p_uuid16 != NULL) {
-        uint8_t i;
-        for (i = 0; i + 2 <= len; i = i + 2) {
-          /* if this BLE device support HID over LE, set HID Major in class of
-           * device */
-          if ((p_uuid16[i] | (p_uuid16[i + 1] << 8)) == UUID_SERVCLASS_LE_HID) {
-            p_cur->dev_class[0] = 0;
-            p_cur->dev_class[1] = BTM_COD_MAJOR_PERIPHERAL;
-            p_cur->dev_class[2] = 0;
-            break;
-          }
-        }
-      }
-    }
+    btm_ble_get_appearance_as_cod(data, p_cur->dev_class);
 
     const uint8_t* p_rsi =
         AdvertiseDataParser::GetFieldByType(data, BTM_BLE_AD_TYPE_RSI, &len);
