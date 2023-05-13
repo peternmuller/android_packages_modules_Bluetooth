@@ -174,7 +174,6 @@ cc_library_static {
         "src/btif_bqr.cc",
         "src/btif_config.cc",
         "src/btif_config_cache.cc",
-        "src/btif_config_transcode.cc",
         "src/btif_core.cc",
         "src/btif_debug_conn.cc",
         "src/btif_dm.cc",
@@ -260,8 +259,13 @@ cc_test {
     ],
     static_libs: [
         "android.hardware.bluetooth.a2dp@1.0",
+        "android.hardware.audio.common-V1-ndk",
+        "android.hardware.bluetooth.audio-V3-ndk",
         "android.hardware.bluetooth@1.0",
         "android.hardware.bluetooth@1.1",
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
+        "android.media.audio.common.types-V2-ndk",
         "android.system.suspend.control-V1-ndk",
         "libFraunhoferAAC",
         "libbluetooth-types",
@@ -295,7 +299,6 @@ cc_test {
     target: {
         android: {
             shared_libs: [
-                "android.hardware.bluetooth.audio-V3-ndk",
                 "libPlatformProperties",
                 "libbinder_ndk",
             ],
@@ -562,7 +565,6 @@ cc_test {
         "libcutils",
         "libhidlbase",
         "liblog",
-        "libtinyxml2",
     ],
     static_libs: [
         "android.hardware.bluetooth.a2dp@1.0",
@@ -590,8 +592,14 @@ cc_test {
     cflags: ["-DBUILDCFG"],
     target: {
         android: {
-            shared_libs: [
+            static_libs: [
+                "android.hardware.audio.common-V1-ndk",
                 "android.hardware.bluetooth.audio-V3-ndk",
+                "android.hardware.common-V2-ndk",
+                "android.hardware.common.fmq-V1-ndk",
+                "android.media.audio.common.types-V2-ndk",
+            ],
+            shared_libs: [
                 "libbinder_ndk",
             ],
         },
@@ -689,7 +697,6 @@ cc_test {
         "libcutils",
         "libhidlbase",
         "liblog",
-        "libtinyxml2",
     ],
     static_libs: [
         "android.hardware.bluetooth.a2dp@1.0",
@@ -715,8 +722,14 @@ cc_test {
     cflags: ["-DBUILDCFG"],
     target: {
         android: {
-            shared_libs: [
+            static_libs: [
+                "android.hardware.audio.common-V1-ndk",
                 "android.hardware.bluetooth.audio-V3-ndk",
+                "android.hardware.common-V2-ndk",
+                "android.hardware.common.fmq-V1-ndk",
+                "android.media.audio.common.types-V2-ndk",
+            ],
+            shared_libs: [
                 "libbinder_ndk",
             ],
         },
