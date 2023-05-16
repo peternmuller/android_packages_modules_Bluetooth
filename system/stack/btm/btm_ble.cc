@@ -70,21 +70,8 @@ namespace {
 constexpr char kBtmLogTag[] = "SEC";
 }
 
-// Pairing parameters defined in Vol 3, Part H, Chapter 3.5.1 - 3.5.2
-// All present in the exact decimal values, not hex
-// Ex: bluetooth.core.smp.le.ctkd.initiator_key_distribution 15(0x0f)
-static const char kPropertyCtkdAuthRequest[] =
-    "bluetooth.core.smp.le.ctkd.auth_request";
-static const char kPropertyCtkdIoCapabilities[] =
-    "bluetooth.core.smp.le.ctkd.io_capabilities";
-// Vol 3, Part H, Chapter 3.6.1, Figure 3.11
-// |EncKey(1)|IdKey(1)|SignKey(1)|LinkKey(1)|Reserved(4)|
-static const char kPropertyCtkdInitiatorKeyDistribution[] =
-    "bluetooth.core.smp.le.ctkd.initiator_key_distribution";
-static const char kPropertyCtkdResponderKeyDistribution[] =
-    "bluetooth.core.smp.le.ctkd.responder_key_distribution";
-static const char kPropertyCtkdMaxKeySize[] =
-    "bluetooth.core.smp.le.ctkd.max_key_size";
+static constexpr char kPropertyCtkdDisableCsrkDistribution[] =
+    "bluetooth.core.smp.le.ctkd.quirk_disable_csrk_distribution";
 
 /******************************************************************************/
 /* External Function to be called by other modules                            */
@@ -583,6 +570,81 @@ bool BTM_ReadConnectedTransportAddress(RawAddress* remote_bda,
   }
 
   return false;
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleReceiverTest
+ *
+ * Description      This function is called to start the LE Receiver test
+ *
+ * Parameter       rx_freq - Frequency Range
+ *               p_cmd_cmpl_cback - Command Complete callback
+ *
+ ******************************************************************************/
+void BTM_BleReceiverTest(uint8_t rx_freq, tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  if (bluetooth::shim::is_gd_shim_enabled()) {
+    return bluetooth::shim::BTM_BleReceiverTest(rx_freq, p_cmd_cmpl_cback);
+  }
+  btm_cb.devcb.p_le_test_cmd_cmpl_cb = p_cmd_cmpl_cback;
+
+  btsnd_hcic_ble_receiver_test(rx_freq);
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleTransmitterTest
+ *
+ * Description      This function is called to start the LE Transmitter test
+ *
+ * Parameter       tx_freq - Frequency Range
+ *                       test_data_len - Length in bytes of payload data in each
+ *                                       packet
+ *                       packet_payload - Pattern to use in the payload
+ *                       p_cmd_cmpl_cback - Command Complete callback
+ *
+ ******************************************************************************/
+void BTM_BleTransmitterTest(uint8_t tx_freq, uint8_t test_data_len,
+                            uint8_t packet_payload,
+                            tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  if (bluetooth::shim::is_gd_shim_enabled()) {
+    return bluetooth::shim::BTM_BleTransmitterTest(
+        tx_freq, test_data_len, packet_payload, p_cmd_cmpl_cback);
+  }
+  btm_cb.devcb.p_le_test_cmd_cmpl_cb = p_cmd_cmpl_cback;
+  btsnd_hcic_ble_transmitter_test(tx_freq, test_data_len, packet_payload);
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleTestEnd
+ *
+ * Description      This function is called to stop the in-progress TX or RX
+ *                  test
+ *
+ * Parameter       p_cmd_cmpl_cback - Command complete callback
+ *
+ ******************************************************************************/
+void BTM_BleTestEnd(tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  if (bluetooth::shim::is_gd_shim_enabled()) {
+    return bluetooth::shim::BTM_BleTestEnd(p_cmd_cmpl_cback);
+  }
+  btm_cb.devcb.p_le_test_cmd_cmpl_cb = p_cmd_cmpl_cback;
+
+  btsnd_hcic_ble_test_end();
+}
+
+/*******************************************************************************
+ * Internal Functions
+ ******************************************************************************/
+void btm_ble_test_command_complete(uint8_t* p) {
+  tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_le_test_cmd_cmpl_cb;
+
+  btm_cb.devcb.p_le_test_cmd_cmpl_cb = NULL;
+
+  if (p_cb) {
+    (*p_cb)(p);
+  }
 }
 
 /*******************************************************************************
@@ -1686,18 +1748,19 @@ uint8_t btm_ble_br_keys_req(tBTM_SEC_DEV_REC* p_dev_rec,
                             tBTM_LE_IO_REQ* p_data) {
   uint8_t callback_rc = BTM_SUCCESS;
   BTM_TRACE_DEBUG("%s", __func__);
-  p_data->io_cap =
-      osi_property_get_int32(kPropertyCtkdIoCapabilities, BTM_IO_CAP_UNKNOWN);
-  p_data->auth_req = osi_property_get_int32(kPropertyCtkdAuthRequest,
-                                            BTM_LE_AUTH_REQ_SC_MITM_BOND);
-  p_data->init_keys = osi_property_get_int32(
-      kPropertyCtkdInitiatorKeyDistribution, SMP_BR_SEC_DEFAULT_KEY);
-  p_data->resp_keys = osi_property_get_int32(
-      kPropertyCtkdResponderKeyDistribution, SMP_BR_SEC_DEFAULT_KEY);
-  p_data->max_key_size =
-      osi_property_get_int32(kPropertyCtkdMaxKeySize, BTM_BLE_MAX_KEY_SIZE);
-  // No OOB data for BR/EDR
-  p_data->oob_data = false;
+  *p_data = tBTM_LE_IO_REQ{
+      .io_cap = BTM_IO_CAP_UNKNOWN,
+      .auth_req = BTM_LE_AUTH_REQ_SC_MITM_BOND,
+      .init_keys = SMP_BR_SEC_DEFAULT_KEY,
+      .resp_keys = SMP_BR_SEC_DEFAULT_KEY,
+      .max_key_size = BTM_BLE_MAX_KEY_SIZE,
+      .oob_data = false,
+  };
+
+  if (osi_property_get_bool(kPropertyCtkdDisableCsrkDistribution, false)) {
+    p_data->init_keys &= (~SMP_SEC_KEY_TYPE_CSRK);
+    p_data->resp_keys &= (~SMP_SEC_KEY_TYPE_CSRK);
+  }
 
   return callback_rc;
 }
