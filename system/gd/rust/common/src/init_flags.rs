@@ -393,6 +393,7 @@ init_flags!(
         read_encryption_key_size = true,
         redact_log = true,
         rust_event_loop = true,
+        sco_codec_select_lc3,
         sco_codec_timeout_clear,
         sdp_serialization = true,
         sdp_skip_rnr_if_known = true,
@@ -401,6 +402,7 @@ init_flags!(
         subrating = true,
         trigger_advertising_callbacks_on_first_resume_after_pause = true,
         use_unified_connection_manager,
+        sdp_return_classic_services_when_le_discovery_fails = true,
     }
     // dynamic flags can be updated at runtime and should be accessed directly
     // to check.

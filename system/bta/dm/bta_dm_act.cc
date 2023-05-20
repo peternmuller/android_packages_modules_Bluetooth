@@ -138,6 +138,7 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
                                     tBTM_LE_EVT_DATA* p_data);
 static void bta_dm_ble_id_key_cback(uint8_t key_type,
                                     tBTM_BLE_LOCAL_KEYS* p_key);
+static uint8_t bta_dm_sirk_verifiction_cback(const RawAddress& bd_addr);
 static void bta_dm_gattc_register(void);
 static void btm_dm_start_gatt_discovery(const RawAddress& bd_addr);
 static void bta_dm_gattc_callback(tBTA_GATTC_EVT event, tBTA_GATTC* p_data);
@@ -349,7 +350,8 @@ const tBTM_APPL_INFO bta_security = {
     .p_bond_cancel_cmpl_callback = &bta_dm_bond_cancel_complete_cback,
     .p_sp_callback = &bta_dm_sp_cback,
     .p_le_callback = &bta_dm_ble_smp_cback,
-    .p_le_key_callback = &bta_dm_ble_id_key_cback};
+    .p_le_key_callback = &bta_dm_ble_id_key_cback,
+    .p_sirk_verification_callback = &bta_dm_sirk_verifiction_cback};
 
 #define MAX_DISC_RAW_DATA_BUF (4096)
 uint8_t g_disc_raw_data_buf[MAX_DISC_RAW_DATA_BUF];
@@ -365,6 +367,20 @@ void bta_dm_enable(tBTA_DM_SEC_CBACK* p_sec_cback) {
   if (p_sec_cback != NULL) bta_dm_cb.p_sec_cback = p_sec_cback;
 
   btm_local_io_caps = btif_storage_get_local_io_caps();
+}
+
+void bta_dm_ble_sirk_sec_cb_register(tBTA_DM_SEC_CBACK* p_cback) {
+  /* Save the callback to be called when a request of member validation will be
+   * needed. */
+  LOG_DEBUG("");
+  bta_dm_cb.p_sec_sirk_cback = p_cback;
+}
+
+void bta_dm_ble_sirk_confirm_device_reply(const RawAddress& bd_addr,
+                                          bool accept) {
+  LOG_DEBUG("");
+  get_btm_client_interface().security.BTM_BleSirkConfirmDeviceReply(
+      bd_addr, accept ? BTM_SUCCESS : BTM_NOT_AUTHORIZED);
 }
 
 void bta_dm_search_set_state(tBTA_DM_STATE state) {
@@ -1127,60 +1143,60 @@ void bta_dm_inq_cmpl(uint8_t num) {
   }
 }
 
-/*******************************************************************************
- *
- * Function         bta_dm_rmt_name
- *
- * Description      Process the remote name result from BTM
- *
- * Returns          void
- *
- ******************************************************************************/
-void bta_dm_rmt_name(tBTA_DM_MSG* p_data) {
-  APPL_TRACE_DEBUG("bta_dm_rmt_name");
-
-  if (p_data->rem_name.result.disc_res.bd_name[0] &&
-      bta_dm_search_cb.p_btm_inq_info) {
-    bta_dm_search_cb.p_btm_inq_info->appl_knows_rem_name = true;
-  }
-
-  bta_dm_discover_device(bta_dm_search_cb.peer_bdaddr);
-}
-
-/*******************************************************************************
- *
- * Function         bta_dm_disc_rmt_name
- *
- * Description      Process the remote name result from BTM when application
- *                  wants to find the name for a bdaddr
- *
- * Returns          void
- *
- ******************************************************************************/
-void bta_dm_disc_rmt_name(tBTA_DM_MSG* p_data) {
+void bta_dm_remote_name_cmpl(const tBTA_DM_MSG* p_data) {
   CHECK(p_data != nullptr);
 
-  APPL_TRACE_DEBUG("bta_dm_disc_rmt_name");
+  const tBTA_DM_REMOTE_NAME& remote_name_msg = p_data->remote_name_msg;
 
-  const tBTA_DM_DISC_RES* disc_res = &p_data->rem_name.result.disc_res;
+  BTM_LogHistory(kBtmLogTag, remote_name_msg.bd_addr, "Remote name completed",
+                 base::StringPrintf(
+                     "status:%s state:%s name:\"%s\"",
+                     hci_status_code_text(remote_name_msg.hci_status).c_str(),
+                     bta_dm_state_text(bta_dm_search_get_state()).c_str(),
+                     PRIVATE_NAME(remote_name_msg.bd_name)));
 
-  BTM_LogHistory(
-      kBtmLogTag, disc_res->bd_addr, "Remote name completed",
-      base::StringPrintf(
-          "status:%s name:\"%s\" service:0x%x device_type:%s num_uuids:%zu",
-          hci_status_code_text(disc_res->hci_status).c_str(), disc_res->bd_name,
-          disc_res->services, DeviceTypeText(disc_res->device_type).c_str(),
-          disc_res->num_uuids));
-
-  tBTM_INQ_INFO* p_btm_inq_info =
-      BTM_InqDbRead(p_data->rem_name.result.disc_res.bd_addr);
-  if (p_btm_inq_info) {
-    if (p_data->rem_name.result.disc_res.bd_name[0]) {
-      p_btm_inq_info->appl_knows_rem_name = true;
-    }
+  tBTM_INQ_INFO* p_btm_inq_info = BTM_InqDbRead(remote_name_msg.bd_addr);
+  if (remote_name_msg.bd_name[0] != '\0' && bta_dm_search_cb.p_btm_inq_info) {
+    p_btm_inq_info->appl_knows_rem_name = true;
   }
 
-  bta_dm_discover_device(p_data->rem_name.result.disc_res.bd_addr);
+  // Callback with this property
+  if (bta_dm_search_cb.p_search_cback != nullptr) {
+    tBTA_DM_SEARCH search_data = {
+        .disc_res =  // tBTA_DM_DISC_RES
+        {
+            .bd_addr = remote_name_msg.bd_addr,
+            .bd_name = {},
+            .services = {},
+            .device_type = {},
+            .num_uuids = 0UL,
+            .p_uuid_list = nullptr,
+            .result = (remote_name_msg.hci_status == HCI_SUCCESS) ? BTA_SUCCESS
+                                                                  : BTA_FAILURE,
+            .hci_status = remote_name_msg.hci_status,
+        },
+    };
+    if (remote_name_msg.hci_status == HCI_SUCCESS) {
+      bd_name_copy(search_data.disc_res.bd_name, remote_name_msg.bd_name);
+    }
+    bta_dm_search_cb.p_search_cback(BTA_DM_DISC_RES_EVT, &search_data);
+  } else {
+    LOG_WARN("Received remote name complete without callback");
+  }
+
+  switch (bta_dm_search_get_state()) {
+    case BTA_DM_SEARCH_ACTIVE:
+      bta_dm_discover_device(bta_dm_search_cb.peer_bdaddr);
+      break;
+    case BTA_DM_DISCOVER_ACTIVE:
+      bta_dm_discover_device(remote_name_msg.bd_addr);
+      break;
+    case BTA_DM_SEARCH_IDLE:
+    case BTA_DM_SEARCH_CANCELLING:
+      LOG_WARN("Received remote name request in state:%s",
+               bta_dm_state_text(bta_dm_search_get_state()).c_str());
+      break;
+  }
 }
 
 static void store_avrcp_profile_feature(tSDP_DISC_REC* sdp_rec) {
@@ -2229,10 +2245,9 @@ static void bta_dm_service_search_remname_cback(const RawAddress& bd_addr,
  * Returns          void
  *
  ******************************************************************************/
-static void bta_dm_remname_cback(const tBTM_REMOTE_DEV_NAME* p) {
-  CHECK(p != nullptr);
+static void bta_dm_remname_cback(const tBTM_REMOTE_DEV_NAME* p_remote_name) {
+  CHECK(p_remote_name != nullptr);
 
-  tBTM_REMOTE_DEV_NAME* p_remote_name = (tBTM_REMOTE_DEV_NAME*)p;
   LOG_INFO(
       "Remote name request complete peer:%s btm_status:%s hci_status:%s "
       "name[0]:%c length:%hu",
@@ -2271,14 +2286,21 @@ static void bta_dm_remname_cback(const tBTM_REMOTE_DEV_NAME* p) {
     GAP_BleReadPeerPrefConnParams(bta_dm_search_cb.peer_bdaddr);
   }
 
-  tBTA_DM_REM_NAME* p_msg =
-      (tBTA_DM_REM_NAME*)osi_malloc(sizeof(tBTA_DM_REM_NAME));
-  p_msg->result.disc_res.hci_status = p->hci_status;
-  p_msg->result.disc_res.bd_addr = bta_dm_search_cb.peer_bdaddr;
-  strlcpy((char*)p_msg->result.disc_res.bd_name,
-          (char*)p_remote_name->remote_bd_name, BD_NAME_LEN + 1);
-  p_msg->hdr.event = BTA_DM_REMT_NAME_EVT;
-
+  tBTA_DM_MSG* p_msg = (tBTA_DM_MSG*)osi_malloc(sizeof(tBTA_DM_MSG));
+  *p_msg = {
+      .remote_name_msg =
+          {
+              // tBTA_DM_REMOTE_NAME
+              .hdr =
+                  {
+                      .event = BTA_DM_REMT_NAME_EVT,
+                  },
+              .bd_addr = bta_dm_search_cb.peer_bdaddr,
+              .bd_name = {},
+              .hci_status = p_remote_name->hci_status,
+          },
+  };
+  bd_name_copy(p_msg->remote_name_msg.bd_name, p_remote_name->remote_bd_name);
   bta_sys_sendmsg(p_msg);
 }
 
@@ -4019,6 +4041,31 @@ static void bta_dm_ble_id_key_cback(uint8_t key_type,
       break;
   }
   return;
+}
+
+/*******************************************************************************
+ *
+ * Function         bta_dm_sirk_verifiction_cback
+ *
+ * Description      SIRK verification when pairing CSIP set member.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static uint8_t bta_dm_sirk_verifiction_cback(const RawAddress& bd_addr) {
+  tBTA_DM_SEC sec_event = {.ble_req = {
+                               .bd_addr = bd_addr,
+                           }};
+
+  if (bta_dm_cb.p_sec_sirk_cback) {
+    LOG_DEBUG("callback called");
+    bta_dm_cb.p_sec_sirk_cback(BTA_DM_SIRK_VERIFICATION_REQ_EVT, &sec_event);
+    return BTM_CMD_STARTED;
+  }
+
+  LOG_DEBUG("no callback registered");
+
+  return BTM_SUCCESS_NO_SECURITY;
 }
 
 /*******************************************************************************
