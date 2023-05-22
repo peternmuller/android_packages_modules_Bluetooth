@@ -46,7 +46,7 @@ android_test {
         "mockito-target-extended-minus-junit4",
         "platform-compat-test-rules",
         "platform-test-annotations",
-        "service-bluetooth.change-ids",
+        // "service-bluetooth.change-ids",
         "truth-prebuilt",
 
         // Statically link service-bluetooth-pre-jarjar since we want to test the working copy of

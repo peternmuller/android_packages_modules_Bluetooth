@@ -182,6 +182,14 @@ class BluetoothManagerService {
     private static final int FLAGS_SYSTEM_APP =
             ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
+    /**
+     * Starting with {@link android.os.Build.VERSION_CODES#TIRAMISU}, applications are
+     * not allowed to enable/disable Bluetooth.
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.TIRAMISU)
+    static final long RESTRICT_ENABLE_DISABLE = 218493289L;
+
     private final Context mContext;
 
     private final UserManager mUserManager;

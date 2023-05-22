@@ -52,9 +52,6 @@ java_defaults {
         "com.android.btservices",
     ],
     min_sdk_version: "Tiramisu",
-    defaults_visibility: [
-        ":__subpackages__",
-    ],
 }
 
 // pre-jarjar version of service-bluetooth that builds against pre-jarjar version of framework-bluetooth
@@ -72,11 +69,11 @@ java_library {
         strict_updatability_linting: true,
     },
     libs: [
+        "app-compat-annotations",
         "framework-annotations-lib",
         "framework-bluetooth-pre-jarjar",
         "framework-configinfrastructure",
         "framework-statsd.stubs.module_lib",
-        "service-bluetooth.change-ids",
     ],
 
     static_libs: [
