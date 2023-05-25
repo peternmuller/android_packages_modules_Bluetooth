@@ -1877,12 +1877,14 @@ static void bta_dm_find_services(const RawAddress& bd_addr) {
         bta_dm_search_cb.service_index = BTA_MAX_SERVICE_ID;
 
       } else {
+#ifndef TARGET_FLOSS
         if (uuid == Uuid::From16Bit(UUID_PROTOCOL_L2CAP)) {
           if (!is_sdp_pbap_pce_disabled(bd_addr)) {
             LOG_DEBUG("SDP search for PBAP Client ");
             BTA_SdpSearch(bd_addr, Uuid::From16Bit(UUID_SERVCLASS_PBAP_PCE));
           }
         }
+#endif
         bta_dm_search_cb.service_index++;
         return;
       }
@@ -2514,7 +2516,7 @@ static void bta_dm_authentication_complete_cback(
 static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
                                    tBTM_SP_EVT_DATA* p_data) {
   tBTM_STATUS status = BTM_CMD_STARTED;
-  tBTA_DM_SEC sec_event;
+  tBTA_DM_SEC sec_event = {};
   tBTA_DM_SEC_EVT pin_evt = BTA_DM_SP_KEY_NOTIF_EVT;
 
   APPL_TRACE_EVENT("bta_dm_sp_cback: %d", event);
@@ -2559,10 +2561,19 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
         break;
       }
 
+      // TODO PleaseFix: This assignment only works with event
+      // BTM_SP_KEY_NOTIF_EVT
       bta_dm_cb.num_val = sec_event.key_notif.passkey =
           p_data->key_notif.passkey;
 
       if (BTM_SP_CFM_REQ_EVT == event) {
+        /* Due to the switch case falling through below to
+           BTM_SP_KEY_NOTIF_EVT,
+           copy these values into key_notif from cfm_req */
+        sec_event.key_notif.bd_addr = p_data->cfm_req.bd_addr;
+        dev_class_copy(sec_event.key_notif.dev_class,
+                       p_data->cfm_req.dev_class);
+        bd_name_copy(sec_event.key_notif.bd_name, p_data->cfm_req.bd_name);
         /* Due to the switch case falling through below to BTM_SP_KEY_NOTIF_EVT,
            call remote name request using values from cfm_req */
         if (p_data->cfm_req.bd_name[0] == 0) {
@@ -2573,23 +2584,20 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
           bta_dm_cb.rmt_auth_req = sec_event.cfm_req.rmt_auth_req;
           bta_dm_cb.loc_auth_req = sec_event.cfm_req.loc_auth_req;
 
-          BTA_COPY_DEVICE_CLASS(bta_dm_cb.pin_dev_class,
-                                p_data->cfm_req.dev_class);
-          if ((BTM_ReadRemoteDeviceName(
-                  p_data->cfm_req.bd_addr, bta_dm_pinname_cback,
-                  BT_TRANSPORT_BR_EDR)) == BTM_CMD_STARTED)
-            return BTM_CMD_STARTED;
-          APPL_TRACE_WARNING(
-              " bta_dm_sp_cback() -> Failed to start Remote Name Request  ");
-        } else {
-          /* Due to the switch case falling through below to
-             BTM_SP_KEY_NOTIF_EVT,
-             copy these values into key_notif from cfm_req */
-          sec_event.key_notif.bd_addr = p_data->cfm_req.bd_addr;
-          BTA_COPY_DEVICE_CLASS(sec_event.key_notif.dev_class,
-                                p_data->cfm_req.dev_class);
-          strlcpy((char*)sec_event.key_notif.bd_name,
-                  (char*)p_data->cfm_req.bd_name, BD_NAME_LEN + 1);
+          dev_class_copy(bta_dm_cb.pin_dev_class, p_data->cfm_req.dev_class);
+          {
+            const tBTM_STATUS btm_status = BTM_ReadRemoteDeviceName(
+                p_data->cfm_req.bd_addr, bta_dm_pinname_cback,
+                BT_TRANSPORT_BR_EDR);
+            switch (btm_status) {
+              case BTM_CMD_STARTED:
+                return btm_status;
+              default:
+                // NOTE: This will issue callback on this failure path
+                LOG_WARN("Failed to start Remote Name Request btm_status:%s",
+                         btm_status_text(btm_status).c_str());
+            };
+          }
         }
       }
 
@@ -4780,6 +4788,12 @@ void bta_dm_remname_cback(const tBTM_REMOTE_DEV_NAME* p) {
 tBT_TRANSPORT bta_dm_determine_discovery_transport(const RawAddress& bd_addr) {
   return ::bta_dm_determine_discovery_transport(bd_addr);
 }
+
+tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event, tBTM_SP_EVT_DATA* p_data) {
+  return ::bta_dm_sp_cback(event, p_data);
+}
+
+void btm_set_local_io_caps(uint8_t io_caps) { ::btm_local_io_caps = io_caps; }
 
 }  // namespace testing
 }  // namespace legacy
