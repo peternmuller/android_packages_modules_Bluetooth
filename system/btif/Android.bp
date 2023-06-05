@@ -262,8 +262,10 @@ cc_test {
         "libaaudio",
         "libbinder_ndk",
         "libcrypto",
+        "libcutils",
         "libfmq",
         "libhidlbase",
+        "libstatssocket",
         "libutils",
     ],
     static_libs: [
@@ -412,6 +414,11 @@ cc_test {
         "libosi",
         "libosi-AllocationTestHarness",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     cflags: ["-DBUILDCFG"],
     sanitize: {
         address: true,
@@ -611,6 +618,7 @@ cc_test {
             ],
             shared_libs: [
                 "libbinder_ndk",
+                "libstatssocket",
             ],
         },
     },
@@ -742,6 +750,7 @@ cc_test {
             ],
             shared_libs: [
                 "libbinder_ndk",
+                "libstatssocket",
             ],
         },
     },
