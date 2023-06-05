@@ -112,6 +112,13 @@ class AdapterBinder(rawBinder: IBinder) {
         adapterBinder.setForegroundUserId(userId, source)
     }
 
+    @Throws(RemoteException::class, TimeoutException::class)
+    fun unregAllGattClient(source: AttributionSource) {
+        val recv: SynchronousResultReceiver<Any> = SynchronousResultReceiver.get()
+        adapterBinder.unregAllGattClient(source, recv)
+        recv.awaitResultNoInterrupt(SYNC_TIMEOUT).getValue(null)
+    }
+
     fun isMediaProfileConnected(source: AttributionSource): Boolean {
         try {
             val recv: SynchronousResultReceiver<Boolean> = SynchronousResultReceiver.get()

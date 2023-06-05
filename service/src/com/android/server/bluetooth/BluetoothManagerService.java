@@ -39,7 +39,6 @@ import android.bluetooth.BluetoothProtoEnums;
 import android.bluetooth.BluetoothStatusCodes;
 import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothCallback;
-import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothManager;
 import android.bluetooth.IBluetoothManagerCallback;
 import android.bluetooth.IBluetoothProfileServiceConnection;
@@ -80,7 +79,6 @@ import android.util.proto.ProtoOutputStream;
 import com.android.bluetooth.BluetoothStatsLog;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.modules.utils.SynchronousResultReceiver;
 import com.android.server.BluetoothManagerServiceDumpProto;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -178,9 +176,6 @@ class BluetoothManagerService {
     // and Airplane mode will have higher priority.
     @VisibleForTesting static final int BLUETOOTH_ON_AIRPLANE = 2;
 
-    private static final int SERVICE_IBLUETOOTH = 1;
-    private static final int SERVICE_IBLUETOOTHGATT = 2;
-
     private static final int FLAGS_SYSTEM_APP =
             ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
@@ -215,10 +210,6 @@ class BluetoothManagerService {
     @GuardedBy("mAdapterLock")
     private AdapterBinder mAdapter = null;
 
-    @GuardedBy("mAdapterLock")
-    private IBluetooth mBluetooth = null;
-
-    private IBluetoothGatt mBluetoothGatt = null;
     private int mBindingUserID;
     private boolean mTryBindOnBindTimeout = false;
 
@@ -1210,6 +1201,7 @@ class BluetoothManagerService {
                             + mState);
         }
 
+        // TODO(b/262605980): enableBle/disableBle should be on handler thread
         updateBleAppCount(token, true, packageName);
 
         if (mState.oneOf(
@@ -1259,6 +1251,8 @@ class BluetoothManagerService {
             Log.d(TAG, "disableBLE(): Already disabled");
             return false;
         }
+        // TODO(b/262605980): enableBle/disableBle should be on handler thread
+        updateBleAppCount(token, false, packageName);
 
         if (mState.oneOf(STATE_BLE_ON) && !isBleAppPresent()) {
             if (mEnable) {
@@ -1354,11 +1348,7 @@ class BluetoothManagerService {
         if (isBleAppPresent()) {
             // Need to stay at BLE ON. Disconnect all Gatt connections
             try {
-                final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
-                if (mBluetoothGatt != null) {
-                    mBluetoothGatt.unregAll(source, recv);
-                }
-                recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
+                mAdapter.unregAllGattClient(source);
             } catch (RemoteException | TimeoutException e) {
                 Log.e(TAG, "Unable to disconnect all apps.", e);
             }
@@ -1497,18 +1487,12 @@ class BluetoothManagerService {
                 }
                 mAdapter = null;
                 mContext.unbindService(mConnection);
-                mTryBindOnBindTimeout = false;
+
                 mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
             }
-            mBluetoothGatt = null;
         } finally {
             mAdapterLock.writeLock().unlock();
         }
-    }
-
-    IBluetoothGatt getBluetoothGatt() {
-        // sync protection
-        return mBluetoothGatt;
     }
 
     public boolean isBluetoothAvailableForBinding() {
@@ -1948,17 +1932,11 @@ class BluetoothManagerService {
             if (DBG) {
                 Log.d(TAG, "BluetoothServiceConnection: " + name);
             }
-            Message msg = mHandler.obtainMessage(MESSAGE_BLUETOOTH_SERVICE_CONNECTED, service);
-            if (name.equals("com.android.bluetooth.btservice.AdapterService")) {
-                msg.arg1 = SERVICE_IBLUETOOTH;
-                mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
-            } else if (name.equals("com.android.bluetooth.gatt.GattService")) {
-                msg.arg1 = SERVICE_IBLUETOOTHGATT;
-            } else {
+            if (!name.equals("com.android.bluetooth.btservice.AdapterService")) {
                 Log.e(TAG, "Unknown service connected: " + name);
                 return;
             }
-            mHandler.sendMessage(msg);
+            mHandler.obtainMessage(MESSAGE_BLUETOOTH_SERVICE_CONNECTED, service).sendToTarget();
         }
 
         public void onServiceDisconnected(ComponentName componentName) {
@@ -1967,16 +1945,11 @@ class BluetoothManagerService {
             if (DBG) {
                 Log.d(TAG, "BluetoothServiceConnection, disconnected: " + name);
             }
-            Message msg = mHandler.obtainMessage(MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED);
-            if (name.equals("com.android.bluetooth.btservice.AdapterService")) {
-                msg.arg1 = SERVICE_IBLUETOOTH;
-            } else if (name.equals("com.android.bluetooth.gatt.GattService")) {
-                msg.arg1 = SERVICE_IBLUETOOTHGATT;
-            } else {
+            if (!name.equals("com.android.bluetooth.btservice.AdapterService")) {
                 Log.e(TAG, "Unknown service disconnected: " + name);
                 return;
             }
-            mHandler.sendMessage(msg);
+            mHandler.sendEmptyMessage(MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED);
         }
     }
 
@@ -2414,13 +2387,9 @@ class BluetoothManagerService {
                     IBinder service = (IBinder) msg.obj;
                     mAdapterLock.writeLock().lock();
                     try {
-                        if (msg.arg1 == SERVICE_IBLUETOOTHGATT) {
-                            mBluetoothGatt = IBluetoothGatt.Stub.asInterface(service);
-                            continueFromBleOnState();
-                            break;
-                        } // else must be SERVICE_IBLUETOOTH
-
-                        mTryBindOnBindTimeout = false;
+                        // Remove timeout
+                        mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
+                        
                         mAdapter = BluetoothServerProxy.getInstance().createAdapterBinder(service);
 
                         int foregroundUserId = ActivityManager.getCurrentUser();
@@ -2546,23 +2515,14 @@ class BluetoothManagerService {
                     break;
 
                 case MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED:
-                    Log.e(TAG, "MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED(" + msg.arg1 + ")");
+                    Log.e(TAG, "MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED");
                     mAdapterLock.writeLock().lock();
                     try {
-                        if (msg.arg1 == SERVICE_IBLUETOOTH) {
-                            // if service is unbinded already, do nothing and return
-                            if (mAdapter == null) {
-                                break;
-                            }
-                            mAdapter = null;
-                            mSupportedProfileList.clear();
-                        } else if (msg.arg1 == SERVICE_IBLUETOOTHGATT) {
-                            mBluetoothGatt = null;
-                            break;
-                        } else {
-                            Log.e(TAG, "Unknown argument for service disconnect!");
+                        // if service is unbinded already, do nothing and return
+                        if (mAdapter == null) {
                             break;
                         }
+                        mAdapter = null;
                         mSupportedProfileList.clear();
                     } finally {
                         mAdapterLock.writeLock().unlock();
@@ -2934,25 +2894,11 @@ class BluetoothManagerService {
             }
             sendBluetoothServiceDownCallback();
             unbindAndFinish();
-            // connect to GattService
         } else if (newState == STATE_BLE_ON && prevState == STATE_BLE_TURNING_ON) {
             if (DBG) {
                 Log.d(TAG, "Bluetooth is in LE only mode");
             }
-            if (mBluetoothGatt != null
-                    || !mContext.getPackageManager()
-                            .hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-                continueFromBleOnState();
-            } else {
-                if (DBG) {
-                    Log.d(TAG, "Binding Bluetooth GATT service");
-                }
-                doBind(
-                        new Intent(IBluetoothGatt.class.getName()),
-                        mConnection,
-                        Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT,
-                        UserHandle.CURRENT);
-            }
+            continueFromBleOnState();
         } // Nothing specific to do for STATE_TURNING_<X>
 
         broadcastIntentStateChange(BluetoothAdapter.ACTION_BLE_STATE_CHANGED, prevState, newState);
@@ -3101,6 +3047,17 @@ class BluetoothManagerService {
         waitForState(STATE_OFF);
 
         sendBluetoothServiceDownCallback();
+
+        mAdapterLock.writeLock().lock();
+        try {
+            if (mAdapter != null) {
+                mAdapter = null;
+                // Unbind
+                mContext.unbindService(mConnection);
+            }
+        } finally {
+            mAdapterLock.writeLock().unlock();
+        }
 
         mHandler.removeMessages(MESSAGE_BLUETOOTH_STATE_CHANGE);
         mState.set(STATE_OFF);

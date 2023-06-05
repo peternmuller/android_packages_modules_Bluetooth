@@ -33,7 +33,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetoothGatt;
-import android.bluetooth.IBluetoothManager;
 import android.bluetooth.annotations.RequiresBluetoothAdvertisePermission;
 import android.bluetooth.annotations.RequiresLegacyBluetoothAdminPermission;
 import android.content.AttributionSource;
@@ -78,7 +77,6 @@ public final class BluetoothLeAdvertiser {
     private static final int ENCRYPTION_OVERHEAD_BYTES = 11;
 
     private final BluetoothAdapter mBluetoothAdapter;
-    private final IBluetoothManager mBluetoothManager;
     private final AttributionSource mAttributionSource;
 
     private final Handler mHandler;
@@ -97,7 +95,6 @@ public final class BluetoothLeAdvertiser {
      */
     public BluetoothLeAdvertiser(BluetoothAdapter bluetoothAdapter) {
         mBluetoothAdapter = Objects.requireNonNull(bluetoothAdapter);
-        mBluetoothManager = mBluetoothAdapter.getBluetoothManager();
         mAttributionSource = mBluetoothAdapter.getAttributionSource();
         mHandler = new Handler(Looper.getMainLooper());
     }
@@ -511,15 +508,7 @@ public final class BluetoothLeAdvertiser {
             throw new IllegalArgumentException("duration out of range: " + duration);
         }
 
-        IBluetoothGatt gatt;
-        try {
-            gatt = mBluetoothManager.getBluetoothGatt();
-        } catch (RemoteException e) {
-            Log.e(TAG, "Failed to get Bluetooth GATT - ", e);
-            postStartSetFailure(handler, callback,
-                    AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR);
-            return;
-        }
+        IBluetoothGatt gatt = mBluetoothAdapter.getBluetoothGatt();
 
         if (gatt == null) {
             Log.e(TAG, "Bluetooth GATT is null");
@@ -569,12 +558,12 @@ public final class BluetoothLeAdvertiser {
             return;
         }
 
+        IBluetoothGatt gatt = mBluetoothAdapter.getBluetoothGatt();
+        if (gatt == null) {
+            Log.e(TAG, "Bluetooth GATT is null");
+            return;
+        }
         try {
-            IBluetoothGatt gatt = mBluetoothManager.getBluetoothGatt();
-            if (gatt == null) {
-                Log.e(TAG, "Bluetooth GATT is null");
-                return;
-            }
             final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
             gatt.stopAdvertisingSet(wrapped, mAttributionSource, recv);
             recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
@@ -740,8 +729,11 @@ public final class BluetoothLeAdvertiser {
                             return;
                         }
 
-                        AdvertisingSet advertisingSet = new AdvertisingSet(
-                                advertiserId, mBluetoothManager, mAttributionSource);
+                        AdvertisingSet advertisingSet =
+                                new AdvertisingSet(
+                                        advertiserId,
+                                        mBluetoothAdapter,
+                                        mAttributionSource);
                         mAdvertisingSets.put(advertiserId, advertisingSet);
                         callback.onAdvertisingSetStarted(advertisingSet, txPower, status);
                     }
