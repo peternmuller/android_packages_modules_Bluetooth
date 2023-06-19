@@ -92,6 +92,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.proto.ProtoOutputStream;
 
+import com.android.bluetooth.BluetoothStatsLog;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.SynchronousResultReceiver;
@@ -1275,7 +1276,6 @@ public class BluetoothManagerService extends IBluetoothManager.Stub {
 
     // Disable ble scan only mode.
     private void disableBleScanMode() {
-        mBluetoothLock.writeLock().lock();
         try {
             mBluetoothLock.readLock().lock();
             if (mBluetooth != null && (synchronousGetState() != BluetoothAdapter.STATE_ON) && (!isBluetoothPersistedStateOnBluetooth())) {
@@ -3611,6 +3611,19 @@ public class BluetoothManagerService extends IBluetoothManager.Stub {
             }
             mActiveLogs.add(
                     new ActiveLog(reason, packageName, enable, System.currentTimeMillis()));
+
+            int state =
+                    enable
+                            ? BluetoothStatsLog.BLUETOOTH_ENABLED_STATE_CHANGED__STATE__ENABLED
+                            : BluetoothStatsLog.BLUETOOTH_ENABLED_STATE_CHANGED__STATE__DISABLED;
+
+            BluetoothStatsLog.write_non_chained(
+                    BluetoothStatsLog.BLUETOOTH_ENABLED_STATE_CHANGED,
+                    Binder.getCallingUid(),
+                    null,
+                    state,
+                    reason,
+                    packageName);
         }
     }
 
