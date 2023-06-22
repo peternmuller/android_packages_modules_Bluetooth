@@ -75,12 +75,11 @@ public class BluetoothOppBtEnablingActivityTest {
 
         mRealTimeoutValue = BluetoothOppBtEnablingActivity.sBtEnablingTimeoutMs;
         BluetoothOppTestUtils.enableOppActivities(true, mTargetContext);
-        TestUtils.setUpUiTest();
+        TestUtils.wakeUpAndDismissKeyGuard();
     }
 
     @After
-    public void tearDown() throws Exception {
-        TestUtils.tearDownUiTest();
+    public void tearDown() {
         BluetoothMethodProxy.setInstanceForTesting(null);
         BluetoothOppBtEnablingActivity.sBtEnablingTimeoutMs = mRealTimeoutValue;
         BluetoothOppTestUtils.enableOppActivities(false, mTargetContext);

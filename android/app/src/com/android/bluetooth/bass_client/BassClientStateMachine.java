@@ -476,16 +476,9 @@ public class BassClientStateMachine extends StateMachine {
                 BluetoothLeBroadcastChannel.Builder channel =
                         new BluetoothLeBroadcastChannel.Builder();
                 channel.setChannelIndex(baseLevel3.index);
+                channel.setCodecMetadata(BluetoothLeAudioCodecConfigMetadata.
+                        fromRawBytes(baseLevel3.codecConfigInfo));
                 channel.setSelected(false);
-                try {
-                    channel.setCodecMetadata(
-                            BluetoothLeAudioCodecConfigMetadata.fromRawBytes(
-                                    baseLevel3.codecConfigInfo));
-                } catch (IllegalArgumentException e) {
-                    Log.w(TAG, "Invalid metadata, adding empty data. Error: " + e);
-                    channel.setCodecMetadata(
-                            BluetoothLeAudioCodecConfigMetadata.fromRawBytes(new byte[0]));
-                }
                 subGroup.addChannel(channel.build());
             }
             byte[] arrayCodecId = baseLevel2.codecId;
@@ -495,25 +488,10 @@ public class BassClientStateMachine extends StateMachine {
                     | (arrayCodecId[1] & 0xff) << 8
                     | (arrayCodecId[0] & 0xff);
             subGroup.setCodecId(codeId);
-            try {
-                subGroup.setCodecSpecificConfig(
-                        BluetoothLeAudioCodecConfigMetadata.fromRawBytes(
-                                baseLevel2.codecConfigInfo));
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Invalid config, adding empty one. Error: " + e);
-                subGroup.setCodecSpecificConfig(
-                        BluetoothLeAudioCodecConfigMetadata.fromRawBytes(new byte[0]));
-            }
-
-            try {
-                subGroup.setContentMetadata(
-                        BluetoothLeAudioContentMetadata.fromRawBytes(baseLevel2.metaData));
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Invalid metadata, adding empty one. Error: " + e);
-                subGroup.setContentMetadata(
-                        BluetoothLeAudioContentMetadata.fromRawBytes(new byte[0]));
-            }
-
+            subGroup.setCodecSpecificConfig(BluetoothLeAudioCodecConfigMetadata.
+                    fromRawBytes(baseLevel2.codecConfigInfo));
+            subGroup.setContentMetadata(BluetoothLeAudioContentMetadata.
+                    fromRawBytes(baseLevel2.metaData));
             metaData.addSubgroup(subGroup.build());
         }
         metaData.setSourceDevice(device, device.getAddressType());
@@ -534,13 +512,8 @@ public class BassClientStateMachine extends StateMachine {
             if (pbData != null) {
                 metaData.setPublicBroadcast(true);
                 metaData.setAudioConfigQuality(pbData.getAudioConfigQuality());
-                try {
-                    metaData.setPublicBroadcastMetadata(
-                            BluetoothLeAudioContentMetadata.fromRawBytes(pbData.getMetadata()));
-                } catch (IllegalArgumentException e) {
-                    Log.w(TAG, "Invalid public metadata, adding empty one. Error " + e);
-                    metaData.setPublicBroadcastMetadata(null);
-                }
+                metaData.setPublicBroadcastMetadata(BluetoothLeAudioContentMetadata
+                        .fromRawBytes(pbData.getMetadata()));
             }
 
             String broadcastName = result.getBroadcastName();

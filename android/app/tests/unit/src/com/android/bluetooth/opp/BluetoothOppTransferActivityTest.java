@@ -106,13 +106,11 @@ public class BluetoothOppTransferActivityTest {
                         BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED)
         ));
         BluetoothOppTestUtils.enableOppActivities(true, mTargetContext);
-        TestUtils.setUpUiTest();
+        TestUtils.wakeUpAndDismissKeyGuard();
     }
 
     @After
-    public void tearDown() throws Exception {
-        TestUtils.tearDownUiTest();
-
+    public void tearDown() {
         BluetoothMethodProxy.setInstanceForTesting(null);
         BluetoothOppTestUtils.enableOppActivities(false, mTargetContext);
     }

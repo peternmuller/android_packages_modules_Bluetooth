@@ -582,6 +582,8 @@ class BluetoothOppNotification {
                             true)
                             .setOngoing(true)
                             .setWhen(info.mTimeStamp)
+                            .addAction(actionDecline)
+                            .addAction(actionAccept)
                             .setContentIntent(PendingIntent.getBroadcast(mContext, 0,
                                     new Intent(baseIntent).setAction(
                                             Constants.ACTION_INCOMING_FILE_CONFIRM),
@@ -631,8 +633,6 @@ class BluetoothOppNotification {
                             .setSmallIcon(R.drawable.bt_incomming_file_notification)
                             .setLocalOnly(true)
                             .setVisibility(Notification.VISIBILITY_PRIVATE)
-                            .addAction(actionDecline)
-                            .addAction(actionAccept)
                             .setPublicVersion(public_n)
                             .build();
             mNotificationMgr.notify(NOTIFICATION_ID_PROGRESS, n);

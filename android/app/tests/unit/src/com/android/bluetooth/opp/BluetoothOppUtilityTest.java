@@ -80,13 +80,11 @@ public class BluetoothOppUtilityTest {
         mContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
         BluetoothMethodProxy.setInstanceForTesting(mCallProxy);
         BluetoothOppTestUtils.enableOppActivities(true, mContext);
-        TestUtils.setUpUiTest();
+        TestUtils.wakeUpAndDismissKeyGuard();
     }
 
     @After
-    public void tearDown() throws Exception {
-        TestUtils.tearDownUiTest();
-
+    public void tearDown() {
         BluetoothOppTestUtils.enableOppActivities(false, mContext);
         BluetoothMethodProxy.setInstanceForTesting(null);
     }
