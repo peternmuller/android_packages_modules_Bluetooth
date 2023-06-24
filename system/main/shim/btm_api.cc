@@ -78,175 +78,6 @@ void btm_set_eir_uuid(const uint8_t* p_eir, tBTM_INQ_RESULTS* p_results);
 void btm_sort_inq_result(void);
 void btm_process_inq_complete(tHCI_STATUS status, uint8_t result_type);
 
-static bool is_classic_device(tBT_DEVICE_TYPE device_type) {
-  return device_type == BT_DEVICE_TYPE_BREDR;
-}
-
-static bool has_classic_device(tBT_DEVICE_TYPE device_type) {
-  return device_type & BT_DEVICE_TYPE_BREDR;
-}
-
-void btm_api_process_inquiry_result(const RawAddress& raw_address,
-                                    uint8_t page_scan_rep_mode,
-                                    DEV_CLASS device_class,
-                                    uint16_t clock_offset) {
-  tINQ_DB_ENT* p_i = btm_inq_db_find(raw_address);
-
-  if (p_i == nullptr) {
-    p_i = btm_inq_db_new(raw_address);
-    CHECK(p_i != nullptr);
-  } else if (p_i->inq_count == btm_cb.btm_inq_vars.inq_counter &&
-             is_classic_device(p_i->inq_info.results.device_type)) {
-    return;
-  }
-
-  p_i->inq_info.results.page_scan_rep_mode = page_scan_rep_mode;
-  p_i->inq_info.results.page_scan_per_mode = 0;  // RESERVED
-  p_i->inq_info.results.page_scan_mode = 0;      // RESERVED
-  p_i->inq_info.results.dev_class[0] = device_class[0];
-  p_i->inq_info.results.dev_class[1] = device_class[1];
-  p_i->inq_info.results.dev_class[2] = device_class[2];
-  p_i->inq_info.results.clock_offset = clock_offset | BTM_CLOCK_OFFSET_VALID;
-  p_i->inq_info.results.inq_result_type = BTM_INQ_RESULT_BR;
-  p_i->inq_info.results.rssi = BTM_INQ_RES_IGNORE_RSSI;
-
-  p_i->time_of_resp = bluetooth::common::time_get_os_boottime_ms();
-  p_i->inq_count = btm_cb.btm_inq_vars.inq_counter;
-  p_i->inq_info.appl_knows_rem_name = false;
-
-  if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
-    p_i->inq_info.results.device_type = BT_DEVICE_TYPE_BREDR;
-    btm_cb.btm_inq_vars.inq_cmpl_info.num_resp++;
-    p_i->scan_rsp = false;
-  } else {
-    p_i->inq_info.results.device_type |= BT_DEVICE_TYPE_BREDR;
-  }
-
-  if (btm_cb.btm_inq_vars.p_inq_results_cb == nullptr) {
-    return;
-  }
-
-  (btm_cb.btm_inq_vars.p_inq_results_cb)(&p_i->inq_info.results, nullptr, 0);
-}
-
-void btm_api_process_inquiry_result_with_rssi(RawAddress raw_address,
-                                              uint8_t page_scan_rep_mode,
-                                              DEV_CLASS device_class,
-                                              uint16_t clock_offset,
-                                              int8_t rssi) {
-  tINQ_DB_ENT* p_i = btm_inq_db_find(raw_address);
-
-  bool update = false;
-  if (btm_inq_find_bdaddr(raw_address)) {
-    if (p_i != nullptr &&
-        (rssi > p_i->inq_info.results.rssi || p_i->inq_info.results.rssi == 0 ||
-         has_classic_device(p_i->inq_info.results.device_type))) {
-      update = true;
-    }
-  }
-
-  bool is_new = true;
-  if (p_i == nullptr) {
-    p_i = btm_inq_db_new(raw_address);
-    CHECK(p_i != nullptr);
-  } else if (p_i->inq_count == btm_cb.btm_inq_vars.inq_counter &&
-             is_classic_device(p_i->inq_info.results.device_type)) {
-    is_new = false;
-  }
-
-  p_i->inq_info.results.rssi = rssi;
-
-  if (is_new) {
-    p_i->inq_info.results.page_scan_rep_mode = page_scan_rep_mode;
-    p_i->inq_info.results.page_scan_per_mode = 0;  // RESERVED
-    p_i->inq_info.results.page_scan_mode = 0;      // RESERVED
-    p_i->inq_info.results.dev_class[0] = device_class[0];
-    p_i->inq_info.results.dev_class[1] = device_class[1];
-    p_i->inq_info.results.dev_class[2] = device_class[2];
-    p_i->inq_info.results.clock_offset = clock_offset | BTM_CLOCK_OFFSET_VALID;
-    p_i->inq_info.results.inq_result_type = BTM_INQ_RESULT_BR;
-
-    p_i->time_of_resp = bluetooth::common::time_get_os_boottime_ms();
-    p_i->inq_count = btm_cb.btm_inq_vars.inq_counter;
-    p_i->inq_info.appl_knows_rem_name = false;
-
-    if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
-      p_i->inq_info.results.device_type = BT_DEVICE_TYPE_BREDR;
-      btm_cb.btm_inq_vars.inq_cmpl_info.num_resp++;
-      p_i->scan_rsp = false;
-    } else {
-      p_i->inq_info.results.device_type |= BT_DEVICE_TYPE_BREDR;
-    }
-  }
-
-  if (btm_cb.btm_inq_vars.p_inq_results_cb == nullptr) {
-    return;
-  }
-
-  if (is_new || update) {
-    (btm_cb.btm_inq_vars.p_inq_results_cb)(&p_i->inq_info.results, nullptr, 0);
-  }
-}
-void btm_api_process_extended_inquiry_result(RawAddress raw_address,
-                                             uint8_t page_scan_rep_mode,
-                                             DEV_CLASS device_class,
-                                             uint16_t clock_offset, int8_t rssi,
-                                             const uint8_t* eir_data,
-                                             size_t eir_len) {
-  tINQ_DB_ENT* p_i = btm_inq_db_find(raw_address);
-
-  bool update = false;
-  if (btm_inq_find_bdaddr(raw_address) && p_i != nullptr) {
-    update = true;
-  }
-
-  bool is_new = true;
-  if (p_i == nullptr) {
-    p_i = btm_inq_db_new(raw_address);
-  } else if (p_i->inq_count == btm_cb.btm_inq_vars.inq_counter &&
-             (p_i->inq_info.results.device_type == BT_DEVICE_TYPE_BREDR)) {
-    is_new = false;
-  }
-
-  p_i->inq_info.results.rssi = rssi;
-
-  if (is_new) {
-    p_i->inq_info.results.page_scan_rep_mode = page_scan_rep_mode;
-    p_i->inq_info.results.page_scan_per_mode = 0;  // RESERVED
-    p_i->inq_info.results.page_scan_mode = 0;      // RESERVED
-    p_i->inq_info.results.dev_class[0] = device_class[0];
-    p_i->inq_info.results.dev_class[1] = device_class[1];
-    p_i->inq_info.results.dev_class[2] = device_class[2];
-    p_i->inq_info.results.clock_offset = clock_offset | BTM_CLOCK_OFFSET_VALID;
-    p_i->inq_info.results.inq_result_type = BTM_INQ_RESULT_BR;
-
-    p_i->time_of_resp = bluetooth::common::time_get_os_boottime_ms();
-    p_i->inq_count = btm_cb.btm_inq_vars.inq_counter;
-    p_i->inq_info.appl_knows_rem_name = false;
-
-    if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
-      p_i->inq_info.results.device_type = BT_DEVICE_TYPE_BREDR;
-      btm_cb.btm_inq_vars.inq_cmpl_info.num_resp++;
-      p_i->scan_rsp = false;
-    } else {
-      p_i->inq_info.results.device_type |= BT_DEVICE_TYPE_BREDR;
-    }
-  }
-
-  if (btm_cb.btm_inq_vars.p_inq_results_cb == nullptr) {
-    return;
-  }
-
-  if (is_new || update) {
-    memset(p_i->inq_info.results.eir_uuid, 0,
-           BTM_EIR_SERVICE_ARRAY_SIZE * (BTM_EIR_ARRAY_BITS / 8));
-    btm_set_eir_uuid(const_cast<uint8_t*>(eir_data), &p_i->inq_info.results);
-    uint8_t* p_eir_data = const_cast<uint8_t*>(eir_data);
-    (btm_cb.btm_inq_vars.p_inq_results_cb)(&p_i->inq_info.results, p_eir_data,
-                                           eir_len);
-  }
-}
-
 namespace {
 std::unordered_map<bluetooth::hci::AddressWithType, bt_bdname_t>
     address_name_map_;
@@ -311,6 +142,10 @@ class ShimUi : public bluetooth::security::UI {
 
     if (bta_callbacks->p_le_key_callback == nullptr) {
       LOG_INFO("UNIMPLEMENTED %s le_key_callback", __func__);
+    }
+
+    if (bta_callbacks->p_sirk_verification_callback == nullptr) {
+      LOG_INFO("UNIMPLEMENTED %s sirk_verification_callback", __func__);
     }
   }
 
@@ -443,6 +278,10 @@ class ShimBondListener : public bluetooth::security::ISecurityManagerListener {
 
     if (bta_callbacks->p_le_key_callback == nullptr) {
       LOG_INFO("UNIMPLEMENTED %s le_key_callback", __func__);
+    }
+
+    if (bta_callbacks->p_sirk_verification_callback == nullptr) {
+      LOG_INFO("UNIMPLEMENTED %s sirk_verification_callback", __func__);
     }
   }
 
@@ -600,6 +439,25 @@ bool bluetooth::shim::BTM_ReadConnectedTransportAddress(
   return false;
 }
 
+void bluetooth::shim::BTM_BleReceiverTest(uint8_t rx_freq,
+                                          tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  LOG_INFO("UNIMPLEMENTED %s", __func__);
+  CHECK(p_cmd_cmpl_cback != nullptr);
+}
+
+void bluetooth::shim::BTM_BleTransmitterTest(uint8_t tx_freq,
+                                             uint8_t test_data_len,
+                                             uint8_t packet_payload,
+                                             tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  LOG_INFO("UNIMPLEMENTED %s", __func__);
+  CHECK(p_cmd_cmpl_cback != nullptr);
+}
+
+void bluetooth::shim::BTM_BleTestEnd(tBTM_CMPL_CB* p_cmd_cmpl_cback) {
+  LOG_INFO("UNIMPLEMENTED %s", __func__);
+  CHECK(p_cmd_cmpl_cback != nullptr);
+}
+
 bool bluetooth::shim::BTM_GetLeSecurityState(const RawAddress& bd_addr,
                                              uint8_t* p_le_dev_sec_flags,
                                              uint8_t* p_le_key_size) {
@@ -620,77 +478,10 @@ uint8_t bluetooth::shim::BTM_BleGetSupportedKeySize(const RawAddress& bd_addr) {
   return 0;
 }
 
-/**
- * This function update(add,delete or clear) the adv local name filtering
- * condition.
- */
-void bluetooth::shim::BTM_LE_PF_local_name(tBTM_BLE_SCAN_COND_OP action,
-                                           tBTM_BLE_PF_FILT_INDEX filt_index,
-                                           std::vector<uint8_t> name,
-                                           tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_srvc_data(tBTM_BLE_SCAN_COND_OP action,
-                                          tBTM_BLE_PF_FILT_INDEX filt_index) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_manu_data(
-    tBTM_BLE_SCAN_COND_OP action, tBTM_BLE_PF_FILT_INDEX filt_index,
-    uint16_t company_id, uint16_t company_id_mask, std::vector<uint8_t> data,
-    std::vector<uint8_t> data_mask, tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_srvc_data_pattern(
-    tBTM_BLE_SCAN_COND_OP action, tBTM_BLE_PF_FILT_INDEX filt_index,
-    std::vector<uint8_t> data, std::vector<uint8_t> data_mask,
-    tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_addr_filter(tBTM_BLE_SCAN_COND_OP action,
-                                            tBTM_BLE_PF_FILT_INDEX filt_index,
-                                            tBLE_BD_ADDR addr,
-                                            tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_uuid_filter(tBTM_BLE_SCAN_COND_OP action,
-                                            tBTM_BLE_PF_FILT_INDEX filt_index,
-                                            tBTM_BLE_PF_COND_TYPE filter_type,
-                                            const bluetooth::Uuid& uuid,
-                                            tBTM_BLE_PF_LOGIC_TYPE cond_logic,
-                                            const bluetooth::Uuid& uuid_mask,
-                                            tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_set(tBTM_BLE_PF_FILT_INDEX filt_index,
-                                    std::vector<ApcfCommand> commands,
-                                    tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_LE_PF_clear(tBTM_BLE_PF_FILT_INDEX filt_index,
-                                      tBTM_BLE_PF_CFG_CBACK cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
 void bluetooth::shim::BTM_BleAdvFilterParamSetup(
     tBTM_BLE_SCAN_COND_OP action, tBTM_BLE_PF_FILT_INDEX filt_index,
     std::unique_ptr<btgatt_filt_param_setup_t> p_filt_params,
     tBTM_BLE_PF_PARAM_CB cb) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_BleUpdateAdvFilterPolicy(tBTM_BLE_AFP adv_policy) {
-  LOG_INFO("UNIMPLEMENTED %s", __func__);
-}
-
-void bluetooth::shim::BTM_BleEnableDisableFilterFeature(
-    uint8_t enable, tBTM_BLE_PF_STATUS_CBACK p_stat_cback) {
   LOG_INFO("UNIMPLEMENTED %s", __func__);
 }
 

@@ -599,7 +599,7 @@ public interface BluetoothProfile {
             case CC_SERVER:
                 return "CC_SERVER";
             default:
-                return "UNKNOWN_PROFILE";
+                return "UNKNOWN_PROFILE (" + profile + ")";
         }
     }
 }

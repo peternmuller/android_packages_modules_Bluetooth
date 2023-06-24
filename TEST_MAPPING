@@ -7,15 +7,15 @@
     {
       "name": "BluetoothInstrumentationTests"
     },
-    //{
-    //  "name": "GoogleBluetoothInstrumentationTests"
-    //},
-    //{
-    //  "name": "FrameworkBluetoothTests"
-    //},
-    //{
-    //  "name": "ServiceBluetoothTests"
-    //},
+    {
+      "name": "GoogleBluetoothInstrumentationTests"
+    },
+    {
+      "name": "FrameworkBluetoothTests"
+    },
+    {
+      "name": "ServiceBluetoothTests"
+    },
     // device only tests
     // Broken
     //{
@@ -155,9 +155,6 @@
       "name": "net_test_eatt"
     },
     {
-      "name": "net_test_hci_fragmenter_native"
-    },
-    {
       "name": "net_test_main_shim"
     },
     {
@@ -220,15 +217,15 @@
     {
       "name": "BluetoothInstrumentationTests"
     },
-    //{
-    //  "name": "GoogleBluetoothInstrumentationTests"
-    //},
-    //{
-    //  "name": "FrameworkBluetoothTests"
-    //},
-    //{
-    //  "name": "ServiceBluetoothTests"
-    //},
+    {
+      "name": "GoogleBluetoothInstrumentationTests"
+    },
+    {
+      "name": "FrameworkBluetoothTests"
+    },
+    {
+      "name": "ServiceBluetoothTests"
+    },
     // device only tests
     // Broken
     //{
@@ -367,9 +364,6 @@
     },
     {
       "name": "net_test_eatt"
-    },
-    {
-      "name": "net_test_hci_fragmenter_native"
     },
     {
       "name": "net_test_main_shim"

@@ -117,6 +117,7 @@ typedef struct {
   uint16_t psm;
   bool is_orig;
   tBTM_SEC_CALLBACK* p_callback;
+  tSMP_SIRK_CALLBACK* p_sirk_callback;
   void* p_ref_data;
   uint16_t rfcomm_security_requirement;
   tBT_TRANSPORT transport;
@@ -164,6 +165,10 @@ typedef struct tBTM_DEVCB {
   tBTM_CMPL_CB* p_tx_power_cmpl_cb; /* Callback function to be called       */
 
   DEV_CLASS dev_class; /* Local device class                   */
+
+  tBTM_CMPL_CB*
+      p_le_test_cmd_cmpl_cb; /* Callback function to be called when
+                             LE test mode command has been sent successfully */
 
   RawAddress read_tx_pwr_addr; /* read TX power target address     */
 

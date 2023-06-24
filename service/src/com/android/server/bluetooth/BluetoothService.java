@@ -49,7 +49,7 @@ public class BluetoothService extends SystemService {
     public void onBootPhase(int phase) {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             publishBinderService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE,
-                    mBluetoothManagerService);
+                    mBluetoothManagerService.getBinder());
         }
     }
 

@@ -17,24 +17,51 @@ rust_library {
         "liblog_rust",
         "libnix",
         "libtokio",
-  ],
-  target: {
-      android: {
-          rustlibs: [
-              "libandroid_logger",
-              "librustutils",
-          ],
-          shared_libs: [
-              "libcutils",
-          ],
-      },
-      host: {
-          rustlibs: [
-              "libenv_logger",
-          ],
-      },
-  },
-  min_sdk_version: "Tiramisu",
+    ],
+    target: {
+        android: {
+            rustlibs: [
+                "libandroid_logger",
+                "librustutils",
+            ],
+            shared_libs: [
+                "libcutils",
+            ],
+        },
+        host: {
+            rustlibs: [
+                "libenv_logger",
+            ],
+        },
+    },
+    min_sdk_version: "Tiramisu",
+}
+
+rust_library {
+    name: "libbt_common_only_init_flags",
+    defaults: ["gd_rust_defaults"],
+    crate_name: "bt_common",
+    srcs: ["src/lib_only_init_flags.rs"],
+    rustlibs: [
+        "liblazy_static",
+        "liblog_rust",
+    ],
+    target: {
+        android: {
+            rustlibs: [
+                "libandroid_logger",
+            ],
+        },
+        host: {
+            rustlibs: [
+                "libenv_logger",
+            ],
+        },
+    },
+    proc_macros: [
+        "libpaste",
+    ],
+    min_sdk_version: "Tiramisu",
 }
 
 rust_defaults {

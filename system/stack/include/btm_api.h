@@ -221,6 +221,23 @@ void BTM_WritePageTimeout(uint16_t timeout);
 void BTM_WriteVoiceSettings(uint16_t settings);
 
 /*******************************************************************************
+ *
+ * Function         BTM_EnableTestMode
+ *
+ * Description      Send HCI the enable device under test command.
+ *
+ *                  Note: Controller can only be taken out of this mode by
+ *                      resetting the controller.
+ *
+ * Returns
+ *      BTM_SUCCESS         Command sent.
+ *      BTM_NO_RESOURCES    If out of resources to send the command.
+ *
+ *
+ ******************************************************************************/
+tBTM_STATUS BTM_EnableTestMode(void);
+
+/*******************************************************************************
  * DEVICE DISCOVERY FUNCTIONS - Inquiry, Remote Name, Discovery, Class of Device
  ******************************************************************************/
 
@@ -921,6 +938,20 @@ uint8_t BTM_GetEirUuidList(const uint8_t* p_eir, size_t eir_len,
  *
  ******************************************************************************/
 tBTM_CONTRL_STATE BTM_PM_ReadControllerState(void);
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleSirkConfirmDeviceReply
+ *
+ * Description      This procedure confirms requested to validate set device.
+ *
+ * Parameter        bd_addr     - BD address of the peer
+ *                  res         - confirmation result BTM_SUCCESS if success
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void BTM_BleSirkConfirmDeviceReply(const RawAddress& bd_addr, uint8_t res);
 
 /**
  * Send remote name request, either to legacy HCI, or to GD shim Name module
