@@ -107,8 +107,13 @@ cc_library_shared {
         "libaaudio",
         "libbinder_ndk",
         "libcrypto",
+        "libcutils",
         "libfmq",
+        "libhidlbase",
+        "liblog",
         "libnativehelper",
+        "libstatssocket",
+        "libutils",
     ],
     sanitize: {
         scs: true,
@@ -133,6 +138,7 @@ android_app {
     certificate: ":com.android.bluetooth.certificate",
 
     jni_libs: ["libbluetooth_jni"],
+    privapp_allowlist: ":privapp_allowlist_com.android.bluetooth.xml",
     libs: [
         "services.net",
         "app-compat-annotations",

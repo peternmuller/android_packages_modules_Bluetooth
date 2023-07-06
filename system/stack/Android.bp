@@ -22,6 +22,10 @@ cc_test_library {
     include_dirs: [
         "packages/modules/Bluetooth/system",
     ],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
     srcs: crypto_toolbox_srcs,
 }
 
@@ -141,6 +145,9 @@ cc_library_static {
         "libcom.android.sysprop.bluetooth",
         "libldacBT_abr",
         "libldacBT_enc",
+    ],
+    apex_available: [
+        "com.android.btservices",
     ],
     host_supported: true,
     min_sdk_version: "Tiramisu",
@@ -290,6 +297,9 @@ cc_library_static {
         "libPlatformProperties",
         "libcrypto",
     ],
+    apex_available: [
+        "com.android.btservices",
+    ],
     host_supported: true,
     min_sdk_version: "Tiramisu",
 }
@@ -316,6 +326,9 @@ cc_defaults {
     ],
     static_libs: [
         "libchrome",
+    ],
+    shared_libs: [
+        "liblog",
     ],
     target: {
         darwin: {
@@ -624,6 +637,7 @@ cc_test {
         "libfmq",
         "libhidlbase",
         "liblog",
+        "libstatssocket",
         "libutils",
         "libz",
     ],
@@ -733,6 +747,13 @@ cc_test {
         "libosi",
         "libprotobuf-cpp-lite",
     ],
+    target: {
+        android: {
+            shared_libs: [
+                "libstatssocket",
+            ],
+        },
+    },
     sanitize: {
         cfi: false,
     },
@@ -959,6 +980,13 @@ cc_test {
         "libosi",
         "libosi-AllocationTestHarness",
     ],
+    target: {
+        android: {
+            shared_libs: [
+                "libstatssocket",
+            ],
+        },
+    },
     sanitize: {
         address: true,
         cfi: true,
@@ -1017,6 +1045,11 @@ cc_test {
         "libosi-AllocationTestHarness",
         "libprotobuf-cpp-lite",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     sanitize: {
         address: true,
         cfi: true,
@@ -1228,6 +1261,11 @@ cc_test {
         "liblog",
         "libosi",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
 }
 
 // Iso manager unit tests
@@ -1331,6 +1369,11 @@ cc_test {
         "libosi",
         "libprotobuf-cpp-lite",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     sanitize: {
         cfi: false,
     },
@@ -1371,6 +1414,9 @@ cc_test {
         ":TestCommonMainHandler",
         ":TestCommonMockFunctions",
         ":TestCommonStackConfig",
+        ":TestFakeLooper",
+        ":TestFakeOsi",
+        ":TestFakeThread",
         ":TestMockBta",
         ":TestMockBtif",
         ":TestMockDevice",
@@ -1421,6 +1467,7 @@ cc_test {
         "test/btm/sco_hci_test.cc",
         "test/btm/stack_btm_regression_tests.cc",
         "test/btm/stack_btm_test.cc",
+        "test/btm/sco_pkt_status_test.cc",
         "test/common/mock_eatt.cc",
         "test/stack_include_test.cc",
     ],
@@ -1548,6 +1595,11 @@ cc_test {
     shared_libs: [
         "libcrypto",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     sanitize: {
         address: true,
         all_undefined: true,
@@ -1697,7 +1749,13 @@ cc_test {
     shared_libs: [
         "libbinder_ndk",
         "libcrypto",
+        "libcutils",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     sanitize: {
         address: true,
         all_undefined: true,
@@ -1773,11 +1831,13 @@ cc_test {
     shared_libs: [
         "libbinder_ndk",
         "libcrypto",
+        "libcutils",
     ],
     target: {
         android: {
             shared_libs: [
                 "libPlatformProperties",
+                "libstatssocket",
             ],
         },
     },
@@ -1857,6 +1917,11 @@ cc_test {
         "libbinder_ndk",
         "libcrypto",
     ],
+    target: {
+        android: {
+            shared_libs: ["libstatssocket"],
+        },
+    },
     sanitize: {
         address: true,
         all_undefined: true,

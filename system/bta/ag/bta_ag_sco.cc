@@ -144,9 +144,9 @@ static void bta_ag_sco_conn_cback(uint16_t sco_idx) {
   }
 
   if (handle != 0) {
-    do_in_main_thread(FROM_HERE,
-                      base::Bind(&bta_ag_sm_execute_by_handle, handle,
-                                 BTA_AG_SCO_OPEN_EVT, tBTA_AG_DATA::kEmpty));
+    do_in_main_thread(
+        FROM_HERE, base::BindOnce(&bta_ag_sm_execute_by_handle, handle,
+                                  BTA_AG_SCO_OPEN_EVT, tBTA_AG_DATA::kEmpty));
   } else {
     /* no match found; disconnect sco, init sco variables */
     bta_ag_cb.sco.p_curr_scb = nullptr;
@@ -243,9 +243,9 @@ static void bta_ag_sco_disc_cback(uint16_t sco_idx) {
 
     bta_ag_cb.sco.p_curr_scb->inuse_codec = BTM_SCO_CODEC_NONE;
 
-    do_in_main_thread(FROM_HERE,
-                      base::Bind(&bta_ag_sm_execute_by_handle, handle,
-                                 BTA_AG_SCO_CLOSE_EVT, tBTA_AG_DATA::kEmpty));
+    do_in_main_thread(
+        FROM_HERE, base::BindOnce(&bta_ag_sm_execute_by_handle, handle,
+                                  BTA_AG_SCO_CLOSE_EVT, tBTA_AG_DATA::kEmpty));
   } else {
     /* no match found */
     APPL_TRACE_DEBUG("no scb for ag_sco_disc_cback");
@@ -386,9 +386,9 @@ static void bta_ag_create_sco(tBTA_AG_SCB* p_scb, bool is_orig) {
                  << " is not active, active_device=" << active_device_addr;
     if (bta_ag_cb.sco.p_curr_scb != nullptr &&
         bta_ag_cb.sco.p_curr_scb->in_use && p_scb == bta_ag_cb.sco.p_curr_scb) {
-      do_in_main_thread(
-          FROM_HERE, base::Bind(&bta_ag_sm_execute, p_scb, BTA_AG_SCO_CLOSE_EVT,
-                                tBTA_AG_DATA::kEmpty));
+      do_in_main_thread(FROM_HERE, base::BindOnce(&bta_ag_sm_execute, p_scb,
+                                                  BTA_AG_SCO_CLOSE_EVT,
+                                                  tBTA_AG_DATA::kEmpty));
     }
     return;
   }
@@ -535,7 +535,7 @@ static void bta_ag_create_pending_sco(tBTA_AG_SCB* p_scb, bool is_local) {
     /* Bypass voice settings if enhanced SCO setup command is supported */
     if (!(controller_get_interface()
               ->supports_enhanced_setup_synchronous_connection())) {
-      if (esco_codec == BTM_SCO_CODEC_MSBC) {
+      if (esco_codec == UUID_CODEC_MSBC || esco_codec == UUID_CODEC_LC3) {
         BTM_WriteVoiceSettings(BTM_VOICE_SETTING_TRANS);
       } else {
         BTM_WriteVoiceSettings(BTM_VOICE_SETTING_CVSD);
@@ -1237,9 +1237,26 @@ void bta_ag_sco_open(tBTA_AG_SCB* p_scb, UNUSED_ATTR const tBTA_AG_DATA& data) {
     return;
   }
 
-  if (data.api_audio_open.force_cvsd) {
-    LOG(INFO) << __func__ << ": set to use fallback codec";
-    p_scb->codec_fallback = true;
+  p_scb->disabled_codecs = data.api_audio_open.disabled_codecs;
+  LOG(INFO) << __func__ << ": disabled_codecs = " << p_scb->disabled_codecs
+            << ", sco_codec = " << p_scb->sco_codec;
+
+  if (p_scb->disabled_codecs & p_scb->sco_codec) {
+    tBTA_AG_PEER_CODEC updated_codec = BTM_SCO_CODEC_NONE;
+
+    if (hfp_hal_interface::get_swb_supported() &&
+        (p_scb->peer_codecs & BTM_SCO_CODEC_LC3) &&
+        !(p_scb->disabled_codecs & BTM_SCO_CODEC_LC3)) {
+      updated_codec = BTM_SCO_CODEC_LC3;
+    } else if ((p_scb->peer_codecs & BTM_SCO_CODEC_MSBC) &&
+               !(p_scb->disabled_codecs & BTM_SCO_CODEC_MSBC)) {
+      updated_codec = BTM_SCO_CODEC_MSBC;
+    } else {
+      updated_codec = BTM_SCO_CODEC_CVSD;
+    }
+
+    p_scb->sco_codec = updated_codec;
+    p_scb->codec_updated = true;
   }
 
   /* if another scb using sco, this is a transfer */

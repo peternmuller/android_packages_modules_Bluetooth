@@ -2123,7 +2123,6 @@ packet ReadTransmitPowerLevel : Command (op_code = READ_TRANSMIT_POWER_LEVEL) {
   connection_handle : 12,
   _reserved_ : 4,
   transmit_power_level_type : TransmitPowerLevelType,
-
 }
 
 packet ReadTransmitPowerLevelComplete : CommandComplete (command_op_code = READ_TRANSMIT_POWER_LEVEL) {
@@ -2461,6 +2460,21 @@ packet SetEventMaskPage2Complete : CommandComplete (command_op_code = SET_EVENT_
   status: ErrorCode,
 }
 
+packet ReadEnhancedTransmitPowerLevel : Command (op_code = READ_ENHANCED_TRANSMIT_POWER_LEVEL) {
+  connection_handle : 12,
+  _reserved_ : 4,
+  transmit_power_level_type : TransmitPowerLevelType,
+}
+
+packet ReadEnhancedTransmitPowerLevelComplete : CommandComplete (command_op_code = READ_ENHANCED_TRANSMIT_POWER_LEVEL) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  tx_power_level_gfsk : 8,
+  tx_power_level_dqpsk : 8,
+  tx_power_level_8dpsk : 8,
+}
+
 packet ReadLeHostSupport : Command (op_code = READ_LE_HOST_SUPPORT) {
 }
 
@@ -2577,6 +2591,7 @@ enum HciVersion : 8 {
   V_5_1 = 0x0a,
   V_5_2 = 0x0b,
   V_5_3 = 0x0c,
+  V_5_4 = 0x0d,
 }
 
 enum LmpVersion : 8 {
@@ -2593,6 +2608,7 @@ enum LmpVersion : 8 {
   V_5_1 = 0x0a,
   V_5_2 = 0x0b,
   V_5_3 = 0x0c,
+  V_5_4 = 0x0d,
 }
 
 struct LocalVersionInformation {

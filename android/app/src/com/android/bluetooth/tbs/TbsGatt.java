@@ -478,6 +478,8 @@ public class TbsGatt {
 
         private void notifyCharacteristicChanged(BluetoothDevice device,
                 BluetoothGattCharacteristic characteristic, byte[] value) {
+            if (getDeviceAuthorization(device) != BluetoothDevice.ACCESS_ALLOWED) return;
+            if (value == null) return;
             if (mBluetoothGattServer != null) {
                 mBluetoothGattServer.notifyCharacteristicChanged(device, characteristic, false,
                                                                  value);
@@ -487,6 +489,7 @@ public class TbsGatt {
         private void notifyCharacteristicChanged(BluetoothDevice device,
                 BluetoothGattCharacteristic characteristic) {
             if (getDeviceAuthorization(device) != BluetoothDevice.ACCESS_ALLOWED) return;
+
             if (mBluetoothGattServer != null) {
                 mBluetoothGattServer.notifyCharacteristicChanged(device, characteristic, false);
             }
@@ -583,7 +586,7 @@ public class TbsGatt {
         }
 
         public void notify(BluetoothDevice device) {
-            if (isNotifiable()) {
+            if (isNotifiable() && super.getValue() != null) {
                 mNotifier.notify(device, this);
             }
         }
@@ -618,16 +621,19 @@ public class TbsGatt {
         public void handleWriteRequest(BluetoothDevice device, int requestId,
                 boolean responseNeeded, byte[] value) {
             int status;
-            if (value.length == 0) {
-                // at least opcode is required
+            if (value.length < 2) {
+                // at least opcode is required and value is at least 1 byte
                 status = BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
             } else {
                 status = BluetoothGatt.GATT_SUCCESS;
             }
 
             if (responseNeeded) {
-                mBluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0,
-                        value);
+                mBluetoothGattServer.sendResponse(device, requestId, status, 0, value);
+            }
+
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                return;
             }
 
             int opcode = (int) value[0];
@@ -1360,6 +1366,10 @@ public class TbsGatt {
                         : (auth == BluetoothDevice.ACCESS_REJECTED ? "REJECTED" : "UNKNOWN")));
         processPendingGattOperations(device);
 
+        if (auth != BluetoothDevice.ACCESS_ALLOWED) {
+            return;
+        }
+
         BluetoothGattService gattService = mBluetoothGattServer.getService(UUID_GTBS);
         if (gattService != null) {
             List<BluetoothGattCharacteristic> characteristics = gattService.getCharacteristics();
@@ -1367,7 +1377,16 @@ public class TbsGatt {
                 GattCharacteristic wrapper =
                         getLocalCharacteristicWrapper(characteristic.getUuid());
                 if (wrapper != null) {
-                    wrapper.notify(device);
+                    /* Value of status flags is not keep in the characteristic but in the
+                     * mStatusFlagValue
+                     */
+                    if (characteristic.getUuid().equals(UUID_STATUS_FLAGS)) {
+                        if (mStatusFlagValue.containsKey(device)) {
+                            updateStatusFlags(device, mStatusFlagValue.get(device));
+                        }
+                    } else {
+                        wrapper.notify(device);
+                    }
                 }
             }
         }

@@ -16,7 +16,11 @@ import asyncio
 import avatar
 import enum
 import grpc
+import inspect
+import itertools
 import logging
+import math
+import numpy as np
 
 from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices, asynchronous
 from bumble import pandora as bumble_server
@@ -28,18 +32,23 @@ from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_false  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
+from mobly.asserts import assert_not_equal  # type: ignore
 from mobly.asserts import assert_true  # type: ignore
-from pandora._utils import AioStream
+from pandora._utils import AioStream, Stream
 from pandora.host_pb2 import PUBLIC, RANDOM, AdvertiseResponse, Connection, DataTypes, OwnAddressType, ScanningResponse
 from pandora.security_pb2 import LE_LEVEL3
 from pandora_experimental.asha_grpc_aio import Asha as AioAsha, add_AshaServicer_to_server
-from typing import List, Optional, Tuple
+from pandora_experimental.asha_pb2 import PlaybackAudioRequest
+from typing import AsyncIterator, ByteString, List, Optional, Tuple
 
 ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str('-')
 HISYCNID: List[int] = [0x01, 0x02, 0x03, 0x04, 0x5, 0x6, 0x7, 0x8]
 COMPLETE_LOCAL_NAME: str = "Bumble"
 AUDIO_SIGNAL_AMPLITUDE = 0.8
 AUDIO_SIGNAL_SAMPLING_RATE = 44100
+AUDIO_ASHA_SAMPLING_RATE = 16000
+SINE_FREQUENCY = 440
+SINE_DURATION = 0.1
 
 
 class Ear(enum.IntEnum):
@@ -201,6 +210,52 @@ class AshaTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         asha_service.on('stop', stop_command_handler)
         return stop_future
+
+    async def get_audio_data(self, ref_asha: AioAsha, connection: Connection, timeout: int) -> ByteString:
+        audio_data = bytearray()
+        try:
+            captured_data = ref_asha.CaptureAudio(connection=connection, timeout=timeout)
+            async for data in captured_data:
+                audio_data.extend(data.data)
+
+        except grpc.aio.AioRpcError as e:
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                pass
+            else:
+                raise
+
+        return audio_data
+
+    async def generate_sine(self, connection: Connection) -> AsyncIterator[PlaybackAudioRequest]:
+        # generate sine wave audio
+        sine = AUDIO_SIGNAL_AMPLITUDE * np.sin(
+            2
+            * np.pi
+            * np.arange(AUDIO_SIGNAL_SAMPLING_RATE * SINE_DURATION)
+            * (SINE_FREQUENCY / AUDIO_SIGNAL_SAMPLING_RATE)
+        )
+        s16le = (sine * 32767).astype('<i2')
+
+        # Interleaved audio.
+        stereo = np.zeros(s16le.size * 2, dtype=s16le.dtype)
+        stereo[0::2] = s16le
+
+        # Send 4 second of audio.
+        for _ in range(0, int(4 / SINE_DURATION)):
+            yield PlaybackAudioRequest(connection=connection, data=stereo.tobytes())
+
+    def get_audio_frequency(self, audio_data: ByteString, start_time: int, end_time: int) -> float:
+        data = np.frombuffer(bytes(audio_data), dtype=np.int16)
+        start_point = int(AUDIO_ASHA_SAMPLING_RATE * start_time / 1000)
+        end_point = int(AUDIO_ASHA_SAMPLING_RATE * end_time / 1000)
+        length = (end_time - start_time) / 1000
+        count = 0
+        for i in range(start_point, end_point):
+            # Count the cycles in the audio sine wave.
+            if data[i] < 0 and data[i + 1] > 0:
+                count += 1
+
+        return count/length
 
     @avatar.parameterized(
         (RANDOM, Ear.LEFT),
@@ -859,14 +914,10 @@ class AshaTest(base_test.BaseTestClass):  # type: ignore[misc]
         logging.info(f"stop_result:{stop_result}")
         assert_is_not_none(stop_result)
 
-        ref_asha = AioAsha(self.ref_left.aio.channel)
-        try:
-            ref_asha.CaptureAudio(connection=ref_dut, timeout=2)
-        except grpc.aio.AioRpcError as e:
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
-                logging.info("no audio data, work as expected")
-            else:
-                raise e
+        audio_data = await self.get_audio_data(
+            ref_asha=AioAsha(self.ref_left.aio.channel), connection=ref_dut, timeout=10
+        )
+        assert_equal(len(audio_data), 0)
 
     @asynchronous
     async def test_music_restart(self) -> None:
@@ -1014,6 +1065,120 @@ class AshaTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert_is_not_none(start_result_right['volume'])
         # ref_left already connected, otherstate = 1
         assert_equal(start_result_right['otherstate'], 1)
+
+    @asynchronous
+    async def test_music_stop_dual_device(self) -> None:
+        """
+        DUT discovers Refs.
+        DUT initiates connection to Refs.
+        Verify that DUT and Refs are bonded and connected.
+        DUT is streaming media to Refs.
+        DUT stops media streaming on Refs.
+        Verify that DUT sends a correct AudioControlPoint `Stop` command.
+        Verify Refs cannot recevice audio data after DUT stops media streaming.
+        """
+
+        async def ref_device_connect(ref_device: BumblePandoraDevice, ear: Ear) -> Tuple[Connection, Connection]:
+            advertisement = await self.ref_advertise_asha(ref_device=ref_device, ref_address_type=RANDOM, ear=ear)
+            ref = await self.dut_scan_for_asha(dut_address_type=RANDOM, ear=ear)
+            # DUT initiates connection to ref_device.
+            dut_ref, ref_dut = await self.dut_connect_to_ref(advertisement, ref, RANDOM)
+            advertisement.cancel()
+
+            return dut_ref, ref_dut
+
+        # DUT starts connecting, pairing with the ref_left
+        dut_ref_left, ref_left_dut = await ref_device_connect(self.ref_left, Ear.LEFT)
+        (secure_left, wait_security_left) = await asyncio.gather(
+            self.dut.aio.security.Secure(connection=dut_ref_left, le=LE_LEVEL3),
+            self.ref_left.aio.security.WaitSecurity(connection=ref_left_dut, le=LE_LEVEL3),
+        )
+        assert_equal(secure_left.result_variant(), 'success')
+        assert_equal(wait_security_left.result_variant(), 'success')
+
+        # DUT starts connecting, pairing with the ref_right
+        dut_ref_right, ref_right_dut = await ref_device_connect(self.ref_right, Ear.RIGHT)
+        (secure_right, wait_security_right) = await asyncio.gather(
+            self.dut.aio.security.Secure(connection=dut_ref_right, le=LE_LEVEL3),
+            self.ref_right.aio.security.WaitSecurity(connection=ref_right_dut, le=LE_LEVEL3),
+        )
+        assert_equal(secure_right.result_variant(), 'success')
+        assert_equal(wait_security_right.result_variant(), 'success')
+
+        dut_asha = AioAsha(self.dut.aio.channel)
+        ref_left_asha = AioAsha(self.ref_left.aio.channel)
+        ref_right_asha = AioAsha(self.ref_right.aio.channel)
+
+        stop_future = self.get_stop_future(self.ref_left)
+
+        await dut_asha.WaitPeripheral(connection=dut_ref_left)
+        await dut_asha.WaitPeripheral(connection=dut_ref_right)
+
+        await dut_asha.Start(connection=dut_ref_left)
+        logging.info("send stop")
+        _, stop_result = await asyncio.gather(dut_asha.Stop(), asyncio.wait_for(stop_future, timeout=10.0))
+
+        logging.info(f"stop_result:{stop_result}")
+        assert_is_not_none(stop_result)
+
+        (audio_data_left, audio_data_right) = await asyncio.gather(
+            self.get_audio_data(ref_asha=ref_left_asha, connection=ref_left_dut, timeout=10),
+            self.get_audio_data(ref_asha=ref_right_asha, connection=ref_right_dut, timeout=10),
+        )
+
+        assert_equal(len(audio_data_left), 0)
+        assert_equal(len(audio_data_right), 0)
+
+    @asynchronous
+    async def test_music_audio_playback(self) -> None:
+        """
+        DUT discovers Ref.
+        DUT initiates connection to Ref.
+        Verify that DUT and Ref are bonded and connected.
+        DUT is streaming media to Ref using playback API.
+        Verify that Ref has received audio data.
+        """
+
+        async def ref_device_connect(ref_device: BumblePandoraDevice, ear: Ear) -> Tuple[Connection, Connection]:
+            advertisement = await self.ref_advertise_asha(ref_device=ref_device, ref_address_type=RANDOM, ear=ear)
+            ref = await self.dut_scan_for_asha(dut_address_type=RANDOM, ear=ear)
+            # DUT initiates connection to ref_device.
+            dut_ref, ref_dut = await self.dut_connect_to_ref(advertisement, ref, RANDOM)
+            advertisement.cancel()
+
+            return dut_ref, ref_dut
+
+        dut_ref_left, ref_left_dut = await ref_device_connect(self.ref_left, Ear.LEFT)
+
+        # DUT starts pairing with the ref_left
+        (secure_left, wait_security_left) = await asyncio.gather(
+            self.dut.aio.security.Secure(connection=dut_ref_left, le=LE_LEVEL3),
+            self.ref_left.aio.security.WaitSecurity(connection=ref_left_dut, le=LE_LEVEL3),
+        )
+
+        assert_equal(secure_left.result_variant(), 'success')
+        assert_equal(wait_security_left.result_variant(), 'success')
+
+        dut_asha = AioAsha(self.dut.aio.channel)
+        ref_asha = AioAsha(self.ref_left.aio.channel)
+
+        await dut_asha.WaitPeripheral(connection=dut_ref_left)
+        await dut_asha.Start(connection=dut_ref_left)
+
+        # Clear audio data before start audio playback testing
+        await self.get_audio_data(ref_asha=ref_asha, connection=ref_left_dut, timeout=10)
+
+        generated_audio = self.generate_sine(connection=dut_ref_left)
+
+        _, audio_data = await asyncio.gather(
+            dut_asha.PlaybackAudio(generated_audio),
+            self.get_audio_data(ref_asha=ref_asha, connection=ref_left_dut, timeout=10),
+        )
+
+        assert_not_equal(len(audio_data), 0)
+        # Take one second of audio after the first second.
+        audio_frequency = self.get_audio_frequency(audio_data=audio_data, start_time=1000, end_time=2000)
+        assert_equal(audio_frequency, SINE_FREQUENCY)
 
 
 if __name__ == "__main__":

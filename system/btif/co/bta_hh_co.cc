@@ -495,9 +495,10 @@ void bta_hh_co_close(btif_hh_device_t* p_dev) {
   /* Stop the polling thread */
   p_dev->hh_keep_polling = 0;
   if (p_dev->hh_poll_thread_id > 0) {
+    p_dev->hh_keep_polling = 0;
     pthread_join(p_dev->hh_poll_thread_id, NULL);
+    p_dev->hh_poll_thread_id = -1;
   }
-  p_dev->hh_poll_thread_id = -1;
   /* UHID file descriptor is closed by the polling thread */
 }
 

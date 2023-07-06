@@ -30,6 +30,9 @@ cc_library_static {
         "libbluetooth-types",
         "libosi",
     ],
+    whole_static_libs: [
+        "libcom.android.sysprop.bluetooth",
+    ],
     shared_libs: [
         "liblog",
     ],
@@ -54,6 +57,7 @@ cc_test {
     },
     include_dirs: [
         "packages/modules/Bluetooth/system",
+        "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/internal_include",
         "packages/modules/Bluetooth/system/stack/include",
     ],
@@ -93,6 +97,7 @@ cc_fuzz {
     ],
     include_dirs: [
         "packages/modules/Bluetooth/system",
+        "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/internal_include",
         "packages/modules/Bluetooth/system/packet/tests",
         "packages/modules/Bluetooth/system/stack/include",

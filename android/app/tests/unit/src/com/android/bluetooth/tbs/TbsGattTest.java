@@ -133,6 +133,7 @@ public class TbsGattTest {
         Assert.assertNotNull(mMockGattServer);
 
         verify(mMockGattServer).addService(mGattServiceCaptor.capture());
+        doReturn(mGattServiceCaptor.getValue()).when(mMockGattServer).getService(any(UUID.class));
         Assert.assertNotNull(mMockGattServer);
     }
 
@@ -554,13 +555,31 @@ public class TbsGattTest {
                 getCharacteristic(TbsGatt.UUID_CALL_CONTROL_POINT);
 
         // Call the internal GATT callback as if peer device accepts the call
-        byte[] value = new byte[] {0x00, /* opcode */ 0x0A, /* argument */ };
+        byte[] value = new byte[] {0x00 /* opcode */, 0x0A /* argument */};
         mTbsGatt.mGattServerCallback.onCharacteristicWriteRequest(mFirstDevice, 1, characteristic,
-                false, false, 0, value);
+                false, true, 0, value);
+
+        verify(mMockGattServer).sendResponse(eq(mFirstDevice), eq(1),
+                eq(BluetoothGatt.GATT_SUCCESS), eq(0), aryEq(new byte[] {0x00, 0x0A}));
 
         // Verify the higher layer callback call
         verify(mMockTbsGattCallback).onCallControlPointRequest(eq(mFirstDevice), eq(0x00),
                 aryEq(new byte[] {0x0A}));
+    }
+
+    @Test
+    public void testHandleControlPointInvalidLengthRequest() {
+        prepareDefaultService();
+        BluetoothGattCharacteristic characteristic =
+                getCharacteristic(TbsGatt.UUID_CALL_CONTROL_POINT);
+
+        // Call the internal GATT callback as if peer device accepts the call
+        byte[] value = new byte[] {0x00 /* opcode */};
+        mTbsGatt.mGattServerCallback.onCharacteristicWriteRequest(mFirstDevice, 1, characteristic,
+                false, true, 0, value);
+
+        verify(mMockGattServer).sendResponse(eq(mFirstDevice), eq(1),
+                eq(BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH), eq(0), aryEq(new byte[] {0x00}));
     }
 
     @Test
@@ -821,6 +840,51 @@ public class TbsGattTest {
         verify(mMockGattServer)
                 .sendResponse(eq(mFirstDevice), eq(1),
                         eq(BluetoothGatt.GATT_INSUFFICIENT_AUTHORIZATION), eq(0), any());
+    }
+
+    @Test
+    public void testCharacteristicNotifyOnAuthorization() {
+        prepareDefaultService();
+        Assert.assertNotNull(mGattServiceCaptor.getValue());
+
+        BluetoothGattCharacteristic characteristic = getCharacteristic(TbsGatt.UUID_STATUS_FLAGS);
+        configureNotifications(mFirstDevice, characteristic, true);
+        configureNotifications(mSecondDevice, characteristic, true);
+
+        doReturn(mGattServiceCaptor.getValue()).when(mMockGattServer).getService(any(UUID.class));
+        Assert.assertNotNull(mGattServiceCaptor.getValue());
+
+        // Leave it as unauthorized yet
+        doReturn(BluetoothDevice.ACCESS_REJECTED)
+                .when(mMockTbsService)
+                .getDeviceAuthorization(any(BluetoothDevice.class));
+
+        int statusFlagValue = TbsGatt.STATUS_FLAG_SILENT_MODE_ENABLED;
+
+        // Assume no update on one of the characteristics
+        BluetoothGattCharacteristic characteristic2 = getCharacteristic(TbsGatt.UUID_CALL_STATE);
+        characteristic2.setValue((byte[]) null);
+
+        Assert.assertNotNull(mGattServiceCaptor.getValue());
+
+        // Call it once but expect no notification for the unauthorized device
+        byte[] valueBytes = new byte[2];
+        valueBytes[0] = (byte) (statusFlagValue & 0xFF);
+        valueBytes[1] = (byte) ((statusFlagValue >> 8) & 0xFF);
+        mTbsGatt.setSilentModeFlag();
+        verify(mMockGattServer, times(0))
+                .notifyCharacteristicChanged(any(), eq(characteristic), eq(false), eq(valueBytes));
+
+        // Expect a single notification for the just authorized device
+        doReturn(BluetoothDevice.ACCESS_ALLOWED)
+                .when(mMockTbsService)
+                .getDeviceAuthorization(any(BluetoothDevice.class));
+        Assert.assertNotNull(mGattServiceCaptor.getValue());
+        mTbsGatt.onDeviceAuthorizationSet(mFirstDevice);
+        verify(mMockGattServer, times(0))
+                .notifyCharacteristicChanged(any(), eq(characteristic2), eq(false));
+        verify(mMockGattServer, times(1))
+                .notifyCharacteristicChanged(any(), eq(characteristic), eq(false), eq(valueBytes));
     }
 
     @Test
