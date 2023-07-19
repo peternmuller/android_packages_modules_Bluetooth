@@ -18,7 +18,6 @@ package com.android.server.bluetooth;
 
 import android.annotation.NonNull;
 import android.content.ContentResolver;
-import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -54,10 +53,6 @@ class BluetoothServerProxy {
             Log.d(TAG, "setInstanceForTesting(), set to " + proxy);
             sInstance = proxy;
         }
-    }
-
-    AdapterBinder createAdapterBinder(IBinder binder) {
-        return new AdapterBinder(binder);
     }
 
     String settingsSecureGetString(ContentResolver contentResolver, String name) {
