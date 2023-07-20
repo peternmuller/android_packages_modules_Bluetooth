@@ -228,9 +228,10 @@ class BluetoothManagerService {
     private IBluetooth mBluetooth = null;
 
     private IBluetoothGatt mBluetoothGatt = null;
+    private boolean mBinding = false;
+    private boolean mUnbinding = false;
     private int mBindingUserID;
     private boolean mTryBindOnBindTimeout = false;
-
     private List<Integer> mSupportedProfileList = new ArrayList<>();
 
     private BluetoothModeChangeHelper mBluetoothModeChangeHelper;
@@ -299,8 +300,6 @@ class BluetoothManagerService {
             new ConcurrentHashMap<IBinder, ClientDeathRecipient>();
 
     private int mState = STATE_OFF;
-    private final HandlerThread mBluetoothHandlerThread =
-            BluetoothServerProxy.getInstance().createHandlerThread("BluetoothManagerService");
     @VisibleForTesting private final BluetoothHandler mHandler;
     private int mErrorRecoveryRetryCounter = 0;
 
@@ -505,7 +504,7 @@ class BluetoothManagerService {
                 }
             }
 
-            int st = mState.get();
+            int st = BluetoothAdapter.STATE_OFF;
 
             Log.d(
                     TAG,
@@ -985,7 +984,7 @@ class BluetoothManagerService {
         return getState() == STATE_ON;
     }
 
-    @GuardedBy("mBluetoothLock")
+ @GuardedBy("mBluetoothLock")
     private boolean synchronousDisable(AttributionSource attributionSource)
             throws RemoteException, TimeoutException {
         if (mBluetooth == null) return false;
@@ -1022,11 +1021,19 @@ class BluetoothManagerService {
     }
 
     @GuardedBy("mBluetoothLock")
+    private int synchronousGetState() throws RemoteException, TimeoutException {
+        if (mBluetooth == null) return BluetoothAdapter.STATE_OFF;
+        final SynchronousResultReceiver<Integer> recv = SynchronousResultReceiver.get();
+        mBluetooth.getState(recv);
+        return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(BluetoothAdapter.STATE_OFF);
+    }
+
+    @GuardedBy("mBluetoothLock")
     private void synchronousOnBrEdrDown(AttributionSource attributionSource)
             throws RemoteException, TimeoutException {
         if (mBluetooth == null) return;
         final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
-        mBluetooth.onBrEdrDown(attributionSource, recv);
+        //mBluetooth.onBrEdrDown(attributionSource, recv);
         recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
     }
 
@@ -1035,7 +1042,7 @@ class BluetoothManagerService {
             throws RemoteException, TimeoutException {
         if (mBluetooth == null) return;
         final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
-        mBluetooth.onLeServiceUp(attributionSource, recv);
+        //mBluetooth.onLeServiceUp(attributionSource, recv);
         recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
     }
 
@@ -1070,7 +1077,7 @@ class BluetoothManagerService {
                 recv.awaitResultNoInterrupt(getSyncTimeout()).getValue((long) 0);
 
         for (int i = 0; i <= BluetoothProfile.MAX_PROFILE_ID; i++) {
-            if ((supportedProfilesBitMask & (1 << i)) != 0) {
+            if ((supportedProfilesBitMask & (1L << i)) != 0) {
                 supportedProfiles.add(i);
             }
         }
@@ -1098,7 +1105,17 @@ class BluetoothManagerService {
     }
 
     int getState() {
-        return mState.get();
+        mBluetoothLock.readLock().lock();
+        try {
+            if (mBluetooth != null) {
+                return synchronousGetState();
+            }
+        } catch (RemoteException | TimeoutException e) {
+            Log.e(TAG, "getState()", e);
+        } finally {
+            mBluetoothLock.readLock().unlock();
+        }
+        return BluetoothAdapter.STATE_OFF;
     }
 
     class ClientDeathRecipient implements IBinder.DeathRecipient {
@@ -1221,6 +1238,8 @@ class BluetoothManagerService {
                     mEnable = false;
                 }
             }
+        } catch (RemoteException | TimeoutException e) {
+            Log.e(TAG, "getState()", e);
         } finally {
             mBluetoothLock.writeLock().unlock();
         }
@@ -1381,7 +1400,7 @@ class BluetoothManagerService {
                 !isBluetoothPersistedStateOnBluetooth()) {
                 Log.i(TAG, "Bluetooth was disabled while enabling BLE, disable BLE now");
                 mEnable = false;
-                mAdapter.stopBle(mContext.getAttributionSource());
+                synchronousOnBrEdrDown(mContext.getAttributionSource());
                 return;
             }
             if (isBluetoothPersistedStateOnBluetooth() ||
@@ -1799,7 +1818,17 @@ class BluetoothManagerService {
         }
 
         private boolean bindService(int rebindCount) {
-            if (!mState.oneOf(STATE_ON)) {
+            int state = BluetoothAdapter.STATE_OFF;
+            try {
+                mBluetoothLock.readLock().lock();
+                state = synchronousGetState();
+            } catch (RemoteException | TimeoutException e) {
+                Log.e(TAG, "Unable to call getState", e);
+                return false;
+            } finally {
+                mBluetoothLock.readLock().unlock();
+            }
+            if (state != BluetoothAdapter.STATE_ON) {
                 if (DBG) {
                     Log.d(TAG, "Unable to bindService while Bluetooth is disabled");
                 }
@@ -2257,8 +2286,9 @@ class BluetoothManagerService {
                     try {
                         if (mBluetooth != null) {
                             boolean isHandled = true;
-                            switch (mState.get()) {
-                                case STATE_BLE_ON:
+                            int state = synchronousGetState();
+                            switch (state) {
+                                case BluetoothAdapter.STATE_BLE_ON:
                                     if (isBle == 1) {
                                         Log.i(TAG, "Already at BLE_ON State");
                                     } else if (isBluetoothPersistedStateOnBluetooth() ||
@@ -2267,7 +2297,7 @@ class BluetoothManagerService {
                                                     "BT on persisted, going to ON");
                                         mBluetooth.updateQuietModeStatus(mQuietEnable,
                                                 mContext.getAttributionSource());
-                                        mAdapter.startBrEdr(mContext.getAttributionSource());
+                                        synchronousOnLeServiceUp(mContext.getAttributionSource());
                                         persistBluetoothSetting(BLUETOOTH_ON_BLUETOOTH);
 
                                         // waive WRITE_SECURE_SETTINGS permission check
@@ -2278,9 +2308,9 @@ class BluetoothManagerService {
                                                     " stay in ble on");
                                     }
                                     break;
-                                case STATE_BLE_TURNING_ON:
-                                case STATE_TURNING_ON:
-                                case STATE_ON:
+                                case BluetoothAdapter.STATE_BLE_TURNING_ON:
+                                case BluetoothAdapter.STATE_TURNING_ON:
+                                case BluetoothAdapter.STATE_ON:
                                     Log.i(TAG, "MESSAGE_ENABLE: already enabled");
                                     break;
                                 default:
@@ -2648,7 +2678,7 @@ class BluetoothManagerService {
                         if ((st == BluetoothAdapter.STATE_TURNING_ON) ||
                            ((st == BluetoothAdapter.STATE_BLE_ON) &&
                            (mEnableExternal || isBluetoothPersistedStateOnBluetooth()))) {
-                            waitForState(STATE_ON);
+                            waitForState(Set.of(BluetoothAdapter.STATE_ON));
                         } else if ((st == BluetoothAdapter.STATE_BLE_ON) && isBleAppPresent()) {
                             Log.e(TAG, "MESSAGE_BLUETOOTH_SERVICE_CONNECTED: ble app present");
                             break;
