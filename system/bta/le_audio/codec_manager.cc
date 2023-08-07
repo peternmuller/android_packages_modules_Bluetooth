@@ -155,9 +155,9 @@ struct codec_manager_impl {
                          LeAudioHalVerifier::SupportsStreamActiveApi())
                             ? stream_map.streams_map_target
                             : stream_map.streams_map_current,
-          // TODO: set the default value 16 for now, would change it if we
+          // TODO: set the default value 24 for now, would change it if we
           // support mode bits_per_sample
-          .bits_per_sample = 16,
+          .bits_per_sample = 24,
           .sampling_rate = stream_params.get(direction).sample_frequency_hz,
           .frame_duration = stream_params.get(direction).frame_duration_us,
           .octets_per_frame =
