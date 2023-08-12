@@ -938,7 +938,6 @@ cc_test {
         "libgmock",
         "liblog",
         "libosi",
-        "libosi-AllocationTestHarness",
         "libstatslog_bt",
     ],
     target: {
@@ -1003,7 +1002,6 @@ cc_test {
         "libevent",
         "liblog",
         "libosi",
-        "libosi-AllocationTestHarness",
         "libprotobuf-cpp-lite",
         "libstatslog_bt",
     ],
@@ -1116,7 +1114,6 @@ cc_test {
         "liblog",
         "libopus",
         "libosi",
-        "libosi-AllocationTestHarness",
     ],
     whole_static_libs: [
         "libaptx_enc",
@@ -1163,7 +1160,6 @@ cc_test {
         "libchrome",
         "liblog",
         "libosi",
-        "libosi-AllocationTestHarness",
     ],
     sanitize: {
         address: true,
@@ -1373,6 +1369,7 @@ cc_test {
         ":BluetoothBtaaSources_host",
         ":BluetoothHalSources_hci_host",
         ":BluetoothOsSources_host",
+        ":OsiCompatSources",
         ":TestCommonLogMsg",
         ":TestCommonMainHandler",
         ":TestCommonMockFunctions",
@@ -1447,7 +1444,6 @@ cc_test {
         "libgmock",
         "liblc3",
         "liblog",
-        "libosi",
         "libprotobuf-cpp-lite",
         "libudrv-uipc",
     ],
