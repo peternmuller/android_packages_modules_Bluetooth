@@ -21,7 +21,6 @@ import android.bluetooth.BluetoothDevice;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
-import com.android.bluetooth.Utils;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 
@@ -30,7 +29,7 @@ import java.util.UUID;
 
 /** Provides Bluetooth AVRCP Controller native interface for the AVRCP Controller service */
 public class AvrcpControllerNativeInterface {
-    static final String TAG = AvrcpControllerNativeInterface.class.getSimpleName().substring(0, 23);
+    static final String TAG = AvrcpControllerNativeInterface.class.getSimpleName();
     static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
     static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
 
@@ -40,14 +39,6 @@ public class AvrcpControllerNativeInterface {
     private static AvrcpControllerNativeInterface sInstance;
 
     private static final Object INSTANCE_LOCK = new Object();
-
-    static {
-        if (Utils.isInstrumentationTestMode()) {
-            Log.w(TAG, "App is instrumented. Skip loading the native");
-        } else {
-            classInitNative();
-        }
-    }
 
     static AvrcpControllerNativeInterface getInstance() {
         synchronized (INSTANCE_LOCK) {
@@ -417,8 +408,6 @@ public class AvrcpControllerNativeInterface {
     /**********************************************************************************************/
     /******************************************* native *******************************************/
     /**********************************************************************************************/
-
-    private static native void classInitNative();
 
     private native void initNative();
 
