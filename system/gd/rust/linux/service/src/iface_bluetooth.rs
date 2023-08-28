@@ -418,7 +418,12 @@ struct IBluetoothDBus {}
 )]
 impl IBluetooth for IBluetoothDBus {
     #[dbus_method("RegisterCallback")]
-    fn register_callback(&mut self, callback: Box<dyn IBluetoothCallback + Send>) {
+    fn register_callback(&mut self, callback: Box<dyn IBluetoothCallback + Send>) -> u32 {
+        dbus_generated!()
+    }
+
+    #[dbus_method("UnregisterCallback")]
+    fn unregister_callback(&mut self, id: u32) -> bool {
         dbus_generated!()
     }
 
@@ -435,14 +440,23 @@ impl IBluetooth for IBluetoothDBus {
         dbus_generated!()
     }
 
+    // Not exposed over D-Bus. The stack is automatically initialized when the daemon starts.
+    fn init(&mut self, init_flags: Vec<String>) -> bool {
+        dbus_generated!()
+    }
+
     // Not exposed over D-Bus. The stack is automatically enabled when the daemon starts.
     fn enable(&mut self) -> bool {
         dbus_generated!()
     }
 
     // Not exposed over D-Bus. The stack is automatically disabled when the daemon exits.
-    // TODO(b/189495858): Handle shutdown properly when SIGTERM is received.
     fn disable(&mut self) -> bool {
+        dbus_generated!()
+    }
+
+    // Not exposed over D-Bus. The stack is automatically cleaned up when the daemon exits.
+    fn cleanup(&mut self) {
         dbus_generated!()
     }
 
@@ -747,6 +761,11 @@ impl IBluetoothSocketManager for IBluetoothSocketManagerDBus {
         &mut self,
         callback: Box<dyn IBluetoothSocketManagerCallbacks + Send>,
     ) -> CallbackId {
+        dbus_generated!()
+    }
+
+    #[dbus_method("UnregisterCallback")]
+    fn unregister_callback(&mut self, callback: CallbackId) -> bool {
         dbus_generated!()
     }
 

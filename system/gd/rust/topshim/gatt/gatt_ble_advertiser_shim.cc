@@ -184,6 +184,7 @@ void BleAdvertiserIntf::StartAdvertisingSet(
   std::vector<uint8_t> enc_key_value;
 
   adv_intf_->StartAdvertisingSet(
+      kAdvertiserClientIdJni,
       reg_id,
       base::Bind(&BleAdvertiserIntf::OnIdTxPowerStatusCallback, base::Unretained(this)),
       converted_params,

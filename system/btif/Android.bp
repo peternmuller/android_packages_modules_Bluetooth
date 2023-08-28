@@ -34,7 +34,7 @@ btifCommonIncludes = [
 
 cc_library {
     name: "libstatslog_bt",
-    defaults: ["fluoride_common_options"],
+    defaults: ["bluetooth_cflags"],
     host_supported: true,
     generated_sources: ["statslog_bt.cpp"],
     generated_headers: ["statslog_bt.h"],
@@ -160,6 +160,9 @@ cc_library_static {
     cflags: [
         "-DBUILDCFG",
     ],
+    apex_available: [
+        "com.android.btservices",
+    ],
     host_supported: true,
     min_sdk_version: "Tiramisu",
 }
@@ -174,7 +177,6 @@ cc_library_static {
         "co/bta_gatts_co.cc",
         // BTIF implementation
         "src/btif_activity_attribution.cc",
-        "src/btif_ble_advertiser.cc",
         "src/btif_ble_scanner.cc",
         "src/btif_bqr.cc",
         "src/btif_config.cc",
@@ -239,6 +241,9 @@ cc_library_static {
         "-DBUILDCFG",
         "-fvisibility=default",
     ],
+    apex_available: [
+        "com.android.btservices",
+    ],
     host_supported: true,
     min_sdk_version: "Tiramisu",
 }
@@ -271,7 +276,7 @@ cc_test {
         "libutils",
     ],
     static_libs: [
-        "android.hardware.audio.common-V1-ndk",
+        "android.hardware.audio.common-V2-ndk",
         "android.hardware.bluetooth.a2dp@1.0",
         "android.hardware.bluetooth.audio-V3-ndk",
         "android.hardware.bluetooth@1.0",
@@ -616,7 +621,7 @@ cc_test {
     target: {
         android: {
             static_libs: [
-                "android.hardware.audio.common-V1-ndk",
+                "android.hardware.audio.common-V2-ndk",
                 "android.hardware.bluetooth.audio-V3-ndk",
                 "android.hardware.common-V2-ndk",
                 "android.hardware.common.fmq-V1-ndk",
@@ -748,7 +753,7 @@ cc_test {
     target: {
         android: {
             static_libs: [
-                "android.hardware.audio.common-V1-ndk",
+                "android.hardware.audio.common-V2-ndk",
                 "android.hardware.bluetooth.audio-V3-ndk",
                 "android.hardware.common-V2-ndk",
                 "android.hardware.common.fmq-V1-ndk",
