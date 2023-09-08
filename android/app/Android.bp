@@ -50,7 +50,7 @@ java_library {
 
 cc_library_shared {
     name: "libbluetooth_jni",
-    defaults: ["fluoride_basic_defaults"],
+    defaults: ["fluoride_defaults"],
     srcs: ["jni/**/*.cpp"],
     version_script: "libbluetooth_jni.map",
     header_libs: [
@@ -95,6 +95,7 @@ cc_library_shared {
         "libbluetooth-types",
         "libbluetooth_core_rs",
         "libbluetooth_core_rs_bridge",
+        "libbluetooth_gd",
         "libbt-audio-hal-interface",
         "libbt-bta",
         "libbt-bta-core",
@@ -113,6 +114,7 @@ cc_library_shared {
         "libchrome",
         "libcutils",
         "libevent",
+        "libflatbuffers-cpp",
         "libfmq",
         "libg722codec",
         "libhidlbase",
@@ -120,6 +122,8 @@ cc_library_shared {
         "libmodpb64",
         "libopus",
         "libosi",
+        "libprotobuf-cpp-lite",
+        "libstatslog_bt",
         "libudrv-uipc",
         "libutils",
     ],
@@ -146,8 +150,12 @@ android_app {
     srcs: [
         ":statslog-bluetooth-java-gen",
         ":statslog-bt-restricted-java-gen",
+        "proto/keystore.proto",
         "src/**/*.java",
     ],
+    proto: {
+        type: "lite",
+    },
     aaptflags: [
         "--custom-package",
         "com.android.bluetooth",

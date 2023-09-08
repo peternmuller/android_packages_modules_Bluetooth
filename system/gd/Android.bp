@@ -162,6 +162,9 @@ cc_defaults {
         "libcrypto",
         "libflatbuffers-cpp",
     ],
+    export_shared_lib_headers: [
+        "libflatbuffers-cpp",
+    ],
     whole_static_libs: [
         "libc++fs",
     ],
@@ -222,6 +225,10 @@ cc_binary {
     name: "bluetooth_stack_with_facade",
     defaults: [
         "gd_defaults",
+    ],
+    include_dirs: [
+        "packages/modules/Bluetooth/system/include",
+        "packages/modules/Bluetooth/system/types",
     ],
     host_supported: true,
     srcs: [
@@ -304,6 +311,10 @@ cc_test {
         "gd_defaults",
         "mts_defaults",
     ],
+    include_dirs: [
+        "packages/modules/Bluetooth/system/include",
+        "packages/modules/Bluetooth/system/types",
+    ],
     host_supported: true,
     // TODO(b/231993739): Reenable isolated:true by deleting the explicit disable below
     isolated: false,
@@ -364,6 +375,7 @@ cc_test {
     generated_headers: [
         "BluetoothGeneratedBundlerSchema_h_bfbs",
         "BluetoothGeneratedDumpsysDataSchema_h",
+        "BluetoothGeneratedDumpsysInternalTestData_h",
         "BluetoothGeneratedDumpsysTestData_h",
         "BluetoothGeneratedPackets_h",
     ],
@@ -465,7 +477,6 @@ cc_defaults {
     ],
     shared_libs: [
         "libcrypto",
-        "libflatbuffers-cpp",
         "libgrpc++",
         "libgrpc_wrap",
     ],

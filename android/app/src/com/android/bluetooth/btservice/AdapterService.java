@@ -41,7 +41,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
-import android.app.AlarmManager;
 import android.app.AppOpsManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -79,10 +78,8 @@ import android.bluetooth.OobData;
 import android.bluetooth.UidTraffic;
 import android.companion.CompanionDeviceManager;
 import android.content.AttributionSource;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.AsyncTask;
@@ -121,6 +118,7 @@ import com.android.bluetooth.bass_client.BassClientService;
 import com.android.bluetooth.btservice.InteropUtil.InteropFeature;
 import com.android.bluetooth.btservice.RemoteDevices.DeviceProperties;
 import com.android.bluetooth.btservice.activityattribution.ActivityAttributionService;
+import com.android.bluetooth.btservice.bluetoothkeystore.BluetoothKeystoreNativeInterface;
 import com.android.bluetooth.btservice.bluetoothkeystore.BluetoothKeystoreService;
 import com.android.bluetooth.btservice.storage.DatabaseManager;
 import com.android.bluetooth.btservice.storage.MetadataDatabase;
@@ -206,9 +204,6 @@ public class AdapterService extends Service {
     public static final String EXTRA_ACTION = "action";
     public static final int PROFILE_CONN_REJECTED = 2;
 
-    private static final String ACTION_ALARM_WAKEUP =
-            "com.android.bluetooth.btservice.action.ALARM_WAKEUP";
-
     private static BluetoothProperties.snoop_log_mode_values sSnoopLogSettingAtEnable =
             BluetoothProperties.snoop_log_mode_values.EMPTY;
     private static String sDefaultSnoopLogSettingAtEnable = "empty";
@@ -283,17 +278,29 @@ public class AdapterService extends Service {
         return sAdapterService;
     }
 
-    private static synchronized void setAdapterService(AdapterService instance) {
-        Log.d(TAG, "setAdapterService() - trying to set service to " + instance);
+    /** Allow test to set an AdapterService to be return by AdapterService.getAdapterService() */
+    @VisibleForTesting
+    public static synchronized void setAdapterService(AdapterService instance) {
         if (instance == null) {
+            Log.e(TAG, "setAdapterService() - instance is null");
             return;
         }
+        Log.d(TAG, "setAdapterService() - set service to " + instance);
         sAdapterService = instance;
     }
 
-    private static synchronized void clearAdapterService(AdapterService current) {
-        if (sAdapterService == current) {
+    /** Clear test Adapter service. See {@code setAdapterService} */
+    @VisibleForTesting
+    public static synchronized void clearAdapterService(AdapterService instance) {
+        if (sAdapterService == instance) {
+            Log.d(TAG, "clearAdapterService() - This adapter was cleared " + instance);
             sAdapterService = null;
+        } else {
+            Log.d(
+                    TAG,
+                    "clearAdapterService() - incorrect cleared adapter."
+                            + (" Instance=" + instance)
+                            + (" vs sAdapterService=" + sAdapterService));
         }
     }
 
@@ -321,7 +328,8 @@ public class AdapterService extends Service {
     private final Map<Integer, PendingAudioProfilePreferenceRequest>
             mCsipGroupsPendingAudioProfileChanges = new HashMap<>();
     // Only BluetoothManagerService should be registered
-    private RemoteCallbackList<IBluetoothCallback> mCallbacks;
+    private RemoteCallbackList<IBluetoothCallback> mRemoteCallbacks;
+    private final Map<BluetoothStateCallback, Executor> mLocalCallbacks = new ConcurrentHashMap<>();
     private int mCurrentRequestId;
     private boolean mQuietmode = false;
     private HashMap<String, CallerInfo> mBondAttemptCallerInfo = new HashMap<>();
@@ -329,8 +337,6 @@ public class AdapterService extends Service {
     private final Map<UUID, RfcommListenerData> mBluetoothServerSockets = new ConcurrentHashMap<>();
     private final Executor mSocketServersExecutor = r -> new Thread(r).start();
 
-    private AlarmManager mAlarmManager;
-    private PendingIntent mPendingAlarm;
     private BatteryStatsManager mBatteryStatsManager;
     private PowerManager mPowerManager;
     private PowerManager.WakeLock mWakeLock;
@@ -598,7 +604,6 @@ public class AdapterService extends Service {
 
         mUserManager = getNonNullSystemService(UserManager.class);
         mAppOps = getNonNullSystemService(AppOpsManager.class);
-        mAlarmManager = getNonNullSystemService(AlarmManager.class);
         mPowerManager = getNonNullSystemService(PowerManager.class);
         mBatteryStatsManager = getNonNullSystemService(BatteryStatsManager.class);
         mCompanionDeviceManager = getNonNullSystemService(CompanionDeviceManager.class);
@@ -611,7 +616,9 @@ public class AdapterService extends Service {
         mAdapterProperties = new AdapterProperties(this);
         mAdapterStateMachine = new AdapterState(this, mLooper);
         mJniCallbacks = new JniCallbacks(this, mAdapterProperties);
-        mBluetoothKeystoreService = new BluetoothKeystoreService(isCommonCriteriaMode());
+        mBluetoothKeystoreService =
+                new BluetoothKeystoreService(
+                        new BluetoothKeystoreNativeInterface(), isCommonCriteriaMode());
         mBluetoothKeystoreService.start();
         int configCompareResult = mBluetoothKeystoreService.getCompareResult();
 
@@ -635,7 +642,7 @@ public class AdapterService extends Service {
                 new RemoteCallbackList<IBluetoothPreferredAudioProfilesCallback>();
         mBluetoothQualityReportReadyCallbacks =
                 new RemoteCallbackList<IBluetoothQualityReportReadyCallback>();
-        mCallbacks = new RemoteCallbackList<IBluetoothCallback>();
+        mRemoteCallbacks = new RemoteCallbackList<IBluetoothCallback>();
         // Load the name and address
         getAdapterPropertyNative(AbstractionLayer.BT_PROPERTY_BDADDR);
         getAdapterPropertyNative(AbstractionLayer.BT_PROPERTY_BDNAME);
@@ -650,9 +657,6 @@ public class AdapterService extends Service {
         mBluetoothQualityReportNativeInterface.init();
 
         mSdpManager = SdpManager.init(this);
-        IntentFilter filter = new IntentFilter(ACTION_ALARM_WAKEUP);
-        filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
-        registerReceiver(mAlarmBroadcastReceiver, filter);
         loadLeAudioAllowDevices();
 
         mDatabaseManager = new DatabaseManager(this);
@@ -1020,8 +1024,9 @@ public class AdapterService extends Service {
     void updateAdapterState(int prevState, int newState) {
         mAdapterProperties.setState(newState);
         invalidateBluetoothGetStateCache();
-        if (mCallbacks != null) {
-            int n = mCallbacks.beginBroadcast();
+
+        if (mRemoteCallbacks != null) {
+            int n = mRemoteCallbacks.beginBroadcast();
             debugLog(
                     "updateAdapterState() - Broadcasting state "
                             + BluetoothAdapter.nameForState(newState)
@@ -1030,12 +1035,18 @@ public class AdapterService extends Service {
                             + " receivers.");
             for (int i = 0; i < n; i++) {
                 try {
-                    mCallbacks.getBroadcastItem(i).onBluetoothStateChange(prevState, newState);
+                    mRemoteCallbacks
+                            .getBroadcastItem(i)
+                            .onBluetoothStateChange(prevState, newState);
                 } catch (RemoteException e) {
                     debugLog("updateAdapterState() - Callback #" + i + " failed (" + e + ")");
                 }
             }
-            mCallbacks.finishBroadcast();
+            mRemoteCallbacks.finishBroadcast();
+        }
+
+        for (Map.Entry<BluetoothStateCallback, Executor> e : mLocalCallbacks.entrySet()) {
+            e.getValue().execute(() -> e.getKey().onBluetoothStateChange(prevState, newState));
         }
 
         // Turn the Adapter all the way off if we are disabling and the snoop log setting changed.
@@ -1237,14 +1248,7 @@ public class AdapterService extends Service {
         mCleaningUp = true;
         invalidateBluetoothCaches();
 
-        unregisterReceiver(mAlarmBroadcastReceiver);
-
         stopRfcommServerSockets();
-
-        if (mPendingAlarm != null) {
-            mAlarmManager.cancel(mPendingAlarm);
-            mPendingAlarm = null;
-        }
 
         // This wake lock release may also be called concurrently by
         // {@link #releaseWakeLock(String lockName)}, so a synchronization is needed here.
@@ -1331,8 +1335,8 @@ public class AdapterService extends Service {
             mBluetoothQualityReportReadyCallbacks.kill();
         }
 
-        if (mCallbacks != null) {
-            mCallbacks.kill();
+        if (mRemoteCallbacks != null) {
+            mRemoteCallbacks.kill();
         }
     }
 
@@ -4067,7 +4071,7 @@ public class AdapterService extends Service {
 
             enforceBluetoothPrivilegedPermission(service);
 
-            service.registerCallback(callback);
+            service.registerRemoteCallback(callback);
         }
 
         @Override
@@ -4092,7 +4096,7 @@ public class AdapterService extends Service {
         private void unregisterCallback(IBluetoothCallback callback, AttributionSource source) {
             AdapterService service = getService();
             if (service == null
-                    || service.mCallbacks == null
+                    || service.mRemoteCallbacks == null
                     || !callerIsSystemOrActiveOrManagedUser(service, TAG, "unregisterCallback")
                     || !Utils.checkConnectPermissionForDataDelivery(service, source, TAG)) {
                 return;
@@ -4100,7 +4104,7 @@ public class AdapterService extends Service {
 
             enforceBluetoothPrivilegedPermission(service);
 
-            service.unregisterCallback(callback);
+            service.unregisterRemoteCallback(callback);
         }
 
         @Override
@@ -5205,6 +5209,7 @@ public class AdapterService extends Service {
             try {
                 AdapterService service = getService();
                 if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
                     service.unregAllGattClient(source);
                 }
                 receiver.send(null);
@@ -6725,14 +6730,24 @@ public class AdapterService extends Service {
         return mAdapterProperties.isA2dpOffloadEnabled();
     }
 
-    @VisibleForTesting
-    void registerCallback(IBluetoothCallback callback) {
-        mCallbacks.register(callback);
+    /** Register a bluetooth state callback */
+    public void registerBluetoothStateCallback(Executor executor, BluetoothStateCallback callback) {
+        mLocalCallbacks.put(callback, executor);
+    }
+
+    /** Unregister a bluetooth state callback */
+    public void unregisterBluetoothStateCallback(BluetoothStateCallback callback) {
+        mLocalCallbacks.remove(callback);
     }
 
     @VisibleForTesting
-    void unregisterCallback(IBluetoothCallback callback) {
-        mCallbacks.unregister(callback);
+    void registerRemoteCallback(IBluetoothCallback callback) {
+        mRemoteCallbacks.register(callback);
+    }
+
+    @VisibleForTesting
+    void unregisterRemoteCallback(IBluetoothCallback callback) {
+        mRemoteCallbacks.unregister(callback);
     }
 
     @VisibleForTesting
@@ -6878,34 +6893,6 @@ public class AdapterService extends Service {
         }
         // errorLog("Incorrect scan mode in convertScanModeFromHal");
         return -1;
-    }
-
-    // This function is called from JNI. It allows native code to set a single wake
-    // alarm. If an alarm is already pending and a new request comes in, the alarm
-    // will be rescheduled (i.e. the previously set alarm will be cancelled).
-    @RequiresPermission(android.Manifest.permission.SCHEDULE_EXACT_ALARM)
-    private boolean setWakeAlarm(long delayMillis, boolean shouldWake) {
-        synchronized (this) {
-            if (mPendingAlarm != null) {
-                mAlarmManager.cancel(mPendingAlarm);
-            }
-
-            long wakeupTime = SystemClock.elapsedRealtime() + delayMillis;
-            int type =
-                    shouldWake
-                            ? AlarmManager.ELAPSED_REALTIME_WAKEUP
-                            : AlarmManager.ELAPSED_REALTIME;
-
-            Intent intent = new Intent(ACTION_ALARM_WAKEUP);
-            mPendingAlarm =
-                    PendingIntent.getBroadcast(
-                            this,
-                            0,
-                            intent,
-                            PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
-            mAlarmManager.setExact(type, wakeupTime, mPendingAlarm);
-            return true;
-        }
     }
 
     // This function is called from JNI. It allows native code to acquire a single wake lock.
@@ -7167,17 +7154,6 @@ public class AdapterService extends Service {
     private void errorLog(String msg) {
         Log.e(TAG, msg);
     }
-
-    private final BroadcastReceiver mAlarmBroadcastReceiver =
-            new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    synchronized (AdapterService.this) {
-                        mPendingAlarm = null;
-                        alarmFiredNative();
-                    }
-                }
-            };
 
     private boolean isCommonCriteriaMode() {
         return getNonNullSystemService(DevicePolicyManager.class).isCommonCriteriaModeEnabled(null);
@@ -7444,6 +7420,20 @@ public class AdapterService extends Service {
                 }
             }
         }
+    }
+
+    /** A callback that will be called when AdapterState is changed */
+    public interface BluetoothStateCallback {
+        /**
+         * Called when the status of bluetooth adapter is changing. {@code prevState} and {@code
+         * newState} takes one of following values defined in BluetoothAdapter.java: STATE_OFF,
+         * STATE_TURNING_ON, STATE_ON, STATE_TURNING_OFF, STATE_BLE_TURNING_ON, STATE_BLE_ON,
+         * STATE_BLE_TURNING_OFF
+         *
+         * @param prevState the previous Bluetooth state.
+         * @param newState the new Bluetooth state.
+         */
+        void onBluetoothStateChange(int prevState, int newState);
     }
 
     /**
@@ -7806,8 +7796,6 @@ public class AdapterService extends Service {
 
     /*package*/
     native boolean factoryResetNative();
-
-    private native void alarmFiredNative();
 
     private native void dumpNative(FileDescriptor fd, String[] arguments);
 

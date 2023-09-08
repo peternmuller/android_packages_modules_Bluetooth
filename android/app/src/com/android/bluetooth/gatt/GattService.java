@@ -91,6 +91,7 @@ import android.bluetooth.le.ScanSettings;
 import android.companion.AssociationInfo;
 import android.companion.CompanionDeviceManager;
 import android.content.AttributionSource;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.PackageManager.PackageInfoFlags;
@@ -325,6 +326,11 @@ public class GattService extends ProfileService {
     private Handler mTestModeHandler;
     private final Object mTestModeLock = new Object();
 
+    public GattService(Context ctx) {
+        attachBaseContext(ctx);
+        onCreate();
+    }
+
     public static boolean isEnabled() {
         return BluetoothProperties.isProfileGattEnabled().orElse(true);
     }
@@ -376,7 +382,12 @@ public class GattService extends ProfileService {
         mBluetoothAdapterProxy = BluetoothAdapterProxy.getInstance();
         mCompanionManager = getSystemService(CompanionDeviceManager.class);
         mAppOps = getSystemService(AppOpsManager.class);
-        mAdvertiseManager = new AdvertiseManager(this, mAdapterService, mAdvertiserMap);
+        mAdvertiseManager =
+                new AdvertiseManager(
+                        this,
+                        new AdvertiseManagerNativeInterface(),
+                        mAdapterService,
+                        mAdvertiserMap);
         mAdvertiseManager.start();
 
         mScanManager = GattObjectsFactory.getInstance()
@@ -3445,7 +3456,7 @@ public class GattService extends ProfileService {
     }
 
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
-    void unregAll(AttributionSource attributionSource) {
+    public void unregAll(AttributionSource attributionSource) {
         for (Integer appId : mClientMap.getAllAppsIds()) {
             if (DBG) {
                 Log.d(TAG, "unreg:" + appId);
