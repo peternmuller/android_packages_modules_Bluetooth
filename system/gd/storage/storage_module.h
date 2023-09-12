@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include "btif/include/btif_storage.h"
 #include "hci/address.h"
 #include "module.h"
 #include "storage/config_cache.h"
@@ -47,6 +48,8 @@ class SecurityManagerImpl;
 namespace hci {
 class AclManager;
 class LeAdvertisingManager;
+class LeScanningManager;
+class LeScanningReassembler;
 }
 
 namespace storage {
@@ -128,6 +131,8 @@ class StorageModule : public bluetooth::Module {
   friend hci::AclManager;
   friend security::internal::SecurityManagerImpl;
   friend hci::LeAdvertisingManager;
+  friend hci::LeScanningManager;
+  friend hci::LeScanningReassembler;
   // For unit test only
   ConfigCache* GetMemoryOnlyConfigCache();
   // Normally, underlying config will be saved at most 3 seconds after the first config change in a series of changes

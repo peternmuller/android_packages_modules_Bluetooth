@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #include "hci/le_scanning_reassembler.h"
 
@@ -33,6 +37,7 @@
 #include "storage/storage_module.h"
 
 namespace bluetooth::hci {
+std::list<LeScanningReassembler::PeriodicAdvertisingFragment> periodic_cache_;
 
 std::optional<LeScanningReassembler::CompleteAdvertisingData>
 LeScanningReassembler::ProcessAdvertisingReport(
@@ -198,6 +203,10 @@ void LeScanningReassembler::RemoveFragment(const AdvertisingKey& key) {
 
 bool LeScanningReassembler::ContainsFragment(const AdvertisingKey& key) {
   return FindFragment(key) != cache_.end();
+}
+
+bool LeScanningReassembler::ContainsPeriodicFragment(uint16_t sync_handle) {
+  return FindPeriodicFragment(sync_handle) != periodic_cache_.end();
 }
 
 std::list<LeScanningReassembler::AdvertisingFragment>::iterator LeScanningReassembler::FindFragment(

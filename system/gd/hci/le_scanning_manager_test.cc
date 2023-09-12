@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "hci/le_scanning_manager.h"
@@ -283,6 +287,8 @@ class MockCallbacks : public bluetooth::hci::ScanningCallback {
   MOCK_METHOD(void, OnPeriodicSyncLost, (uint16_t));
   MOCK_METHOD(void, OnPeriodicSyncTransferred, (int, uint8_t, Address));
   MOCK_METHOD(void, OnBigInfoReport, (uint16_t, bool));
+  MOCK_METHOD(
+      bool, OnFetchPseudoAddressFromIdentityAddress, (Address, uint8_t, Address*), (override));
 } mock_callbacks_;
 
 class LeScanningManagerTest : public ::testing::Test {
