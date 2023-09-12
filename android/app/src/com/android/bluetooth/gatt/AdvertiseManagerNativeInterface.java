@@ -12,7 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+
 
 package com.android.bluetooth.gatt;
 
@@ -65,21 +70,29 @@ public class AdvertiseManagerNativeInterface {
     void startAdvertisingSet(
             AdvertisingSetParameters parameters,
             byte[] advertiseDataBytes,
+            byte[] advertiseDataEncBytes,
             byte[] scanResponseBytes,
+            byte[] scanResponseEncBytes,
             PeriodicAdvertisingParameters periodicParameters,
             byte[] periodicDataBytes,
+            byte[] periodicDataEncBytes,
             int duration,
             int maxExtAdvEvents,
+            byte[] encryptedKeyMaterialValue,
             int cbId,
             int serverIf) {
         startAdvertisingSetNative(
                 parameters,
                 advertiseDataBytes,
+                advertiseDataEncBytes,
                 scanResponseBytes,
+                scanResponseEncBytes,
                 periodicParameters,
                 periodicDataBytes,
+                periodicDataEncBytes,
                 duration,
                 maxExtAdvEvents,
+                encryptedKeyMaterialValue,
                 cbId,
                 serverIf);
     }
@@ -96,12 +109,14 @@ public class AdvertiseManagerNativeInterface {
         enableAdvertisingSetNative(advertiserId, enable, duration, maxExtAdvEvents);
     }
 
-    void setAdvertisingData(int advertiserId, byte[] advertiseDataBytes) {
-        setAdvertisingDataNative(advertiserId, advertiseDataBytes);
+    void setAdvertisingData(
+            int advertiserId, byte[] advertiseDataBytes, byte[] advertiseDataEncBytes) {
+        setAdvertisingDataNative(advertiserId, advertiseDataBytes, advertiseDataEncBytes);
     }
 
-    void setScanResponseData(int advertiserId, byte[] advertiseDataBytes) {
-        setScanResponseDataNative(advertiserId, advertiseDataBytes);
+    void setScanResponseData(
+            int advertiserId, byte[] advertiseDataBytes, byte[] advertiseDataEncBytes) {
+        setScanResponseDataNative(advertiserId, advertiseDataBytes, advertiseDataEncBytes);
     }
 
     void setAdvertisingParameters(int advertiserId, AdvertisingSetParameters parameters) {
@@ -113,8 +128,9 @@ public class AdvertiseManagerNativeInterface {
         setPeriodicAdvertisingParametersNative(advertiserId, parameters);
     }
 
-    void setPeriodicAdvertisingData(int advertiserId, byte[] advertiseDataBytes) {
-        setPeriodicAdvertisingDataNative(advertiserId, advertiseDataBytes);
+    void setPeriodicAdvertisingData(
+            int advertiserId, byte[] advertiseDataBytes, byte[] advertiseDataEncBytes) {
+        setPeriodicAdvertisingDataNative(advertiserId, advertiseDataBytes, advertiseDataEncBytes);
     }
 
     void setPeriodicAdvertisingEnable(int advertiserId, boolean enable) {
@@ -167,11 +183,15 @@ public class AdvertiseManagerNativeInterface {
     private native void startAdvertisingSetNative(
             AdvertisingSetParameters parameters,
             byte[] advertiseData,
+            byte[] advertiseDataEnc,
             byte[] scanResponse,
+            byte[] scanResponseEnc,
             PeriodicAdvertisingParameters periodicParameters,
             byte[] periodicData,
+            byte[] periodicDataEnc,
             int duration,
             int maxExtAdvEvents,
+            byte[] encryptedKeyMaterialValue,
             int regId,
             int serverIf);
 
@@ -182,9 +202,9 @@ public class AdvertiseManagerNativeInterface {
     private native void enableAdvertisingSetNative(
             int advertiserId, boolean enable, int duration, int maxExtAdvEvents);
 
-    private native void setAdvertisingDataNative(int advertiserId, byte[] data);
+    private native void setAdvertisingDataNative(int advertiserId, byte[] data, byte[] dataEnc);
 
-    private native void setScanResponseDataNative(int advertiserId, byte[] data);
+    private native void setScanResponseDataNative(int advertiserId, byte[] data, byte[] dataEnc);
 
     private native void setAdvertisingParametersNative(
             int advertiserId, AdvertisingSetParameters parameters);
@@ -192,7 +212,8 @@ public class AdvertiseManagerNativeInterface {
     private native void setPeriodicAdvertisingParametersNative(
             int advertiserId, PeriodicAdvertisingParameters parameters);
 
-    private native void setPeriodicAdvertisingDataNative(int advertiserId, byte[] data);
+    private native void setPeriodicAdvertisingDataNative(
+            int advertiserId, byte[] data, byte[] dataEnc);
 
     private native void setPeriodicAdvertisingEnableNative(int advertiserId, boolean enable);
 }
