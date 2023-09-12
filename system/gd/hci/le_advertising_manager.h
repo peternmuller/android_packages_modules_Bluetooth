@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #pragma once
 
@@ -26,7 +30,23 @@
 #include "module.h"
 
 namespace bluetooth {
+namespace shim {
+namespace legacy {
+#define GATT_UUID_GAP_ENC_KEY_MATERIAL 0x2B88
+}  // namespace legacy
+}  // namespace shim
+
 namespace hci {
+class EncKeyMaterialCallback {
+ public:
+  virtual ~EncKeyMaterialCallback() = default;
+  virtual void OnGetEncKeyMaterial(std::vector<uint8_t> temp, uint16_t attr_uuid) = 0;
+};
+
+struct EncrDataKey {
+  std::vector<uint8_t> key;
+  std::vector<uint8_t> iv;
+};
 
 class PeriodicAdvertisingParameters {
  public:
@@ -164,6 +184,10 @@ class LeAdvertisingManager : public bluetooth::Module {
   void ResetAdvertiser(AdvertiserId advertiser_id);
 
   void RegisterAdvertisingCallback(AdvertisingCallback* advertising_callback);
+
+  void RegisterEncKeyMaterialCallback(EncKeyMaterialCallback* enc_key_material_callback);
+
+  void GetEncKeyMaterial();
 
   static const ModuleFactory Factory;
 

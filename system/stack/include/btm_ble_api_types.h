@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #ifndef BTM_BLE_API_TYPES_H
@@ -305,6 +309,7 @@ typedef void(tBTM_RAND_ENC_CB)(tBTM_RAND_ENC* p1);
 #define BTM_BLE_AD_TYPE_APPEARANCE 0x19
 #define BTM_BLE_AD_TYPE_RSI HCI_EIR_RSI_TYPE /* 0x2E */
 #define BTM_BLE_AD_TYPE_BROADCAST_NAME 0x30
+#define BTM_BLE_AD_TYPE_ED 0x31
 
 /*  Min/max Preferred  number of payload octets that the local Controller
     should include in a single Link Layer Data Channel PDU. */

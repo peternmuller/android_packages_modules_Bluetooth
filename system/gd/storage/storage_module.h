@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #pragma once
 
@@ -42,6 +46,7 @@ class SecurityManagerImpl;
 
 namespace hci {
 class AclManager;
+class LeAdvertisingManager;
 }
 
 namespace storage {
@@ -122,6 +127,7 @@ class StorageModule : public bluetooth::Module {
   friend shim::BtifConfigInterface;
   friend hci::AclManager;
   friend security::internal::SecurityManagerImpl;
+  friend hci::LeAdvertisingManager;
   // For unit test only
   ConfigCache* GetMemoryOnlyConfigCache();
   // Normally, underlying config will be saved at most 3 seconds after the first config change in a series of changes

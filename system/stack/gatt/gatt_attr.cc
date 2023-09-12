@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 /******************************************************************************
@@ -24,6 +28,7 @@
  ******************************************************************************/
 
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <deque>
 #include <map>
@@ -31,12 +36,15 @@
 #include "base/functional/callback.h"
 #include "btif/include/btif_storage.h"
 #include "eatt/eatt.h"
+#include "gap_api.h"
 #include "gatt_api.h"
 #include "gatt_int.h"
+#include "gd/common/init_flags.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "os/log.h"
 #include "os/logging/log_adapter.h"
+#include "stack/btm/btm_int_types.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_sec_api.h"
@@ -46,6 +54,8 @@
 using base::StringPrintf;
 using bluetooth::Uuid;
 using namespace bluetooth;
+
+extern tBTM_CB btm_cb;
 
 #define BLE_GATT_SVR_SUP_FEAT_EATT_BITMASK 0x01
 
@@ -566,6 +576,14 @@ static bool gatt_att_write_cl_supp_feat(uint16_t conn_id, uint16_t handle) {
     return false;
   }
 
+  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    gatt_op_cb_data cb_data;
+    cb_data.cb = base::BindOnce(
+        [](const RawAddress& bdaddr, uint8_t support) { return; });
+    cb_data.op_uuid = GATT_UUID_CLIENT_SUP_FEAT;
+    OngoingOps[conn_id].emplace_back(std::move(cb_data));
+  }
+
   return true;
 }
 
@@ -610,6 +628,12 @@ static void gatt_cl_op_cmpl_cback(uint16_t conn_id, tGATTC_OPTYPE op,
                                      uint8_t support) { return; }));
     } else {
       log::debug("Not interested in that write response");
+    }
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (status == GATT_SUCCESS && (cl_op_uuid == GATT_UUID_CLIENT_SUP_FEAT)) {
+        tGATT_PROFILE_CLCB* p_clcb = gatt_profile_find_clcb_by_conn_id(conn_id);
+        if (p_clcb != NULL) GAP_BleGetEncKeyMaterialInfo(p_clcb->bda);
+      }
     }
     return;
   }
