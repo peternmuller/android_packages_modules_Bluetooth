@@ -2346,7 +2346,7 @@ bool acl_peer_supports_sniff_subrating(const RawAddress& remote_bda) {
 }
 
 bool acl_peer_supports_ble_connection_subrating(const RawAddress& remote_bda) {
-  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_BR_EDR);
+  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_LE);
   if (p_acl == nullptr) {
     LOG_WARN("Unable to find active acl");
     return false;
@@ -2361,7 +2361,7 @@ bool acl_peer_supports_ble_connection_subrating(const RawAddress& remote_bda) {
 
 bool acl_peer_supports_ble_connection_subrating_host(
     const RawAddress& remote_bda) {
-  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_BR_EDR);
+  tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, BT_TRANSPORT_LE);
   if (p_acl == nullptr) {
     LOG_WARN("Unable to find active acl");
     return false;
@@ -2708,8 +2708,37 @@ void acl_disconnect_from_handle(uint16_t handle, tHCI_STATUS reason,
   acl_disconnect_after_role_switch(handle, reason, comment);
 }
 
+// BLUETOOTH CORE SPECIFICATION Version 5.4 | Vol 4, Part E
+// 7.1.6 Disconnect command
+// Only a subset of reasons are valid and will be accepted
+// by the controller
+bool is_disconnect_reason_valid(const tHCI_REASON& reason) {
+  switch (reason) {
+    case HCI_ERR_AUTH_FAILURE:
+    case HCI_ERR_PEER_USER:
+    case HCI_ERR_REMOTE_LOW_RESOURCE:
+    case HCI_ERR_REMOTE_POWER_OFF:
+    case HCI_ERR_UNSUPPORTED_REM_FEATURE:
+    case HCI_ERR_PAIRING_WITH_UNIT_KEY_NOT_SUPPORTED:
+    case HCI_ERR_UNACCEPT_CONN_INTERVAL:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
 void acl_disconnect_after_role_switch(uint16_t conn_handle, tHCI_STATUS reason,
                                       std::string comment) {
+  if (!is_disconnect_reason_valid(reason)) {
+    LOG_WARN(
+        "Controller will not accept invalid reason parameter:%s"
+        " instead sending:%s",
+        hci_error_code_text(reason).c_str(),
+        hci_error_code_text(HCI_ERR_PEER_USER).c_str());
+    reason = HCI_ERR_PEER_USER;
+  }
+
   tACL_CONN* p_acl = internal_.acl_get_connection_from_handle(conn_handle);
   if (p_acl == nullptr) {
     LOG_ERROR("Sending disconnect for unknown acl:%hu PLEASE FIX", conn_handle);
