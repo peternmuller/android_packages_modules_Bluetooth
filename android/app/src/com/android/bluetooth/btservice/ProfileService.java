@@ -31,6 +31,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 import com.android.bluetooth.BluetoothMetricsProto;
+import com.android.internal.annotations.VisibleForTesting;
 
 /**
  * Base class for a background service that runs a Bluetooth profile
@@ -296,11 +297,14 @@ public abstract class ProfileService extends Service {
         super.onDestroy();
     }
 
-    @RequiresPermission(anyOf = {
-            android.Manifest.permission.MANAGE_USERS,
-            android.Manifest.permission.INTERACT_ACROSS_USERS
-    })
-    void doStart() {
+    /** start the profile and inform AdapterService */
+    @RequiresPermission(
+            anyOf = {
+                android.Manifest.permission.MANAGE_USERS,
+                android.Manifest.permission.INTERACT_ACROSS_USERS
+            })
+    @VisibleForTesting
+    public void doStart() {
         Log.v(mName, "doStart");
         if (mAdapter == null) {
             Log.w(mName, "Can't start profile service: device does not have BT");
@@ -326,7 +330,10 @@ public abstract class ProfileService extends Service {
         mAdapterService.onProfileServiceStateChanged(this, BluetoothAdapter.STATE_ON);
     }
 
-    void doStop() {
+    /** stop the profile and inform AdapterService */
+    @VisibleForTesting
+    public void doStop() {
+        Log.v(mName, "doStop");
         if (mAdapterService == null || mAdapterService.isStartedProfile(mName)) {
             Log.w(mName, "Unexpectedly do Stop, don't stop.");
             return;

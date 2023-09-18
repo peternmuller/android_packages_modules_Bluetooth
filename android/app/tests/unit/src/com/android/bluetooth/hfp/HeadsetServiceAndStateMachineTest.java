@@ -41,7 +41,6 @@ import android.os.ParcelUuid;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.telecom.PhoneAccount;
-import android.util.Log;
 
 import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.intent.Intents;
@@ -53,6 +52,7 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.bluetooth.TestUtils;
 import com.android.bluetooth.btservice.ActiveDeviceManager;
 import com.android.bluetooth.btservice.AdapterService;
+import com.android.bluetooth.btservice.SilenceDeviceManager;
 import com.android.bluetooth.btservice.storage.DatabaseManager;
 
 import org.hamcrest.Matchers;
@@ -98,7 +98,6 @@ public class HeadsetServiceAndStateMachineTest {
     private Context mTargetContext;
     private HeadsetService mHeadsetService;
     private BluetoothAdapter mAdapter;
-    private HeadsetNativeInterface mNativeInterface;
     private ArgumentCaptor<HeadsetStateMachine> mStateMachineArgument =
             ArgumentCaptor.forClass(HeadsetStateMachine.class);
     private HashSet<BluetoothDevice> mBondedDevices = new HashSet<>();
@@ -108,6 +107,8 @@ public class HeadsetServiceAndStateMachineTest {
     private HeadsetIntentReceiver mHeadsetIntentReceiver;
     private int mOriginalVrTimeoutMs = 5000;
     private PowerManager.WakeLock mVoiceRecognitionWakeLock;
+
+    @Mock private HeadsetNativeInterface mNativeInterface;
 
     private class HeadsetIntentReceiver extends BroadcastReceiver {
         @Override
@@ -152,6 +153,7 @@ public class HeadsetServiceAndStateMachineTest {
     @Spy private HeadsetObjectsFactory mObjectsFactory = HeadsetObjectsFactory.getInstance();
     @Mock private AdapterService mAdapterService;
     @Mock private ActiveDeviceManager mActiveDeviceManager;
+    @Mock private SilenceDeviceManager mSilenceDeviceManager;
     @Mock private DatabaseManager mDatabaseManager;
     @Mock private HeadsetSystemInterface mSystemInterface;
     @Mock private AudioManager mAudioManager;
@@ -187,6 +189,7 @@ public class HeadsetServiceAndStateMachineTest {
         doReturn(new BluetoothSinkAudioPolicy.Builder().build()).when(mAdapterService)
                 .getRequestedAudioPolicyAsSink(any(BluetoothDevice.class));
         doReturn(mActiveDeviceManager).when(mAdapterService).getActiveDeviceManager();
+        doReturn(mSilenceDeviceManager).when(mAdapterService).getSilenceDeviceManager();
         // Mock system interface
         doNothing().when(mSystemInterface).stop();
         doReturn(mPhoneState).when(mSystemInterface).getHeadsetPhoneState();
@@ -196,9 +199,6 @@ public class HeadsetServiceAndStateMachineTest {
         doReturn(mVoiceRecognitionWakeLock).when(mSystemInterface).getVoiceRecognitionWakeLock();
         doReturn(true).when(mSystemInterface).isCallIdle();
         // Mock methods in HeadsetNativeInterface
-        mNativeInterface = spy(HeadsetNativeInterface.getInstance());
-        doNothing().when(mNativeInterface).init(anyInt(), anyBoolean());
-        doNothing().when(mNativeInterface).cleanup();
         doReturn(true).when(mNativeInterface).connectHfp(any(BluetoothDevice.class));
         doReturn(true).when(mNativeInterface).disconnectHfp(any(BluetoothDevice.class));
         doReturn(true).when(mNativeInterface).connectAudio(any(BluetoothDevice.class));
@@ -474,6 +474,7 @@ public class HeadsetServiceAndStateMachineTest {
         Assert.assertTrue(mHeadsetService.setActiveDevice(activeDevice));
         verify(mNativeInterface).setActiveDevice(activeDevice);
         verify(mActiveDeviceManager).hfpActiveStateChanged(activeDevice);
+        verify(mSilenceDeviceManager).hfpActiveDeviceChanged(activeDevice);
         Assert.assertEquals(activeDevice, mHeadsetService.getActiveDevice());
         // Start virtual call
         Assert.assertTrue(mHeadsetService.startScoUsingVirtualVoiceCall());
@@ -1184,6 +1185,11 @@ public class HeadsetServiceAndStateMachineTest {
                         device,
                         BluetoothProfile.STATE_DISCONNECTED,
                         BluetoothProfile.STATE_CONNECTING);
+        verify(mSilenceDeviceManager, timeout(STATE_CHANGE_TIMEOUT_MILLIS))
+                .hfpConnectionStateChanged(
+                        device,
+                        BluetoothProfile.STATE_DISCONNECTED,
+                        BluetoothProfile.STATE_CONNECTING);
         Assert.assertEquals(BluetoothProfile.STATE_CONNECTING,
                 mHeadsetService.getConnectionState(device));
         Assert.assertEquals(Collections.singletonList(device),
@@ -1195,6 +1201,11 @@ public class HeadsetServiceAndStateMachineTest {
                         HeadsetHalConstants.CONNECTION_STATE_SLC_CONNECTED, device);
         mHeadsetService.messageFromNative(slcConnectedEvent);
         verify(mActiveDeviceManager, timeout(STATE_CHANGE_TIMEOUT_MILLIS))
+                .hfpConnectionStateChanged(
+                        device,
+                        BluetoothProfile.STATE_CONNECTING,
+                        BluetoothProfile.STATE_CONNECTED);
+        verify(mSilenceDeviceManager, timeout(STATE_CHANGE_TIMEOUT_MILLIS))
                 .hfpConnectionStateChanged(
                         device,
                         BluetoothProfile.STATE_CONNECTING,
