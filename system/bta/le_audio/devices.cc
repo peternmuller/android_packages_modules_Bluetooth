@@ -1034,39 +1034,39 @@ void LeAudioDeviceGroup::CigGenerateCisIds(
 
   uint8_t idx = 0;
   while (cis_count_bidir > 0) {
-    struct le_audio::types::cis cis_entry = {
-        .id = idx,
-        .addr = RawAddress::kEmpty,
-        .type = CisType::CIS_TYPE_BIDIRECTIONAL,
-        .conn_handle = 0,
-    };
-    cises_.push_back(cis_entry);
-    cis_count_bidir--;
-    idx++;
+      struct le_audio::types::cis cis_entry = {
+          .id = idx,
+          .type = CisType::CIS_TYPE_BIDIRECTIONAL,
+          .conn_handle = 0,
+          .addr = RawAddress::kEmpty,
+      };
+      cises_.push_back(cis_entry);
+      cis_count_bidir--;
+      idx++;
   }
 
   while (cis_count_unidir_sink > 0) {
-    struct le_audio::types::cis cis_entry = {
-        .id = idx,
-        .addr = RawAddress::kEmpty,
-        .type = CisType::CIS_TYPE_UNIDIRECTIONAL_SINK,
-        .conn_handle = 0,
-    };
-    cises_.push_back(cis_entry);
-    cis_count_unidir_sink--;
-    idx++;
+      struct le_audio::types::cis cis_entry = {
+          .id = idx,
+          .type = CisType::CIS_TYPE_UNIDIRECTIONAL_SINK,
+          .conn_handle = 0,
+          .addr = RawAddress::kEmpty,
+      };
+      cises_.push_back(cis_entry);
+      cis_count_unidir_sink--;
+      idx++;
   }
 
   while (cis_count_unidir_source > 0) {
-    struct le_audio::types::cis cis_entry = {
-        .id = idx,
-        .addr = RawAddress::kEmpty,
-        .type = CisType::CIS_TYPE_UNIDIRECTIONAL_SOURCE,
-        .conn_handle = 0,
-    };
-    cises_.push_back(cis_entry);
-    cis_count_unidir_source--;
-    idx++;
+      struct le_audio::types::cis cis_entry = {
+          .id = idx,
+          .type = CisType::CIS_TYPE_UNIDIRECTIONAL_SOURCE,
+          .conn_handle = 0,
+          .addr = RawAddress::kEmpty,
+      };
+      cises_.push_back(cis_entry);
+      cis_count_unidir_source--;
+      idx++;
   }
 }
 
@@ -2063,6 +2063,20 @@ void LeAudioDeviceGroup::AddToAllowListNotConnectedGroupMembers(int gatt_if) {
 
     BTA_GATTC_CancelOpen(gatt_if, address, false);
     BTA_GATTC_Open(gatt_if, address, BTM_BLE_BKG_CONNECT_ALLOW_LIST, false);
+    device_iter.lock()->SetConnectionState(
+        DeviceConnectState::CONNECTING_AUTOCONNECT);
+  }
+}
+
+void LeAudioDeviceGroup::ApplyReconnectionMode(
+    int gatt_if, tBTM_BLE_CONN_TYPE reconnection_mode) {
+  for (const auto& device_iter : leAudioDevices_) {
+    BTA_GATTC_CancelOpen(gatt_if, device_iter.lock()->address_, false);
+    BTA_GATTC_Open(gatt_if, device_iter.lock()->address_, reconnection_mode,
+                   false);
+    LOG_INFO("Group %d in state %s. Adding %s to default reconnection mode ",
+             group_id_, bluetooth::common::ToString(GetState()).c_str(),
+             ADDRESS_TO_LOGGABLE_CSTR(device_iter.lock()->address_));
     device_iter.lock()->SetConnectionState(
         DeviceConnectState::CONNECTING_AUTOCONNECT);
   }

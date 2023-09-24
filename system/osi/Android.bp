@@ -80,6 +80,14 @@ cc_library_static {
         "-DLIB_OSI_INTERNAL",
     ],
     min_sdk_version: "Tiramisu",
+    apex_available: [
+        "//apex_available:platform",
+    ],
+    header_libs: ["libbluetooth_headers"],
+    static_libs: [
+        "libbt-platform-protos-lite",
+        "libbt_shim_bridge",
+    ],
 }
 
 // libosi unit tests for target and host
@@ -122,6 +130,8 @@ cc_test {
     static_libs: [
         "libbluetooth_gd",
         "libbt-common",
+        "libbt_shim_bridge",
+        "libbt_shim_ffi",
         "libc++fs",
         "libchrome",
         "libevent",
@@ -144,4 +154,5 @@ cc_test {
         address: true,
         cfi: false,
     },
+    header_libs: ["libbluetooth_headers"],
 }

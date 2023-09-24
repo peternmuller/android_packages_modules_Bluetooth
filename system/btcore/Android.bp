@@ -52,12 +52,14 @@ cc_library_static {
             cflags: ["-D_GNU_SOURCE"],
         },
     },
+    static_libs: ["libbt_shim_bridge"],
 }
 
 cc_library_static {
     name: "libbtcore",
     defaults: ["libbtcore_defaults"],
     min_sdk_version: "Tiramisu",
+    static_libs: ["libbt_shim_bridge"],
 }
 
 cc_library_headers {
@@ -93,6 +95,7 @@ cc_test {
         "liblog",
     ],
     static_libs: [
+        "libbluetooth-types",
         "libbtcore",
         "libchrome",
         "libosi",
@@ -104,4 +107,5 @@ cc_test {
     sanitize: {
         address: true,
     },
+    header_libs: ["libbluetooth_headers"],
 }
