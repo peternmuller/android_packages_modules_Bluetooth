@@ -52,7 +52,6 @@
 package com.android.bluetooth.gatt;
 
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
-
 import static com.android.bluetooth.Utils.callerIsSystemOrActiveOrManagedUser;
 import static com.android.bluetooth.Utils.checkCallerTargetSdk;
 import static com.android.bluetooth.Utils.enforceBluetoothPrivilegedPermission;
@@ -244,6 +243,7 @@ public class GattService extends ProfileService {
         public ScanSettings settings;
         public List<ScanFilter> filters;
         public String callingPackage;
+        public int callingUid;
 
         @Override
         public boolean equals(Object other) {
@@ -530,6 +530,15 @@ public class GattService extends ProfileService {
             return Service.START_NOT_STICKY;
         }
         return super.onStartCommand(intent, flags, startId);
+    }
+
+    /** Notify Scan manager of bluetooth profile connection state changes */
+    public void notifyProfileConnectionStateChange(int profile, int fromState, int toState) {
+        if (mScanManager == null) {
+            Log.w(TAG, "scan manager is null");
+            return;
+        }
+        mScanManager.handleBluetoothProfileConnectionStateChanged(profile, fromState, toState);
     }
 
     /**
@@ -3301,15 +3310,22 @@ public class GattService extends ProfileService {
         settings = enforceReportDelayFloor(settings);
         enforcePrivilegedPermissionIfNeeded(filters);
         UUID uuid = UUID.randomUUID();
-        if (DBG) {
-            Log.d(TAG, "startScan(PI) - UUID=" + uuid);
-        }
         String callingPackage = attributionSource.getPackageName();
+        int callingUid = attributionSource.getUid();
+        if (DBG) {
+            Log.d(
+                    TAG,
+                    "startScan(PI) -"
+                            + (" UUID=" + uuid)
+                            + (" Package=" + callingPackage)
+                            + (" UID=" + callingUid));
+        }
         PendingIntentInfo piInfo = new PendingIntentInfo();
         piInfo.intent = pendingIntent;
         piInfo.settings = settings;
         piInfo.filters = filters;
         piInfo.callingPackage = callingPackage;
+        piInfo.callingUid = callingUid;
 
         // Don't start scan if the Pi scan already in mScannerMap.
         if (mScannerMap.getByContextInfo(piInfo) != null) {
@@ -3360,7 +3376,7 @@ public class GattService extends ProfileService {
     void continuePiStartScan(int scannerId, ScannerMap.App app) {
         final PendingIntentInfo piInfo = app.info;
         final ScanClient scanClient =
-                new ScanClient(scannerId, piInfo.settings, piInfo.filters);
+                new ScanClient(scannerId, piInfo.settings, piInfo.filters, piInfo.callingUid);
         scanClient.hasLocationPermission = app.hasLocationPermission;
         scanClient.userHandle = app.mUserHandle;
         scanClient.isQApp = checkCallerTargetSdk(this, app.name, Build.VERSION_CODES.Q);
@@ -4605,6 +4621,28 @@ public class GattService extends ProfileService {
         if (DBG) {
             Log.d(TAG, "serverConnect() - address=" + address);
         }
+
+        int importance = mActivityManager.getUidImportance(attributionSource.getUid());
+        if (importance == IMPORTANCE_FOREGROUND_SERVICE) {
+            MetricsLogger.getInstance()
+                    .count(
+                            isDirect
+                                    ? BluetoothProtoEnums
+                                            .GATT_SERVER_CONNECT_IS_DIRECT_IN_FOREGROUND
+                                    : BluetoothProtoEnums
+                                            .GATT_SERVER_CONNECT_IS_AUTOCONNECT_IN_FOREGROUND,
+                            1);
+        } else {
+            MetricsLogger.getInstance()
+                    .count(
+                            isDirect
+                                    ? BluetoothProtoEnums
+                                            .GATT_SERVER_CONNECT_IS_DIRECT_NOT_IN_FOREGROUND
+                                    : BluetoothProtoEnums
+                                            .GATT_SERVER_CONNECT_IS_AUTOCONNECT_NOT_IN_FOREGROUND,
+                            1);
+        }
+
         mNativeInterface.gattServerConnect(serverIf, address, isDirect, transport);
     }
 

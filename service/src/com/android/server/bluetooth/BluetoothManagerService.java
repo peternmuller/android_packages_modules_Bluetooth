@@ -24,9 +24,7 @@ import static android.bluetooth.BluetoothAdapter.STATE_ON;
 import static android.bluetooth.BluetoothAdapter.STATE_TURNING_OFF;
 import static android.bluetooth.BluetoothAdapter.STATE_TURNING_ON;
 import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED;
-
 import static com.android.server.bluetooth.BluetoothAirplaneModeListener.APM_ENHANCEMENT;
-
 import static java.util.Objects.requireNonNull;
 
 import android.annotation.NonNull;
@@ -234,8 +232,6 @@ class BluetoothManagerService {
     private int mBindingUserID;
     private boolean mTryBindOnBindTimeout = false;
     private List<Integer> mSupportedProfileList = new ArrayList<>();
-
-    private BluetoothModeChangeHelper mBluetoothModeChangeHelper;
 
     private final BluetoothAirplaneModeListener mBluetoothAirplaneModeListener;
 
@@ -1117,6 +1113,21 @@ class BluetoothManagerService {
         return mIsHearingAidProfileSupported;
     }
 
+    boolean isMediaProfileConnected() {
+        if (mBluetooth == null || mState != BluetoothAdapter.STATE_ON) {
+            return false;
+        }
+
+        try {
+            final SynchronousResultReceiver<Boolean> recv = SynchronousResultReceiver.get();
+            mBluetooth.isMediaProfileConnected(mContext.getAttributionSource(), recv);
+            return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(false);
+        } catch (RemoteException | TimeoutException e) {
+             Log.e(TAG, "Error when calling isMediaProfileConnected", e);
+             return false;
+        }
+    }
+
     // Monitor change of BLE scan only mode settings.
     private void registerForBleScanModeChange() {
         ContentObserver contentObserver =
@@ -1676,10 +1687,7 @@ class BluetoothManagerService {
             mHandler.sendEmptyMessage(MESSAGE_GET_NAME_AND_ADDRESS);
         }
 
-        mBluetoothModeChangeHelper = new BluetoothModeChangeHelper(mContext);
-        if (mBluetoothAirplaneModeListener != null) {
-            mBluetoothAirplaneModeListener.start(mBluetoothModeChangeHelper);
-        }
+        mBluetoothAirplaneModeListener.start(new BluetoothModeChangeHelper(mContext));
         setApmEnhancementState();
     }
 

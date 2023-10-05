@@ -300,6 +300,12 @@ public class VolumeControlService extends ProfileService {
             }
         }
 
+        // Unregister handler and remove all queued messages.
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler = null;
+        }
+
         // Cleanup native interface
         mVolumeControlNativeInterface.cleanup();
         mVolumeControlNativeInterface = null;
@@ -1099,6 +1105,11 @@ public class VolumeControlService extends ProfileService {
     @VisibleForTesting
     synchronized void connectionStateChanged(BluetoothDevice device, int fromState,
                                              int toState) {
+        if (!isAvailable()) {
+            Log.w(TAG, "connectionStateChanged: service is not available");
+            return;
+        }
+
         if ((device == null) || (fromState == toState)) {
             Log.e(TAG, "connectionStateChanged: unexpected invocation. device=" + device
                     + " fromState=" + fromState + " toState=" + toState);
@@ -1133,6 +1144,8 @@ public class VolumeControlService extends ProfileService {
                 }
             }
         }
+        mAdapterService.handleProfileConnectionStateChange(
+                BluetoothProfile.VOLUME_CONTROL, device, fromState, toState);
     }
 
     /**

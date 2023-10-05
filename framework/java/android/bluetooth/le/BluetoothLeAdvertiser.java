@@ -569,9 +569,12 @@ public final class BluetoothLeAdvertiser {
             return;
         }
 
-        IBluetoothGatt gatt;
         try {
-            gatt = mBluetoothManager.getBluetoothGatt();
+            IBluetoothGatt gatt = mBluetoothManager.getBluetoothGatt();
+            if (gatt == null) {
+                Log.e(TAG, "Bluetooth GATT is null");
+                return;
+            }
             final SynchronousResultReceiver recv = SynchronousResultReceiver.get();
             gatt.stopAdvertisingSet(wrapped, mAttributionSource, recv);
             recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);

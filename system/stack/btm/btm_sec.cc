@@ -247,25 +247,6 @@ static tBTM_SEC_DEV_REC* btm_sec_find_dev_by_sec_state(uint8_t state) {
 
 /*******************************************************************************
  *
- * Function         access_secure_service_from_temp_bond
- *
- * Description      a utility function to test whether an access to
- *                  secure service from temp bonding is happening
- *
- * Returns          true if the aforementioned condition holds,
- *                  false otherwise
- *
- ******************************************************************************/
-static bool access_secure_service_from_temp_bond(const tBTM_SEC_DEV_REC* p_dev_rec,
-                                                 bool locally_initiated,
-                                                 uint16_t security_req) {
-  return !locally_initiated && (security_req & BTM_SEC_IN_AUTHENTICATE) &&
-    p_dev_rec->is_device_authenticated() &&
-    p_dev_rec->is_bond_type_temporary();
-}
-
-/*******************************************************************************
- *
  * Function         BTM_SecRegister
  *
  * Description      Application manager calls this function to register for
@@ -1167,13 +1148,52 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
       break;
   }
 
-  /* enqueue security request if security is active */
-  if (p_dev_rec->p_callback || (p_dev_rec->sec_state != BTM_SEC_STATE_IDLE)) {
-    LOG_WARN("Security Manager: BTM_SetEncryption busy, enqueue request");
-    btm_sec_queue_encrypt_request(bd_addr, transport, p_callback, p_ref_data,
-                                  sec_act);
-    LOG_INFO("Queued start encryption");
-    return BTM_CMD_STARTED;
+  /* Enqueue security request if security is active */
+  if (bluetooth::common::init_flags::encryption_in_busy_state_is_enabled()) {
+    bool enqueue = false;
+    switch (p_dev_rec->sec_state) {
+      case BTM_SEC_STATE_AUTHENTICATING:
+      case BTM_SEC_STATE_DISCONNECTING_BOTH:
+        /* Applicable for both transports */
+        enqueue = true;
+        break;
+
+      case BTM_SEC_STATE_ENCRYPTING:
+      case BTM_SEC_STATE_DISCONNECTING:
+        if (transport == BT_TRANSPORT_BR_EDR) {
+          enqueue = true;
+        }
+        break;
+
+      case BTM_SEC_STATE_LE_ENCRYPTING:
+      case BTM_SEC_STATE_DISCONNECTING_BLE:
+        if (transport == BT_TRANSPORT_LE) {
+          enqueue = true;
+        }
+        break;
+
+      default:
+        if (p_dev_rec->p_callback != nullptr) {
+          enqueue = true;
+        }
+        break;
+    }
+
+    if (enqueue) {
+      LOG_WARN("Security Manager: Enqueue request in state:%s",
+               security_state_text(p_dev_rec->sec_state).c_str());
+      btm_sec_queue_encrypt_request(bd_addr, transport, p_callback, p_ref_data,
+                                    sec_act);
+      return BTM_CMD_STARTED;
+    }
+  } else {
+    if (p_dev_rec->p_callback || (p_dev_rec->sec_state != BTM_SEC_STATE_IDLE)) {
+      LOG_WARN("Security Manager: BTM_SetEncryption busy, enqueue request");
+      btm_sec_queue_encrypt_request(bd_addr, transport, p_callback, p_ref_data,
+                                    sec_act);
+      LOG_INFO("Queued start encryption");
+      return BTM_CMD_STARTED;
+    }
   }
 
   p_dev_rec->p_callback = p_callback;
@@ -1686,14 +1706,9 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
       }
 
       if (rc == BTM_SUCCESS) {
-        if (access_secure_service_from_temp_bond(p_dev_rec, is_originator, security_required)) {
-          LOG_ERROR("Trying to access a secure service from a temp bonding, rejecting");
-          rc = BTM_FAILED_ON_SECURITY;
-        }
-
         if (p_callback)
-          (*p_callback)(&bd_addr, transport, (void*)p_ref_data, rc);
-        return rc;
+          (*p_callback)(&bd_addr, transport, (void*)p_ref_data, BTM_SUCCESS);
+        return (BTM_SUCCESS);
       }
     }
 
@@ -1951,11 +1966,6 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
                                security_required, p_callback, p_ref_data);
     } else /* rc == BTM_SUCCESS */
     {
-      if (access_secure_service_from_temp_bond(p_dev_rec,
-          is_originator, security_required)) {
-        LOG_ERROR("Trying to access a secure rfcomm service from a temp bonding, rejecting");
-        rc = BTM_FAILED_ON_SECURITY;
-      }
       if (p_callback) {
         LOG_DEBUG("Notifying client that security access has been granted");
         (*p_callback)(&bd_addr, transport, p_ref_data, rc);
@@ -4573,13 +4583,6 @@ tBTM_STATUS btm_sec_execute_procedure(tBTM_SEC_DEV_REC* p_dev_rec) {
     BTM_TRACE_EVENT(
         "%s: Security Manager: SC only service, but link key type is 0x%02x -",
         "security failure", __func__, p_dev_rec->link_key_type);
-    return (BTM_FAILED_ON_SECURITY);
-  }
-
-  if (access_secure_service_from_temp_bond(p_dev_rec,
-                                           p_dev_rec->IsLocallyInitiated(),
-                                           p_dev_rec->security_required)) {
-    LOG_ERROR("Trying to access a secure service from a temp bonding, rejecting");
     return (BTM_FAILED_ON_SECURITY);
   }
 

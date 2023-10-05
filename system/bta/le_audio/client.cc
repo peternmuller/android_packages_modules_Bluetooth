@@ -17,6 +17,7 @@
 
 #include <base/functional/bind.h>
 #include <base/strings/string_number_conversions.h>
+#include <lc3.h>
 
 #include <deque>
 #include <mutex>
@@ -2815,8 +2816,6 @@ class LeAudioClientImpl : public LeAudioClient {
     }
 
     leAudioDevice->known_service_handles_ = true;
-    btif_storage_leaudio_update_handles_bin(leAudioDevice->address_);
-
     leAudioDevice->notify_connected_after_read_ = true;
     if (leAudioHealthStatus_) {
       leAudioHealthStatus_->AddStatisticForDevice(
@@ -4855,7 +4854,8 @@ class LeAudioClientImpl : public LeAudioClient {
     if (data && !!PTR_TO_INT(data)) {
       leAudioDevice->notify_connected_after_read_ = false;
 
-      /* Update PACs and ASEs when all is read.*/
+      /* Update handles, PACs and ASEs when all is read.*/
+      btif_storage_leaudio_update_handles_bin(leAudioDevice->address_);
       btif_storage_leaudio_update_pacs_bin(leAudioDevice->address_);
       btif_storage_leaudio_update_ase_bin(leAudioDevice->address_);
 
@@ -5203,7 +5203,6 @@ class LeAudioClientImpl : public LeAudioClient {
          * STREAMING. Peer device uses cache. For the moment
          * it is handled same as IDLE
          */
-        FALLTHROUGH;
       case GroupStreamStatus::IDLE: {
         if (sw_enc_left) sw_enc_left.reset();
         if (sw_enc_right) sw_enc_right.reset();
