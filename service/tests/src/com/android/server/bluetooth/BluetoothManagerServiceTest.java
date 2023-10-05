@@ -181,7 +181,7 @@ public class BluetoothManagerServiceTest {
                 .when(mUserManager)
                 .hasUserRestrictionForUser(eq(UserManager.DISALLOW_BLUETOOTH_SHARING), any());
 
-//         // Check if disable message sent once for system user only
+        // Check if disable message sent once for system user only
 
         // test run on user -1, should not turning Bluetooth off
         mManagerService.onUserRestrictionsChanged(UserHandle.CURRENT);

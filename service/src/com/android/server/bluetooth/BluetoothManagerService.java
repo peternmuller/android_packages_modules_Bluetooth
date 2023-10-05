@@ -227,10 +227,9 @@ class BluetoothManagerService {
     private IBluetooth mBluetooth = null;
 
     private IBluetoothGatt mBluetoothGatt = null;
-    private boolean mBinding = false;
-    private boolean mUnbinding = false;
     private int mBindingUserID;
     private boolean mTryBindOnBindTimeout = false;
+
     private List<Integer> mSupportedProfileList = new ArrayList<>();
 
     private final BluetoothAirplaneModeListener mBluetoothAirplaneModeListener;
@@ -500,7 +499,7 @@ class BluetoothManagerService {
                 }
             }
 
-            int st = STATE_OFF;
+            int st = mState.get();
 
             Log.d(
                     TAG,
