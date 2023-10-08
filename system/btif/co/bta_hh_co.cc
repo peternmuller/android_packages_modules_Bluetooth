@@ -35,6 +35,7 @@
 #include "btif_hh.h"
 #include "btif_util.h"
 #include "device/include/controller.h"
+#include "device/include/interop.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
 #include "osi/include/osi.h"
@@ -588,6 +589,15 @@ void bta_hh_co_send_hid_info(btif_hh_device_t* p_dev, const char* dev_name,
       "ctry_code=0x%02x",
       __func__, vendor_id, product_id, version, ctry_code);
 
+  if (interop_match_vendor_product_ids(INTEROP_CHANGE_HID_VID_PID, vendor_id,
+                                       product_id) ||
+      interop_match_name(INTEROP_CHANGE_HID_VID_PID, dev_name)) {
+    vendor_id = 0x1000;
+    product_id = 0x1000;
+    APPL_TRACE_WARNING(
+        "%s: vendor_id = 0x%04x, product_id = 0x%04x, name = [%s]", __func__,
+        vendor_id, product_id, dev_name);
+  }
   // Create and send hid descriptor to kernel
   memset(&ev, 0, sizeof(ev));
   ev.type = UHID_CREATE;
