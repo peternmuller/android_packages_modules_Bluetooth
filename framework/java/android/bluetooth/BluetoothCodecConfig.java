@@ -19,6 +19,7 @@ package android.bluetooth;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -97,17 +98,22 @@ public final class BluetoothCodecConfig implements Parcelable {
     /**
      * Represents the count of valid source codec types.
      */
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_CODEC_TYPE_MAX = 7;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_CODEC_TYPE_APTX_ADAPTIVE = SOURCE_CODEC_TYPE_MAX;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_CODEC_TYPE_APTX_TWSP = SOURCE_CODEC_TYPE_MAX + 1;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_QVA_CODEC_TYPE_MAX = SOURCE_CODEC_TYPE_MAX + 2;
 
     /* CELT is not an A2DP Codec and only used to fetch encoder
     ** format for BA usecase, moving out of a2dp codec value list
     */
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_CODEC_TYPE_CELT = 10;
 
     /** @hide */
@@ -186,12 +192,16 @@ public final class BluetoothCodecConfig implements Parcelable {
      */
     public static final int SAMPLE_RATE_192000 = 0x1 << 5;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SAMPLE_RATE_16000 = 0x1 << 6;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SAMPLE_RATE_24000 = 0x1 << 7;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SAMPLE_RATE_32000 = 0x1 << 8;
 
+    @SuppressLint("UnflaggedApi")
     public static final int SAMPLE_RATE_8000 = 0x1 << 9;
 
     /** @hide */
@@ -231,7 +241,9 @@ public final class BluetoothCodecConfig implements Parcelable {
             CHANNEL_MODE_MONO,
             CHANNEL_MODE_STEREO
     })
+
     @Retention(RetentionPolicy.SOURCE)
+    /** @hide */
     public @interface ChannelMode {}
 
     /**
@@ -249,6 +261,7 @@ public final class BluetoothCodecConfig implements Parcelable {
      * Codec channel mode STEREO.
      */
     public static final int CHANNEL_MODE_STEREO = 0x1 << 1;
+    @SuppressLint("UnflaggedApi")
     public static final int CHANNEL_MODE_JOINT_STEREO = 0x1 << 2;
 
     private final @SourceCodecType int mCodecType;

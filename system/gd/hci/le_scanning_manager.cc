@@ -542,6 +542,8 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
   }
 
   void scan(bool start) {
+    // On-resume flag should always be reset if there is an explicit start/stop call.
+    scan_on_resume_ = false;
     if (start) {
       configure_scan();
       start_scan();
@@ -561,8 +563,6 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
       scan_on_resume_ = true;
       return;
     }
-    scan_on_resume_ = false;
-
     is_scanning_ = true;
     if (!address_manager_registered_) {
       le_address_manager_->Register(this);
@@ -586,8 +586,6 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
   }
 
   void stop_scan() {
-    scan_on_resume_ = false;
-
     if (!is_scanning_) {
       LOG_INFO("Scanning already stopped, return!");
       return;
@@ -1614,6 +1612,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
     }
     paused_ = false;
     if (scan_on_resume_ == true) {
+      scan_on_resume_ = false;
       start_scan();
     }
     le_address_manager_->AckResume(this);
