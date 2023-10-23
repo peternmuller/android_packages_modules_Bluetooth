@@ -758,7 +758,8 @@ class UnicastTestNoInit : public Test {
               for (LeAudioDevice* device = group->GetFirstDevice();
                    device != nullptr; device = group->GetNextDevice(device)) {
                 for (auto& ase : device->ases_) {
-                  ase.data_path_state = types::AudioStreamDataPathState::IDLE;
+                  ase.cis_state = types::CisState::IDLE;
+                  ase.data_path_state = types::DataPathState::IDLE;
                   ase.active = false;
                   ase.state =
                       types::AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED;
@@ -806,8 +807,8 @@ class UnicastTestNoInit : public Test {
 
             // And also skip the ase establishment procedure which should
             // be tested as part of the state machine unit tests
-            ase.data_path_state =
-                types::AudioStreamDataPathState::DATA_PATH_ESTABLISHED;
+            ase.cis_state = types::CisState::CONNECTED;
+            ase.data_path_state = types::DataPathState::CONFIGURED;
             ase.state = types::AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING;
 
             uint16_t cis_conn_hdl = ase.cis_conn_hdl;
@@ -936,8 +937,8 @@ class UnicastTestNoInit : public Test {
 
               // And also skip the ase establishment procedure which should
               // be tested as part of the state machine unit tests
-              ase.data_path_state =
-                  types::AudioStreamDataPathState::DATA_PATH_ESTABLISHED;
+              ase.cis_state = types::CisState::CONNECTED;
+              ase.data_path_state = types::DataPathState::CONFIGURED;
               ase.state = types::AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING;
               ase.pres_delay_min = 2500;
               ase.pres_delay_max = 2500;
@@ -1132,8 +1133,7 @@ class UnicastTestNoInit : public Test {
           for (LeAudioDevice* device = group->GetFirstDevice();
                device != nullptr; device = group->GetNextDevice(device)) {
             for (auto& ase : device->ases_) {
-              ase.data_path_state =
-                  types::AudioStreamDataPathState::CIS_ESTABLISHED;
+              ase.cis_state = types::CisState::CONNECTED;
               ase.active = false;
               ase.state =
                   types::AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED;
@@ -1216,14 +1216,12 @@ class UnicastTestNoInit : public Test {
               auto ases_pair =
                   leAudioDevice->GetAsesByCisConnHdl(event->cis_conn_hdl);
               if (ases_pair.sink) {
-                ases_pair.sink->data_path_state =
-                    types::AudioStreamDataPathState::CIS_ASSIGNED;
+                ases_pair.sink->cis_state = types::CisState::ASSIGNED;
                 ases_pair.sink->active = false;
               }
               if (ases_pair.source) {
                 ases_pair.source->active = false;
-                ases_pair.source->data_path_state =
-                    types::AudioStreamDataPathState::CIS_ASSIGNED;
+                ases_pair.source->cis_state = types::CisState::ASSIGNED;
               }
               /* Invalidate stream configuration if needed */
               auto* stream_conf = &group->stream_conf;
@@ -1359,7 +1357,8 @@ class UnicastTestNoInit : public Test {
             group->CigUnassignCis(device);
 
             for (auto& ase : device->ases_) {
-              ase.data_path_state = types::AudioStreamDataPathState::IDLE;
+              ase.cis_state = types::CisState::IDLE;
+              ase.data_path_state = types::DataPathState::IDLE;
               ase.active = false;
               ase.state = types::AseState::BTA_LE_AUDIO_ASE_STATE_IDLE;
               ase.cis_id = 0;
@@ -3771,9 +3770,10 @@ TEST_F(UnicastTest, DoubleResumeFromAF) {
   Mock::VerifyAndClearExpectations(&mock_audio_hal_client_callbacks_);
   Mock::VerifyAndClearExpectations(&mock_le_audio_source_hal_client_);
 
-  LocalAudioSourceResume(false, true);
+  // Additional resume shall be ignored.
+  LocalAudioSourceResume(false, false);
 
-  EXPECT_CALL(mock_state_machine_, StopStream(_)).Times(1);
+  EXPECT_CALL(mock_state_machine_, StopStream(_)).Times(0);
 
   do_in_main_thread(
       FROM_HERE,
@@ -3786,6 +3786,77 @@ TEST_F(UnicastTest, DoubleResumeFromAF) {
           group_id, base::Unretained(state_machine_callbacks_)));
   SyncOnMainLoop();
   Mock::VerifyAndClearExpectations(&mock_state_machine_);
+
+  // Verify Data transfer on one audio source cis
+  constexpr uint8_t cis_count_out = 1;
+  constexpr uint8_t cis_count_in = 0;
+  TestAudioDataTransfer(group_id, cis_count_out, cis_count_in, 1920);
+}
+
+TEST_F(UnicastTest, DoubleResumeFromAFOnLocalSink) {
+  const RawAddress test_address0 = GetTestAddress(0);
+  int group_id = bluetooth::groups::kGroupUnknown;
+
+  default_channel_cnt = 1;
+
+  SetSampleDatabaseEarbudsValid(
+      1, test_address0, codec_spec_conf::kLeAudioLocationStereo,
+      codec_spec_conf::kLeAudioLocationStereo, default_channel_cnt,
+      default_channel_cnt, 0x0004,
+      /* source sample freq 16khz */ false /*add_csis*/, true /*add_cas*/,
+      true /*add_pacs*/, default_ase_cnt /*add_ascs_cnt*/, 1 /*set_size*/,
+      0 /*rank*/);
+  EXPECT_CALL(mock_audio_hal_client_callbacks_,
+              OnConnectionState(ConnectionState::CONNECTED, test_address0))
+      .Times(1);
+  EXPECT_CALL(mock_audio_hal_client_callbacks_,
+              OnGroupNodeStatus(test_address0, _, GroupNodeStatus::ADDED))
+      .WillOnce(DoAll(SaveArg<1>(&group_id)));
+
+  ConnectLeAudio(test_address0);
+  ASSERT_NE(group_id, bluetooth::groups::kGroupUnknown);
+
+  // Audio sessions are started only when device gets active
+  EXPECT_CALL(*mock_le_audio_source_hal_client_, Start(_, _)).Times(1);
+  EXPECT_CALL(*mock_le_audio_sink_hal_client_, Start(_, _)).Times(1);
+  LeAudioClient::Get()->GroupSetActive(group_id);
+  SyncOnMainLoop();
+
+  EXPECT_CALL(mock_state_machine_, StartStream(_, _, _, _)).Times(1);
+
+  block_streaming_state_callback = true;
+
+  UpdateLocalSinkMetadata(AUDIO_SOURCE_MIC);
+  LocalAudioSinkResume();
+
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_audio_hal_client_callbacks_);
+  Mock::VerifyAndClearExpectations(&mock_le_audio_source_hal_client_);
+
+  EXPECT_CALL(*mock_le_audio_sink_hal_client_, CancelStreamingRequest())
+      .Times(0);
+
+  // Actuall test here: send additional resume which shall be ignored.
+  LocalAudioSinkResume();
+
+  EXPECT_CALL(mock_state_machine_, StopStream(_)).Times(0);
+
+  do_in_main_thread(
+      FROM_HERE,
+      base::BindOnce(
+          [](int group_id, le_audio::LeAudioGroupStateMachine::Callbacks*
+                               state_machine_callbacks) {
+            state_machine_callbacks->StatusReportCb(
+                group_id, GroupStreamStatus::STREAMING);
+          },
+          group_id, base::Unretained(state_machine_callbacks_)));
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_state_machine_);
+
+  // Verify Data transfer on local audio sink which is started
+  constexpr uint8_t cis_count_out = 0;
+  constexpr uint8_t cis_count_in = 1;
+  TestAudioDataTransfer(group_id, cis_count_out, cis_count_in, 0, 40);
 }
 
 TEST_F(UnicastTest, RemoveNodeWhileStreaming) {
@@ -4764,7 +4835,8 @@ TEST_F(UnicastTest, SpeakerStreamingAutonomousRelease) {
   for (LeAudioDevice* device = group->GetFirstDevice(); device != nullptr;
        device = group->GetNextDevice(device)) {
     for (auto& ase : device->ases_) {
-      ase.data_path_state = types::AudioStreamDataPathState::IDLE;
+      ase.cis_state = types::CisState::IDLE;
+      ase.data_path_state = types::DataPathState::IDLE;
       ase.state = types::AseState::BTA_LE_AUDIO_ASE_STATE_IDLE;
       InjectCisDisconnected(group_id, ase.cis_conn_hdl);
     }

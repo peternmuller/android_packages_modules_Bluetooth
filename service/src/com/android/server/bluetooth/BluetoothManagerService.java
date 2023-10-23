@@ -264,6 +264,7 @@ class BluetoothManagerService {
             mPackageName = packageName;
             mEnable = enable;
             mTimestamp = timestamp;
+            Log.d(TAG, this.toString());
         }
 
         @Override

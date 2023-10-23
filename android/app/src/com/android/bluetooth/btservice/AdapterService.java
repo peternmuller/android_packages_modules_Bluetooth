@@ -109,6 +109,7 @@ import android.util.SparseArray;
 
 import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.BluetoothStatsLog;
+import com.android.bluetooth.Flags;
 import com.android.bluetooth.R;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.a2dp.A2dpService;
@@ -360,7 +361,9 @@ public class AdapterService extends Service {
     private UserManager mUserManager;
     private CompanionDeviceManager mCompanionDeviceManager;
 
-    private PhonePolicy mPhonePolicy;
+    // Phone Policy is not used on all devices. Ensure you null check before using it
+    @Nullable private PhonePolicy mPhonePolicy;
+
     private ActiveDeviceManager mActiveDeviceManager;
     private DatabaseManager mDatabaseManager;
     private SilenceDeviceManager mSilenceDeviceManager;
@@ -700,7 +703,11 @@ public class AdapterService extends Service {
             Log.i(TAG, "Phone policy disabled");
         }
 
-        mActiveDeviceManager = new ActiveDeviceManager(this, new ServiceFactory());
+        if (Flags.audioRoutingCentralization()) {
+            mActiveDeviceManager = new AudioRoutingManager(this, new ServiceFactory());
+        } else {
+            mActiveDeviceManager = new ActiveDeviceManager(this, new ServiceFactory());
+        }
         mActiveDeviceManager.start();
 
         mSilenceDeviceManager = new SilenceDeviceManager(this, new ServiceFactory(), mLooper);
@@ -6937,7 +6944,9 @@ public class AdapterService extends Service {
 
     /** Update PhonePolicy when new {@link BluetoothDevice} creates an ACL connection. */
     public void updatePhonePolicyOnAclConnect(BluetoothDevice device) {
-        mPhonePolicy.handleAclConnected(device);
+        if (mPhonePolicy != null) {
+            mPhonePolicy.handleAclConnected(device);
+        }
     }
 
     /**
@@ -6960,14 +6969,18 @@ public class AdapterService extends Service {
      */
     public void handleProfileConnectionStateChange(
             int profile, BluetoothDevice device, int fromState, int toState) {
-        mPhonePolicy.profileConnectionStateChanged(profile, device, fromState, toState);
+        if (mPhonePolicy != null) {
+            mPhonePolicy.profileConnectionStateChanged(profile, device, fromState, toState);
+        }
     }
 
     /** Handle Bluetooth app state when active device changes for a given {@code profile}. */
     public void handleActiveDeviceChange(int profile, BluetoothDevice device) {
         mActiveDeviceManager.profileActiveDeviceChanged(profile, device);
         mSilenceDeviceManager.profileActiveDeviceChanged(profile, device);
-        mPhonePolicy.profileActiveDeviceChanged(profile, device);
+        if (mPhonePolicy != null) {
+            mPhonePolicy.profileActiveDeviceChanged(profile, device);
+        }
     }
 
     static int convertScanModeToHal(int mode) {

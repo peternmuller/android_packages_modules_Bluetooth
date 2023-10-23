@@ -58,6 +58,7 @@ cc_library_static {
         "src/socket.cc",
         "src/socket_utils/socket_local_client.cc",
         "src/socket_utils/socket_local_server.cc",
+        "src/stack_power_telemetry.cc",
         "src/thread.cc",
         "src/thread_scheduler.cc",
         "src/wakelock.cc",
@@ -112,6 +113,7 @@ cc_test {
         "test/rand_test.cc",
         "test/reactor_test.cc",
         "test/ringbuffer_test.cc",
+        "test/stack_power_telemetry_test.cc",
         "test/thread_test.cc",
         "test/wakelock_test.cc", // test internal sources only used inside the libosi
 
@@ -128,6 +130,7 @@ cc_test {
         "test",
     ],
     static_libs: [
+        "libbluetooth-types",
         "libbluetooth_gd",
         "libbt-common",
         "libbt_shim_bridge",
