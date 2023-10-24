@@ -235,8 +235,6 @@ class BluetoothManagerService {
     private boolean mTryBindOnBindTimeout = false;
     private List<Integer> mSupportedProfileList = new ArrayList<>();
 
-    private BluetoothModeChangeHelper mBluetoothModeChangeHelper;
-
     private final BluetoothAirplaneModeListener mBluetoothAirplaneModeListener;
 
     private BluetoothNotificationManager mBluetoothNotificationManager;
@@ -266,6 +264,7 @@ class BluetoothManagerService {
             mPackageName = packageName;
             mEnable = enable;
             mTimestamp = timestamp;
+            Log.d(TAG, this.toString());
         }
 
         @Override
@@ -310,8 +309,7 @@ class BluetoothManagerService {
     // bluetooth profile services
     private final Map<Integer, ProfileServiceConnections> mProfileServices = new HashMap<>();
 
-    @GuardedBy("mProfileServices")
-    private boolean mUnbindingAll = false;
+    private volatile boolean mUnbindingAll = false;
 
     private final IBluetoothCallback mBluetoothCallback =
             new IBluetoothCallback.Stub() {
@@ -1117,6 +1115,21 @@ class BluetoothManagerService {
         return mIsHearingAidProfileSupported;
     }
 
+    boolean isMediaProfileConnected() {
+        if (mBluetooth == null || mState != BluetoothAdapter.STATE_ON) {
+            return false;
+        }
+
+        try {
+            final SynchronousResultReceiver<Boolean> recv = SynchronousResultReceiver.get();
+            mBluetooth.isMediaProfileConnected(mContext.getAttributionSource(), recv);
+            return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(false);
+        } catch (RemoteException | TimeoutException e) {
+             Log.e(TAG, "Error when calling isMediaProfileConnected", e);
+             return false;
+        }
+    }
+
     // Monitor change of BLE scan only mode settings.
     private void registerForBleScanModeChange() {
         ContentObserver contentObserver =
@@ -1444,20 +1457,13 @@ class BluetoothManagerService {
     }
 
     boolean disable(String packageName, boolean persist) {
-        if (isSatelliteModeOn()) {
-            Log.d(TAG, "disable: not disabling - satellite mode is on.");
-            return false;
-        }
-
         if (DBG) {
             Log.d(
                     TAG,
-                    "disable(): mBluetooth="
-                            + mBluetooth
-                            + ", persist="
-                            + persist
-                            + ", isBinding="
-                            + isBinding());
+                    "disable():"
+                            + (" mBluetooth=" + mBluetooth)
+                            + (" persist=" + persist)
+                            + (" isBinding=" + isBinding()));
         }
 
         synchronized (mReceiver) {
@@ -1603,6 +1609,9 @@ class BluetoothManagerService {
 
     void unbindBluetoothProfileService(
             int bluetoothProfile, IBluetoothProfileServiceConnection proxy) {
+        if (mUnbindingAll) {
+            return;
+        }
         synchronized (mProfileServices) {
             ProfileServiceConnections psc = mProfileServices.get(bluetoothProfile);
             if (psc == null) {
@@ -1618,18 +1627,14 @@ class BluetoothManagerService {
                 } catch (IllegalArgumentException e) {
                     Log.e(TAG, "Unable to unbind service with intent: " + psc.mIntent, e);
                 }
-                if (!mUnbindingAll) {
-                    Log.w(TAG, "psc.isEmpty is true, removing psc entry for profile "
-                                 + bluetoothProfile);
-                    mProfileServices.remove(bluetoothProfile);
-                }
+                mProfileServices.remove(bluetoothProfile);
             }
         }
     }
 
     private void unbindAllBluetoothProfileServices() {
+        mUnbindingAll = true;
         synchronized (mProfileServices) {
-            mUnbindingAll = true;
             for (Integer i : mProfileServices.keySet()) {
                 ProfileServiceConnections psc = mProfileServices.get(i);
                 try {
@@ -1639,9 +1644,9 @@ class BluetoothManagerService {
                 }
                 psc.removeAllProxies();
             }
-            mUnbindingAll = false;
             mProfileServices.clear();
         }
+        mUnbindingAll = false;
     }
 
     /**
@@ -1676,10 +1681,7 @@ class BluetoothManagerService {
             mHandler.sendEmptyMessage(MESSAGE_GET_NAME_AND_ADDRESS);
         }
 
-        mBluetoothModeChangeHelper = new BluetoothModeChangeHelper(mContext);
-        if (mBluetoothAirplaneModeListener != null) {
-            mBluetoothAirplaneModeListener.start(mBluetoothModeChangeHelper);
-        }
+        mBluetoothAirplaneModeListener.start(new BluetoothModeChangeHelper(mContext));
         setApmEnhancementState();
     }
 
@@ -2474,11 +2476,28 @@ class BluetoothManagerService {
                     sendBluetoothServiceUpCallback();
                     break;
                 case MESSAGE_REGISTER_STATE_CHANGE_CALLBACK:
-                    mStateChangeCallbacks.register((IBluetoothStateChangeCallback) msg.obj);
+                    IBluetoothStateChangeCallback regCallback =
+                            (IBluetoothStateChangeCallback)msg.obj;
+                    if (mState != BluetoothAdapter.STATE_ON) {
+                        try {
+                            regCallback.onBluetoothStateChange(true);
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "REGISTER_STATE_CHANGE_CALLBACK: callback failed", e);
+                            break;
+                        }
+                    }
+                    mStateChangeCallbacks.register(regCallback);
                     break;
 
                 case MESSAGE_UNREGISTER_STATE_CHANGE_CALLBACK:
-                    mStateChangeCallbacks.unregister((IBluetoothStateChangeCallback) msg.obj);
+                    IBluetoothStateChangeCallback unregCallback =
+                            (IBluetoothStateChangeCallback)msg.obj;
+                    try {
+                        unregCallback.onBluetoothStateChange(false);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "UNREGISTER_STATE_CHANGE_CALLBACK: callback failed", e);
+                    }
+                    mStateChangeCallbacks.unregister(unregCallback);
                     break;
 
                 case MESSAGE_ADD_PROXY_DELAYED:

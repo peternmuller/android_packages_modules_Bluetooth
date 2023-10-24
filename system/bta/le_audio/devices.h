@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <base/logging.h>
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -149,8 +151,8 @@ class LeAudioDevice {
       struct types::ase* base_ase);
   struct types::ase* GetNextActiveAseWithDifferentDirection(
       struct types::ase* base_ase);
-  struct types::ase* GetFirstActiveAseByDataPathState(
-      types::AudioStreamDataPathState state);
+  struct types::ase* GetFirstActiveAseByCisAndDataPathState(
+      types::CisState cis_state, types::DataPathState data_path_state);
   struct types::ase* GetFirstInactiveAse(uint8_t direction,
                                          bool reconnect = false);
   struct types::ase* GetFirstAseWithState(uint8_t direction,
@@ -347,11 +349,11 @@ class LeAudioDeviceGroup {
       types::LeAudioContextType context_type) const;
   LeAudioDevice* GetFirstActiveDevice(void) const;
   LeAudioDevice* GetNextActiveDevice(LeAudioDevice* leAudioDevice) const;
-  LeAudioDevice* GetFirstActiveDeviceByDataPathState(
-      types::AudioStreamDataPathState data_path_state) const;
-  LeAudioDevice* GetNextActiveDeviceByDataPathState(
-      LeAudioDevice* leAudioDevice,
-      types::AudioStreamDataPathState data_path_state) const;
+  LeAudioDevice* GetFirstActiveDeviceByCisAndDataPathState(
+      types::CisState cis_state, types::DataPathState data_path_state) const;
+  LeAudioDevice* GetNextActiveDeviceByCisAndDataPathState(
+      LeAudioDevice* leAudioDevice, types::CisState cis_state,
+      types::DataPathState data_path_state) const;
   bool IsDeviceInTheGroup(LeAudioDevice* leAudioDevice) const;
   bool HaveAllActiveDevicesAsesTheSameState(types::AseState state) const;
   bool HaveAnyActiveDeviceInUnconfiguredState() const;
@@ -400,6 +402,7 @@ class LeAudioDeviceGroup {
   void SetPendingConfiguration(void);
   void ClearPendingConfiguration(void);
   void AddToAllowListNotConnectedGroupMembers(int gatt_if);
+  void ApplyReconnectionMode(int gatt_if, tBTM_BLE_CONN_TYPE reconnection_mode);
   void Disable(int gatt_if);
   void Enable(int gatt_if, tBTM_BLE_CONN_TYPE reconnection_mode);
   bool IsEnabled(void) const;

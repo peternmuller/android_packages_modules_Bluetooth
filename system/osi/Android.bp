@@ -58,6 +58,7 @@ cc_library_static {
         "src/socket.cc",
         "src/socket_utils/socket_local_client.cc",
         "src/socket_utils/socket_local_server.cc",
+        "src/stack_power_telemetry.cc",
         "src/thread.cc",
         "src/thread_scheduler.cc",
         "src/wakelock.cc",
@@ -80,6 +81,14 @@ cc_library_static {
         "-DLIB_OSI_INTERNAL",
     ],
     min_sdk_version: "Tiramisu",
+    apex_available: [
+        "//apex_available:platform",
+    ],
+    header_libs: ["libbluetooth_headers"],
+    static_libs: [
+        "libbt-platform-protos-lite",
+        "libbt_shim_bridge",
+    ],
 }
 
 // libosi unit tests for target and host
@@ -104,6 +113,7 @@ cc_test {
         "test/rand_test.cc",
         "test/reactor_test.cc",
         "test/ringbuffer_test.cc",
+        "test/stack_power_telemetry_test.cc",
         "test/thread_test.cc",
         "test/wakelock_test.cc", // test internal sources only used inside the libosi
 
@@ -120,8 +130,11 @@ cc_test {
         "test",
     ],
     static_libs: [
+        "libbluetooth-types",
         "libbluetooth_gd",
         "libbt-common",
+        "libbt_shim_bridge",
+        "libbt_shim_ffi",
         "libc++fs",
         "libchrome",
         "libevent",
@@ -139,9 +152,11 @@ cc_test {
     },
     cflags: [
         "-DLIB_OSI_INTERNAL",
+        "-Wno-unused-parameter",
     ],
     sanitize: {
         address: true,
         cfi: false,
     },
+    header_libs: ["libbluetooth_headers"],
 }
