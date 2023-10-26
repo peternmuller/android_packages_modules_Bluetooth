@@ -16,15 +16,6 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
-genrule {
-    name: "statslog-bluetooth-java-gen",
-    tools: ["stats-log-api-gen"],
-    cmd: "$(location stats-log-api-gen) --java $(out) --module bluetooth"
-        + " --javaPackage com.android.bluetooth --javaClass BluetoothStatsLog"
-        + " --minApiLevel 33",
-    out: ["com/android/bluetooth/BluetoothStatsLog.java"],
-}
-
 filegroup {
     name: "services.bluetooth-sources",
     srcs: [
@@ -39,8 +30,10 @@ filegroup {
 }
 
 // pre-jarjar version of service-bluetooth that builds against pre-jarjar version of framework-bluetooth
-java_defaults {
+java_library {
     name: "service-bluetooth-pre-jarjar",
+    installable: false,
+    //defaults: ["service-bluetooth-common-defaults"],
     srcs: [
         ":services.bluetooth-sources",
     ],
@@ -80,6 +73,7 @@ java_defaults {
         "framework-bluetooth-pre-jarjar",
         "framework-configinfrastructure",
         "framework-statsd.stubs.module_lib",
+       // "service-bluetooth.change-ids",
     ],
 
     static_libs: [
@@ -91,22 +85,28 @@ java_defaults {
         "modules-utils-shell-command-handler",
     ],
 
-    min_sdk_version: "Tiramisu",
-
-    visibility: [":__subpackages__"],
+    apex_available: [
+        "com.android.btservices",
+    ],
+    min_sdk_version: "Tiramisu"
 }
 
 // service-bluetooth static library
 // ==============================================================
 java_library {
     name: "service-bluetooth",
-    defaults: ["service-bluetooth-pre-jarjar"],
+   // defaults: ["service-bluetooth-pre-jarjar"],
     installable: true,
+    static_libs: [
+        "androidx.appcompat_appcompat",
+        "service-bluetooth-pre-jarjar",
+    ],
 
     libs: [
         "app-compat-annotations",
         "framework-bluetooth.impl",
     ],
+    sdk_version: "system_server_current",
 
     jarjar_rules: ":bluetooth-jarjar-rules",
 
@@ -118,7 +118,10 @@ java_library {
     visibility: [
         "//packages/modules/Bluetooth/apex",
     ],
-    min_sdk_version: "Tiramisu",
+    apex_available: [
+        "com.android.btservices",
+    ],
+    min_sdk_version: "Tiramisu"
 }
 
 java_library {
@@ -134,6 +137,9 @@ java_library {
         ":srcs_bluetooth_manager_service_proto",
     ],
     sdk_version: "system_server_current",
+    apex_available: [
+        "com.android.btservices",
+    ],
     min_sdk_version: "Tiramisu"
 }
 
@@ -157,65 +163,9 @@ java_library {
     min_sdk_version: "Tiramisu",
 }
 
-java_library {
-    name: "bluetooth-proto-enums-java-gen",
-    installable: false,
-    proto: {
-        type: "stream",
-    },
-    srcs: [
-        ":srcs_bluetooth_protos",
-    ],
-    apex_available: [
-        "com.android.bluetooth",
-    ],
-    min_sdk_version: "33",
-    sdk_version: "module_current",
-}
-
-// (b/269501291) this package moved from android/app/Android.bp
-cc_library {
-    name: "libbluetooth-core",
-    defaults: ["fluoride_defaults"],
-    header_libs: [
-        "jni_headers",
-        "libbluetooth_headers",
-    ],
-    include_dirs: [
-        "packages/modules/Bluetooth/system/types",
-    ],
-    static_libs: [
-        "libbte",
-        "libbt-bta-core",
-        "libbt-common",
-        "libbtdevice",
-        "libbtif-core",
-        "libbt-hci",
-        "libbt-stack-core",
-        "libbt-utils",
-        "libbtcore",
-        "libosi",
-        "lib-bt-packets",
-        "lib-bt-packets-base",
-
-        "libbluetooth-types",
-        "libc++fs",
-    ],
-    cflags: [
-        /* we export all classes, so change default visibility, instead of having EXPORT_SYMBOL on each class*/
-        "-fvisibility=default",
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-        "-Wno-unused-parameter",
-    ],
-    sanitize: {
-        scs: true,
-    },
-    apex_available: [
-        "com.android.btservices",
-    ],
-    host_supported: true,
-    min_sdk_version: "Tiramisu",
+platform_compat_config
+{
+    name: "bluetooth-compat-config",
+    src: ":service-bluetooth-pre-jarjar",
 }
 

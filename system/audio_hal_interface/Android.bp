@@ -71,6 +71,9 @@ cc_library_static {
     ],
     min_sdk_version: "Tiramisu",
     header_libs: ["libbluetooth_headers"],
+    apex_available: [
+        "com.android.btservices",
+    ],
 }
 
 // Bluetooth Audio client interface library unit tests for target and host
