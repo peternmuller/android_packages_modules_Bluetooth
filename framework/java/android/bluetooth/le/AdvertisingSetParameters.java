@@ -23,7 +23,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.app.ActivityThread;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -492,16 +491,8 @@ public final class AdvertisingSetParameters implements Parcelable {
          * if the setTxPowerLevel is invoked from com.android.bluetooth process
          */
         public Builder setTxPowerLevel(int txPowerLevel) {
-            String packageName = ActivityThread.currentPackageName();
-            if (packageName != null && packageName.contains("com.android.bluetooth")) {
-                int maxPowerLevel = 20;
-                if (txPowerLevel < TX_POWER_MIN || txPowerLevel > maxPowerLevel) {
-                    throw new IllegalArgumentException("invalid txPowerLevel " + txPowerLevel);
-                }
-            } else {
-                if (txPowerLevel < TX_POWER_MIN || txPowerLevel > TX_POWER_MAX) {
-                    throw new IllegalArgumentException("unknown txPowerLevel " + txPowerLevel);
-                }
+           if (txPowerLevel < TX_POWER_MIN || txPowerLevel > TX_POWER_MAX) {
+              throw new IllegalArgumentException("unknown txPowerLevel " + txPowerLevel);
             }
             mTxPowerLevel = txPowerLevel;
             return this;

@@ -35,7 +35,7 @@ android_test {
     // Linking source to test the working copy, not the on-device copy.
     // Use 'pre-jarjar' so that we can reference symbols before renaming.
     // Then apply the same common jarjar_rules
-    defaults: ["service-bluetooth-pre-jarjar"],
+    //defaults: ["service-bluetooth-pre-jarjar"],
     jarjar_rules: ":bluetooth-jarjar-rules",
 
     srcs: [
@@ -72,7 +72,7 @@ android_test {
 }
 
 cc_library_shared {
-    name: "libbluetooth_jni",
+    name: "libbluetooth_jni_test",
     srcs: ["jni/**/*.cpp"],
     header_libs: [
         "jni_headers",

@@ -1088,7 +1088,7 @@ public final class BluetoothAdapter {
      */
     @RequiresNoPermission
     public BluetoothDevice getRemoteDevice(String address) {
-        android.util.SeempLog.record(62);
+        //android.util.SeempLog.record(62);
         final BluetoothDevice res = new BluetoothDevice(address);
         res.setAttributionSource(mAttributionSource);
         return res;
@@ -1129,7 +1129,7 @@ public final class BluetoothAdapter {
      */
     @RequiresNoPermission
     public BluetoothDevice getRemoteDevice(byte[] address) {
-        android.util.SeempLog.record(62);
+        //android.util.SeempLog.record(62);
         if (address == null || address.length != 6) {
             throw new IllegalArgumentException("Bluetooth address must have 6 bytes");
         }
@@ -1446,7 +1446,7 @@ public final class BluetoothAdapter {
     @RequiresLegacyBluetoothPermission
     @RequiresNoPermission
     public @AdapterState int getState() {
-        android.util.SeempLog.record(63);
+        //android.util.SeempLog.record(63);
         int state = getStateInternal();
 
         // Consider all internal states as OFF
@@ -1544,7 +1544,7 @@ public final class BluetoothAdapter {
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean enable() {
-        android.util.SeempLog.record(56);
+        //android.util.SeempLog.record(56);
         if (isEnabled()) {
             if (DBG) {
                 Log.d(TAG, "enable(): BT already enabled!");
@@ -1597,7 +1597,7 @@ public final class BluetoothAdapter {
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean disable() {
-        android.util.SeempLog.record(57);
+        //android.util.SeempLog.record(57);
         return disable(true);
     }
 
@@ -1616,7 +1616,7 @@ public final class BluetoothAdapter {
             android.Manifest.permission.BLUETOOTH_PRIVILEGED,
     })
     public boolean disable(boolean persist) {
-        android.util.SeempLog.record(57);
+        //android.util.SeempLog.record(57);
         try {
             return mManagerService.disable(mAttributionSource, persist);
         } catch (RemoteException e) {
@@ -2110,7 +2110,7 @@ public final class BluetoothAdapter {
     @RequiresBluetoothLocationPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_SCAN)
     public boolean startDiscovery() {
-        android.util.SeempLog.record(58);
+        //android.util.SeempLog.record(58);
         if (getState() != STATE_ON) {
             return false;
         }
@@ -2982,7 +2982,7 @@ public final class BluetoothAdapter {
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public Set<BluetoothDevice> getBondedDevices() {
-        android.util.SeempLog.record(61);
+        //android.util.SeempLog.record(61);
         if (getState() != STATE_ON) {
             return toDeviceSet(Arrays.asList());
         }
@@ -3172,7 +3172,7 @@ public final class BluetoothAdapter {
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public @ConnectionState int getProfileConnectionState(int profile) {
-        android.util.SeempLog.record(64);
+        //android.util.SeempLog.record(64);
         if (getState() != STATE_ON) {
             return STATE_DISCONNECTED;
         }
@@ -3475,7 +3475,7 @@ public final class BluetoothAdapter {
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public BluetoothServerSocket listenUsingInsecureRfcommWithServiceRecord(String name, UUID uuid)
             throws IOException {
-        android.util.SeempLog.record(59);
+        //android.util.SeempLog.record(59);
         return createNewRfcommSocketAndRecord(name, uuid, false, false);
     }
 
@@ -3893,9 +3893,6 @@ public final class BluetoothAdapter {
         } else if (profile == BluetoothProfile.PBAP) {
             BluetoothPbap pbap = new BluetoothPbap(context, listener, this);
             return true;
-        } else if (profile == BluetoothProfile.DUN) {
-            BluetoothDun dun = new BluetoothDun(context, listener);
-            return true;
         } else if (profile == BluetoothProfile.HEALTH) {
             Log.e(TAG, "getProfileProxy(): BluetoothHealth is deprecated");
             return false;
@@ -3931,12 +3928,6 @@ public final class BluetoothAdapter {
                 return true;
             }
             return false;
-        } else if (profile == BluetoothProfile.GROUP_CLIENT) {
-            BluetoothDeviceGroup groupClient = new BluetoothDeviceGroup(context, listener);
-            return true;
-        } else if (profile == BluetoothProfile.VCP) {
-            BluetoothVcp vcp = new BluetoothVcp(context, listener);
-            return true;
         } else if (profile == BluetoothProfile.LE_AUDIO) {
             BluetoothLeAudio leAudio = new BluetoothLeAudio(context, listener, this);
             return true;

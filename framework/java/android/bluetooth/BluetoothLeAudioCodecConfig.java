@@ -16,6 +16,7 @@
 
 package android.bluetooth;
 
+import android.annotation.SuppressLint;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.os.Parcel;
@@ -49,11 +50,10 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
     public @interface SourceCodecType {};
 
     public static final int SOURCE_CODEC_TYPE_LC3 = 0;
-    /**
-     * AptX Adaptive LEA Codec.
-     * @hide
-     */
+
+    @SuppressLint("UnflaggedApi")
     public static final int SOURCE_CODEC_TYPE_APTX_ADAPTIVE_LE = 1;
+
     public static final int SOURCE_CODEC_TYPE_INVALID = 1000 * 1000;
     /**
      * AptX Adaptive R4 Codec.
