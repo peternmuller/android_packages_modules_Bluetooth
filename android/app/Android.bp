@@ -230,6 +230,9 @@ android_app {
         "framework-connectivity.stubs.module_lib",
         "framework-mediaprovider",
         "unsupportedappusage",
+
+        // Need to link the class at runtime
+        "framework-bluetooth",
         "framework-annotations-lib",
         "error_prone_annotations",
     ],
@@ -254,7 +257,6 @@ android_app {
         "modules-utils-backgroundthread",
         "modules-utils-bytesmatcher",
         "modules-utils-statemachine",
-        "modules-utils-synchronous-result-receiver",
         "sap-api-java-static",
         "net-utils-services-common",
         "networkstack-client",
