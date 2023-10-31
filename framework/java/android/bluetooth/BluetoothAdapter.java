@@ -4529,6 +4529,30 @@ public final class BluetoothAdapter {
         }
     }
 
+    /**
+     * Return a binder to BluetoothGatt service
+     *
+     * @hide
+     */
+    public @Nullable IBluetoothGatt getBluetoothGatt() {
+        IBluetoothGatt defaultValue = null;
+        mServiceLock.readLock().lock();
+        try {
+            if (mService != null) {
+                final SynchronousResultReceiver<IBinder> recv = SynchronousResultReceiver.get();
+                mService.getBluetoothGatt(recv);
+                return IBluetoothGatt.Stub.asInterface(
+                        recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null));
+            }
+
+        } catch (RemoteException | TimeoutException e) {
+            Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
+        } finally {
+            mServiceLock.readLock().unlock();
+        }
+        return defaultValue;
+    }
+
     /*package*/ void removeServiceStateCallback(IBluetoothManagerCallback cb) {
         requireNonNull(cb);
         synchronized (sServiceLock) {

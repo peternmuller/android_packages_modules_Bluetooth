@@ -68,7 +68,6 @@ import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothActivityEnergyInfoListener;
 import android.bluetooth.IBluetoothCallback;
 import android.bluetooth.IBluetoothConnectionCallback;
-import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothMetadataListener;
 import android.bluetooth.IBluetoothOobDataCallback;
 import android.bluetooth.IBluetoothPreferredAudioProfilesCallback;
@@ -393,9 +392,9 @@ public class AdapterService extends Service {
     private CsipSetCoordinatorService mCsipSetCoordinatorService;
     private LeAudioService mLeAudioService;
     private BassClientService mBassClientService;
-	private IBluetoothGatt mBluetoothGatt;
     private BatteryService mBatteryService;
     private BluetoothQualityReportNativeInterface mBluetoothQualityReportNativeInterface;
+    private GattService mGattService;
 
     private volatile boolean mTestModeEnabled = false;
 
@@ -953,13 +952,19 @@ public class AdapterService extends Service {
                     TAG,
                     "GATT is configured off but the stack assumes it to be enabled. Start anyway.");
         }
-        setProfileServiceState(GattService.class, BluetoothAdapter.STATE_ON);
+        startGattProfileService(); 
     }
 
     void bringDownBle() {
         stopGattProfileService();
     }
 
+    private void startGattProfileService() {
+        mStartedProfiles.add(GattService.class.getSimpleName());
+
+        mGattService = new GattService(this);
+        ((ProfileService) mGattService).doStart();
+    }
     void stateChangeCallback(int status) {
         if (status == AbstractionLayer.BT_STATE_OFF) {
             debugLog("stateChangeCallback: disableNative() completed");
@@ -1008,14 +1013,18 @@ public class AdapterService extends Service {
             setAllProfileServiceStates(supportedProfileServices, BluetoothAdapter.STATE_OFF);
         }
     }
-
     private void stopGattProfileService() {
         mAdapterProperties.onBleDisable();
         if (mRunningProfiles.size() == 0) {
             debugLog("stopGattProfileService() - No profiles services to stop.");
             mAdapterStateMachine.sendMessage(AdapterState.BLE_STOPPED);
         }
-        setProfileServiceState(GattService.class, BluetoothAdapter.STATE_OFF);
+
+        mStartedProfiles.remove(GattService.class.getSimpleName());
+        if (mGattService != null) {
+            ((ProfileService) mGattService).doStop();
+            mGattService = null;
+        }
     }
 
     private void invalidateBluetoothGetStateCache() {
@@ -5248,20 +5257,20 @@ public class AdapterService extends Service {
 
         @Override
         public void getBluetoothGatt(SynchronousResultReceiver receiver) {
-          //  try {
-          //      receiver.send(getBluetoothGatt());
-          //  } catch (RuntimeException e) {
-         //       receiver.propagateException(e);
-         //   }
+            try {
+                receiver.send(getBluetoothGatt());
+            } catch (RuntimeException e) {
+                receiver.propagateException(e);
+            }
         }
 
-        //private IBinder getBluetoothGatt() {
-          //  AdapterService service = getService();
-           // if (service == null) {
-           //     return null;
-          //  }
-         //   return service.getBluetoothGatt();
-      //  }
+        private IBinder getBluetoothGatt() {
+            AdapterService service = getService();
+            if (service == null) {
+                return null;
+            }
+            return service.getBluetoothGatt();
+        }
 
         @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
         @Override
@@ -6917,8 +6926,11 @@ public class AdapterService extends Service {
         return BluetoothStatusCodes.FEATURE_NOT_SUPPORTED;
     }
 
-        IBluetoothGatt getBluetoothGatt() {
-        return mBluetoothGatt;
+    IBinder getBluetoothGatt() {
+        if (mGattService == null) {
+            return null;
+        }
+        return ((ProfileService) mGattService).getBinder();
     }
 
     void unregAllGattClient(AttributionSource source) {
