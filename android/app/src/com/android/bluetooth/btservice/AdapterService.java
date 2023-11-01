@@ -6922,13 +6922,9 @@ public class AdapterService extends Service {
     }
 
     void unregAllGattClient(AttributionSource source) {
-        //if (mBluetoothGatt != null) {
-        //    try {
-        //        mBluetoothGatt.unregAll(source);
-        //    } catch (RemoteException e) {
-        //        Log.e(TAG, "Unable to disconnect all apps.", e);
-        //    }
-        //}
+        if (mGattService != null) {
+            mGattService.unregAll(source);
+        }
     }
 
     /**
@@ -6975,11 +6971,11 @@ public class AdapterService extends Service {
      * BluetoothProfile}.
      */
     public void notifyProfileConnectionStateChangeToGatt(int profile, int fromState, int toState) {
-  //      if (mGattService == null) {
-  //          Log.w(TAG, "GATT Service is not running!");
-  //          return;
-  //      }
-  //      mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
+        if (mGattService == null) {
+            Log.w(TAG, "GATT Service is not running!");
+            return;
+        }
+        mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
     }
 
     /**

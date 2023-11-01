@@ -288,6 +288,7 @@ public abstract class ProfileService extends Service {
     // Suppressed since this is called from framework
     @SuppressLint("AndroidFrameworkRequiresPermission")
     public void onDestroy() {
+        Log.v(mName, "onDestroy");
         cleanup();
         if (mBinder != null) {
             mBinder.cleanup();

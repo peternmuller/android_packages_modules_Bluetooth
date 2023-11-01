@@ -1012,3 +1012,4 @@ public class AdapterServiceTest {
         mAdapterService.dump(fd, writer, new String[] {"random", "arguments"});
     }
 }
+
