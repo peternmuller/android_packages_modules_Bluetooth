@@ -21,6 +21,7 @@ filegroup {
     srcs: [
         ":statslog-bluetooth-java-gen",
         "src/**/*.java",
+        "src/com/**/*.kt",
     ],
     visibility: [
       ":__subpackages__",
@@ -83,6 +84,7 @@ java_library {
         "bluetooth-nano-protos",
         "bluetooth-proto-enums-java-gen",
         "modules-utils-shell-command-handler",
+        "jetbrains-annotations",
     ],
 
     apex_available: [
