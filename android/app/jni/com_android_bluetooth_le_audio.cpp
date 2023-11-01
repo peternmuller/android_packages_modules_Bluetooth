@@ -1479,7 +1479,7 @@ int register_com_android_bluetooth_le_audio(JNIEnv* env) {
                    javaMethods);
 
   const JNIJavaMethod javaLeAudioCodecMethods[] = {
-      {"<init>", "(IIIIIIIII)V",
+      {"<init>", "(IIIIIIIIIJJJJ)V",
        &android_bluetooth_BluetoothLeAudioCodecConfig.constructor},
       {"getCodecType", "()I",
        &android_bluetooth_BluetoothLeAudioCodecConfig.getCodecType},
