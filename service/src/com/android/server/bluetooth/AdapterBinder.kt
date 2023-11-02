@@ -128,4 +128,11 @@ class AdapterBinder(rawBinder: IBinder) {
             return false
         }
     }
+
+    @Throws(RemoteException::class, TimeoutException::class)
+    fun unregAllGattClient(source: AttributionSource) {
+        val recv: SynchronousResultReceiver<Any> = SynchronousResultReceiver.get()
+        adapterBinder.unregAllGattClient(source, recv)
+        recv.awaitResultNoInterrupt(SYNC_TIMEOUT).getValue(null)
+    }
 }

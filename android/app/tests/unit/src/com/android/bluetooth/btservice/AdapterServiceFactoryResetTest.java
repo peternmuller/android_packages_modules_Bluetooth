@@ -269,7 +269,7 @@ public class AdapterServiceFactoryResetTest {
         Log.e(TAG, "tearDown()");
 
         // Enable the stack to re-create the config. Next tests rely on it.
-        doEnable(0, false);
+        doEnable();
 
         // Restores the foregroundUserId to the ID prior to the test setup
         Utils.setForegroundUserId(mForegroundUserId);
