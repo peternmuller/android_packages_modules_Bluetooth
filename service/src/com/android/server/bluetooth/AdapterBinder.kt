@@ -128,4 +128,20 @@ class AdapterBinder(rawBinder: IBinder) {
             return false
         }
     }
+
+    fun updateQuietModeStatus(quietEnabled: Boolean, source: AttributionSource) {
+        try {
+            adapterBinder.updateQuietModeStatus(quietEnabled, source)
+            //TODO: b/290710129 - AdapterBinder.kt conversion causes build error
+        } catch (ex: Exception) {
+            when (ex) {
+                is RemoteException,
+                is TimeoutException -> {
+                    Log.e(TAG, "Error when calling updateQuietModeStatus", ex)
+                }
+                else -> throw ex
+            }
+        }
+    }
 }
+
