@@ -184,8 +184,6 @@ class BluetoothManagerService {
     private static final int FLAGS_SYSTEM_APP =
             ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
-    static final long RESTRICT_ENABLE_DISABLE = 218493289L;
-
     // APM enhancement feature is enabled by default
     // Set this value to 0 to disable the feature
     private static final int DEFAULT_APM_ENHANCEMENT_STATE = 1;
