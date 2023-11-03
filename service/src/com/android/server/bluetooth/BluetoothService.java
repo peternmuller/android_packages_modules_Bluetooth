@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
+import android.os.HandlerThread;
 import android.os.UserManager;
 
 import com.android.server.SystemService;
@@ -28,11 +29,16 @@ import com.android.server.SystemService.TargetUser;
 public class BluetoothService extends SystemService {
     private BluetoothManagerService mBluetoothManagerService;
     private boolean mInitialized = false;
+    private HandlerThread mHandlerThread;
 
     public BluetoothService(Context context) {
         super(context);
-        mBluetoothManagerService = new BluetoothManagerService(context);
+
+        mHandlerThread = new HandlerThread("BluetoothManagerService");
+        mHandlerThread.start();
+        mBluetoothManagerService = new BluetoothManagerService(context, mHandlerThread.getLooper());
     }
+
 
     private void initialize() {
         if (!mInitialized) {
@@ -49,7 +55,7 @@ public class BluetoothService extends SystemService {
     public void onBootPhase(int phase) {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             publishBinderService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE,
-                    mBluetoothManagerService);
+                    mBluetoothManagerService.getBinder());
         }
     }
 

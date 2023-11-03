@@ -44,8 +44,6 @@ import android.bluetooth.IBluetoothManager;
 import android.bluetooth.IBluetoothManagerCallback;
 import android.bluetooth.IBluetoothProfileServiceConnection;
 import android.bluetooth.IBluetoothStateChangeCallback;
-import android.compat.annotation.ChangeId;
-import android.compat.annotation.EnabledSince;
 import android.content.AttributionSource;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -186,12 +184,6 @@ class BluetoothManagerService {
     private static final int FLAGS_SYSTEM_APP =
             ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
-    /**
-     * Starting with {@link android.os.Build.VERSION_CODES#TIRAMISU}, applications are
-     * not allowed to enable/disable Bluetooth.
-     */
-    @ChangeId
-    @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.TIRAMISU)
     static final long RESTRICT_ENABLE_DISABLE = 218493289L;
 
     // APM enhancement feature is enabled by default
@@ -2690,7 +2682,7 @@ class BluetoothManagerService {
                                 mEnable = false;
                                 mAdapter.stopBle(mContext.getAttributionSource());
                             }
-                        } else if (mBinding || mAdapter != null) {
+                        } else if (isBinding() || mAdapter != null) {
                             Message userMsg = Message.obtain(msg);
                             userMsg.arg1++;
                             // if user is switched when service is binding retry after a delay

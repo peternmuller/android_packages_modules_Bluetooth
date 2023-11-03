@@ -69,7 +69,6 @@ java_library {
     ],
 
     libs: [
-        "app-compat-annotations",
         "framework-annotations-lib",
         "framework-bluetooth-pre-jarjar",
         "framework-configinfrastructure",
@@ -84,7 +83,6 @@ java_library {
         "bluetooth-nano-protos",
         "bluetooth-proto-enums-java-gen",
         "modules-utils-shell-command-handler",
-        "jetbrains-annotations",
     ],
 
     apex_available: [
