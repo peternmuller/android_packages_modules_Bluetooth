@@ -35,6 +35,7 @@ import android.provider.Settings;
 import android.test.mock.MockContentResolver;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.util.test.FakeSettingsProvider;
@@ -61,6 +62,13 @@ public class BluetoothAirplaneModeListenerTest {
     @Mock private PackageManager mPackageManager;
     @Mock private Resources mResources;
     private MockContentResolver mContentResolver;
+
+    static {
+        // Required for reading DeviceConfig during BluetoothManagerService static init
+        InstrumentationRegistry.getInstrumentation()
+                .getUiAutomation()
+                .adoptShellPermissionIdentity(android.Manifest.permission.READ_DEVICE_CONFIG);
+    }
 
     @Before
     public void setUp() throws Exception {

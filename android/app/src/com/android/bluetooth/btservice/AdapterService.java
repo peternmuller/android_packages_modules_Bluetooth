@@ -67,6 +67,7 @@ import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothActivityEnergyInfoListener;
 import android.bluetooth.IBluetoothCallback;
 import android.bluetooth.IBluetoothConnectionCallback;
+import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothMetadataListener;
 import android.bluetooth.IBluetoothOobDataCallback;
 import android.bluetooth.IBluetoothPreferredAudioProfilesCallback;
@@ -439,6 +440,8 @@ public class AdapterService extends Service {
     private static final int MESSAGE_PROFILE_SERVICE_REGISTERED = 2;
     private static final int MESSAGE_PROFILE_SERVICE_UNREGISTERED = 3;
     private static final int MESSAGE_PREFERRED_AUDIO_PROFILES_AUDIO_FRAMEWORK_TIMEOUT = 4;
+    private static final int MESSAGE_ON_PROFILE_SERVICE_BIND = 5;
+    private static final int MESSAGE_ON_PROFILE_SERVICE_UNBIND = 6;
 
     class AdapterServiceHandler extends Handler {
         AdapterServiceHandler(Looper looper) {
@@ -950,12 +953,6 @@ public class AdapterService extends Service {
         stopGattProfileService();
     }
 
-    private void startGattProfileService() {
-        mStartedProfiles.add(GattService.class.getSimpleName());
-
-        mGattService = new GattService(this);
-        ((ProfileService) mGattService).doStart();
-    }
     void stateChangeCallback(int status) {
         if (status == AbstractionLayer.BT_STATE_OFF) {
             debugLog("stateChangeCallback: disableNative() completed");
@@ -1004,6 +1001,14 @@ public class AdapterService extends Service {
             setAllProfileServiceStates(supportedProfileServices, BluetoothAdapter.STATE_OFF);
         }
     }
+
+    private void startGattProfileService() {
+        mStartedProfiles.add(GattService.class.getSimpleName());
+
+        mGattService = new GattService(this);
+        ((ProfileService) mGattService).doStart();
+    }
+
     private void stopGattProfileService() {
         mAdapterProperties.onBleDisable();
         if (mRunningProfiles.size() == 0) {

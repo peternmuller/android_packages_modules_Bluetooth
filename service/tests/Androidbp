@@ -40,6 +40,7 @@ android_test {
 
     srcs: [
         "src/**/*.java",
+        "src/**/*.kt",
     ],
 
     static_libs: [
@@ -47,6 +48,7 @@ android_test {
         "frameworks-base-testutils",
         "libprotobuf-java-nano",
         "mockito-target-extended-minus-junit4",
+        "kotlinx_coroutines_test",
         "platform-compat-test-rules",
         "platform-test-annotations",
         "truth",

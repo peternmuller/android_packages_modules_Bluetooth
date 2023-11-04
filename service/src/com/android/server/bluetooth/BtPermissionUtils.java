@@ -23,7 +23,7 @@ import static android.os.Process.SYSTEM_UID;
 import static android.permission.PermissionManager.PERMISSION_GRANTED;
 import static android.permission.PermissionManager.PERMISSION_HARD_DENIED;
 
-import static com.android.server.bluetooth.BluetoothManagerService.RESTRICT_ENABLE_DISABLE;
+import static com.android.server.bluetooth.ChangeIds.RESTRICT_ENABLE_DISABLE;
 
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
