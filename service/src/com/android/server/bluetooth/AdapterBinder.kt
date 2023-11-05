@@ -112,6 +112,13 @@ class AdapterBinder(rawBinder: IBinder) {
         adapterBinder.setForegroundUserId(userId, source)
     }
 
+    @Throws(RemoteException::class, TimeoutException::class)
+    fun unregAllGattClient(source: AttributionSource) {
+        val recv: SynchronousResultReceiver<Any> = SynchronousResultReceiver.get()
+        adapterBinder.unregAllGattClient(source, recv)
+        recv.awaitResultNoInterrupt(SYNC_TIMEOUT).getValue(null)
+    }
+
     fun isMediaProfileConnected(source: AttributionSource): Boolean {
         try {
             val recv: SynchronousResultReceiver<Boolean> = SynchronousResultReceiver.get()
@@ -128,4 +135,20 @@ class AdapterBinder(rawBinder: IBinder) {
             return false
         }
     }
+
+    fun updateQuietModeStatus(quietEnabled: Boolean, source: AttributionSource) {
+        try {
+            adapterBinder.updateQuietModeStatus(quietEnabled, source)
+            //TODO: b/290710129 - AdapterBinder.kt conversion causes build error
+        } catch (ex: Exception) {
+            when (ex) {
+                is RemoteException,
+                is TimeoutException -> {
+                    Log.e(TAG, "Error when calling updateQuietModeStatus", ex)
+                }
+                else -> throw ex
+            }
+        }
+    }
 }
+
