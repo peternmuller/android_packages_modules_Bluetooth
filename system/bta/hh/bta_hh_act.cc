@@ -28,18 +28,17 @@
 #include <cstdint>
 #include <string>
 
-#include "bt_target.h"  // Must be first to define build configuration
 #include "bta/hh/bta_hh_int.h"
 #include "bta/include/bta_hh_api.h"
 #include "bta/include/bta_hh_co.h"
 #include "bta/sys/bta_sys.h"
 #include "btif/include/btif_storage.h"
-#include "main/shim/dumpsys.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/bt_uuid16.h"
 #include "stack/include/hiddefs.h"
 #include "stack/include/hidh_api.h"
 #include "stack/include/sdp_api.h"
@@ -205,7 +204,7 @@ static void bta_hh_sdp_cback(uint16_t result, uint16_t attr_mask,
     /* security is required for the connection, add attr_mask bit*/
     attr_mask |= HID_SEC_REQUIRED;
 
-    APPL_TRACE_EVENT("%s: p_cb: %d result 0x%02x, attr_mask 0x%02x, handle %x",
+    APPL_TRACE_EVENT("%s: p_cb: %p result 0x%02x, attr_mask 0x%02x, handle %x",
                      __func__, p_cb, result, attr_mask, p_cb->hid_handle);
 
     /* check to see type of device is supported , and should not been added
@@ -267,7 +266,7 @@ static void bta_hh_di_sdp_cback(UNUSED_ATTR const RawAddress& bd_addr,
   tBTA_HH_STATUS status = BTA_HH_ERR_SDP;
   tSDP_DI_GET_RECORD di_rec;
   tHID_STATUS ret;
-  APPL_TRACE_EVENT("%s: p_cb: %d result 0x%02x", __func__, p_cb, result);
+  APPL_TRACE_EVENT("%s: p_cb: %p result 0x%02x", __func__, p_cb, result);
 
   /* if DI record does not exist on remote device, vendor_id in
    * tBTA_HH_DEV_DSCP_INFO will be set to 0xffff and we will allow the

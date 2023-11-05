@@ -29,15 +29,14 @@
 #include <cstring>
 #include <set>
 
-#include "bt_target.h"
 #include "gd/hal/snoop_logger.h"
-#include "main/shim/shim.h"
+#include "main/shim/entry.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/btm/btm_sec.h"
 #include "stack/include/bt_hdr.h"
-#include "stack/include/sdpdefs.h"
+#include "stack/include/bt_uuid16.h"
 #include "stack/l2cap/l2c_int.h"
 #include "stack/rfcomm/port_int.h"
 #include "stack/rfcomm/rfc_int.h"
@@ -418,7 +417,7 @@ void rfc_port_sm_orig_wait_sec_check(tPORT* p_port, tRFC_PORT_EVENT event,
       if (*((uint8_t*)p_data) != BTM_SUCCESS) {
         RFCOMM_TRACE_ERROR(
             "%s, RFC_PORT_EVENT_SEC_COMPLETE, index=%d, result=%d", __func__,
-            event, p_port->handle, *((uint8_t*)p_data));
+            p_port->handle, *((uint8_t*)p_data));
         p_port->rfc.p_mcb->is_disc_initiator = true;
         PORT_DlcEstablishCnf(p_port->rfc.p_mcb, p_port->dlci, 0,
                              RFCOMM_SECURITY_ERR);
@@ -571,7 +570,7 @@ void rfc_port_sm_disc_wait_ua(tPORT* p_port, tRFC_PORT_EVENT event,
 
     case RFC_PORT_EVENT_CLEAR:
       RFCOMM_TRACE_WARNING("%s, RFC_PORT_EVENT_CLEAR, index=%d", __func__,
-                           event, p_port->handle);
+                           p_port->handle);
       rfc_port_closed(p_port);
       return;
 

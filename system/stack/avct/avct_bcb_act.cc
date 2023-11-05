@@ -34,7 +34,7 @@
 #include "avct_api.h"
 #include "avct_int.h"
 #include "bt_target.h"
-#include "bta/include/bta_api.h"
+#include "bta/include/bta_sec_api.h"
 #include "btm_api.h"
 #include "osi/include/allocator.h"
 #include "osi/include/log.h"
@@ -539,10 +539,12 @@ void avct_bcb_msg_ind(tAVCT_BCB* p_bcb, tAVCT_LCB_EVT* p_data) {
 
   /* parse header byte */
   AVCT_PARSE_HDR(p, label, type, cr_ipid);
+  /* parse PID */
+  BE_STREAM_TO_UINT16(pid, p);
 
   /* check for invalid cr_ipid */
   if (cr_ipid == AVCT_CR_IPID_INVALID) {
-    AVCT_TRACE_WARNING("Invalid cr_ipid", cr_ipid);
+    AVCT_TRACE_WARNING("Invalid cr_ipid %d", cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     return;
   }
@@ -556,8 +558,7 @@ void avct_bcb_msg_ind(tAVCT_BCB* p_bcb, tAVCT_LCB_EVT* p_data) {
   } else
 #endif
   {
-    /* parse and lookup PID */
-    BE_STREAM_TO_UINT16(pid, p);
+    /* lookup PID */
     p_ccb = avct_lcb_has_pid(p_lcb, pid);
     if (p_ccb) {
       /* PID found; send msg up, adjust bt hdr and call msg callback */

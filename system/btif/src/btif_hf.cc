@@ -49,8 +49,8 @@
 #include "include/hardware/bluetooth_headset_interface.h"
 #include "include/hardware/bt_hf.h"
 #include "main/shim/dumpsys.h"
-#include "osi/include/log.h"
 #include "stack/btm/btm_sco_hfp_hal.h"
+#include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_api.h"
 #include "types/raw_address.h"
 
@@ -166,8 +166,8 @@ static uint32_t get_hf_features() {
           DEFAULT_BTIF_HF_FEATURES);
   return hf_features;
 #elif TARGET_FLOSS
-  return BTA_AG_FEAT_ECS | BTA_AG_FEAT_CODEC | BTA_AG_FEAT_UNAT |
-         BTA_AG_FEAT_HF_IND;
+  return BTA_AG_FEAT_3WAY | BTA_AG_FEAT_ECS | BTA_AG_FEAT_CODEC |
+         BTA_AG_FEAT_UNAT | BTA_AG_FEAT_HF_IND;
 #else
   return DEFAULT_BTIF_HF_FEATURES;
 #endif
@@ -876,9 +876,10 @@ bt_status_t HeadsetInterface::Init(Callbacks* callbacks, int max_hf_clients,
          " maximum is "
       << BTA_AG_MAX_NUM_CLIENTS << " was given " << max_hf_clients;
   btif_max_hf_clients = max_hf_clients;
-  BTIF_TRACE_DEBUG(
-      "%s: btif_hf_features=%zu, max_hf_clients=%d, inband_ringing_enabled=%d",
-      __func__, btif_hf_features, btif_max_hf_clients, inband_ringing_enabled);
+  BTIF_TRACE_DEBUG("%s: btif_hf_features=%" PRIu32
+                   ", max_hf_clients=%d, inband_ringing_enabled=%d",
+                   __func__, btif_hf_features, btif_max_hf_clients,
+                   inband_ringing_enabled);
   bt_hf_callbacks = callbacks;
   for (btif_hf_cb_t& hf_cb : btif_hf_cb) {
     reset_control_block(&hf_cb);

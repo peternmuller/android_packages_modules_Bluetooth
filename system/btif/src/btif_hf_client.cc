@@ -46,6 +46,7 @@
 #define LOG_TAG "bt_btif_hfc"
 #endif
 
+#include <base/logging.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bt_hf_client.h>
 #include <string.h>
@@ -56,9 +57,8 @@
 #include "btif_util.h"
 #include "osi/include/osi.h"
 #include "osi/include/properties.h"
+#include "stack/include/bt_uuid16.h"
 #include "types/raw_address.h"
-
-#include <base/logging.h>
 
 /*******************************************************************************
  *  Constants & Macros
@@ -845,7 +845,7 @@ static void btif_hf_client_upstreams_evt(uint16_t event, char* p_param) {
     cb = btif_hf_client_allocate_cb();
     if (cb == NULL) {
       BTIF_TRACE_ERROR("%s: event BTA_HF_CLIENT_OPEN_EVT failed to allocate cb",
-                       __func__, event);
+                       __func__);
       return;
     }
     cb->handle = p_data->open.handle;

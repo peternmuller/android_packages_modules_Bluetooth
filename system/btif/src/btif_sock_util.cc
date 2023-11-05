@@ -38,13 +38,14 @@
 
 #include "bt_target.h"
 #include "btif_util.h"
+#include "osi/include/log.h"
 #include "osi/include/osi.h"
 
 #define asrt(s)                                                              \
   do {                                                                       \
     if (!(s))                                                                \
       BTIF_TRACE_ERROR("## %s assert %s failed at line:%d ##", __func__, #s, \
-                       __LINE__)                                             \
+                       __LINE__);                                            \
   } while (0)
 
 int sock_send_all(int sock_fd, const uint8_t* buf, int len) {
@@ -54,7 +55,8 @@ int sock_send_all(int sock_fd, const uint8_t* buf, int len) {
     ssize_t ret;
     OSI_NO_INTR(ret = send(sock_fd, buf, s, 0));
     if (ret <= 0) {
-      BTIF_TRACE_ERROR("sock fd:%d send errno:%d, ret:%d", sock_fd, errno, ret);
+      BTIF_TRACE_ERROR("sock fd:%d send errno:%d, ret:%zd", sock_fd, errno,
+                       ret);
       return -1;
     }
     buf += ret;
@@ -69,7 +71,8 @@ int sock_recv_all(int sock_fd, uint8_t* buf, int len) {
     ssize_t ret;
     OSI_NO_INTR(ret = recv(sock_fd, buf, r, MSG_WAITALL));
     if (ret <= 0) {
-      BTIF_TRACE_ERROR("sock fd:%d recv errno:%d, ret:%d", sock_fd, errno, ret);
+      BTIF_TRACE_ERROR("sock fd:%d recv errno:%d, ret:%zd", sock_fd, errno,
+                       ret);
       return -1;
     }
     buf += ret;

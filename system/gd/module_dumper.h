@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,21 @@
 
 #pragma once
 
-#include <cstdint>
+#include <string>
 
-uint8_t BTM_AllocateSCN(void);
-bool BTM_FreeSCN(uint8_t scn);
-bool BTM_TryAllocateSCN(uint8_t scn);
+namespace bluetooth {
+
+class ModuleRegistry;
+
+class ModuleDumper {
+ public:
+  ModuleDumper(const ModuleRegistry& module_registry, const char* title)
+      : module_registry_(module_registry), title_(title) {}
+  void DumpState(std::string* output) const;
+
+ private:
+  const ModuleRegistry& module_registry_;
+  const std::string title_;
+};
+
+}  // namespace bluetooth

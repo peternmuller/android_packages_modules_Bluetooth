@@ -51,45 +51,37 @@
 #include <optional>
 
 #include "advertise_data_parser.h"
+#include "bta/dm/bta_dm_disc.h"
 #include "bta/include/bta_api.h"
-#include "bta_csis_api.h"
 #include "bta_dm_int.h"
-#include "bta_gatt_api.h"
-#include "bta_le_audio_api.h"
-#include "bta_vc_api.h"
 #include "btif/include/stack_manager.h"
 #include "btif_api.h"
-#include "btif_av.h"
 #include "btif_bqr.h"
 #include "btif_config.h"
 #include "btif_dm.h"
-#include "btif_gatt.h"
-#include "btif_hd.h"
-#include "btif_hf.h"
-#include "btif_hh.h"
 #include "btif_metrics_logging.h"
 #include "btif_profile_storage.h"
-#include "btif_sdp.h"
 #include "btif_storage.h"
 #include "btif_util.h"
-#include "common/lru.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
-#include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
 #include "gd/common/lru_cache.h"
 #include "internal_include/stack_config.h"
 #include "main/shim/dumpsys.h"
 #include "main/shim/le_advertising_manager.h"
-#include "main/shim/shim.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "stack/btm/btm_dev.h"
+#include "stack/include/btm_sec_api.h"
+#include "stack/include/btm_sec_api_types.h"
+#include "stack/include/btm_ble_sec_api.h"
+#include "stack/include/btm_ble_sec_api_types.h"
 #include "stack/btm/btm_sec.h"
 #include "stack/include/bt_octets.h"
+#include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/sdp/sdpint.h"
 #include "stack_config.h"
@@ -2167,15 +2159,14 @@ void BTIF_dm_disable() {
 
 /*******************************************************************************
  *
- * Function         btif_dm_upstreams_cback
+ * Function         btif_dm_sec_evt
  *
- * Description      Executes UPSTREAMS events in btif context
+ * Description      Executes security related events
  *
  * Returns          void
  *
  ******************************************************************************/
-static void btif_dm_upstreams_evt(uint16_t event, char* p_param) {
-  tBTA_DM_SEC* p_data = (tBTA_DM_SEC*)p_param;
+void btif_dm_sec_evt(tBTA_DM_SEC_EVT event, tBTA_DM_SEC* p_data) {
   RawAddress bd_addr;
 
   BTIF_TRACE_EVENT("%s: ev: %s", __func__, dump_dm_event(event));
@@ -2207,75 +2198,14 @@ static void btif_dm_upstreams_evt(uint16_t event, char* p_param) {
       break;
 
     case BTA_DM_DEV_UNPAIRED_EVT:
-      bd_addr = p_data->link_down.bd_addr;
-      btm_set_bond_type_dev(p_data->link_down.bd_addr,
+      bd_addr = p_data->dev_unpair.bd_addr;
+      btm_set_bond_type_dev(p_data->dev_unpair.bd_addr,
                             tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN);
 
       GetInterfaceToProfiles()->removeDeviceFromProfiles(bd_addr);
       btif_storage_remove_bonded_device(&bd_addr);
       bond_state_changed(BT_STATUS_SUCCESS, bd_addr, BT_BOND_STATE_NONE);
       break;
-
-    case BTA_DM_LINK_UP_EVT:
-      bd_addr = p_data->link_up.bd_addr;
-      BTIF_TRACE_DEBUG("BTA_DM_LINK_UP_EVT. Sending BT_ACL_STATE_CONNECTED");
-
-      btif_update_remote_version_property(&bd_addr);
-
-      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
-          BT_STATUS_SUCCESS, bd_addr, BT_ACL_STATE_CONNECTED,
-          (int)p_data->link_up.transport_link_type, HCI_SUCCESS,
-          btm_is_acl_locally_initiated()
-              ? bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING
-              : bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING,
-          p_data->link_up.acl_handle);
-      break;
-
-    case BTA_DM_LINK_UP_FAILED_EVT:
-      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
-          BT_STATUS_FAIL, p_data->link_up_failed.bd_addr,
-          BT_ACL_STATE_DISCONNECTED, p_data->link_up_failed.transport_link_type,
-          p_data->link_up_failed.status,
-          btm_is_acl_locally_initiated()
-              ? bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING
-              : bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING,
-          INVALID_ACL_HANDLE);
-      break;
-
-    case BTA_DM_LINK_DOWN_EVT: {
-      bd_addr = p_data->link_down.bd_addr;
-      btm_set_bond_type_dev(p_data->link_down.bd_addr,
-                            tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN);
-      GetInterfaceToProfiles()->onLinkDown(bd_addr);
-
-      bt_conn_direction_t direction;
-      switch (btm_get_acl_disc_reason_code()) {
-        case HCI_ERR_PEER_USER:
-        case HCI_ERR_REMOTE_LOW_RESOURCE:
-        case HCI_ERR_REMOTE_POWER_OFF:
-          direction = bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING;
-          break;
-        case HCI_ERR_CONN_CAUSE_LOCAL_HOST:
-        case HCI_ERR_HOST_REJECT_SECURITY:
-          direction = bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING;
-          break;
-        default:
-          direction = bt_conn_direction_t::BT_CONN_DIRECTION_UNKNOWN;
-      }
-
-      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
-          BT_STATUS_SUCCESS, bd_addr, BT_ACL_STATE_DISCONNECTED,
-          (int)p_data->link_down.transport_link_type,
-          static_cast<bt_hci_error_code_t>(btm_get_acl_disc_reason_code()),
-          direction, INVALID_ACL_HANDLE);
-      LOG_DEBUG(
-          "Sent BT_ACL_STATE_DISCONNECTED upward as ACL link down event "
-          "device:%s reason:%s",
-          ADDRESS_TO_LOGGABLE_CSTR(bd_addr),
-          hci_reason_code_text(
-              static_cast<tHCI_REASON>(btm_get_acl_disc_reason_code()))
-              .c_str());
-    } break;
 
     case BTA_DM_BLE_KEY_EVT:
       BTIF_TRACE_DEBUG("BTA_DM_BLE_KEY_EVT key_type=0x%02x ",
@@ -2401,10 +2331,6 @@ static void btif_dm_upstreams_evt(uint16_t event, char* p_param) {
       btif_dm_ble_auth_cmpl_evt(&p_data->auth_cmpl);
       break;
 
-    case BTA_DM_LE_FEATURES_READ:
-      btif_get_adapter_property(BT_PROPERTY_LOCAL_LE_FEATURES);
-      break;
-
     case BTA_DM_LE_ADDR_ASSOC_EVT:
       GetInterfaceToProfiles()->events->invoke_le_address_associate_cb(
           p_data->proc_id_addr.pairing_bda, p_data->proc_id_addr.id_addr);
@@ -2423,16 +2349,86 @@ static void btif_dm_upstreams_evt(uint16_t event, char* p_param) {
 
 /*******************************************************************************
  *
- * Function         bte_dm_evt
+ * Function         bte_dm_acl_evt
  *
- * Description      Switches context from BTE to BTIF for all DM events
+ * Description      BTIF handler for ACL up/down, identity address report events
  *
  * Returns          void
  *
  ******************************************************************************/
+void btif_dm_acl_evt(tBTA_DM_ACL_EVT event, tBTA_DM_ACL* p_data) {
+  RawAddress bd_addr;
 
-void bte_dm_evt(tBTA_DM_SEC_EVT event, tBTA_DM_SEC* p_data) {
-  btif_dm_upstreams_evt(event, (char*)p_data);
+  switch (event) {
+    case BTA_DM_LINK_UP_EVT:
+      bd_addr = p_data->link_up.bd_addr;
+      BTIF_TRACE_DEBUG("BTA_DM_LINK_UP_EVT. Sending BT_ACL_STATE_CONNECTED");
+
+      btif_update_remote_version_property(&bd_addr);
+
+      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
+          BT_STATUS_SUCCESS, bd_addr, BT_ACL_STATE_CONNECTED,
+          (int)p_data->link_up.transport_link_type, HCI_SUCCESS,
+          btm_is_acl_locally_initiated()
+              ? bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING
+              : bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING,
+          p_data->link_up.acl_handle);
+      break;
+
+    case BTA_DM_LINK_UP_FAILED_EVT:
+      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
+          BT_STATUS_FAIL, p_data->link_up_failed.bd_addr,
+          BT_ACL_STATE_DISCONNECTED, p_data->link_up_failed.transport_link_type,
+          p_data->link_up_failed.status,
+          btm_is_acl_locally_initiated()
+              ? bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING
+              : bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING,
+          INVALID_ACL_HANDLE);
+      break;
+
+    case BTA_DM_LINK_DOWN_EVT: {
+      bd_addr = p_data->link_down.bd_addr;
+      btm_set_bond_type_dev(p_data->link_down.bd_addr,
+                            tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN);
+      GetInterfaceToProfiles()->onLinkDown(bd_addr);
+
+      bt_conn_direction_t direction;
+      switch (btm_get_acl_disc_reason_code()) {
+        case HCI_ERR_PEER_USER:
+        case HCI_ERR_REMOTE_LOW_RESOURCE:
+        case HCI_ERR_REMOTE_POWER_OFF:
+          direction = bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING;
+          break;
+        case HCI_ERR_CONN_CAUSE_LOCAL_HOST:
+        case HCI_ERR_HOST_REJECT_SECURITY:
+          direction = bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING;
+          break;
+        default:
+          direction = bt_conn_direction_t::BT_CONN_DIRECTION_UNKNOWN;
+      }
+      GetInterfaceToProfiles()->events->invoke_acl_state_changed_cb(
+          BT_STATUS_SUCCESS, bd_addr, BT_ACL_STATE_DISCONNECTED,
+          (int)p_data->link_down.transport_link_type,
+          static_cast<bt_hci_error_code_t>(btm_get_acl_disc_reason_code()),
+          direction, INVALID_ACL_HANDLE);
+      LOG_DEBUG(
+          "Sent BT_ACL_STATE_DISCONNECTED upward as ACL link down event "
+          "device:%s reason:%s",
+          ADDRESS_TO_LOGGABLE_CSTR(bd_addr),
+          hci_reason_code_text(
+              static_cast<tHCI_REASON>(btm_get_acl_disc_reason_code()))
+              .c_str());
+    } break;
+    case BTA_DM_LE_FEATURES_READ:
+      btif_get_adapter_property(BT_PROPERTY_LOCAL_LE_FEATURES);
+      break;
+
+
+  default: {
+      LOG_ERROR("Unexpected tBTA_DM_ACL_EVT: %d", event);
+    } break;
+
+  }
 }
 
 /*******************************************************************************
@@ -2451,8 +2447,8 @@ static void bta_energy_info_cb(tBTM_BLE_TX_TIME_MS tx_time,
                                tBTM_CONTRL_STATE ctrl_state,
                                tBTA_STATUS status) {
   BTIF_TRACE_DEBUG(
-      "energy_info_cb-Status:%d,state=%d,tx_t=%ld, rx_t=%ld, "
-      "idle_time=%ld,used=%ld",
+      "energy_info_cb-Status:%d,state=%d,tx_t=%u, rx_t=%u, "
+      "idle_time=%u,used=%u",
       status, ctrl_state, tx_time, rx_time, idle_time, energy_used);
 
   bt_activity_energy_info energy_info;
@@ -2551,7 +2547,7 @@ void btif_dm_create_bond(const RawAddress bd_addr, int transport) {
  ******************************************************************************/
 void btif_dm_create_bond_le(const RawAddress bd_addr,
                             tBLE_ADDR_TYPE addr_type) {
-  BTIF_TRACE_EVENT("%s: bd_addr=%s, addr_type=%d, transport=%d", __func__,
+  BTIF_TRACE_EVENT("%s: bd_addr=%s, addr_type=%d", __func__,
                    ADDRESS_TO_LOGGABLE_CSTR(bd_addr), addr_type);
   const tBLE_BD_ADDR ble_bd_addr{
       .type = addr_type,
