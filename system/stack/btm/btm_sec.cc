@@ -51,6 +51,7 @@
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_psm_types.h"
 #include "stack/include/btm_status.h"
+#include "stack/include/btm_sec_api.h"
 #include "stack/include/l2cap_security_interface.h"
 #include "stack/include/main_thread.h"
 #include "stack/include/stack_metrics_logging.h"
@@ -2317,6 +2318,10 @@ void btm_sec_abort_access_req(const RawAddress& bd_addr) {
 static tBTM_STATUS btm_sec_dd_create_conn(tBTM_SEC_DEV_REC* p_dev_rec) {
   tBTM_STATUS status = l2cu_ConnectAclForSecurity(p_dev_rec->bd_addr);
   if (status == BTM_CMD_STARTED) {
+    /* If already connected, start pending security procedure */
+    if (BTM_IsAclConnectionUp(p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR)) {
+      return BTM_SUCCESS;
+    }
     btm_sec_change_pairing_state(BTM_PAIR_STATE_WAIT_PIN_REQ);
     return BTM_CMD_STARTED;
   } else if (status == BTM_NO_RESOURCES) {
@@ -2515,6 +2520,7 @@ void btm_sec_rmt_name_request_complete(const RawAddress* p_bd_addr,
                       BTM_SEC_IS_SM4(p_dev_rec->sm4),
                       BTM_SEC_IS_SM4_UNKNOWN(p_dev_rec->sm4));
 
+      bool await_connection = true;
       /* BT 2.1 or carkit, bring up the connection to force the peer to request
        *PIN.
        ** Else prefetch (btm_sec_check_prefetch_pin will do the prefetching if
@@ -2531,15 +2537,24 @@ void btm_sec_rmt_name_request_complete(const RawAddress* p_bd_addr,
               __func__);
         }
         /* Both we and the peer are 2.1 - continue to create connection */
-        else if (btm_sec_dd_create_conn(p_dev_rec) != BTM_CMD_STARTED) {
-          BTM_TRACE_WARNING("%s: failed to start connection", __func__);
+        else {
+          tBTM_STATUS req_status = btm_sec_dd_create_conn(p_dev_rec);
+          if (req_status == BTM_SUCCESS) {
+            await_connection = false;
+          } else if (req_status != BTM_CMD_STARTED) {
+            BTM_TRACE_WARNING("%s: failed to start connection", __func__);
 
-          btm_sec_change_pairing_state(BTM_PAIR_STATE_IDLE);
+            btm_sec_change_pairing_state(BTM_PAIR_STATE_IDLE);
 
-          NotifyBondingChange(*p_dev_rec, HCI_ERR_MEMORY_FULL);
+            NotifyBondingChange(*p_dev_rec, HCI_ERR_MEMORY_FULL);
+          }
         }
       }
-      return;
+
+      if (await_connection) {
+        LOG_DEBUG("Wait for connection to begin pairing");
+        return;
+      }
     } else {
       BTM_TRACE_WARNING("%s: wrong BDA, retry with pairing BDA", __func__);
       if (BTM_ReadRemoteDeviceName(btm_cb.pairing_bda, NULL,
@@ -2653,8 +2668,10 @@ void btm_io_capabilities_req(const RawAddress& p) {
 
   if ((btm_cb.security_mode == BTM_SEC_MODE_SC) &&
       (!p_dev_rec->remote_feature_received)) {
-    BTM_TRACE_EVENT("%s: Device security mode is SC only.",
-                    "To continue need to know remote features.", __func__);
+    BTM_TRACE_EVENT(
+        "%s: Device security mode is SC only."
+        "To continue need to know remote features.",
+        __func__);
 
     // ACL calls back to btm_sec_set_peer_sec_caps after it gets data
     p_dev_rec->remote_features_needed = true;
@@ -4155,7 +4172,7 @@ void btm_sec_link_key_notification(const RawAddress& p_bda,
 
     BTM_TRACE_EVENT("rmt_io_caps:%d, sec_flags:x%x, dev_class[1]:x%02x",
                     p_dev_rec->rmt_io_caps, p_dev_rec->sec_flags,
-                    p_dev_rec->dev_class[1])
+                    p_dev_rec->dev_class[1]);
     return;
   }
 
@@ -4205,7 +4222,7 @@ void btm_sec_link_key_request(const uint8_t* p_event) {
       (btm_cb.p_collided_dev_rec->bd_addr == bda)) {
     BTM_TRACE_EVENT(
         "btm_sec_link_key_request() rejecting link key req "
-        "State: %d START_TIMEOUT : %d",
+        "State: %d START_TIMEOUT : %" PRIu64,
         btm_cb.pairing_state, btm_cb.collision_start_time);
     btsnd_hcic_link_key_neg_reply(bda);
     return;
@@ -4430,8 +4447,8 @@ void btm_sec_pin_code_request(const uint8_t* p_event) {
                 BTM_COD_MAJOR_PERIPHERAL) &&
                (p_dev_rec->dev_class[2] & BTM_COD_MINOR_KEYBOARD))) {
     BTM_TRACE_WARNING(
-        "btm_sec_pin_code_request(): Pairing disabled:%d; PIN callback:%x, Dev "
-        "Rec:%x!",
+        "btm_sec_pin_code_request(): Pairing disabled:%d; PIN callback:%p, Dev "
+        "Rec:%p!",
         p_cb->pairing_disabled, p_cb->api.p_pin_callback, p_dev_rec);
 
     btsnd_hcic_pin_code_neg_reply(p_bda);
@@ -4632,8 +4649,9 @@ tBTM_STATUS btm_sec_execute_procedure(tBTM_SEC_DEV_REC* p_dev_rec) {
   if ((p_dev_rec->security_required & BTM_SEC_MODE4_LEVEL4) &&
       (p_dev_rec->link_key_type != BTM_LKEY_TYPE_AUTH_COMB_P_256)) {
     BTM_TRACE_EVENT(
-        "%s: Security Manager: SC only service, but link key type is 0x%02x -",
-        "security failure", __func__, p_dev_rec->link_key_type);
+        "%s: Security Manager: SC only service, but link key type is 0x%02x -"
+        "security failure",
+        __func__, p_dev_rec->link_key_type);
     return (BTM_FAILED_ON_SECURITY);
   }
 

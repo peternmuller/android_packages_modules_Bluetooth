@@ -33,6 +33,7 @@
 
 #include <cstdint>
 
+#include "bta_sec_api.h"
 #include "bta_hh_co.h"
 #include "btif/include/btif_common.h"
 #include "btif/include/btif_profile_storage.h"
@@ -1762,7 +1763,7 @@ static bt_status_t send_data(RawAddress* bd_addr, char* data) {
 
     /* Build a SendData data buffer */
     hex_bytes_filled = ascii_2_hex(data, len, hexbuf);
-    BTIF_TRACE_ERROR("Hex bytes filled, hex value: %d, %d", hex_bytes_filled,
+    BTIF_TRACE_ERROR("Hex bytes filled, hex value: %d, %zu", hex_bytes_filled,
                      len);
 
     if (hex_bytes_filled) {

@@ -34,6 +34,7 @@ import static com.android.bluetooth.Utils.getBytesFromAddress;
 import static com.android.bluetooth.Utils.hasBluetoothPrivilegedPermission;
 import static com.android.bluetooth.Utils.isDualModeAudioEnabled;
 import static com.android.bluetooth.Utils.isPackageNameAccurate;
+
 import static java.util.Objects.requireNonNull;
 
 import android.annotation.NonNull;
@@ -96,7 +97,6 @@ import android.os.PowerManager;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.DeviceConfig;
@@ -123,6 +123,7 @@ import com.android.bluetooth.btservice.bluetoothkeystore.BluetoothKeystoreServic
 import com.android.bluetooth.btservice.storage.DatabaseManager;
 import com.android.bluetooth.btservice.storage.MetadataDatabase;
 import com.android.bluetooth.csip.CsipSetCoordinatorService;
+import com.android.bluetooth.flags.FeatureFlagsImpl;
 import com.android.bluetooth.gatt.GattService;
 import com.android.bluetooth.gatt.ScanManager;
 import com.android.bluetooth.hap.HapClientService;
@@ -208,7 +209,6 @@ public class AdapterService extends Service {
     private final ArrayList<ProfileService> mRegisteredProfiles = new ArrayList<>();
     private final ArrayList<ProfileService> mRunningProfiles = new ArrayList<>();
     private HashSet<String> mLeAudioAllowDevices = new HashSet<>();
-    private boolean mLeAudioAllowListEnabled = false;
 
     public static final String ACTION_LOAD_ADAPTER_PROPERTIES =
             "com.android.bluetooth.btservice.action.LOAD_ADAPTER_PROPERTIES";
@@ -236,8 +236,7 @@ public class AdapterService extends Service {
     static final String LOCAL_MAC_ADDRESS_PERM = android.Manifest.permission.LOCAL_MAC_ADDRESS;
     static final String RECEIVE_MAP_PERM = android.Manifest.permission.RECEIVE_BLUETOOTH_MAP;
     static final String BLUETOOTH_LE_AUDIO_ALLOW_LIST = "persist.bluetooth.leaudio.allow_list";
-    static final String BLUETOOTH_ENABLE_LE_AUDIO_ALLOW_LIST =
-            "persist.bluetooth.leaudio.enable_allow_list";
+
 
     static final String PHONEBOOK_ACCESS_PERMISSION_PREFERENCE_FILE = "phonebook_access_permission";
     static final String MESSAGE_ACCESS_PERMISSION_PREFERENCE_FILE = "message_access_permission";
@@ -675,9 +674,10 @@ public class AdapterService extends Service {
         mBluetoothQualityReportNativeInterface.init();
 
         mSdpManager = SdpManager.init(this);
-        loadLeAudioAllowDevices();
 
-        mDatabaseManager = new DatabaseManager(this);
+        FeatureFlagsImpl featureFlags = new FeatureFlagsImpl();
+
+        mDatabaseManager = new DatabaseManager(this, featureFlags);
         mDatabaseManager.start(MetadataDatabase.createDatabase(this));
 
         boolean isAutomotiveDevice =
@@ -693,7 +693,7 @@ public class AdapterService extends Service {
          */
         if (!isAutomotiveDevice && getResources().getBoolean(R.bool.enable_phone_policy)) {
             Log.i(TAG, "Phone policy enabled");
-            mPhonePolicy = new PhonePolicy(this, new ServiceFactory());
+            mPhonePolicy = new PhonePolicy(this, new ServiceFactory(), featureFlags);
             mPhonePolicy.start();
         } else {
             Log.i(TAG, "Phone policy disabled");
@@ -1556,8 +1556,7 @@ public class AdapterService extends Service {
             return Utils.arrayContains(remoteDeviceUuids, BluetoothUuid.COORDINATED_SET);
         }
         if (profile == BluetoothProfile.LE_AUDIO) {
-            return Utils.arrayContains(remoteDeviceUuids, BluetoothUuid.LE_AUDIO)
-                    && isLeAudioAllowed(device);
+            return Utils.arrayContains(remoteDeviceUuids, BluetoothUuid.LE_AUDIO);
         }
         if (profile == BluetoothProfile.HAP_CLIENT) {
             return Utils.arrayContains(remoteDeviceUuids, BluetoothUuid.HAS);
@@ -6986,11 +6985,11 @@ public class AdapterService extends Service {
      * BluetoothProfile}.
      */
     public void notifyProfileConnectionStateChangeToGatt(int profile, int fromState, int toState) {
-  //      if (mGattService == null) {
-  //          Log.w(TAG, "GATT Service is not running!");
-  //          return;
-  //      }
-  //      mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
+        if (mGattService == null) {
+            Log.w(TAG, "GATT Service is not running!");
+            return;
+        }
+        mGattService.notifyProfileConnectionStateChange(profile, fromState, toState);
     }
 
     /**
@@ -7552,15 +7551,16 @@ public class AdapterService extends Service {
                                 ScanManager.SCAN_MODE_SCREEN_OFF_BALANCED_INTERVAL_MS);
                 mLeAudioAllowList = properties.getString(LE_AUDIO_ALLOW_LIST, "");
 
-                if (mLeAudioAllowList.isEmpty()) {
-                    List<String> leAudioAllowDevices = BluetoothProperties.le_audio_allow_list();
-                    if (leAudioAllowDevices != null && !leAudioAllowDevices.isEmpty()) {
-                        mLeAudioAllowDevices = new HashSet<String>(leAudioAllowDevices);
-                    }
-                } else {
-                    List<String> leAudioAllowDevices = Arrays.asList(mLeAudioAllowList.split(","));
-                    BluetoothProperties.le_audio_allow_list(leAudioAllowDevices);
-                    mLeAudioAllowDevices = new HashSet<String>(leAudioAllowDevices);
+                if (!mLeAudioAllowList.isEmpty()) {
+                    List<String> leAudioAllowlistFromDeviceConfig =
+                            Arrays.asList(mLeAudioAllowList.split(","));
+                    BluetoothProperties.le_audio_allow_list(leAudioAllowlistFromDeviceConfig);
+                }
+
+                List<String> leAudioAllowlistProp = BluetoothProperties.le_audio_allow_list();
+                if (leAudioAllowlistProp != null && !leAudioAllowlistProp.isEmpty()) {
+                    mLeAudioAllowDevices.clear();
+                    mLeAudioAllowDevices.addAll(leAudioAllowlistProp);
                 }
             }
         }
@@ -7784,54 +7784,20 @@ public class AdapterService extends Service {
         mNativeInterface.interopDatabaseAddRemoveName(false, feature.name(), name);
     }
 
-    private void loadLeAudioAllowDevices() {
-        Log.i(TAG, "loadLeAudioAllowDevices");
-        mLeAudioAllowListEnabled =
-                SystemProperties.getBoolean(BLUETOOTH_ENABLE_LE_AUDIO_ALLOW_LIST, false);
-
-        if (!mLeAudioAllowListEnabled) {
-            Log.i(TAG, "LE Audio allow list is disabled.");
-            return;
-        }
-
-        synchronized (mDeviceConfigLock) {
-            mLeAudioAllowDevices = new HashSet<String>(Arrays.asList(mLeAudioAllowList.split(",")));
-        }
-        return;
-    }
-
     /**
      * Checks the remote device is in the LE Audio allow list or not.
      *
      * @param device the device to check
-     * @return boolean true if le audio allow list is not enabled or the device is in the allow
-     *     list, false otherwise.
+     * @return boolean true if the device is in the allow list, false otherwise.
      */
     public boolean isLeAudioAllowed(BluetoothDevice device) {
-        if (!mLeAudioAllowListEnabled) {
-            return true;
-        }
-
         DeviceProperties deviceProp = mRemoteDevices.getDeviceProperties(device);
 
         if (deviceProp == null
                 || deviceProp.getModelName() == null
                 || !mLeAudioAllowDevices.contains(deviceProp.getModelName())) {
 
-            if (mLeAudioService != null) {
-                mLeAudioService.setConnectionPolicy(
-                        device, BluetoothProfile.CONNECTION_POLICY_FORBIDDEN);
-            }
-
-            Log.e(
-                    TAG,
-                    String.format("Device %s not in the LE Audio allow list, ", device)
-                            + "force LE Audio policy to forbidden");
             return false;
-        }
-
-        if (mLeAudioService != null) {
-            mLeAudioService.setConnectionPolicy(device, BluetoothProfile.CONNECTION_POLICY_ALLOWED);
         }
 
         return true;
@@ -7856,7 +7822,7 @@ public class AdapterService extends Service {
         Log.i(TAG, "sendUuidsInternal: Received service discovery UUIDs for device " + device);
         if (DBG) {
             for (int i = 0; i < uuids.length; i++) {
-                Log.d(TAG, "index=" + i + "uuid=" + uuids[i]);
+                Log.d(TAG, "sendUuidsInternal: index=" + i + " uuid=" + uuids[i]);
             }
         }
         if (mPhonePolicy != null) {

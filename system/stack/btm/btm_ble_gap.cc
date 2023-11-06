@@ -42,9 +42,6 @@
 #include "common/time_util.h"
 #include "device/include/controller.h"
 #include "main/shim/acl_api.h"
-#include "main/shim/btm_api.h"
-#include "main/shim/shim.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
@@ -53,11 +50,13 @@
 #include "stack/btm/btm_ble_int_types.h"
 #include "stack/btm/btm_dev.h"
 #include "stack/btm/btm_int_types.h"
+#include "stack/btm/btm_sec.h"
 #include "stack/gatt/gatt_int.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/advertise_data_parser.h"
 #include "stack/include/ble_scanner.h"
 #include "stack/include/bt_types.h"
+#include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_api_types.h"
 #include "stack/include/gap_api.h"
 #include "stack/include/hci_error_code.h"
@@ -2750,8 +2749,8 @@ void btm_ble_process_adv_pkt(uint8_t data_len, const uint8_t* data) {
     STREAM_TO_INT8(rssi, p);
 
     if (rssi >= 21 && rssi <= 126) {
-      BTM_TRACE_ERROR("%s: bad rssi value in advertising report: ", __func__,
-                      pkt_data_len, rssi);
+      BTM_TRACE_ERROR("%s: bad rssi value in advertising report: %d", __func__,
+                      rssi);
     }
 
     // Pass up the address to GattService#onScanResult to use in

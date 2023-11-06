@@ -30,6 +30,7 @@
 #include "avct_int.h"
 #include "bt_target.h"
 #include "bta/include/bta_api.h"
+#include "bta/include/bta_sec_api.h"
 #include "btm_api.h"
 #include "device/include/device_iot_config.h"
 #include "osi/include/allocator.h"
@@ -621,7 +622,7 @@ void avct_lcb_send_msg(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
       pkt_type = AVCT_PKT_TYPE_END;
     }
   }
-  AVCT_TRACE_DEBUG("%s tx_q_count:%d", __func__,
+  AVCT_TRACE_DEBUG("%s tx_q_count:%zu", __func__,
                    fixed_queue_length(p_lcb->tx_q));
   return;
 }
@@ -675,10 +676,12 @@ void avct_lcb_msg_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
 
   /* parse header byte */
   AVCT_PARSE_HDR(p, label, type, cr_ipid);
+  /* parse PID */
+  BE_STREAM_TO_UINT16(pid, p);
 
   /* check for invalid cr_ipid */
   if (cr_ipid == AVCT_CR_IPID_INVALID) {
-    AVCT_TRACE_WARNING("Invalid cr_ipid", cr_ipid);
+    AVCT_TRACE_WARNING("Invalid cr_ipid %d", cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     return;
   }
@@ -692,8 +695,7 @@ void avct_lcb_msg_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
   } else
 #endif
   {
-    /* parse and lookup PID */
-    BE_STREAM_TO_UINT16(pid, p);
+    /* lookup PID */
     p_ccb = avct_lcb_has_pid(p_lcb, pid);
     if (p_ccb) {
       /* PID found; send msg up, adjust bt hdr and call msg callback */

@@ -34,7 +34,6 @@
 
 #include <alloca.h>
 #include <base/logging.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -45,19 +44,13 @@
 #include "btif/include/stack_manager.h"
 #include "btif_api.h"
 #include "btif_config.h"
-#include "btif_hd.h"
-#include "btif_hh.h"
 #include "btif_storage.h"
 #include "btif_util.h"
 #include "core_callbacks.h"
 #include "device/include/controller.h"
-#include "gd/common/init_flags.h"
 #include "osi/include/allocator.h"
-#include "osi/include/compat.h"
-#include "osi/include/config.h"
-#include "osi/include/log.h"
-#include "osi/include/osi.h"
 #include "stack/include/bt_octets.h"
+#include "stack/include/bt_uuid16.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
 
@@ -880,8 +873,8 @@ bt_status_t btif_storage_add_bonded_device(RawAddress* remote_bd_addr,
       btif_config_set_int(bdstr, BTIF_STORAGE_KEY_LINK_KEY_TYPE, (int)key_type);
   ret &=
       btif_config_set_int(bdstr, BTIF_STORAGE_KEY_PIN_LENGTH, (int)pin_length);
-  ret &= btif_config_set_bin(bdstr, BTIF_STORAGE_KEY_LINK_KEY_TYPE,
-                             link_key.data(), link_key.size());
+  ret &= btif_config_set_bin(bdstr, BTIF_STORAGE_KEY_LINK_KEY, link_key.data(),
+                             link_key.size());
 
   if (ret) {
     btif_storage_set_mode(remote_bd_addr);
