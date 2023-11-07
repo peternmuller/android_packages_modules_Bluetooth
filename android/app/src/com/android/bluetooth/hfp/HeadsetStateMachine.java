@@ -1840,9 +1840,9 @@ public class HeadsetStateMachine extends StateMachine {
     }
 
     private void processAtCind(BluetoothDevice device) {
-        int call, callSetup;
+        int call, callSetup, service, signal;
         final HeadsetPhoneState phoneState = mSystemInterface.getHeadsetPhoneState();
-
+        logi("processAtCind");
         /* Handsfree carkits expect that +CIND is properly responded to
          Hence we ensure that a proper response is sent
          for the virtual call too.*/
@@ -1855,9 +1855,24 @@ public class HeadsetStateMachine extends StateMachine {
             callSetup = phoneState.getNumHeldCall();
         }
 
-        mNativeInterface.cindResponse(device, phoneState.getCindService(), call, callSetup,
-                phoneState.getCallState(), phoneState.getCindSignal(), phoneState.getCindRoam(),
-                phoneState.getCindBatteryCharge());
+         if(((!mHeadsetService.isVirtualCallStarted()) &&
+            (phoneState.getNumActiveCall() > 0) || (phoneState.getNumHeldCall() > 0) ||
+             phoneState.getCallState() == HeadsetHalConstants.CALL_STATE_ALERTING ||
+             phoneState.getCallState() == HeadsetHalConstants.CALL_STATE_DIALING ||
+             phoneState.getCallState() == HeadsetHalConstants.CALL_STATE_INCOMING) &&
+            (phoneState.getCindService() == HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE)) {
+             logi("processAtCind: If regular call is in process/active/held while RD connection " +
+                   "during BT-ON, update service availablity and signal strength");
+             service = HeadsetHalConstants.NETWORK_STATE_AVAILABLE;
+             signal = 3;
+         } else {
+             service = phoneState.getCindService();
+             signal = phoneState.getCindSignal();
+        }
+
+        mNativeInterface.cindResponse(device, service, call, callSetup,
+        phoneState.getCallState(), signal, phoneState.getCindRoam(),
+        phoneState.getCindBatteryCharge());
     }
 
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
