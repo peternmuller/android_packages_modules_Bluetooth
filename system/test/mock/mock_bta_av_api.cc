@@ -60,6 +60,7 @@ struct BTA_AvStart BTA_AvStart;
 struct BTA_AvStop BTA_AvStop;
 struct BTA_AvVendorCmd BTA_AvVendorCmd;
 struct BTA_AvVendorRsp BTA_AvVendorRsp;
+struct BTA_AvSetCodecMode BTA_AvSetCodecMode;
 
 }  // namespace bta_av_api
 }  // namespace mock
@@ -187,5 +188,11 @@ void BTA_AvVendorRsp(uint8_t rc_handle, uint8_t label, tBTA_AV_CODE rsp_code,
   test::mock::bta_av_api::BTA_AvVendorRsp(rc_handle, label, rsp_code, p_data,
                                           len, company_id);
 }
+
+void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode) {
+  inc_func_call_count(__func__);
+  test::mock::bta_av_api::BTA_AvSetCodecMode(handle, enc_mode);
+}
+
 // Mocked functions complete
 // END mockcify generation

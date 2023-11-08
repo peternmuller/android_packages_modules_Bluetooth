@@ -696,6 +696,17 @@ void BTA_AvSetLatency(tBTA_AV_HNDL handle, bool is_low_latency);
 
 /*******************************************************************************
  *
+ * Function         BTA_AvSetCodecMode
+ *
+ * Description      Set Codec Mode based on Metadata update.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode);
+
+/*******************************************************************************
+ *
  * Function         BTA_AvOffloadStart
  *
  * Description      Request Starting of A2DP Offload.

@@ -676,3 +676,27 @@ void BTA_AvSetPeerSep(const RawAddress& bdaddr, uint8_t sep) {
 
   bta_sys_sendmsg(p_buf);
 }
+
+/*******************************************************************************
+*
+* Function         BTA_AvSetCodecMode
+*
+* Description      Update the Codec Mode based on the Metadata being sent.
+*                  This function would process the metadata update to VSC.
+*
+* Returns          void
+*
+******************************************************************************/
+void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode) {
+  LOG_INFO(
+      "Set Codec Config Mode bta_handle:%hhu, enc_mode:%d",
+      handle, enc_mode);
+
+  tBTA_AV_SET_CODEC_MODE* p_buf =
+       (tBTA_AV_SET_CODEC_MODE*)osi_malloc(sizeof(tBTA_AV_SET_CODEC_MODE));
+
+  p_buf->hdr.event = BTA_AV_SET_CODEC_MODE_EVT;
+  p_buf->enc_mode = enc_mode;
+
+  bta_sys_sendmsg(p_buf);
+}

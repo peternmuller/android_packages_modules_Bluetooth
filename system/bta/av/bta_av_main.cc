@@ -1217,6 +1217,9 @@ static void bta_av_non_state_machine_event(uint16_t event,
     case BTA_AV_API_SET_LATENCY_EVT:
       bta_av_api_set_latency(p_data);
       break;
+    case BTA_AV_SET_CODEC_MODE_EVT:
+      bta_av_set_codec_mode(p_data);
+      break;
     case BTA_AV_CI_SRC_DATA_READY_EVT:
       bta_av_ci_data(p_data);
       break;
@@ -1510,6 +1513,10 @@ const char* bta_av_evt_code(uint16_t evt_code) {
       return "API_START";
     case BTA_AV_API_STOP_EVT:
       return "API_STOP";
+    case BTA_AV_API_SET_LATENCY_EVT:
+      return "API_SET_LATENCY";
+    case BTA_AV_SET_CODEC_MODE_EVT:
+      return "SET_CODEC_MODE";
     default:
       return "unknown";
   }
