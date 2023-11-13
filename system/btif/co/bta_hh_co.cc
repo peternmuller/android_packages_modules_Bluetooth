@@ -65,26 +65,25 @@ static void* btif_hh_poll_event_thread(void* arg);
 void uhid_set_non_blocking(int fd) {
   int opts = fcntl(fd, F_GETFL);
   if (opts < 0)
-    APPL_TRACE_ERROR("%s() Getting flags failed (%s)", __func__,
-                     strerror(errno));
+    LOG_ERROR("%s() Getting flags failed (%s)", __func__, strerror(errno));
 
   opts |= O_NONBLOCK;
 
   if (fcntl(fd, F_SETFL, opts) < 0)
-    APPL_TRACE_EVENT("%s() Setting non-blocking flag failed (%s)", __func__,
-                     strerror(errno));
+    LOG_VERBOSE("%s() Setting non-blocking flag failed (%s)", __func__,
+                strerror(errno));
 }
 
 static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
   uint8_t* startDescPtr = data;
   uint8_t* desc = data;
 
-  BTIF_TRACE_DEBUG("remove_digitizer_descriptor");
+  LOG_VERBOSE("remove_digitizer_descriptor");
   /* Parse until complete report descriptor is parsed */
   while (startDescPtr < data + *length) {
     uint8_t item = *startDescPtr++;
     if (startDescPtr > data + *length) {
-      APPL_TRACE_ERROR("%s: is having invalid startDescPtr: %p", __func__,
+      LOG_ERROR("%s: is having invalid startDescPtr: %p", __func__,
                        startDescPtr);
       return;
     }
@@ -119,17 +118,17 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
             traversePtr++;
           }
           remainingBytesToBeCopied = *length - (traversePtr - data);
-          BTIF_TRACE_DEBUG("starting point of digitizer desc = %d\n",
+          LOG_VERBOSE("starting point of digitizer desc = %d\n",
                            (startDescPtr - data) - 1);
-          BTIF_TRACE_DEBUG(
+          LOG_VERBOSE(
               "start collection = %d, end collection = "
               " %d\n",
               num_of_collections, num_of_end_collections);
-          BTIF_TRACE_DEBUG("end point of digitizer desc = %d\n",
+          LOG_VERBOSE("end point of digitizer desc = %d\n",
                            (traversePtr - data));
-          BTIF_TRACE_DEBUG("length of digitizer desc = %d\n",
+          LOG_VERBOSE("length of digitizer desc = %d\n",
                            traversePtr - startDescPtr + 2);
-          BTIF_TRACE_DEBUG("bytes remaining to be copied = %d\n",
+          LOG_VERBOSE("bytes remaining to be copied = %d\n",
                            remainingBytesToBeCopied);
           if (remainingBytesToBeCopied) {
             uint32_t i;
@@ -145,7 +144,7 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
           }
           /* update the length as digitizer descriptor is removed */
           *length = *length - (traversePtr - startDescPtr) - 1;
-          BTIF_TRACE_DEBUG("new length of report desc = %d\n", *length);
+          LOG_VERBOSE("new length of report desc = %d\n", *length);
           /* Update the start descriptor again to continue parsing
            * for digitizer records assuming more than 1 digitizer
            * record exists in report descriptor */
@@ -227,11 +226,11 @@ static int uhid_write(int fd, const struct uhid_event* ev) {
 
   if (ret < 0) {
     int rtn = -errno;
-    APPL_TRACE_ERROR("%s: Cannot write to uhid:%s", __func__, strerror(errno));
+    LOG_ERROR("%s: Cannot write to uhid:%s", __func__, strerror(errno));
     return rtn;
   } else if (ret != (ssize_t)sizeof(*ev)) {
-    APPL_TRACE_ERROR("%s: Wrong size written to uhid: %zd != %zu", __func__,
-                     ret, sizeof(*ev));
+    LOG_ERROR("%s: Wrong size written to uhid: %zd != %zu", __func__, ret,
+              sizeof(*ev));
     return -EFAULT;
   }
 
@@ -249,40 +248,39 @@ static int uhid_read_event(btif_hh_device_t* p_dev) {
   OSI_NO_INTR(ret = read(p_dev->fd, &ev, sizeof(ev)));
 
   if (ret == 0) {
-    APPL_TRACE_ERROR("%s: Read HUP on uhid-cdev %s", __func__, strerror(errno));
+    LOG_ERROR("%s: Read HUP on uhid-cdev %s", __func__, strerror(errno));
     return -EFAULT;
   } else if (ret < 0) {
-    APPL_TRACE_ERROR("%s: Cannot read uhid-cdev: %s", __func__,
-                     strerror(errno));
+    LOG_ERROR("%s: Cannot read uhid-cdev: %s", __func__, strerror(errno));
     return -errno;
   }
 
   switch (ev.type) {
     case UHID_START:
-      APPL_TRACE_DEBUG("UHID_START from uhid-dev\n");
+      LOG_VERBOSE("UHID_START from uhid-dev\n");
       p_dev->ready_for_data = true;
       break;
     case UHID_STOP:
-      APPL_TRACE_DEBUG("UHID_STOP from uhid-dev\n");
+      LOG_VERBOSE("UHID_STOP from uhid-dev\n");
       p_dev->ready_for_data = false;
       break;
     case UHID_OPEN:
-      APPL_TRACE_DEBUG("UHID_OPEN from uhid-dev\n");
+      LOG_VERBOSE("UHID_OPEN from uhid-dev\n");
       p_dev->ready_for_data = true;
       break;
     case UHID_CLOSE:
-      APPL_TRACE_DEBUG("UHID_CLOSE from uhid-dev\n");
+      LOG_VERBOSE("UHID_CLOSE from uhid-dev\n");
       p_dev->ready_for_data = false;
       break;
     case UHID_OUTPUT:
       if (ret < (ssize_t)(sizeof(ev.type) + sizeof(ev.u.output))) {
-        APPL_TRACE_ERROR("%s: Invalid size read from uhid-dev: %zd < %zu",
-                         __func__, ret, sizeof(ev.type) + sizeof(ev.u.output));
+        LOG_ERROR("%s: Invalid size read from uhid-dev: %zd < %zu", __func__,
+                  ret, sizeof(ev.type) + sizeof(ev.u.output));
         return -EFAULT;
       }
 
-      APPL_TRACE_DEBUG("UHID_OUTPUT: Report type = %d, report_size = %d",
-                       ev.u.output.rtype, ev.u.output.size);
+      LOG_VERBOSE("UHID_OUTPUT: Report type = %d, report_size = %d",
+                  ev.u.output.rtype, ev.u.output.size);
       // Send SET_REPORT with feature report if the report type in output event
       // is FEATURE
       if (ev.u.output.rtype == UHID_FEATURE_REPORT)
@@ -291,17 +289,16 @@ static int uhid_read_event(btif_hh_device_t* p_dev) {
       else if (ev.u.output.rtype == UHID_OUTPUT_REPORT)
         btif_hh_senddata(p_dev, ev.u.output.size, ev.u.output.data);
       else
-        APPL_TRACE_ERROR("%s: UHID_OUTPUT: Invalid report type = %d", __func__,
-                         ev.u.output.rtype);
+        LOG_ERROR("%s: UHID_OUTPUT: Invalid report type = %d", __func__,
+                  ev.u.output.rtype);
       break;
     case UHID_OUTPUT_EV:
       if (ret < (ssize_t)(sizeof(ev.type) + sizeof(ev.u.output_ev))) {
-        APPL_TRACE_ERROR("%s: Invalid size read from uhid-dev: %zd < %zu",
-                         __func__, ret,
-                         sizeof(ev.type) + sizeof(ev.u.output_ev));
+        LOG_ERROR("%s: Invalid size read from uhid-dev: %zd < %zu", __func__,
+                  ret, sizeof(ev.type) + sizeof(ev.u.output_ev));
         return -EFAULT;
       }
-      APPL_TRACE_DEBUG("UHID_OUTPUT_EV from uhid-dev\n");
+      LOG_VERBOSE("UHID_OUTPUT_EV from uhid-dev\n");
       break;
 
     case UHID_FEATURE:  // UHID_GET_REPORT
@@ -350,17 +347,17 @@ static int uhid_read_event(btif_hh_device_t* p_dev) {
  ******************************************************************************/
 static inline pthread_t create_thread(void* (*start_routine)(void*),
                                       void* arg) {
-  APPL_TRACE_DEBUG("create_thread: entered");
+  LOG_VERBOSE("create_thread: entered");
   pthread_attr_t thread_attr;
 
   pthread_attr_init(&thread_attr);
   pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   pthread_t thread_id = -1;
   if (pthread_create(&thread_id, &thread_attr, start_routine, arg) != 0) {
-    APPL_TRACE_ERROR("pthread_create : %s", strerror(errno));
+    LOG_ERROR("pthread_create : %s", strerror(errno));
     return -1;
   }
-  APPL_TRACE_DEBUG("create_thread: thread created successfully");
+  LOG_VERBOSE("create_thread: thread created successfully");
   return thread_id;
 }
 
@@ -447,7 +444,7 @@ static void* btif_hh_poll_event_thread(void* arg) {
       break;
     }
     if (pfds[0].revents & POLLIN) {
-      APPL_TRACE_DEBUG("%s: POLLIN", __func__);
+      LOG_VERBOSE("%s: POLLIN", __func__);
       ret = uhid_read_event(p_dev);
       if (ret != 0) {
         LOG_ERROR("Unhandled UHID event");
@@ -466,14 +463,14 @@ static void* btif_hh_poll_event_thread(void* arg) {
 }
 
 int bta_hh_co_write(int fd, uint8_t* rpt, uint16_t len) {
-  APPL_TRACE_VERBOSE("%s: UHID write %d", __func__, len);
+  LOG_VERBOSE("%s: UHID write %d", __func__, len);
 
   struct uhid_event ev;
   memset(&ev, 0, sizeof(ev));
   ev.type = UHID_INPUT;
   ev.u.input.size = len;
   if (len > sizeof(ev.u.input.data)) {
-    APPL_TRACE_WARNING("%s: Report size greater than allowed size", __func__);
+    LOG_WARN("%s: Report size greater than allowed size", __func__);
     return -1;
   }
   memcpy(ev.u.input.data, rpt, len);
@@ -618,15 +615,14 @@ void bta_hh_co_data(uint8_t dev_handle, uint8_t* p_rpt, uint16_t len,
                     uint8_t app_id) {
   btif_hh_device_t* p_dev;
 
-  APPL_TRACE_DEBUG(
+  LOG_VERBOSE(
       "%s: dev_handle = %d, subclass = 0x%02X, mode = %d, "
       "ctry_code = %d, app_id = %d",
       __func__, dev_handle, sub_class, mode, ctry_code, app_id);
 
   p_dev = btif_hh_find_connected_dev_by_handle(dev_handle);
   if (p_dev == NULL) {
-    APPL_TRACE_WARNING("%s: Error: unknown HID device handle %d", __func__,
-                       dev_handle);
+    LOG_WARN("%s: Error: unknown HID device handle %d", __func__, dev_handle);
     return;
   }
 
@@ -644,8 +640,8 @@ void bta_hh_co_data(uint8_t dev_handle, uint8_t* p_rpt, uint16_t len,
   if ((p_dev->fd >= 0) && p_dev->ready_for_data) {
     bta_hh_co_write(p_dev->fd, p_rpt, len);
   } else {
-    APPL_TRACE_WARNING("%s: Error: fd = %d, ready %d, len = %d", __func__,
-                       p_dev->fd, p_dev->ready_for_data, len);
+    LOG_WARN("%s: Error: fd = %d, ready %d, len = %d", __func__, p_dev->fd,
+             p_dev->ready_for_data, len);
   }
 }
 
@@ -670,14 +666,14 @@ void bta_hh_co_send_hid_info(btif_hh_device_t* p_dev, const char* dev_name,
   struct uhid_event ev;
 
   if (p_dev->fd < 0) {
-    APPL_TRACE_WARNING("%s: Error: fd = %d, dscp_len = %d", __func__, p_dev->fd,
-                       dscp_len);
+    LOG_WARN("%s: Error: fd = %d, dscp_len = %d", __func__, p_dev->fd,
+             dscp_len);
     return;
   }
 
-  APPL_TRACE_WARNING("%s: fd = %d, name = [%s], dscp_len = %d", __func__,
-                     p_dev->fd, dev_name, dscp_len);
-  APPL_TRACE_WARNING(
+  LOG_WARN("%s: fd = %d, name = [%s], dscp_len = %d", __func__, p_dev->fd,
+           dev_name, dscp_len);
+  LOG_WARN(
       "%s: vendor_id = 0x%04x, product_id = 0x%04x, version= 0x%04x,"
       "ctry_code=0x%02x",
       __func__, vendor_id, product_id, version, ctry_code);
@@ -691,7 +687,7 @@ void bta_hh_co_send_hid_info(btif_hh_device_t* p_dev, const char* dev_name,
       interop_match_name(INTEROP_CHANGE_HID_VID_PID, dev_name)) {
     vendor_id = 0x1000;
     product_id = 0x1000;
-    APPL_TRACE_WARNING(
+    LOG_WARN(
         "%s: vendor_id = 0x%04x, product_id = 0x%04x, name = [%s]", __func__,
         vendor_id, product_id, dev_name);
   }
@@ -719,13 +715,11 @@ void bta_hh_co_send_hid_info(btif_hh_device_t* p_dev, const char* dev_name,
   ev.u.create.country = ctry_code;
   result = uhid_write(p_dev->fd, &ev);
 
-  APPL_TRACE_WARNING(
-      "%s: wrote descriptor to fd = %d, dscp_len = %d, result = %d", __func__,
-      p_dev->fd, dscp_len, result);
+  LOG_WARN("%s: wrote descriptor to fd = %d, dscp_len = %d, result = %d",
+           __func__, p_dev->fd, dscp_len, result);
 
   if (result) {
-    APPL_TRACE_WARNING("%s: Error: failed to send DSCP, result = %d", __func__,
-                       result);
+    LOG_WARN("%s: Error: failed to send DSCP, result = %d", __func__, result);
 
     /* The HID report descriptor is corrupted. Close the driver. */
     close(p_dev->fd);
@@ -884,8 +878,8 @@ void bta_hh_le_co_rpt_info(const RawAddress& remote_bda,
     btif_config_set_bin(bdstr, "HidReport", (const uint8_t*)sReportCache,
                         idx * sizeof(tBTA_HH_RPT_CACHE_ENTRY));
     btif_config_set_int(bdstr, "HidReportVersion", BTA_HH_CACHE_REPORT_VERSION);
-    BTIF_TRACE_DEBUG("%s() - Saving report; dev=%s, idx=%d", __func__,
-                     ADDRESS_TO_LOGGABLE_CSTR(remote_bda), idx);
+    LOG_VERBOSE("%s() - Saving report; dev=%s, idx=%d", __func__,
+                ADDRESS_TO_LOGGABLE_CSTR(remote_bda), idx);
   }
 }
 
@@ -927,8 +921,8 @@ tBTA_HH_RPT_CACHE_ENTRY* bta_hh_le_co_cache_load(const RawAddress& remote_bda,
 
   *p_num_rpt = len / sizeof(tBTA_HH_RPT_CACHE_ENTRY);
 
-  BTIF_TRACE_DEBUG("%s() - Loaded %d reports; dev=%s", __func__, *p_num_rpt,
-                   ADDRESS_TO_LOGGABLE_CSTR(remote_bda));
+  LOG_VERBOSE("%s() - Loaded %d reports; dev=%s", __func__, *p_num_rpt,
+              ADDRESS_TO_LOGGABLE_CSTR(remote_bda));
 
   return sReportCache;
 }
@@ -951,6 +945,6 @@ void bta_hh_le_co_reset_rpt_cache(const RawAddress& remote_bda,
 
   btif_config_remove(bdstr, "HidReport");
   btif_config_remove(bdstr, "HidReportVersion");
-  BTIF_TRACE_DEBUG("%s() - Reset cache for bda %s", __func__,
-                   ADDRESS_TO_LOGGABLE_CSTR(remote_bda));
+  LOG_VERBOSE("%s() - Reset cache for bda %s", __func__,
+              ADDRESS_TO_LOGGABLE_CSTR(remote_bda));
 }

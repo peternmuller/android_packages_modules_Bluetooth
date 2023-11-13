@@ -76,7 +76,7 @@ bool SDP_InitDiscoveryDb(tSDP_DISCOVERY_DB* p_db, uint32_t len,
   /* verify the parameters */
   if (p_db == NULL || (sizeof(tSDP_DISCOVERY_DB) > len) ||
       num_attr > SDP_MAX_ATTR_FILTERS || num_uuid > SDP_MAX_UUID_FILTERS) {
-    SDP_TRACE_ERROR(
+    LOG_ERROR(
         "SDP_InitDiscoveryDb Illegal param: p_db 0x%x, len %d, num_uuid %d, "
         "num_attr %d",
         PTR_TO_UINT(p_db), len, num_uuid, num_attr);
@@ -394,14 +394,13 @@ tSDP_DISC_REC* SDP_FindServiceInDb(const tSDP_DISCOVERY_DB* p_db,
              p_sattr = p_sattr->p_next_attr) {
           if ((SDP_DISC_ATTR_TYPE(p_sattr->attr_len_type) == UUID_DESC_TYPE) &&
               (SDP_DISC_ATTR_LEN(p_sattr->attr_len_type) == 2)) {
-            SDP_TRACE_DEBUG(
+            LOG_VERBOSE(
                 "SDP_FindServiceInDb - p_sattr value = 0x%x serviceuuid = 0x%x",
                 p_sattr->attr_value.v.u16, service_uuid);
             if (service_uuid == UUID_SERVCLASS_HDP_PROFILE) {
               if ((p_sattr->attr_value.v.u16 == UUID_SERVCLASS_HDP_SOURCE) ||
                   (p_sattr->attr_value.v.u16 == UUID_SERVCLASS_HDP_SINK)) {
-                SDP_TRACE_DEBUG(
-                    "SDP_FindServiceInDb found HDP source or sink\n");
+                LOG_VERBOSE("SDP_FindServiceInDb found HDP source or sink\n");
                 return (p_rec);
               }
             }
@@ -598,7 +597,7 @@ static bool sdp_fill_proto_elem(const tSDP_DISC_ATTR* p_attr,
     /* Now, see if the entry contains the layer we are interested in */
     for (p_sattr = p_attr->attr_value.v.p_sub_attr; p_sattr;
          p_sattr = p_sattr->p_next_attr) {
-      /* SDP_TRACE_DEBUG ("SDP - p_sattr 0x%x, layer_uuid:0x%x, u16:0x%x####",
+      /* LOG_VERBOSE ("SDP - p_sattr 0x%x, layer_uuid:0x%x, u16:0x%x####",
           p_sattr, layer_uuid, p_sattr->attr_value.v.u16); */
 
       if ((SDP_DISC_ATTR_TYPE(p_sattr->attr_len_type) == UUID_DESC_TYPE) &&
@@ -1062,22 +1061,6 @@ uint16_t SDP_SetLocalDiRecord(const tSDP_DI_RECORD* p_device_info,
     sdp_cb.server_db.di_primary_handle = handle;
 
   return result;
-}
-
-/*******************************************************************************
- *
- * Function         SDP_SetTraceLevel
- *
- * Description      This function sets the trace level for SDP. If called with
- *                  a value of 0xFF, it simply reads the current trace level.
- *
- * Returns          the new (current) trace level
- *
- ******************************************************************************/
-uint8_t SDP_SetTraceLevel(uint8_t new_level) {
-  if (new_level != 0xFF) sdp_cb.trace_level = new_level;
-
-  return (sdp_cb.trace_level);
 }
 
 namespace {
