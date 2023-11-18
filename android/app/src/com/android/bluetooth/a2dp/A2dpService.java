@@ -53,6 +53,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.SystemProperties;
 import android.sysprop.BluetoothProperties;
 import android.util.Log;
 
@@ -123,6 +124,23 @@ public class A2dpService extends ProfileService {
     private int mMaxConnectedAudioDevices = 1;
     // A2DP Offload Enabled in platform
     boolean mA2dpOffloadEnabled = false;
+    private boolean mAlsDisabled;
+
+    // Head tracker available
+    private final long HEAD_TRACKER_AVAILABLE_MASK = 0x00300000;
+    private final long HEAD_TRACKER_AVAILABLE_OFF = 0x00100000;
+    private final long HEAD_TRACKER_AVAILABLE_ON = 0x00200000;
+
+    //Only Gaming Tx
+    private static final long GAMING_OFF = 0x00001000;
+    private static final long GAMING_ON = 0x00002000;
+    private static final long GAMING_MODE_MASK = 0x00007000;
+    private static final long APTX_ULL = 0x00005000;
+
+    private static final int APTX_HQ = 0x1000;
+    private static final int APTX_LL = 0x2000;
+    private static final long APTX_MODE_MASK = 0x7000;
+    private static final long APTX_SCAN_FILTER_MASK = 0x8000;
 
     private final AudioManagerAudioDeviceCallback mAudioManagerAudioDeviceCallback =
             new AudioManagerAudioDeviceCallback();
@@ -169,6 +187,9 @@ public class A2dpService extends ProfileService {
         mAudioManager = getSystemService(AudioManager.class);
         mCompanionDeviceManager = getSystemService(CompanionDeviceManager.class);
         requireNonNull(mAudioManager, "AudioManager cannot be null when A2dpService starts");
+
+        mAlsDisabled = SystemProperties.getBoolean
+                                        ("persist.vendor.service.bt.als_disabled", false);
 
         // Step 2: Get maximum number of connected audio devices
         mMaxConnectedAudioDevices = mAdapterService.getMaxConnectedAudioDevices();
@@ -790,6 +811,34 @@ public class A2dpService extends ProfileService {
             Log.e(TAG, "setCodecConfigPreference: Invalid device");
             return;
         }
+
+        long cs4 = codecConfig.getCodecSpecific4();
+        boolean isGamingEnabled = false;
+        boolean isLowLatencyModeEnabled = false;
+        long mGamingStatus = (cs4 & GAMING_MODE_MASK);
+        long mLowLatencyStatus = (cs4 & HEAD_TRACKER_AVAILABLE_MASK);
+
+        if (cs4 > 0 && codecConfig.getCodecType() ==
+                                BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE) {
+            if (mAlsDisabled) {
+                Log.e(TAG, "setCodecConfigPreference: ALS trigger is ignored");
+                return;
+            }
+
+            if(mGamingStatus == GAMING_ON) {
+                Log.i(TAG, " Gaming is enabled");
+                isGamingEnabled = true;
+            }
+
+            if(mLowLatencyStatus == HEAD_TRACKER_AVAILABLE_ON) {
+                Log.i(TAG, " Low Latency is enabled");
+                isLowLatencyModeEnabled = true;
+            }
+
+            setStreamMode(isGamingEnabled, isLowLatencyModeEnabled);
+
+        }
+
         if (codecConfig == null) {
             Log.e(TAG, "setCodecConfigPreference: Codec config can't be null");
             return;
@@ -1183,6 +1232,14 @@ public class A2dpService extends ProfileService {
 
     public void handleBondStateChanged(BluetoothDevice device, int fromState, int toState) {
         mHandler.post(() -> bondStateChanged(device, toState));
+    }
+
+    private void setStreamMode(Boolean isGamingEnabled, Boolean isLowLatencyEnabled) {
+        if (DBG) {
+            Log.d(TAG, "setStreamMode: isGamingEnabled: " + isGamingEnabled +
+                       "isLowLatencyEnabled: " + isLowLatencyEnabled);
+        }
+        mNativeInterface.setStreamMode(isGamingEnabled, isLowLatencyEnabled);
     }
 
     /**

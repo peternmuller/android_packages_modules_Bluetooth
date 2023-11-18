@@ -3768,6 +3768,15 @@ static bt_status_t codec_config_src(
   return status;
 }
 
+static void set_stream_mode(bool isGamingEnabled, bool isLowLatency) {
+  LOG(INFO) << __func__ << "isGamingEnabled: " << isGamingEnabled
+                        << "isLowLatency: " << isLowLatency;
+
+  if (isGamingEnabled || isLowLatency) {
+    btif_av_update_codec_mode(true);
+  }
+}
+
 static void cleanup_src(void) {
   LOG_VERBOSE("%s", __func__);
   do_in_main_thread(FROM_HERE,
@@ -3789,6 +3798,7 @@ static const btav_source_interface_t bt_av_src_interface = {
     src_set_silence_sink,
     src_set_active_sink,
     codec_config_src,
+    set_stream_mode,
     cleanup_src,
 };
 
