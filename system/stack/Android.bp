@@ -204,6 +204,7 @@ cc_library_static {
         "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/udrv/include",
+        "packages/modules/Bluetooth/system/btconfigstore",
     ],
     srcs: [
         ":LegacyStackSdp",
@@ -236,6 +237,7 @@ cc_library_static {
         "btm/btm_sec.cc",
         "btm/btm_sec_cb.cc",
         "btm/btm_security_client_interface.cc",
+        "btm/btm_vendor.cc",
         "btu/btu_event.cc",
         "btu/btu_hcif.cc",
         "eatt/eatt.cc",
@@ -296,6 +298,7 @@ cc_library_static {
         "libbluetooth_core_rs",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
+        "libbtconfigstore_qti",
         "libbluetooth_hci_pdl",
         "libbt-hci",
         "libbt-platform-protos-lite",
@@ -652,6 +655,7 @@ cc_test {
         "latest_android_hardware_bluetooth_audio_ndk_shared",
         "latest_android_media_audio_common_types_ndk_static",
         "mts_defaults",
+        "libbtconfigstore_qti_defaults",
     ],
     test_suites: ["general-tests"],
     local_include_dirs: [
@@ -1448,6 +1452,7 @@ cc_test {
     defaults: [
         "fluoride_defaults",
         "mts_defaults",
+        "libbtconfigstore_qti_defaults",
     ],
     local_include_dirs: [
         "btm",
@@ -1513,6 +1518,7 @@ cc_test {
         "btm/btm_sec.cc",
         "btm/btm_sec_cb.cc",
         "btm/btm_security_client_interface.cc",
+        "btm/btm_vendor.cc",
         "btm/hfp_lc3_decoder.cc",
         "btm/hfp_lc3_encoder.cc",
         "btm/hfp_msbc_decoder.cc",

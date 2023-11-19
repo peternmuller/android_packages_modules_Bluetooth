@@ -10,7 +10,10 @@ package {
 
 cc_defaults {
     name: "net_test_defaults",
-    defaults: ["fluoride_defaults"],
+    defaults: [
+        "fluoride_defaults",
+        "libbtconfigstore_qti_defaults",
+    ],
     include_dirs: [
         "frameworks/av/media/libaaudio/include",
         "packages/modules/Bluetooth/system",

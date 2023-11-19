@@ -27,6 +27,7 @@
 #include "stack/include/btm_api_types.h"
 #include "stack/include/btm_ble_api_types.h"
 #include "stack/include/btm_status.h"
+#include "stack/include/btm_vendor_types.h"
 #include "stack/include/security_client_callbacks.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -164,6 +165,14 @@ struct btm_client_interface_t {
     tBTM_INQ_INFO* (*BTM_InqDbNext)(tBTM_INQ_INFO* p_cur);
     tBTM_STATUS (*BTM_ClearInqDb)(const RawAddress* p_bda);
   } db;
+
+  struct {
+    void (*BTM_ReadVendorAddOnFeatures)();
+    bt_device_host_add_on_features_t* (*BTM_GetHostAddOnFeatures)(
+        uint8_t* host_add_on_features_len);
+    bt_device_soc_add_on_features_t* (*BTM_GetSocAddOnFeatures)(
+        uint8_t* soc_add_on_features_len);
+  } vendor;
 };
 
 struct btm_client_interface_t& get_btm_client_interface();
