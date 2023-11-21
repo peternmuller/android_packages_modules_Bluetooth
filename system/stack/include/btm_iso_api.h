@@ -52,6 +52,11 @@ struct BigCallbacks {
 
   virtual void OnBigEvent(uint8_t event, void* data) = 0;
 };
+
+struct VscCallback {
+  virtual ~VscCallback() = default;
+  virtual void OnVscEvent(uint16_t delay, uint8_t mode) = 0;
+};
 }  // namespace iso_manager
 
 class IsoManager {
@@ -75,6 +80,8 @@ class IsoManager {
    * @param callbacks CigCallbacks implementation
    */
   virtual void RegisterCigCallbacks(iso_manager::CigCallbacks* callbacks) const;
+
+  virtual void RegisterVscCallback(iso_manager::VscCallback* callback) const;
 
   /**
    * Set BIG related callbacks
@@ -229,6 +236,9 @@ class IsoManager {
    * @param length event packet buffer length
    */
   virtual void HandleHciEvent(uint8_t sub_code, uint8_t* params,
+                              uint16_t length);
+
+  virtual void HandleVscHciEvent(uint8_t sub_code, uint8_t* params,
                               uint16_t length);
 
   /**

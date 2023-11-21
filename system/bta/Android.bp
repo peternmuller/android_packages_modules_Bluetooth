@@ -894,6 +894,7 @@ cc_test {
         ":TestMockBtaLeAudioHalVerifier",
         ":TestMockMainShim",
         ":TestStubOsi",
+        ":TestMockStackHcic",
         "gatt/database.cc",
         "gatt/database_builder.cc",
         "le_audio/client.cc",

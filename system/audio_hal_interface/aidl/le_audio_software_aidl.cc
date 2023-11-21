@@ -750,11 +750,11 @@ AudioConfiguration offload_config_to_hal_audio_config(
     if (offload_config.codec_id.vendor_codec_id ==
         ::le_audio::types::kLeAudioCodingFormatAptxLeX) {
       for (int i = 0; i < 4; i++) {
-            vs_metadata.push_back((2 &
+            vs_metadata.push_back((offload_config.mode &
          (0xff <<((3 - i)*8))) >> ((3 - i)*8));
       }
       for (int i = 4; i < 6; i++) {
-            vs_metadata.push_back((25 &
+            vs_metadata.push_back((offload_config.delay &
          (0xff <<((5 - i)*8))) >> ((5 - i)*8));
       }
     }

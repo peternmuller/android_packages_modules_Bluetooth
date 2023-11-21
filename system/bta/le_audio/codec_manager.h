@@ -41,6 +41,8 @@ struct offload_config {
   uint16_t octets_per_frame;
   uint8_t blocks_per_sdu;
   uint16_t peer_delay_ms;
+  uint16_t delay;
+  uint8_t mode;
   std::vector<uint8_t> codec_metadata;
 };
 

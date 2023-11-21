@@ -1175,7 +1175,8 @@ struct stream_parameters {
   /* Total number of channels we request from the audio framework */
   uint8_t num_of_channels;
   int num_of_devices;
-
+  uint8_t mode;
+  uint16_t delay;
   std::vector<uint8_t> codec_spec_metadata;
 
   /* cis_handle, audio location*/

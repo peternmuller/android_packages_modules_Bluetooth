@@ -40,6 +40,12 @@ void IsoManager::RegisterCigCallbacks(
   pimpl_->RegisterCigCallbacks(callbacks);
 }
 
+void IsoManager::RegisterVscCallback(
+    iso_manager::VscCallback* callbacks) const {
+  if (!pimpl_) return;
+  pimpl_->RegisterVscCallbacks(callbacks);
+}
+
 void IsoManager::RegisterBigCallbacks(
     iso_manager::BigCallbacks* callbacks) const {
   if (!pimpl_) return;
@@ -132,6 +138,12 @@ void IsoManager::HandleHciEvent(uint8_t sub_code, uint8_t* params,
                                 uint16_t length) {
   if (!pimpl_) return;
   pimpl_->HandleHciEvent(sub_code, params, length);
+}
+
+void IsoManager::HandleVscHciEvent(uint8_t sub_code, uint8_t* params,
+                                uint16_t length) {
+  if (!pimpl_) return;
+  pimpl_->HandleVscHciEvent(sub_code, params, length);
 }
 
 void IsoManager::Start() {
