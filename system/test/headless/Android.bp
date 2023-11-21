@@ -117,6 +117,7 @@ cc_binary {
         "android.hardware.bluetooth@1.0",
         "android.hardware.bluetooth@1.1",
         "android.system.suspend-V1-ndk",
+        "vendor.qti.hardware.bluetooth.audio-V1-ndk",
         "libPlatformProperties",
         "libaaudio",
         "libbase",

@@ -22,10 +22,13 @@
 #include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 #include "codec_status_aidl.h"
 #include "hal_version_manager.h"
 #include "osi/include/log.h"
+#include <aidl/vendor/qti/hardware/bluetooth/audio/LeAudioVendorConfiguration.h>
+#include <aidl/vendor/qti/hardware/bluetooth/audio/VendorCodecType.h>
 
 namespace bluetooth {
 namespace audio {
@@ -46,6 +49,12 @@ using ::bluetooth::audio::le_audio::StartRequestState;
 using ::bluetooth::audio::le_audio::StreamCallbacks;
 using ::le_audio::set_configurations::SetConfiguration;
 using ::le_audio::types::LeAudioCoreCodecConfig;
+
+using VendorConfiguration =
+    ::aidl::android::hardware::bluetooth::audio::LeAudioCodecConfiguration::VendorConfiguration;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveLeConfiguration;
+using ::aidl::vendor::qti::hardware::bluetooth::audio::LeAudioVendorConfiguration;
+using VendorCodecType = ::aidl::vendor::qti::hardware::bluetooth::audio::VendorCodecType;
 
 static ChannelMode le_audio_channel_mode2audio_hal(uint8_t channels_count) {
   switch (channels_count) {
@@ -669,26 +678,101 @@ std::vector<AudioSetConfiguration> get_offload_capabilities() {
 
 AudioConfiguration offload_config_to_hal_audio_config(
     const ::le_audio::offload_config& offload_config) {
-  Lc3Configuration lc3_config{
-      .pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample),
-      .samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate),
-      .frameDurationUs = static_cast<int32_t>(offload_config.frame_duration),
-      .octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame),
-      .blocksPerSdu = static_cast<int8_t>(offload_config.blocks_per_sdu),
-  };
-  LeAudioConfiguration ucast_config = {
-      .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
-      .leAudioCodecConfig = LeAudioCodecConfiguration(lc3_config)};
+  if (offload_config.codec_id.coding_format == ::le_audio::types::kLeAudioCodingFormatLC3) {
+    if (offload_config.codec_metadata.empty()) {
+      LOG(INFO) << __func__ << " LC3";
+      Lc3Configuration lc3_config{
+          .pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample),
+          .samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate),
+          .frameDurationUs = static_cast<int32_t>(offload_config.frame_duration),
+          .octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame),
+          .blocksPerSdu = static_cast<int8_t>(offload_config.blocks_per_sdu),
+      };
+      LeAudioConfiguration ucast_config = {
+          .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+          .leAudioCodecConfig = LeAudioCodecConfiguration(lc3_config)};
 
-  for (auto& [handle, location, state] : offload_config.stream_map) {
-    ucast_config.streamMap.push_back({
+      for (auto& [handle, location, state] : offload_config.stream_map) {
+        ucast_config.streamMap.push_back({
+            .streamHandle = handle,
+            .audioChannelAllocation = static_cast<int32_t>(location),
+            .isStreamActive = state,
+        });
+      }
+      return AudioConfiguration(ucast_config);
+    } else {
+      LOG(INFO) << __func__ << " LC3Q";
+      VendorConfiguration vendor_config;
+      LeAudioVendorConfiguration lc3q_config;
+      lc3q_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);
+      lc3q_config.samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate);
+      lc3q_config.frameDurationUs = static_cast<int32_t>(offload_config.frame_duration);
+      lc3q_config.octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame);
+      lc3q_config.blocksPerSdu = 1;
+      std::vector<uint8_t> vs_metadata;
+      vs_metadata.assign(offload_config.codec_metadata.begin(),
+                         offload_config.codec_metadata.end());
+      lc3q_config.vendorCodecType = VendorCodecType::LC3Q;
+      lc3q_config.codecSpecificData = vs_metadata;
+      vendor_config.extension.setParcelable(lc3q_config);
+      LeAudioConfiguration ucast_config = {
+       .codecType = CodecType::VENDOR,
+       .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+       .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
+      for (auto& [handle, location, state] : offload_config.stream_map) {
+        ucast_config.streamMap.push_back({
+          .streamHandle = handle,
+          .audioChannelAllocation = static_cast<int32_t>(location),
+          .isStreamActive = state,
+        });
+      }
+      return AudioConfiguration(ucast_config);
+    }
+  } else {
+    LOG(INFO) << __func__ << " APTX";
+    VendorConfiguration vendor_config;
+    LeAudioVendorConfiguration  aptx_config;
+    aptx_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);
+    aptx_config.samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate);
+    aptx_config.frameDurationUs = static_cast<int32_t>(offload_config.frame_duration);
+    aptx_config.octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame);
+    aptx_config.blocksPerSdu = 1;
+    std::vector<uint8_t> vs_metadata;
+    vs_metadata.assign(offload_config.codec_metadata.begin(),
+                       offload_config.codec_metadata.end());
+    if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+      aptx_config.vendorCodecType = VendorCodecType::APTX_ADAPTIVE_R4;
+    } else if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLe) {
+      aptx_config.vendorCodecType = VendorCodecType::APTX_ADAPTIVE_R3;
+    }
+    if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+      for (int i = 0; i < 4; i++) {
+            vs_metadata.push_back((2 &
+         (0xff <<((3 - i)*8))) >> ((3 - i)*8));
+      }
+      for (int i = 4; i < 6; i++) {
+            vs_metadata.push_back((25 &
+         (0xff <<((5 - i)*8))) >> ((5 - i)*8));
+      }
+    }
+    aptx_config.codecSpecificData = vs_metadata;
+    vendor_config.extension.setParcelable(aptx_config);
+    LeAudioConfiguration ucast_config = {
+     .codecType = CodecType::VENDOR,
+     .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+     .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
+    for (auto& [handle, location, state] : offload_config.stream_map) {
+      ucast_config.streamMap.push_back({
         .streamHandle = handle,
         .audioChannelAllocation = static_cast<int32_t>(location),
         .isStreamActive = state,
-    });
+      });
+    }
+    return AudioConfiguration(ucast_config);
   }
-
-  return AudioConfiguration(ucast_config);
 }
 
 }  // namespace le_audio
