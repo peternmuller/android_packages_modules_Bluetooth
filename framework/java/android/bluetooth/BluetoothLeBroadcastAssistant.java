@@ -17,6 +17,7 @@
 package android.bluetooth;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -30,7 +31,6 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.content.AttributionSource;
 import android.content.Context;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.CloseGuard;
 import android.util.Log;
@@ -213,6 +213,17 @@ public final class BluetoothLeBroadcastAssistant implements BluetoothProfile, Au
                         Executor executor = callbackExecutorEntry.getValue();
                         executor.execute(
                                 () -> callback.onReceiveStateChanged(sink, sourceId, state));
+                    }
+                }
+
+                @Override
+                public void onSourceLost(int broadcastId) {
+                    for (Map.Entry<BluetoothLeBroadcastAssistant.Callback, Executor>
+                            callbackExecutorEntry : mCallbackExecutorMap.entrySet()) {
+                        BluetoothLeBroadcastAssistant.Callback callback =
+                                callbackExecutorEntry.getKey();
+                        Executor executor = callbackExecutorEntry.getValue();
+                        executor.execute(() -> callback.onSourceLost(broadcastId));
                     }
                 }
             };
@@ -444,6 +455,21 @@ public final class BluetoothLeBroadcastAssistant implements BluetoothProfile, Au
         @SystemApi
         void onReceiveStateChanged(@NonNull BluetoothDevice sink, int sourceId,
                 @NonNull BluetoothLeBroadcastReceiveState state);
+
+        /**
+         * Callback invoked when the Broadcast Source is lost together with source broadcast id.
+         *
+         * <p>This callback is to notify source lost due to periodic advertising sync lost. Callback
+         * client can know that the source notified by {@link
+         * Callback#onSourceFound(BluetoothLeBroadcastMetadata)} before is not available any more
+         * after this callback.
+         *
+         * @param broadcastId broadcast ID as defined in the BASS specification
+         * @hide
+         */
+        @FlaggedApi("com.android.bluetooth.flags.leaudio_broadcast_monitor_source_sync_status")
+        @SystemApi
+        default void onSourceLost(int broadcastId) {}
     }
 
     /**
@@ -483,14 +509,11 @@ public final class BluetoothLeBroadcastAssistant implements BluetoothProfile, Au
     private BluetoothAdapter mBluetoothAdapter;
     private final AttributionSource mAttributionSource;
 
-    private final BluetoothProfileConnector<IBluetoothLeBroadcastAssistant> mProfileConnector =
-            new BluetoothProfileConnector(this, BluetoothProfile.LE_AUDIO_BROADCAST_ASSISTANT,
-                    TAG, IBluetoothLeBroadcastAssistant.class.getName()) {
-                @Override
-                public IBluetoothLeBroadcastAssistant getServiceInterface(IBinder service) {
-                    return IBluetoothLeBroadcastAssistant.Stub.asInterface(service);
-                }
-            };
+    private final BluetoothProfileConnector mProfileConnector =
+            new BluetoothProfileConnector(
+                    this,
+                    BluetoothProfile.LE_AUDIO_BROADCAST_ASSISTANT,
+                    IBluetoothLeBroadcastAssistant.class.getName());
 
     /**
      * Create a new instance of an LE Audio Broadcast Assistant.
@@ -522,7 +545,7 @@ public final class BluetoothLeBroadcastAssistant implements BluetoothProfile, Au
     }
 
     private IBluetoothLeBroadcastAssistant getService() {
-        return mProfileConnector.getService();
+        return IBluetoothLeBroadcastAssistant.Stub.asInterface(mProfileConnector.getService());
     }
 
     /**

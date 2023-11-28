@@ -106,7 +106,6 @@ cc_test {
     name: "net_test_bluetooth",
     test_suites: ["general-tests"],
     defaults: [
-        "bluetooth_gtest_x86_asan_workaround",
         "mts_defaults",
         "net_test_defaults",
     ],
