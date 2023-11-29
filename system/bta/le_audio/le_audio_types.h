@@ -180,10 +180,15 @@ constexpr uint32_t kLeAudioLocationStereo =
 /* Octets Per Frame */
 constexpr uint16_t kLeAudioCodecFrameLen30 = 30;
 constexpr uint16_t kLeAudioCodecFrameLen40 = 40;
+constexpr uint16_t kLeAudioCodecFrameLen45 = 45;
 constexpr uint16_t kLeAudioCodecFrameLen60 = 60;
+constexpr uint16_t kLeAudioCodecFrameLen75 = 75;
 constexpr uint16_t kLeAudioCodecFrameLen80 = 80;
+constexpr uint16_t kLeAudioCodecFrameLen90 = 90;
 constexpr uint16_t kLeAudioCodecFrameLen100 = 100;
+constexpr uint16_t kLeAudioCodecFrameLen117 = 117;
 constexpr uint16_t kLeAudioCodecFrameLen120 = 120;
+constexpr uint16_t kLeAudioCodecFrameLen155 = 155;
 
 }  // namespace codec_spec_conf
 
