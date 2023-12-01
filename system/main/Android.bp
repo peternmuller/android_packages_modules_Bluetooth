@@ -207,6 +207,7 @@ cc_test {
     static_libs: [
         "libbluetooth-dumpsys",
         "libbluetooth-types",
+        "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
         "libbluetooth_hci_pdl",
         "libbt-common",
@@ -223,6 +224,7 @@ cc_test {
     ],
     shared_libs: [
         "libcrypto",
+        "server_configurable_flags",
     ],
     sanitize: {
         address: true,

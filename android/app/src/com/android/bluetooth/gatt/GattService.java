@@ -104,6 +104,7 @@ import android.net.MacAddress;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.ParcelUuid;
@@ -394,8 +395,12 @@ public class GattService extends ProfileService {
                         mAdapterService,
                         mAdvertiserMap);
 
-        mScanManager = GattObjectsFactory.getInstance()
-                .createScanManager(this, mAdapterService, mBluetoothAdapterProxy);
+        HandlerThread thread = new HandlerThread("BluetoothScanManager");
+        thread.start();
+        mScanManager =
+                GattObjectsFactory.getInstance()
+                        .createScanManager(
+                                this, mAdapterService, mBluetoothAdapterProxy, thread.getLooper());
 
         mPeriodicScanManager = GattObjectsFactory.getInstance()
                 .createPeriodicScanManager(mAdapterService);

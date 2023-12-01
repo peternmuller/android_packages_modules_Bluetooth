@@ -34,6 +34,7 @@
 #include "btif/include/btif_debug_conn.h"
 #include "btif/include/btif_storage.h"
 #include "device/include/controller.h"
+#include "hardware/bt_gatt_types.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
@@ -878,7 +879,7 @@ void bta_gattc_start_discover(tBTA_GATTC_CLCB* p_clcb,
 }
 
 void bta_gattc_continue_discovery_if_needed(const RawAddress& bd_addr,
-                                            uint16_t acl_handle) {
+                                            uint16_t /* acl_handle */) {
   tBTA_GATTC_SERV* p_srcb = bta_gattc_find_srvr_cache(bd_addr);
   if (!p_srcb || !p_srcb->disc_blocked_waiting_on_version) {
     return;
