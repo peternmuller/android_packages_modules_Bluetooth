@@ -698,6 +698,48 @@
             "qos_config_name": ["QoS_Config_Low_Latency"]
         },
         {
+            "name": "VND_SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_32khz_AptxLeX_V1",
+            "codec_config_name": "VND_SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_AptxLeX_V1",
+            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLeX_V1_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLeX_V1",
+            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLeX_V1_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLeX_V1",
+            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V2_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V2",
+            "qos_config_name": ["VND_QoS_Config_R10_L74"],
+            "codec_metadata_name": ["VND_AptxLe_V2_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V2_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V2",
+            "qos_config_name": ["VND_QoS_Config_R10_L74"],
+            "codec_metadata_name": ["VND_AptxLe_V2_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V1_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V1",
+            "qos_config_name": ["VND_QoS_Config_R10_L74"],
+            "codec_metadata_name": ["VND_AptxLe_V1_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V1_High_Reliability",
+            "codec_config_name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V1",
+            "qos_config_name": ["VND_QoS_Config_R10_L74"],
+            "codec_metadata_name": ["VND_AptxLe_V1_VS_Metadata"]
+        },
+	{
             "name": "DualDev_OneChanStereoSnk_48_2_High_Reliability",
             "codec_config_name": "DualDev_OneChanStereoSnk_48_2",
             "qos_config_name": ["QoS_Config_High_Reliability"]
@@ -721,6 +763,12 @@
             "name": "DualDev_OneChanStereoSnk_48_1_2",
             "codec_config_name": "DualDev_OneChanStereoSnk_48_1",
             "qos_config_name": ["QoS_Config_48_1_2"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48_4_High_Reliability",
+            "codec_config_name": "SingleDev_OneChanStereoSnk_48_4",
+            "qos_config_name": ["QoS_Config_High_Reliability"],
+            "codec_metadata_name": ["VND_LC3Q_V1_VS_Metadata"]
         },
         {
             "name": "SingleDev_OneChanStereoSnk_48_4_High_Reliability",
@@ -1048,6 +1096,11 @@
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
+            "name": "SingleDev_OneChanStereoSnk_48_1_1_OneChanStereoSrc_16_1_1",
+            "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanStereoSrc_16_1",
+            "qos_config_name": ["QoS_Config_48_1_1", "VND_QoS_Config_R3_L15"]
+        },
+        {
             "name": "DualDev_OneChanStereoSnk_OneChanStereoSrc_48_1_Low_Latency",
             "codec_config_name": "DualDev_OneChanStereoSnk_OneChanStereoSrc_48_1",
             "qos_config_name": ["QoS_Config_Low_Latency"]
@@ -1211,6 +1264,73 @@
                             "compound_value": {
                                 "value": [
                                     30,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_DualDev_OneChanStereoSnk_48khz_155octs_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 2,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "MONO_ONE_CIS_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    155,
                                     0
                                 ]
                             }
@@ -2027,6 +2147,135 @@
             ]
         },
         {
+            "name": "SingleDev_OneChanStereoSnk_OneChanStereoSrc_32_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    80,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    80,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             "name": "DualDev_OneChanMonoSnk_16_2",
             "subconfigurations": [
                 {
@@ -2121,7 +2370,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    1
+                                    0
                                 ]
                             }
                         },
@@ -2142,7 +2391,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    40,
+                                    30,
                                     0
                                 ]
                             }
@@ -2188,7 +2437,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    0
+                                    1
                                 ]
                             }
                         },
@@ -2209,7 +2458,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    30,
+                                    40,
                                     0
                                 ]
                             }
@@ -2294,6 +2543,133 @@
                 {
                     "device_cnt": 1,
                     "ase_cnt": 1,
+                    "direction": "SOURCE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    40,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_DualDev_OneChanStereoSnk_48khz_155octs_OneChanStereoSrc_16khz_40octs_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 2,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    3
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    155,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 2,
+                    "ase_cnt": 2,
                     "direction": "SOURCE",
                     "codec_id": {
                         "coding_format": 6,
@@ -2824,7 +3200,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    1
+                                    0
                                 ]
                             }
                         },
@@ -2943,7 +3319,7 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    3
+                                    6
                                 ]
                             }
                         },
@@ -2952,7 +3328,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    0
+                                    1
                                 ]
                             }
                         },
@@ -3072,7 +3448,7 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    6
+                                    3
                                 ]
                             }
                         },
@@ -3476,7 +3852,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    1,
+                                    3,
                                     0,
                                     0,
                                     0
@@ -3543,7 +3919,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    3,
+                                    1,
                                     0,
                                     0,
                                     0
@@ -4633,7 +5009,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    1
+                                    0
                                 ]
                             }
                         },
@@ -4699,7 +5075,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    0
+                                    1
                                 ]
                             }
                         },
@@ -5635,7 +6011,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    0
+                                    1
                                 ]
                             }
                         },
@@ -5836,7 +6212,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    1
+                                    0
                                 ]
                             }
                         },
@@ -5943,6 +6319,73 @@
             ]
         },
         {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    3,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    75,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             "name": "VND_SingleDev_TwoChanStereoSnk_48khz_100octs_1",
             "subconfigurations": [
                 {
@@ -5979,7 +6422,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    3,
+                                    1,
                                     0,
                                     0,
                                     0
@@ -6126,73 +6569,6 @@
                             "compound_value": {
                                 "value": [
                                     100,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "VND_SingleDev_TwoChanStereoSnk_48khz_75octs_1",
-            "subconfigurations": [
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    3,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    75,
                                     0
                                 ]
                             }
@@ -7908,7 +8284,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    1,
+                                    3,
                                     0,
                                     0,
                                     0
@@ -8103,7 +8479,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    3,
+                                    1,
                                     0,
                                     0,
                                     0
@@ -8723,134 +9099,7 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    120,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
                                     5
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_16_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SINK",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
                                 ]
                             }
                         },
@@ -8960,13 +9209,12 @@
             ]
         },
         {
-            "name": "DualDev_OneChanStereoSnk_OneChanStereoSrc_48_1",
+            "name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_16_2",
             "subconfigurations": [
                 {
-                    "device_cnt": 2,
-                    "ase_cnt": 2,
-                    "direction": "SOURCE",
-                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
+                    "device_cnt": 1,
+                    "ase_cnt": 1,
+                    "direction": "SINK",
                     "codec_id": {
                         "coding_format": 6,
                         "vendor_company_id": 0,
@@ -9058,6 +9306,134 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    120,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 1,
+                    "direction": "SOURCE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    80,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "DualDev_OneChanStereoSnk_OneChanStereoSrc_48_1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 2,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
                                     3,
                                     0,
                                     0,
@@ -9071,6 +9447,73 @@
                             "compound_value": {
                                 "value": [
                                     75,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSrc_48khz_100octs_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    3,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    100,
                                     0
                                 ]
                             }
@@ -9125,7 +9568,7 @@
                             "type": 3,
                             "compound_value": {
                                 "value": [
-                                    3,
+                                    1,
                                     0,
                                     0,
                                     0
@@ -9158,140 +9601,6 @@
                     "ase_cnt": 2,
                     "direction": "SINK",
                     "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    3,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    100,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "VND_SingleDev_TwoChanStereoSrc_48khz_100octs_1",
-            "subconfigurations": [
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    3,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    100,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "VND_SingleDev_OneChanStereoSrc_48khz_100octs_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 2,
-                    "direction": "SOURCE",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
                     "codec_id": {
                         "coding_format": 6,
                         "vendor_company_id": 0,
@@ -9370,134 +9679,6 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    3,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    60,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    60,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "VND_SingleDev_TwoChanStereoSnk_48khz_75octs_TwoChanStereoSrc_16khz_30octs_1",
-            "subconfigurations": [
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
                                     8
                                 ]
                             }
@@ -9528,7 +9709,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    75,
+                                    60,
                                     0
                                 ]
                             }
@@ -9543,12 +9724,16 @@
                             }
                         }
                     ]
-                },
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_TwoChanStereoSnk_OneChanStereoSrc_32khz_60octs_1",
+            "subconfigurations": [
                 {
                     "device_cnt": 1,
                     "ase_cnt": 1,
                     "direction": "SOURCE",
-                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
                     "codec_id": {
                         "coding_format": 6,
                         "vendor_company_id": 0,
@@ -9560,7 +9745,7 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    3
+                                    6
                                 ]
                             }
                         },
@@ -9590,7 +9775,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    30,
+                                    60,
                                     0
                                 ]
                             }
@@ -10667,7 +10852,7 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
-                                    6
+                                    8
                                 ]
                             }
                         },
@@ -10676,7 +10861,7 @@
                             "type": 2,
                             "compound_value": {
                                 "value": [
-                                    1
+                                    0
                                 ]
                             }
                         },
@@ -10697,7 +10882,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    75,
                                     0
                                 ]
                             }
@@ -10794,6 +10979,202 @@
                             "type": 1,
                             "compound_value": {
                                 "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    75,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_OneChanMonoSrc_32khz_45octs_1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    3
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    80,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 1,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    45,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "SingleDev_OneChanStereoSnk_48_1_OneChanStereoSrc_16_1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
                                     6
                                 ]
                             }
@@ -10825,6 +11206,68 @@
                             "compound_value": {
                                 "value": [
                                     80,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    30,
                                     0
                                 ]
                             }
@@ -11044,6 +11487,463 @@
             ]
         },
         {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_155octs_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    155,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSrc_48khz_100octs_2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 3,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    100,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_AptxLeX_V1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
+                    "max_sdu": 75,
+                    "iso_interval": 7500,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 429
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    3,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SOURCE",
+                    "configuration_strategy": "STEREO_ONE_CIS_PER_DEVICE",
+                    "max_sdu": 75,
+                    "iso_interval": 7500,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 429
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    6
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    3,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLeX_V1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 188,
+                    "iso_interval": 10000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 429
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLeX_V1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 188,
+                    "iso_interval": 10000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 429
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    10
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 1976,
+                    "iso_interval": 15000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 1
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V2",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 1976,
+                    "iso_interval": 15000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 1
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    10
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLe_V1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 1304,
+                    "iso_interval": 15000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 1
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLe_V1",
+            "subconfigurations": [
+                {
+                    "device_cnt": 1,
+                    "ase_cnt": 2,
+                    "direction": "SINK",
+                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
+                    "max_sdu": 1304,
+                    "iso_interval": 15000,
+                    "codec_id": {
+                        "coding_format": 255,
+                        "vendor_company_id": 10,
+                        "vendor_codec_id": 1
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 129,
+                            "compound_value": {
+                                "value": [
+                                    10
+                                ]
+                            }
+                        },
+                        {
+                            "name": "audio_channel_allocation",
+                            "type": 131,
+                            "compound_value": {
+                                "value": [
+                                    1,
+                                    0,
+                                    0,
+                                    0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             "name": "SingleDev_OneChanStereoSnk_32_1",
             "subconfigurations": [
                 {
@@ -11173,6 +12073,11 @@
             "max_transport_latency": 95
         },
         {
+            "name": "QoS_Config_48_1_1",
+            "retransmission_number": 5,
+            "max_transport_latency": 15
+        },
+        {
             "name": "QoS_Config_48_1_2",
             "retransmission_number": 13,
             "max_transport_latency": 75
@@ -11203,6 +12108,61 @@
             "max_transport_latency": 22
         },
         {
+            "name": "VND_QoS_Config_R31_L100",
+            "retransmission_number": 31,
+            "max_transport_latency": 100
+        },
+        {
+            "name": "VND_QoS_Config_R10_L74",
+            "retransmission_number": 10,
+            "max_transport_latency": 74
+        },
+        {
+            "name": "VND_QoS_Config_R3_L15",
+            "retransmission_number": 3,
+            "max_transport_latency": 15
+        },
+        {
+            "name": "VND_QoS_Config_R24_L100",
+            "retransmission_number": 24,
+            "max_transport_latency": 100
+        },
+        {
+            "name": "VND_QoS_Config_R59_L200",
+            "retransmission_number": 59,
+            "max_transport_latency": 200
+        },
+        {
+            "name": "VND_QoS_Config_R3_L5",
+            "retransmission_number": 3,
+            "max_transport_latency": 5
+        },
+        {
+            "name": "VND_QoS_Config_R31_L100",
+            "retransmission_number": 31,
+            "max_transport_latency": 100
+        },
+        {
+            "name": "VND_QoS_Config_R13_L100",
+            "retransmission_number": 13,
+            "max_transport_latency": 100
+        },
+        {
+            "name": "VND_QoS_Config_R5_L10",
+            "retransmission_number": 5,
+            "max_transport_latency": 10
+        },
+        {
+            "name": "VND_QoS_Config_R5_L20",
+            "retransmission_number": 5,
+            "max_transport_latency": 20
+        },
+        {
+            "name": "VND_QoS_Config_R5_L70",
+            "retransmission_number": 5,
+            "max_transport_latency": 70
+        },
+	{
             "name": "VND_QoS_Config_R15_L70",
             "retransmission_number": 15,
             "max_transport_latency": 70
@@ -11246,6 +12206,102 @@
             "retransmission_number": 0,
             "max_transport_latency": 0
         }
-
+    ],
+    "codec_specific_metadata": [
+        {
+            "name": "VND_LC3Q_V1_VS_Metadata",
+            "type": 16,
+            "vendor_company_id": 10,
+            "compound_value": {
+                "value": [
+                   0,
+                   1,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0
+                ]
+            }
+        },
+        {
+            "name": "VND_LC3Q_V2_VS_Metadata",
+            "type": 16,
+            "vendor_company_id": 10,
+            "compound_value": {
+                "value": [
+                   2,
+                   1,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0
+                ]
+            }
+        },
+        {
+            "name": "VND_AptxLe_V1_VS_Metadata",
+            "type": 17,
+            "vendor_company_id": 10,
+            "compound_value": {
+                "value": [
+                   0,
+                   1,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0
+                ]
+            }
+        },
+        {
+            "name": "VND_AptxLe_V2_VS_Metadata",
+            "type": 17,
+            "vendor_company_id": 10,
+            "compound_value": {
+                "value": [
+                   0,
+                   2,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0
+                ]
+            }
+        },
+        {
+            "name": "VND_AptxLeX_V1_VS_Metadata",
+            "type": 17,
+            "vendor_company_id": 10,
+            "compound_value": {
+                "value": [
+                   0,
+                   65,
+                   0,
+                   1,
+                   5,
+                   0,
+                   0,
+                   0,
+                   0,
+                   0
+                ]
+            }
+        }
     ]
 }

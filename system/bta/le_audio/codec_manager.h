@@ -34,12 +34,14 @@ struct stream_map_info {
 
 struct offload_config {
   std::vector<stream_map_info> stream_map;
+  types::LeAudioCodecId codec_id;
   uint8_t bits_per_sample;
   uint32_t sampling_rate;
   uint32_t frame_duration;
   uint16_t octets_per_frame;
   uint8_t blocks_per_sdu;
   uint16_t peer_delay_ms;
+  std::vector<uint8_t> codec_metadata;
 };
 
 struct broadcast_offload_config {
@@ -71,7 +73,7 @@ class CodecManager {
   virtual void ClearCisConfiguration(uint8_t direction);
   virtual void UpdateActiveAudioConfig(
       const types::BidirectionalPair<stream_parameters>& stream_params,
-      types::BidirectionalPair<uint16_t> delays_ms,
+      types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,
       std::function<void(const offload_config& config, uint8_t direction)>
           update_receiver);
   virtual const ::le_audio::set_configurations::AudioSetConfigurations*

@@ -25,6 +25,8 @@
 #include "dm/bta_dm_gatt_client.h"
 #include "le_audio_set_configuration_provider.h"
 #include "metrics_collector.h"
+#include "common/init_flags.h"
+#include <base/strings/string_number_conversions.h>
 
 namespace le_audio {
 
@@ -1276,6 +1278,7 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
         ent.ase_cnt / ent.device_cnt + (ent.ase_cnt % ent.device_cnt);
     uint8_t active_ase_num = 0;
     auto strategy = ent.strategy;
+    std::vector<uint8_t> vendor_metadata;
 
     LOG_DEBUG(
         " Number of devices: %d, number of ASEs: %d,  Max ASE per device: %d "
@@ -1292,23 +1295,78 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
     }
 
     for (auto* device = GetFirstDevice();
-         device != nullptr && required_device_cnt > 0;
-         device = GetNextDevice(device)) {
+        device != nullptr && required_device_cnt > 0;
+        device = GetNextDevice(device)) {
       /* Skip if device has ASE configured in this direction already */
 
       if (device->ases_.empty()) continue;
+      auto pac = device->GetCodecConfigurationSupportedPac(context_type, ent.direction,
+          ent.codec, ent.vendor_metadata);
+      if (pac == nullptr) continue;
 
-      if (!device->GetCodecConfigurationSupportedPac(ent.direction,
-                                                     ent.codec)) {
-        LOG_DEBUG("Insufficient PAC");
-        continue;
+      LOG(INFO) << "Matching PAC \n\tCoding format: " << loghex(pac->codec_id.coding_format)
+        << "\n\tVendor codec company ID: "
+        << loghex(pac->codec_id.vendor_company_id)
+        << "\n\tVendor codec ID: " << loghex(pac->codec_id.vendor_codec_id)
+        << "\n\tCodec spec caps:\n"
+        << pac->codec_spec_caps.ToString("", types::CodecCapabilitiesLtvFormat)
+        << "\n\tMetadata: "
+        << base::HexEncode(pac->metadata.data(),pac->metadata.size());
+
+      /* Vendor codec metadata passing logic start */
+      if (bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
+    bool parsed_ok = false;
+    auto pac_metadata = types::LeAudioLtvMap::Parse(pac->metadata.data(), pac->metadata.size(), parsed_ok);
+        auto vndr_metadata = pac_metadata.Find(types::kLeAudioVendorSpecific);
+        if (vndr_metadata != std::nullopt && parsed_ok && !ent.vendor_metadata->vs_metadata.empty()) {
+          vendor_metadata = vndr_metadata.value();
+          vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioVendorSpecific);
+          vendor_metadata.insert(vendor_metadata.begin(), vendor_metadata.size() + 1);
+          if (ent.codec.id.coding_format == types::kLeAudioCodingFormatLC3) {
+            vendor_metadata[6] = std::min(ent.vendor_metadata->vs_metadata[1], vendor_metadata[6]);
+            vendor_metadata[7] = std::min(ent.vendor_metadata->vs_metadata[0], vendor_metadata[7]);
+          } else if (ent.codec.id.coding_format == types::kLeAudioVendorSpecific) {
+            if ((ent.codec.id.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm) &&
+                ((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
+                 (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {
+              vendor_metadata[7] = std::min(ent.vendor_metadata->vs_metadata[1], vendor_metadata[7]);
+            }
+          }
+        }
+
+        if (ent.direction == types::kLeAudioDirectionSink)
+          sink_context_to_vendor_metadata_map[context_type] = vendor_metadata;
+        else
+          source_context_to_vendor_metadata_map[context_type] = vendor_metadata;
+
+        if (vendor_metadata.empty()) {
+          LOG_INFO("Vendor Metadata empty ");
+        } else {
+          LOG_INFO("Negotiated Vendor Metadata configuration values: ");
+          for (auto& metadata_value : vendor_metadata)
+            LOG_INFO("%d ", metadata_value);
+        }
+        /* Vendor codec metadata passing logic end */
       }
 
       int needed_ase = std::min(static_cast<int>(max_required_ase_per_dev),
-                                static_cast<int>(ent.ase_cnt - active_ase_num));
+          static_cast<int>(ent.ase_cnt - active_ase_num));
+
+      /* If we required more ASEs per device which means we would like to
+       * create more CISes to one device, we should also check the allocation
+       * if it allows us to do this.
+       */
+
+      types::AudioLocations audio_locations = 0;
+      /* Check direction and if audio location allows to create more cise */
+      if (ent.direction == types::kLeAudioDirectionSink)
+        audio_locations = device->snk_audio_locations_;
+      else
+        audio_locations = device->src_audio_locations_;
 
       if (!CheckIfStrategySupported(strategy, ent, *device)) {
-        LOG_DEBUG("Strategy not supported");
+        LOG_DEBUG(" insufficient device audio allocation: %lu",
+            audio_locations.to_ulong());
         continue;
       }
 
@@ -1320,7 +1378,6 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
 
         if (needed_ase == 0) break;
       }
-
       if (needed_ase > 0) {
         LOG_DEBUG("Device has too less ASEs. Still needed ases %d", needed_ase);
         return false;
@@ -1486,6 +1543,10 @@ LeAudioDeviceGroup::GetActiveConfiguration(void) const {
   return GetCachedConfiguration(configuration_context_type_);
 }
 
+bool LeAudioDeviceGroup::IsSeamlessSupported(void) {
+  return false;
+}
+
 const set_configurations::AudioSetConfiguration*
 LeAudioDeviceGroup::GetConfiguration(LeAudioContextType context_type) {
   if (context_type == LeAudioContextType::UNINITIALIZED) {
@@ -1514,7 +1575,7 @@ LeAudioDeviceGroup::GetCachedCodecConfigurationByDirection(
       GetCachedConfiguration(context_type);
   if (!audio_set_conf) return std::nullopt;
 
-  LeAudioCodecConfiguration group_config = {0, 0, 0, 0};
+  LeAudioCodecConfiguration group_config = {{0, 0, 0}, 0, 0, 0, 0, 0};
   for (const auto& conf : audio_set_conf->confs) {
     if (conf.direction != direction) continue;
 
@@ -1546,13 +1607,38 @@ LeAudioDeviceGroup::GetCachedCodecConfigurationByDirection(
                    << loghex(direction);
       return std::nullopt;
     }
+
+    if (group_config.octets_per_codec_frame != 0 &&
+        conf.codec.GetOctetsPerFrame() != group_config.octets_per_codec_frame) {
+      LOG(WARNING) << __func__
+                   << ", stream configuration could not be "
+                      "determined (ocets per frame differs) for direction: "
+                   << loghex(direction);
+      return std::nullopt;
+    }
+
+    group_config.octets_per_codec_frame = conf.codec.GetOctetsPerFrame();
     group_config.bits_per_sample = conf.codec.GetBitsPerSample();
 
     group_config.num_channels +=
-        conf.codec.GetChannelCountPerIsoStream() * conf.device_cnt;
+        conf.codec.GetChannelCountPerIsoStream()*conf.device_cnt;
+    group_config.codec.coding_format = conf.codec.id.coding_format;
+    group_config.codec.vendor_company_id = conf.codec.id.vendor_company_id;
+    group_config.codec.vendor_codec_id = conf.codec.id.vendor_codec_id;
   }
 
-  if (group_config.IsInvalid()) return std::nullopt;
+  if (group_config.IsInvalid()){
+   LOG(WARNING) << __func__
+         << ", Sample Rate "
+         << group_config.sample_rate
+         << ", Channels "
+         << group_config.num_channels
+         << ", Data Interval "
+         << group_config.data_interval_us
+         << ", Bits Per Sample "
+         << group_config.bits_per_sample;
+   return std::nullopt;
+  }
 
   return group_config;
 }
@@ -1806,8 +1892,9 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
   for (const auto& ent : (*audio_set_conf).confs) {
     LOG_INFO("Looking for requirements: %s - %s", audio_set_conf->name.c_str(),
              (ent.direction == 1 ? "snk" : "src"));
-    auto pac = leAudioDevice->GetCodecConfigurationSupportedPac(ent.direction,
-                                                                ent.codec);
+    auto pac = leAudioDevice->GetCodecConfigurationSupportedPac(configuration_context_type_,
+                                                        ent.direction, ent.codec,
+                                    ent.vendor_metadata);
     if (pac != nullptr) {
       LOG_INFO("Configuration is supported by device %s",
                ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_));

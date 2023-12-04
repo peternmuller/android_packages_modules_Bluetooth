@@ -37,6 +37,34 @@
 #include "osi/include/alarm.h"
 #include "stack/include/bt_types.h"
 
+#define NON_HS_TOPOLOGY_CONFIG_MASK 0x1
+#define MONO_SRC_CONFIG_MASK        0x2
+#define SEAMLESS_LEA_CONFIG_MASK    0x4
+#define SEAMLESS_XPAN_CONFIG_MASK   0x8
+
+#define CODEC_VERSION_1           0x01
+#define CODEC_VERSION_2           0x02
+
+/* Vendor specific config LTV */
+// TO-DO: Find a better place to define it
+constexpr uint8_t  LTV_TYPE_VER_NUM        = 0X00;
+constexpr uint8_t  LTV_TYPE_FREQ           = 0X01;
+constexpr uint8_t  LTV_TYPE_USE_CASE       = 0X02;
+constexpr uint8_t  LTV_TYPE_CONN_HANDLE    = 0X06;
+constexpr uint8_t  LTV_TYPE_CODEC_ID       = 0X07;
+
+constexpr uint8_t  LTV_LEN_VER_NUM         = 0X02;
+constexpr uint8_t  LTV_LEN_CONN_HANDLE     = 0X03;
+constexpr uint8_t  LTV_LEN_FREQ            = 0X02;
+constexpr uint8_t  LTV_LEN_CODEC_ID        = 0X06;
+constexpr uint8_t  LTV_LEN_USE_CASE        = 0X02;
+
+constexpr uint8_t  HQ_AUDIO_USE_CASE       = 0X00;
+constexpr uint8_t  GAMING_NO_VBC_USE_CASE  = 0X01;
+constexpr uint8_t  GAMING_VBC_USE_CASE     = 0X02;
+constexpr uint8_t  VOICE_USE_CASE          = 0X03;
+constexpr uint8_t  STEREO_REC_USE_CASE     = 0X04;
+
 namespace le_audio {
 
 #define UINT8_TO_VEC_UINT8(u8) \
@@ -113,6 +141,12 @@ constexpr uint8_t kLeAudioLtvTypeAudioChannelAllocation = 0x03;
 constexpr uint8_t kLeAudioLtvTypeOctetsPerCodecFrame = 0x04;
 constexpr uint8_t kLeAudioLtvTypeCodecFrameBlocksPerSdu = 0x05;
 
+namespace qcom_codec_spec_conf {
+/* LTV Types - AptX */
+constexpr uint8_t kLeAudioCodecAptxLeTypeSamplingFreq = 0x81;
+constexpr uint8_t kLeAudioCodecAptxLeTypeAudioChannelAllocation = 0x83;
+
+}
 /* Sampling Frequencies */
 constexpr uint8_t kLeAudioSamplingFreq8000Hz = 0x01;
 constexpr uint8_t kLeAudioSamplingFreq11025Hz = 0x02;
@@ -131,6 +165,7 @@ constexpr uint8_t kLeAudioSamplingFreq384000Hz = 0x0D;
 /* Frame Durations */
 constexpr uint8_t kLeAudioCodecFrameDur7500us = 0x00;
 constexpr uint8_t kLeAudioCodecFrameDur10000us = 0x01;
+constexpr uint8_t kLeAudioCodecFrameDur15000us = 0x02;
 
 /* Audio Allocations */
 constexpr uint32_t kLeAudioLocationNotAllowed = 0x00000000;
@@ -253,8 +288,11 @@ constexpr uint8_t kLeAudioCodecFrameDur7500us = FrameDurationConfig2Capability(
     codec_spec_conf::kLeAudioCodecFrameDur7500us);
 constexpr uint8_t kLeAudioCodecFrameDur10000us = FrameDurationConfig2Capability(
     codec_spec_conf::kLeAudioCodecFrameDur10000us);
+constexpr uint8_t kLeAudioCodecFrameDur15000us = FrameDurationConfig2Capability(
+    codec_spec_conf::kLeAudioCodecFrameDur15000us);
 constexpr uint8_t kLeAudioCodecFrameDurPrefer7500us = 0x10;
 constexpr uint8_t kLeAudioCodecFrameDurPrefer10000us = 0x20;
+constexpr uint8_t kLeAudioCodecFrameDurPrefer15000us = 0x40;
 
 /* Audio Channel Counts */
 /* Each bit represents support for additional channel: bit 0 - one channel,
@@ -291,6 +329,10 @@ constexpr uint8_t kLeAudioCodingFormatVendorSpecific =
 constexpr uint16_t kLeAudioVendorCompanyIdUndefined = 0x00;
 constexpr uint16_t kLeAudioVendorCodecIdUndefined = 0x00;
 
+constexpr uint16_t kLeAudioVendorCompanyIdQualcomm = 0x000A;
+constexpr uint16_t kLeAudioCodingFormatAptxLe = bluetooth::hci::qcom::kIsoCodingFormatAptxLe;
+constexpr uint16_t kLeAudioCodingFormatAptxLeX = bluetooth::hci::qcom::kIsoCodingFormatAptxLeX;
+
 constexpr uint16_t kLeAudioVendorCompanyIdGoogle = 0x00E0;
 /* Todo: Temporary value */
 constexpr uint16_t kLeAudioVendorCodecIdHeadtracking = 0x0001;
@@ -306,6 +348,17 @@ constexpr uint8_t kLeAudioMetadataTypeLen = 1;
 constexpr uint8_t kLeAudioMetadataLenLen = 1;
 
 constexpr uint8_t kLeAudioMetadataStreamingAudioContextLen = 2;
+
+/* Vendor Specific Metadata LTV Types */
+constexpr uint8_t kLeAudioVendorSpecific = 0xFF;
+
+namespace qcom_codec_metadata {
+constexpr uint8_t kLeAudioCodecLC3QSupportedFeaturesMetadataType = 0x10;
+constexpr uint8_t kLeAudioCodecAptxLeSupportedFeaturesMetadataType = 0x11;
+
+constexpr uint8_t kLeAudioCodecLC3QSupportedFeaturesMetadataLen = 0x0B;
+constexpr uint8_t kLeAudioCodecAptxLeSupportedFeaturesMetadataLen = 0x0B;
+} // namespace qcom_codec_metadata
 
 /* CSIS Types */
 constexpr uint8_t kDefaultScanDurationS = 5;
@@ -332,6 +385,18 @@ constexpr uint32_t kPresDelayNoPreference = 0x00000000;
 
 constexpr uint16_t kMaxTransportLatencyMin = 0x0005;
 constexpr uint16_t kMaxTransportLatencyMax = 0x0FA0;
+
+namespace qcom_lex {
+/* LeX Context Types */
+enum class LeXAudioContextTypeMask : uint8_t {
+  NONE = 0x00,
+  MEDIA = 0x01,
+  GAME = 0x02,
+  CONVERSATIONAL = 0x04,
+  LIVE = 0x08,
+};
+
+} // namespace qcom_lex
 
 enum class CigState : uint8_t { NONE, CREATING, CREATED, REMOVING, RECOVERING };
 
@@ -751,6 +816,26 @@ class LeAudioLtvMap {
       STREAM_TO_UINT8(core.codec_frames_blocks_per_sdu, ptr);
     }
 
+    vec_opt = ltvs.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq);
+    if (vec_opt &&
+        (vec_opt->size() ==
+         sizeof(decltype(core.sampling_frequency)::value_type))) {
+      auto ptr = vec_opt->data();
+      STREAM_TO_UINT8(core.sampling_frequency, ptr);
+    }
+
+    vec_opt = ltvs.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation);
+    if (vec_opt &&
+        (vec_opt->size() ==
+         sizeof(decltype(core.audio_channel_allocation)::value_type))) {
+      auto ptr = vec_opt->data();
+      STREAM_TO_UINT32(core.audio_channel_allocation, ptr);
+      core.allocated_channel_count =
+              std::bitset<32>(core.audio_channel_allocation.value()).count();
+    } else {
+      core.allocated_channel_count = 1;
+    }
+
     return core;
   }
 
@@ -972,6 +1057,7 @@ struct CodecConfigSetting {
   /* Channel count per device */
   uint8_t channel_count_per_iso_stream;
 
+  uint16_t GetOctetsPerFrame() const;
   /* Sampling freqency requested for codec */
   uint32_t GetSamplingFrequencyHz() const;
   /* Data fetch/feed interval for codec in microseconds */
@@ -988,6 +1074,12 @@ struct CodecConfigSetting {
    */
 };
 
+struct CodecMetadataSetting {
+  uint16_t vendor_company_id;
+  int8_t vendor_metadata_type;
+  std::vector<uint8_t> vs_metadata;
+};
+
 struct QosConfigSetting {
   uint8_t target_latency;
   uint8_t retransmission_number;
@@ -1001,13 +1093,15 @@ struct SetConfiguration {
                                            .max_transport_latency = 0},
                    le_audio::types::LeAudioConfigurationStrategy strategy =
                        le_audio::types::LeAudioConfigurationStrategy::
-                           MONO_ONE_CIS_PER_DEVICE)
+                           MONO_ONE_CIS_PER_DEVICE,
+                   CodecMetadataSetting metadata = {})
       : direction(direction),
         device_cnt(device_cnt),
         ase_cnt(ase_cnt),
         codec(codec),
         qos(qos),
-        strategy(strategy) {}
+        strategy(strategy),
+        vendor_metadata(metadata) {}
 
   uint8_t direction;  /* Direction of set */
   uint8_t device_cnt; /* How many devices must be in set */
@@ -1021,6 +1115,7 @@ struct SetConfiguration {
   CodecConfigSetting codec;
   QosConfigSetting qos;
   types::LeAudioConfigurationStrategy strategy;
+  std::optional<CodecMetadataSetting> vendor_metadata;
 };
 
 /* Defined audio scenarios */
@@ -1035,6 +1130,15 @@ const types::LeAudioCodecId LeAudioCodecIdLc3 = {
     .coding_format = types::kLeAudioCodingFormatLC3,
     .vendor_company_id = types::kLeAudioVendorCompanyIdUndefined,
     .vendor_codec_id = types::kLeAudioVendorCodecIdUndefined};
+const types::LeAudioCodecId LeAudioCodecIdAptxLe = {
+    .coding_format = types::kLeAudioCodingFormatVendorSpecific,
+    .vendor_company_id = types::kLeAudioVendorCompanyIdQualcomm,
+    .vendor_codec_id = types::kLeAudioCodingFormatAptxLe};
+
+const types::LeAudioCodecId LeAudioCodecIdAptxLeX = {
+    .coding_format = types::kLeAudioCodingFormatVendorSpecific,
+    .vendor_company_id = types::kLeAudioVendorCompanyIdQualcomm,
+    .vendor_codec_id = types::kLeAudioCodingFormatAptxLeX};
 
 static constexpr uint32_t kChannelAllocationStereo =
     codec_spec_conf::kLeAudioLocationFrontLeft |
@@ -1052,8 +1156,10 @@ bool check_if_may_cover_scenario(
 bool check_if_may_cover_scenario(
     const AudioSetConfiguration* audio_set_configuration, uint8_t group_size);
 bool IsCodecConfigSettingSupported(
+    types::LeAudioContextType context_type,
     const types::acs_ac_record& pac_record,
-    const CodecConfigSetting& codec_capability_setting);
+    const CodecConfigSetting& codec_capability_setting,
+    std::optional<CodecMetadataSetting> vendor_metadata);
 uint8_t get_num_of_devices_in_configuration(
     const AudioSetConfiguration* audio_set_configuration);
 }  // namespace set_configurations
@@ -1069,6 +1175,9 @@ struct stream_parameters {
   /* Total number of channels we request from the audio framework */
   uint8_t num_of_channels;
   int num_of_devices;
+
+  std::vector<uint8_t> codec_spec_metadata;
+
   /* cis_handle, audio location*/
   std::vector<std::pair<uint16_t, uint32_t>> stream_locations;
 

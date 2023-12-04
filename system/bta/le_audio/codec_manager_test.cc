@@ -36,6 +36,7 @@ using le_audio::set_configurations::AudioSetConfiguration;
 using le_audio::types::CodecLocation;
 using le_audio::types::kLeAudioDirectionSink;
 using le_audio::types::kLeAudioDirectionSource;
+using le_audio::set_configurations::LeAudioCodecIdLc3;
 
 void osi_property_set_bool(const char* key, bool value);
 
@@ -178,6 +179,7 @@ TEST_F(CodecManagerTestAdsp, testStreamConfigurationAdspDownMix) {
               .codec_frames_blocks_per_sdu = 1,
               .num_of_channels = 1,
               .num_of_devices = 1,
+              .codec_spec_metadata = {},
               .stream_locations =
                   {
                       std::pair<uint16_t, uint32_t>{
@@ -195,6 +197,8 @@ TEST_F(CodecManagerTestAdsp, testStreamConfigurationAdspDownMix) {
               .codec_frames_blocks_per_sdu = 1,
               .num_of_channels = 1,
               .num_of_devices = 1,
+              .codec_spec_metadata = {},
+              .stream_locations =
               {
                   std::pair<uint16_t, uint32_t>{
                       97 /*conn_handle*/,
@@ -212,6 +216,7 @@ TEST_F(CodecManagerTestAdsp, testStreamConfigurationAdspDownMix) {
   types::BidirectionalPair<std::optional<offload_config>> out_offload_configs;
   codec_manager->UpdateActiveAudioConfig(
       stream_params, {.sink = 44, .source = 44},
+      le_audio::set_configurations::LeAudioCodecIdLc3,
       [&out_offload_configs](const offload_config& config, uint8_t direction) {
         out_offload_configs.get(direction) = config;
       });
@@ -259,6 +264,7 @@ TEST_F(CodecManagerTestAdsp, testStreamConfigurationAdspDownMix) {
   out_offload_configs.source = std::nullopt;
   codec_manager->UpdateActiveAudioConfig(
       stream_params, {.sink = 44, .source = 44},
+      le_audio::set_configurations::LeAudioCodecIdLc3,
       [&out_offload_configs](const offload_config& config, uint8_t direction) {
         out_offload_configs.get(direction) = config;
       });

@@ -37,6 +37,7 @@
 #include "osi/include/alarm.h"
 #include "osi/include/osi.h"
 #include "osi/include/properties.h"
+#include "stack/include/hcimsgs.h"
 
 // clang-format off
 /* ASCS state machine 1.0
@@ -91,6 +92,7 @@
 
 using bluetooth::common::ToString;
 using bluetooth::hci::IsoManager;
+using bluetooth::legacy::hci::GetInterface;
 using bluetooth::le_audio::GroupStreamStatus;
 using le_audio::CodecManager;
 using le_audio::LeAudioDevice;
@@ -111,6 +113,24 @@ using le_audio::types::CodecLocation;
 using le_audio::types::DataPathState;
 using le_audio::types::LeAudioContextType;
 using le_audio::types::LeAudioCoreCodecConfig;
+
+std::map<uint32_t, uint8_t> freq_to_ltv_map = {
+     {8000,     le_audio::codec_spec_conf::kLeAudioSamplingFreq8000Hz},
+     {11025,    le_audio::codec_spec_conf::kLeAudioSamplingFreq11025Hz},
+     {16000,    le_audio::codec_spec_conf::kLeAudioSamplingFreq16000Hz},
+     {22050,    le_audio::codec_spec_conf::kLeAudioSamplingFreq22050Hz},
+     {24000,    le_audio::codec_spec_conf::kLeAudioSamplingFreq24000Hz},
+     {32000,    le_audio::codec_spec_conf::kLeAudioSamplingFreq32000Hz},
+     {44100,    le_audio::codec_spec_conf::kLeAudioSamplingFreq44100Hz},
+     {48000,    le_audio::codec_spec_conf::kLeAudioSamplingFreq48000Hz},
+     {88200,    le_audio::codec_spec_conf::kLeAudioSamplingFreq88200Hz},
+     {96000,    le_audio::codec_spec_conf::kLeAudioSamplingFreq96000Hz},
+     {176400,   le_audio::codec_spec_conf::kLeAudioSamplingFreq176400Hz},
+     {192000,   le_audio::codec_spec_conf::kLeAudioSamplingFreq192000Hz},
+     {384000,   le_audio::codec_spec_conf::kLeAudioSamplingFreq384000Hz},
+};
+
+constexpr int kIsoDataPathPlatformDefault = 0x01;
 
 namespace {
 
@@ -502,6 +522,51 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     group->SetState(AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED);
 
     if (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+      /* As streaming is about to start send HCI configure data path
+       * based on codec selected before CIS creation ensuring order
+       * Connected_Iso_Group_Create -> HCI_Configure Data path ->
+       * Create CIS -> SetUp ISO Datapath
+       * (need to ensure HCI Datapath is configure just after group creation
+       * and before CIS/ISO Data path creation so that vendor offload path
+       *  is configured properly between ADSP and BT Controller
+       */
+      bool config_host_to_controller_sent = false;
+      bool config_controller_to_host_sent = false;
+      /* Above flags to ensure HCI Config data path sent only once for Tx only
+       * OR Rx only OR Tx/Rx both based on cis type direction
+       */
+      for (struct le_audio::types::cis& cis : group->cig.cises) {
+        if (cis.type == le_audio::types::CisType::CIS_TYPE_BIDIRECTIONAL) {
+          if (!config_host_to_controller_sent) {
+            std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
+                group, conn_handles, le_audio::types::kLeAudioDirectionSink, false);
+            GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
+                                  kIsoDataPathPlatformDefault, vendor_config_sink);
+            config_host_to_controller_sent = true;
+          }
+          if (!config_controller_to_host_sent) {
+            std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
+                group, conn_handles, le_audio::types::kLeAudioDirectionSource, false);
+            GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
+                                  kIsoDataPathPlatformDefault, vendor_config_source);
+            config_controller_to_host_sent = true;
+          }
+        } else if (cis.type == le_audio::types::CisType::CIS_TYPE_UNIDIRECTIONAL_SINK) {
+          if (config_host_to_controller_sent) continue;
+          std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
+              group, conn_handles, le_audio::types::kLeAudioDirectionSink, false);
+          GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
+                                kIsoDataPathPlatformDefault, vendor_config_sink);
+          config_host_to_controller_sent = true;
+        } else {
+          if (config_controller_to_host_sent) continue;
+          std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
+              group, conn_handles, le_audio::types::kLeAudioDirectionSource, false);
+          GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
+                                kIsoDataPathPlatformDefault, vendor_config_source);
+          config_controller_to_host_sent = false;
+        }
+      }
       PrepareAndSendQoSToTheGroup(group);
     } else {
       LOG_ERROR(", invalid state transition, from: %s , to: %s",
@@ -884,12 +949,12 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     if (ases_pair.sink &&
         (ases_pair.sink->data_path_state == DataPathState::IDLE)) {
-      PrepareDataPath(group->group_id_, ases_pair.sink);
+      PrepareDataPath(group, ases_pair.sink);
     }
 
     if (ases_pair.source &&
         (ases_pair.source->data_path_state == DataPathState::IDLE)) {
-      PrepareDataPath(group->group_id_, ases_pair.source);
+      PrepareDataPath(group, ases_pair.source);
     }
 
     if (osi_property_get_bool("persist.bluetooth.iso_link_quality_report",
@@ -1255,14 +1320,18 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                  core_config.GetFrameDurationUs());
     }
 
+    if (!group->stream_conf.conf->confs[0].vendor_metadata.value().vs_metadata.empty()) {
+      LOG_INFO("Vendor Metadata");
+      params.codec_spec_metadata = group->GetFirstActiveDevice()->GetVsMetadata();
+    }
+
     LOG_INFO(
         " Added %s Stream Configuration. CIS Connection Handle: %d"
-        ", Audio Channel Allocation: %d"
         ", Number Of Devices: %d"
         ", Number Of Channels: %d",
         (ase->direction == le_audio::types::kLeAudioDirectionSink ? "Sink"
                                                                   : "Source"),
-        cis_conn_hdl, ase_audio_channel_allocation, params.num_of_devices,
+        cis_conn_hdl, params.num_of_devices,
         params.num_of_channels);
 
     /* Update CodecManager stream configuration */
@@ -1555,24 +1624,33 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     return true;
   }
 
-  static void PrepareDataPath(int group_id, struct ase* ase) {
+  static void PrepareDataPath(LeAudioDeviceGroup* group, struct ase* ase) {
+	std::vector<uint8_t> codec_config_payload;
+	      std::vector<uint16_t> conn_handle;
+      conn_handle.push_back(ase->cis_conn_hdl);
+    codec_config_payload =
+        PrepareVendorConfigPayloadData(group, conn_handle, ase->direction, true);
     bluetooth::hci::iso_manager::iso_data_path_params param = {
         .data_path_dir =
             ase->direction == le_audio::types::kLeAudioDirectionSink
                 ? bluetooth::hci::iso_manager::kIsoDataPathDirectionIn
                 : bluetooth::hci::iso_manager::kIsoDataPathDirectionOut,
         .data_path_id = ase->data_path_id,
-        .codec_id_format = ase->is_codec_in_controller
-                               ? ase->codec_id.coding_format
-                               : bluetooth::hci::kIsoCodingFormatTransparent,
+        .codec_id_format = (ase->codec_id.coding_format !=
+                        le_audio::types::kLeAudioCodingFormatLC3) ?
+                        ase->codec_id.coding_format :
+                        bluetooth::hci::kIsoCodingFormatTransparent,
         .codec_id_company = ase->codec_id.vendor_company_id,
         .codec_id_vendor = ase->codec_id.vendor_codec_id,
         .controller_delay = 0x00000000,
-        .codec_conf = std::vector<uint8_t>(),
+        .codec_conf = (ase->codec_id.coding_format ==
+                        le_audio::types::kLeAudioCodingFormatLC3) ?
+                        std::vector<uint8_t>() :
+                        codec_config_payload,
     };
 
     LeAudioLogHistory::Get()->AddLogHistory(
-        kLogStateMachineTag, group_id, RawAddress::kEmpty,
+        kLogStateMachineTag, group->group_id_, RawAddress::kEmpty,
         kLogSetDataPathOp + "cis_h:" + loghex(ase->cis_conn_hdl),
         "direction: " + loghex(param.data_path_dir));
 
@@ -1591,6 +1669,122 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     LOG_ASSERT(ase) << __func__
                     << " Shouldn't be called without an active ASE.";
     RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
+  }
+
+  static uint8_t audioContextToUseCase(const LeAudioContextType& context) {
+    switch (context) {
+      case LeAudioContextType::UNINITIALIZED:
+      case LeAudioContextType::UNSPECIFIED:
+      case LeAudioContextType::MEDIA:
+      case LeAudioContextType::INSTRUCTIONAL:
+      case LeAudioContextType::ALERTS:
+      case LeAudioContextType::SOUNDEFFECTS:
+      case LeAudioContextType::NOTIFICATIONS:
+      case LeAudioContextType::EMERGENCYALARM:
+        return HQ_AUDIO_USE_CASE;
+      case LeAudioContextType::CONVERSATIONAL:
+      case LeAudioContextType::VOICEASSISTANTS:
+      case LeAudioContextType::RINGTONE:
+        return VOICE_USE_CASE;
+      case LeAudioContextType::GAME:
+        return GAMING_NO_VBC_USE_CASE;
+      case LeAudioContextType::LIVE:
+        return STEREO_REC_USE_CASE;
+      default:
+        return HQ_AUDIO_USE_CASE;
+    }
+  }
+
+  static std::vector<uint8_t> PrepareVendorConfigPayloadData(
+      LeAudioDeviceGroup* group, std::vector<uint16_t> conn_handles,
+      uint8_t direction, bool iso_datapath_payload) {
+    std::vector<uint8_t> vendor_datapath_config;
+    auto context_type = group->GetConfigurationContextType();
+
+    if (CodecManager::GetInstance()->GetCodecLocation() ==
+        CodecLocation::HOST) {
+      LOG(INFO) << __func__ << "send empty payload for non-offload";
+      return vendor_datapath_config;
+    }
+
+    LeAudioDevice* leAudioDevice = group->GetFirstActiveDevice();
+    LOG_ASSERT(leAudioDevice)
+        << __func__ << " Shouldn't be called without an active device.";
+
+    auto datapath_state = (iso_datapath_payload) ?
+        CisState::CONNECTED : CisState::ASSIGNED;
+    auto ase = leAudioDevice->GetFirstActiveAseByCisAndDataPathState(datapath_state, DataPathState::IDLE);
+    if (!ase) {
+      LOG(INFO) << __func__ << "Invalid datapath state " << datapath_state;
+      return vendor_datapath_config;
+    }
+    // Populate codec version number
+    uint8_t codec_ver = 0;
+    uint8_t len = LTV_LEN_VER_NUM;
+    uint8_t type = LTV_TYPE_VER_NUM;
+    auto vendor_metadata = group->GetCodecVendorMetadata(direction, context_type);
+
+    if (vendor_metadata.empty())
+      codec_ver = 0;
+    else
+      codec_ver = ase->codec_id.coding_format == le_audio::types::kLeAudioCodingFormatLC3 ?
+                  (direction == le_audio::types::kLeAudioDirectionSink ?
+                  vendor_metadata[6] : vendor_metadata[7]) : vendor_metadata[7];
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &codec_ver, &codec_ver + 1);
+
+    // Populate frequency
+    uint32_t frequency = (ase->codec_id.coding_format == le_audio::types::kLeAudioCodingFormatLC3) ?
+        ase->codec_config.GetAsCoreCodecConfig().GetSamplingFrequencyHz() :
+        ase->codec_config.GetAsCoreCodecConfig().GetSamplingFrequencyHz();
+    uint8_t freq = freq_to_ltv_map.count(frequency) ? freq_to_ltv_map.at(frequency) : 0;
+    LOG_DEBUG("frequency %d, freq %d, ", frequency, freq);
+    len = LTV_LEN_FREQ;
+    type = LTV_TYPE_FREQ;
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &freq, &freq + 1);
+
+    // Populate usecase number
+    uint8_t usecase = HQ_AUDIO_USE_CASE;
+    len = LTV_LEN_USE_CASE;
+    type = LTV_TYPE_USE_CASE;
+    usecase = audioContextToUseCase(context_type);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &usecase, &usecase + 1);
+
+    // For QC Android T backward compatiblity
+    if (iso_datapath_payload)
+      return vendor_datapath_config;
+
+    // Populated codec ID
+    uint16_t vendor_company_id = ase->codec_id.vendor_company_id;
+    uint16_t vendor_codec_id = ase->codec_id.vendor_codec_id;
+    LOG_DEBUG("coding format %d, cmpny id %d, vendor id %d, ", ase->codec_id.coding_format,
+        ase->codec_id.vendor_company_id, ase->codec_id.vendor_codec_id);
+    len = LTV_LEN_CODEC_ID;
+    type = LTV_TYPE_CODEC_ID;
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &ase->codec_id.coding_format,
+                                  &ase->codec_id.coding_format + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), vendor_company_id);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), vendor_company_id >> 8);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), vendor_codec_id);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), vendor_codec_id >> 8);
+
+    // Populate connection handle
+    uint16_t connection_handle = conn_handles[0];
+    len = LTV_LEN_CONN_HANDLE;
+    type = LTV_TYPE_CONN_HANDLE;
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), connection_handle);
+    vendor_datapath_config.insert(vendor_datapath_config.end(), connection_handle >> 8);
+
+    return vendor_datapath_config;
   }
 
   void SetAseState(LeAudioDevice* leAudioDevice, struct ase* ase,

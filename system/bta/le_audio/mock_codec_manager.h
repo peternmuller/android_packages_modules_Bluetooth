@@ -36,6 +36,7 @@ class MockCodecManager {
               (const le_audio::types::BidirectionalPair<
                    le_audio::stream_parameters>& stream_params,
                le_audio::types::BidirectionalPair<uint16_t> delays_ms,
+               le_audio::types::LeAudioCodecId id,
                std::function<void(const ::le_audio::offload_config& config,
                                   uint8_t direction)>
                    update_receiver));

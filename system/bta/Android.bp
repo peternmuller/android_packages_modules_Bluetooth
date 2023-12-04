@@ -801,6 +801,7 @@ cc_test {
     srcs: [
         ":TestCommonMockFunctions",
         ":TestMockBtaLeAudioHalVerifier",
+        ":TestMockLegacyHciInterface",
         ":TestMockMainShim",
         ":TestStubOsi",
         "le_audio/audio_hal_client/audio_hal_client_test.cc",
