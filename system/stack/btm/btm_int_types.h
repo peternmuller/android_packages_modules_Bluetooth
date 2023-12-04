@@ -93,6 +93,9 @@ typedef struct tBTM_DEVCB {
   tBTM_CMPL_CB* p_link_qual_cmpl_cb; /* Callback function to be called when  */
                                      /* read link quality function completes */
 
+  tBTM_CMPL_CB* p_flow_spec_cmpl_cb; /* Callback function to be called when  */
+                                     /* flow spec function completes         */
+
   alarm_t* read_tx_power_timer;     /* Read tx power timer */
   tBTM_CMPL_CB* p_tx_power_cmpl_cb; /* Callback function to be called       */
 

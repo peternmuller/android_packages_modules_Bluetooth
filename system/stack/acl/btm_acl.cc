@@ -62,6 +62,7 @@
 #include "stack/acl/acl.h"
 #include "stack/acl/peer_packet_types.h"
 #include "stack/btm/btm_dev.h"
+#include "stack/btm/btm_int.h"
 #include "stack/btm/btm_int_types.h"
 #include "stack/btm/btm_sco.h"
 #include "stack/btm/btm_sec.h"
@@ -102,6 +103,9 @@ void BTM_db_reset(void);
 extern tBTM_CB btm_cb;
 void btm_iot_save_remote_properties(tACL_CONN* p_acl_cb);
 void btm_iot_save_remote_versions(tACL_CONN* p_acl_cb);
+
+extern void btm_flow_spec_complete(uint8_t status, uint16_t handle,
+                            tBT_FLOW_SPEC* p_flow);
 
 struct StackAclBtmAcl {
   tACL_CONN* acl_allocate_connection();
@@ -2828,4 +2832,64 @@ void find_in_device_record(const RawAddress& bd_addr,
   }
   *address_with_type = {.type = BLE_ADDR_PUBLIC, .bda = bd_addr};
   return;
+}
+
+tBTM_STATUS BTM_FlowSpec(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                    tBTM_CMPL_CB* p_cb) {
+  tACL_CONN* p = nullptr;
+
+  VLOG(2) << __func__ << " BdAddr: " << addr;
+
+  /* If someone already waiting on the version, do not allow another */
+  if (btm_cb.devcb.p_flow_spec_cmpl_cb) return (BTM_BUSY);
+
+  p = internal_.btm_bda_to_acl(addr, BT_TRANSPORT_BR_EDR);
+  if (p != NULL) {
+    btm_cb.devcb.p_flow_spec_cmpl_cb = p_cb;
+
+    btsnd_hcic_flow_spec(p->hci_handle, p_flow->qos_unused, p_flow->flow_direction,
+                         p_flow->service_type,
+                         p_flow->token_rate, p_flow->token_bucket_size ,
+                         p_flow->peak_bandwidth, p_flow->latency);
+    return (BTM_CMD_STARTED);
+  }
+
+  /* If here, no BD Addr found */
+  return (BTM_UNKNOWN_ADDR);
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_flow_spec_complete
+ *
+ * Description      This function is called when the command complete message
+ *                  is received from the HCI for the flow spec request.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_flow_spec_complete(uint8_t status, uint16_t handle,
+                            tBT_FLOW_SPEC* p_flow) {
+  tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_flow_spec_cmpl_cb;
+  tBTM_FLOW_SPEC_CMPL flow_su;
+
+  LOG_DEBUG("%s", __func__);
+  btm_cb.devcb.p_flow_spec_cmpl_cb = NULL;
+
+  /* If there was a registered callback, call it */
+  if (p_cb) {
+    memset(&flow_su, 0, sizeof(tBTM_FLOW_SPEC_CMPL));
+    flow_su.status = status;
+    flow_su.handle = handle;
+    if (p_flow != NULL) {
+      flow_su.flow.qos_unused = p_flow->qos_unused;
+      flow_su.flow.service_type = p_flow->service_type;
+      flow_su.flow.flow_direction = p_flow->flow_direction;
+      flow_su.flow.token_rate = p_flow->token_rate;
+      flow_su.flow.token_bucket_size = p_flow->token_bucket_size;
+      flow_su.flow.peak_bandwidth = p_flow->peak_bandwidth;
+      flow_su.flow.latency = p_flow->latency;
+    }
+    (*p_cb)(&flow_su);
+  }
 }

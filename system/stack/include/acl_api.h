@@ -186,6 +186,12 @@ tBTM_STATUS BTM_ReadTxPower(const RawAddress& remote_bda,
  ******************************************************************************/
 uint16_t BTM_GetNumAclLinks(void);
 
+tBTM_STATUS BTM_FlowSpec(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                    tBTM_CMPL_CB* p_cb);
+
+void btm_flow_spec_complete(uint8_t status, uint16_t handle,
+        tBT_FLOW_SPEC* p_flow);
+
 void btm_set_packet_types_from_address(const RawAddress& bda,
                                        uint16_t pkt_types);
 

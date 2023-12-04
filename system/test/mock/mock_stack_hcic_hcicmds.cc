@@ -100,6 +100,7 @@ struct btsnd_hcic_write_pin_type btsnd_hcic_write_pin_type;
 struct btsnd_hcic_write_policy_set btsnd_hcic_write_policy_set;
 struct btsnd_hcic_write_scan_enable btsnd_hcic_write_scan_enable;
 struct btsnd_hcic_write_voice_settings btsnd_hcic_write_voice_settings;
+struct btsnd_hcic_flow_spec btsnd_hcic_flow_spec;
 
 }  // namespace stack_hcic_hcicmds
 }  // namespace mock
@@ -406,6 +407,13 @@ void btsnd_hcic_write_scan_enable(uint8_t flag) {
 void btsnd_hcic_write_voice_settings(uint16_t flags) {
   inc_func_call_count(__func__);
   test::mock::stack_hcic_hcicmds::btsnd_hcic_write_voice_settings(flags);
+}
+void btsnd_hcic_flow_spec(uint16_t handle, uint8_t unused, uint8_t direction,
+                          uint8_t service_type, uint32_t token_rate,
+                          uint32_t token_size, uint32_t peak, uint32_t latency) {
+  inc_func_call_count(__func__);
+  test::mock::stack_hcic_hcicmds::btsnd_hcic_flow_spec(handle, unused, direction, service_type,
+                                                       token_rate, token_size, peak, latency);
 }
 // Mocked functions complete
 // END mockcify generation

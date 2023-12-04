@@ -296,4 +296,14 @@
 
 #define BT_1SEC_TIMEOUT_MS (1 * 1000) /* 1 second */
 
+typedef struct {
+  uint8_t qos_unused;         /* UNUSED */
+  uint8_t flow_direction;       /* flow direction */
+  uint8_t service_type;       /* see below */
+  uint32_t token_rate;        /* bytes/second */
+  uint32_t token_bucket_size; /* bytes */
+  uint32_t peak_bandwidth;    /* bytes/second */
+  uint32_t latency;           /* microseconds */
+} tBT_FLOW_SPEC;
+
 #endif
