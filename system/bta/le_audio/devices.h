@@ -177,13 +177,14 @@ class LeAudioDevice {
     return HaveAllActiveAsesCisEst() &&
            HaveAllActiveAsesSameDataPathState(types::DataPathState::CONFIGURED);
   }
+  uint8_t GetSupportedAudioChannelCounts(uint8_t direction) const;
   bool IsReadyToSuspendStream(void);
   bool HaveAllActiveAsesCisEst(void) const;
   bool HaveAnyCisConnected(void);
   const struct types::acs_ac_record* GetCodecConfigurationSupportedPac(
-      uint8_t direction,
-      const set_configurations::CodecConfigSetting& codec_capability_setting);
-  uint8_t GetSupportedAudioChannelCounts(uint8_t direction) const;
+    types::LeAudioContextType context_type, uint8_t direction,
+	const set_configurations::CodecConfigSetting& codec_capability_setting,
+	std::optional<set_configurations::CodecMetadataSetting> metadata);
   uint8_t GetPhyBitmask(void);
   bool ConfigureAses(
       const le_audio::set_configurations::SetConfiguration& ent,
@@ -243,6 +244,7 @@ class LeAudioDevice {
   void DisconnectAcl(void);
   std::vector<uint8_t> GetMetadata(types::AudioContexts context_type,
                                    const std::vector<uint8_t>& ccid_list);
+  std::vector<uint8_t> GetVsMetadata();
   bool IsMetadataChanged(
       const types::BidirectionalPair<types::AudioContexts>& context_types,
       const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists);

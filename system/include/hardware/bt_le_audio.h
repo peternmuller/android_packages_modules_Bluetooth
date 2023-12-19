@@ -88,11 +88,12 @@ enum class GroupNodeStatus {
 
 typedef enum {
   LE_AUDIO_CODEC_INDEX_SOURCE_LC3 = 0,
+  LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LE = 1,
+  LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX = 2,
   LE_AUDIO_CODEC_INDEX_SOURCE_INVALID = 1000 * 1000,
 } btle_audio_codec_index_t;
 
 typedef enum { QUALITY_STANDARD = 0, QUALITY_HIGH } btle_audio_quality_t;
-
 typedef enum {
   LE_AUDIO_SAMPLE_RATE_INDEX_NONE = 0,
   LE_AUDIO_SAMPLE_RATE_INDEX_8000HZ = 0x01 << 0,
@@ -100,7 +101,8 @@ typedef enum {
   LE_AUDIO_SAMPLE_RATE_INDEX_24000HZ = 0x01 << 4,
   LE_AUDIO_SAMPLE_RATE_INDEX_32000HZ = 0x01 << 5,
   LE_AUDIO_SAMPLE_RATE_INDEX_44100HZ = 0x01 << 6,
-  LE_AUDIO_SAMPLE_RATE_INDEX_48000HZ = 0x01 << 7
+  LE_AUDIO_SAMPLE_RATE_INDEX_48000HZ = 0x01 << 7,
+  LE_AUDIO_SAMPLE_RATE_INDEX_96000HZ = 0x01 << 8
 } btle_audio_sample_rate_index_t;
 
 typedef enum {
@@ -144,6 +146,12 @@ typedef struct {
       case LE_AUDIO_CODEC_INDEX_SOURCE_LC3:
         codec_name_str = "LC3";
         break;
+      case LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LE:
+        codec_name_str = "APTX_LE";
+        break;
+      case LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX:
+        codec_name_str = "APTX_LEX";
+        break;
       default:
         codec_name_str = "Unknown LE codec " + std::to_string(codec_type);
         break;
@@ -170,6 +178,9 @@ typedef struct {
         break;
       case LE_AUDIO_SAMPLE_RATE_INDEX_48000HZ:
         sample_rate_str = "48000 hz";
+        break;
+      case LE_AUDIO_SAMPLE_RATE_INDEX_96000HZ:
+        sample_rate_str = "96000 hz";
         break;
       default:
         sample_rate_str =

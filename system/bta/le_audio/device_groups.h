@@ -159,6 +159,7 @@ class LeAudioDeviceGroup {
   bool IsGroupStreamReady(void) const;
   bool IsGroupReadyToCreateStream(void) const;
   bool IsGroupReadyToSuspendStream(void) const;
+  bool IsSeamlessSupported(void);
   bool HaveAllCisesDisconnected(void) const;
   void ClearAllCises(void);
   void UpdateCisConfiguration(uint8_t direction);
@@ -270,6 +271,13 @@ class LeAudioDeviceGroup {
     return metadata_context_type_;
   }
 
+  inline std::vector<uint8_t> GetCodecVendorMetadata(uint8_t direction,
+    types::LeAudioContextType context_type) {
+   return (direction == le_audio::types::kLeAudioDirectionSink) ?
+    sink_context_to_vendor_metadata_map[context_type] :
+    source_context_to_vendor_metadata_map[context_type];
+  }
+
   inline void SetAvailableContexts(
       types::BidirectionalPair<types::AudioContexts> new_contexts) {
     group_available_contexts_ = new_contexts;
@@ -372,6 +380,15 @@ class LeAudioDeviceGroup {
    * our group configuration capabilities to clear this.
    */
   types::AudioContexts pending_group_available_contexts_change_;
+
+  /* Current source metadata context types to vendor metadata map */
+  mutable std::map<types::LeAudioContextType,
+                std::vector<uint8_t>> source_context_to_vendor_metadata_map;
+
+      /* Current sink metadata context types to vendor metadata map */
+  mutable std::map<types::LeAudioContextType,
+                  std::vector<uint8_t>> sink_context_to_vendor_metadata_map;
+
 
   /* Possible configuration cache - refreshed on each group context availability
    * change. Stored as a pair of (is_valid_cache, configuration*). `pair.first`

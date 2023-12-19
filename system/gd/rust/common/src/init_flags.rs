@@ -376,6 +376,7 @@ init_flags!(
         hci_adapter: i32,
         hfp_dynamic_version = true,
         irk_rotation,
+        leaudio_multicodec_support = false,
         leaudio_targeted_announcement_reconnection_mode = true,
         pbap_pse_dynamic_version_upgrade = false,
         periodic_advertising_adi = true,

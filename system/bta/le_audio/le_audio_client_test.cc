@@ -83,6 +83,7 @@ using le_audio::DsaModes;
 using le_audio::types::AudioContexts;
 using le_audio::types::BidirectionalPair;
 using le_audio::types::LeAudioContextType;
+using le_audio::types::kLeAudioCodingFormatLC3;
 
 extern struct fake_osi_alarm_set_on_mloop fake_osi_alarm_set_on_mloop_;
 
@@ -5722,11 +5723,12 @@ TEST_F(UnicastTest, UpdateActiveAudioConfigForLocalSinkSource) {
       .Times(1);
   EXPECT_CALL(*mock_le_audio_source_hal_client_, UpdateAudioConfigToHal(_))
       .Times(1);
-  EXPECT_CALL(*mock_codec_manager_, UpdateActiveAudioConfig(_, _, _))
+  EXPECT_CALL(*mock_codec_manager_, UpdateActiveAudioConfig(_, _, _, _))
       .Times(1)
       .WillOnce(
           [](const types::BidirectionalPair<stream_parameters>& stream_params,
              types::BidirectionalPair<uint16_t> delays_ms,
+             types::LeAudioCodecId id,
              std::function<void(const offload_config& config,
                                 uint8_t direction)>
                  update_receiver) {
@@ -5797,11 +5799,12 @@ TEST_F(UnicastTest, UpdateActiveAudioConfigForLocalSource) {
       .Times(1);
   EXPECT_CALL(*mock_le_audio_sink_hal_client_, UpdateAudioConfigToHal(_))
       .Times(0);
-  EXPECT_CALL(*mock_codec_manager_, UpdateActiveAudioConfig(_, _, _))
+  EXPECT_CALL(*mock_codec_manager_, UpdateActiveAudioConfig(_, _, _, _))
       .Times(1)
       .WillOnce(
           [](const types::BidirectionalPair<stream_parameters>& stream_params,
              types::BidirectionalPair<uint16_t> delays_ms,
+             types::LeAudioCodecId id,
              std::function<void(const offload_config& config,
                                 uint8_t direction)>
                  update_receiver) {

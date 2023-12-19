@@ -43,6 +43,7 @@ using ::le_audio::set_configurations::CodecConfigSetting;
 constexpr uint8_t kChannelNumberMono = 1;
 constexpr uint8_t kChannelNumberStereo = 2;
 
+constexpr uint32_t kSampleRate96000 = 96000;
 constexpr uint32_t kSampleRate48000 = 48000;
 constexpr uint32_t kSampleRate44100 = 44100;
 constexpr uint32_t kSampleRate32000 = 32000;

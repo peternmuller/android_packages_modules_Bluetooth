@@ -237,7 +237,8 @@ bool LeAudioDevice::ConfigureAses(
       ent.ase_cnt / ent.device_cnt + (ent.ase_cnt % ent.device_cnt);
   le_audio::types::LeAudioConfigurationStrategy strategy = ent.strategy;
 
-  auto pac = GetCodecConfigurationSupportedPac(ent.direction, ent.codec);
+  auto pac = GetCodecConfigurationSupportedPac(context_type, ent.direction,
+                                               ent.codec, ent.vendor_metadata);
   if (!pac) return false;
 
   int needed_ase = std::min((int)(max_required_ase_per_dev),
@@ -272,19 +273,29 @@ bool LeAudioDevice::ConfigureAses(
       ase->codec_id = ent.codec.id;
       ase->codec_config = ent.codec.params;
 
-      /* Let's choose audio channel allocation if not set */
-      ase->codec_config.Add(
-          codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
-          PickAudioLocation(strategy, audio_locations,
-                            group_audio_locations_memo.get(ent.direction)));
-
-      /* Get default value if no requirement for specific frame blocks per sdu
-       */
-      if (!ase->codec_config.Find(
-              codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu)) {
+      if (ase->codec_id.coding_format == types::kLeAudioCodingFormatLC3) {
+        /* Let's choose audio channel allocation if not set */
         ase->codec_config.Add(
-            codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu,
-            GetMaxCodecFramesPerSduFromPac(pac));
+            codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
+            PickAudioLocation(strategy, audio_locations,
+                              group_audio_locations_memo.get(ent.direction)));
+
+        /* Get default value if no requirement for specific frame blocks per sdu
+         */
+        if (!ase->codec_config.Find(
+                codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu)) {
+          ase->codec_config.Add(
+              codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu,
+              GetMaxCodecFramesPerSduFromPac(pac));
+        }
+      } else if (ase->codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
+          (ase->codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
+          ase->codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
+        /* Let's choose audio channel allocation if not set */
+        ase->codec_config.Add(
+            codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
+            PickAudioLocation(strategy, audio_locations,
+                            group_audio_locations_memo.get(ent.direction)));
       }
 
       /* Recalculate Max SDU size */
@@ -698,19 +709,33 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
     auto& pac_recs = std::get<1>(pac_tuple);
 
     for (const auto pac : pac_recs) {
-      if (pac.codec_id.coding_format != types::kLeAudioCodingFormatLC3)
+      if (pac.codec_id.coding_format != types::kLeAudioCodingFormatLC3 &&
+          pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLe &&
+          pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLeX)
         continue;
 
-      auto supported_channel_count_ltv = pac.codec_spec_caps.Find(
-          codec_spec_caps::kLeAudioLtvTypeSupportedAudioChannelCounts);
-
-      if (supported_channel_count_ltv == std::nullopt ||
-          supported_channel_count_ltv->size() == 0L) {
-        return 1;
+      if (pac.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
+          (pac.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
+          pac.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
+        auto supported_channel_count_ltv = pac.codec_spec_caps.Find(
+            codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation);
+        if (supported_channel_count_ltv == std::nullopt ||
+            supported_channel_count_ltv->size() == 0L) {
+          LOG(ERROR) << __func__ << "No ChannelAllocation Aptx Ltv";
+          return 1;
+        }
+        return VEC_UINT8_TO_UINT8(supported_channel_count_ltv.value());
+      } else {
+        auto supported_channel_count_ltv = pac.codec_spec_caps.Find(
+            codec_spec_caps::kLeAudioLtvTypeSupportedAudioChannelCounts);
+        if (supported_channel_count_ltv == std::nullopt ||
+            supported_channel_count_ltv->size() == 0L) {
+          LOG(ERROR) << __func__ << "No ChannelAllocation Lc3 Ltv";
+          return 1;
+        }
+        return VEC_UINT8_TO_UINT8(supported_channel_count_ltv.value());
       }
-
-      return VEC_UINT8_TO_UINT8(supported_channel_count_ltv.value());
-    };
+    }
   }
 
   return 0;
@@ -718,7 +743,9 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
 
 const struct types::acs_ac_record*
 LeAudioDevice::GetCodecConfigurationSupportedPac(
-    uint8_t direction, const CodecConfigSetting& codec_capability_setting) {
+    types::LeAudioContextType context_type,
+    uint8_t direction, const CodecConfigSetting& codec_capability_setting,
+    std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
   auto& pacs =
       direction == types::kLeAudioDirectionSink ? snk_pacs_ : src_pacs_;
 
@@ -734,7 +761,8 @@ LeAudioDevice::GetCodecConfigurationSupportedPac(
     auto& pac_recs = std::get<1>(pac_tuple);
 
     for (const auto& pac : pac_recs) {
-      if (!IsCodecConfigSettingSupported(pac, codec_capability_setting))
+      if (!IsCodecConfigSettingSupported(context_type, pac,
+                                      codec_capability_setting, vendor_metadata))
         continue;
 
       return &pac;
@@ -966,6 +994,21 @@ void LeAudioDevice::DeactivateAllAses(void) {
     ase.cis_id = le_audio::kInvalidCisId;
     ase.cis_conn_hdl = 0;
   }
+}
+
+std::vector<uint8_t> LeAudioDevice::GetVsMetadata() {
+  const auto* ase = GetFirstActiveAse();
+  for (const auto& pac_tuple : snk_pacs_) {
+    /* Get PAC records from tuple as second element from tuple */
+    auto& pac_recs = std::get<1>(pac_tuple);
+
+    for (const auto& pac : pac_recs) {
+      if (pac.codec_id == ase->codec_id) {
+        return std::vector<uint8_t>(pac.metadata.data()+4, (pac.metadata.data()+4)+(pac.metadata.size()-4));
+      }
+    }
+  }
+  return std::vector<uint8_t>();
 }
 
 std::vector<uint8_t> LeAudioDevice::GetMetadata(

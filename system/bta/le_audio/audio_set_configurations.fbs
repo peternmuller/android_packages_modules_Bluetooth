@@ -22,6 +22,10 @@ enum CodecSpecificLtvGenericTypes : byte {
     SUPPORTED_OCTETS_PER_CODEC_FRAME = 0x04,
     SUPPORTED_CODEC_FRAME_BLOCKS_PER_SDU = 0x05,
 }
+enum AptxVendorCodecSpecificLtvGenericTypes : ubyte {
+    SUPPORTED_SAMPLING_FREQUENCY = 0x81,
+    SUPPORTED_AUDIO_CHANNEL_ALLOCATION = 0x83,
+}
 /// Note: Holds either a single value (when `value_width == 0`) or multiple
 ///       values if `value.length()` is no-remainder divisible by the non-zero
 ///       `value_width`.
@@ -55,11 +59,17 @@ enum AudioSetConfigurationTargetLatency : byte {
     BALANCED_RELIABILITY = 0x02,
     HIGH_RELIABILITY = 0x03,
 }
+enum CodecSpecificVendorMetadataLtvTypes : byte {
+    QCOM_LC3_LE_SUPPORTED_FEATURES = 0x10,
+    QCOM_APTX_LE_SUPPORTED_FEATURES = 0x11,
+}
 table AudioSetSubConfiguration {
     device_cnt: ubyte;
     ase_cnt: ubyte;
     direction: AudioSetConfigurationDirection = SINK;
     configuration_strategy: AudioSetConfigurationStrategy;
+    max_sdu: ushort;
+    iso_interval: ushort;
     codec_id : CodecId (required);
     codec_configuration: [CodecSpecificConfiguration] (required);
 }
@@ -81,11 +91,19 @@ table AudioSetConfiguration {
     name: string (key, required);
     codec_config_name: string (required);
     qos_config_name: [string] (required);
+    codec_metadata_name: [string];
+}
+table CodecSpecifcMetadata {
+    name: string (key, required);
+    type: CodecSpecificVendorMetadataLtvTypes = QCOM_LC3_LE_SUPPORTED_FEATURES;
+    vendor_company_id : ushort;
+    compound_value: CompoundValue;
 }
 table AudioSetConfigurations {
     _comments_: [string];
     configurations: [AudioSetConfiguration] (required);
     codec_configurations: [CodecConfiguration] (required);
     qos_configurations: [QosConfiguration] (required);
+    codec_specific_metadata: [CodecSpecifcMetadata] (required);
 }
 root_type AudioSetConfigurations;

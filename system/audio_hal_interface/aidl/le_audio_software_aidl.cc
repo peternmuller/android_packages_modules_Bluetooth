@@ -458,7 +458,8 @@ std::unordered_map<int32_t, uint8_t> sampling_freq_map{
 
 std::unordered_map<int32_t, uint8_t> frame_duration_map{
     {7500, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur7500us},
-    {10000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur10000us}};
+    {10000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur10000us},
+    {15000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur15000us}};
 
 std::unordered_map<int32_t, uint16_t> octets_per_frame_map{
     {30, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen30},

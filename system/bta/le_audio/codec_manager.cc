@@ -144,7 +144,7 @@ struct codec_manager_impl {
 
   void UpdateActiveAudioConfig(
       const types::BidirectionalPair<stream_parameters>& stream_params,
-      types::BidirectionalPair<uint16_t> delays_ms,
+      types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,
       std::function<void(const offload_config& config, uint8_t direction)>
           update_receiver) {
     if (GetCodecLocation() != le_audio::types::CodecLocation::ADSP) {
@@ -168,6 +168,7 @@ struct codec_manager_impl {
                             : stream_map.streams_map_current,
           // TODO: set the default value 24 for now, would change it if we
           // support mode bits_per_sample
+          .codec_id = id,
           .bits_per_sample = 24,
           .sampling_rate = stream_params.get(direction).sample_frequency_hz,
           .frame_duration = stream_params.get(direction).frame_duration_us,
@@ -176,6 +177,7 @@ struct codec_manager_impl {
           .blocks_per_sdu =
               stream_params.get(direction).codec_frames_blocks_per_sdu,
           .peer_delay_ms = delays_ms.get(direction),
+          .codec_metadata = stream_params.get(direction).codec_spec_metadata,
       };
       update_receiver(unicast_cfg, direction);
       stream_map.is_initial = false;
@@ -425,6 +427,11 @@ struct codec_manager_impl {
 
   bool IsSetConfigurationMatched(const SetConfiguration& software_set_config,
                                  const SetConfiguration& adsp_set_config) {
+    // Skip the check if config is APTX due to AOSP ADSP doesn't support Codec
+    if (software_set_config.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
+        software_set_config.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) {
+      return true;
+    }
     // Skip the check of stategry and ase_cnt due to ADSP doesn't have the info
     return (
         software_set_config.direction == adsp_set_config.direction &&
@@ -635,7 +642,11 @@ struct codec_manager_impl {
   std::unordered_map<btle_audio_codec_index_t, uint8_t>
       btle_audio_codec_type_map_ = {
           {::bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_LC3,
-           types::kLeAudioCodingFormatLC3}};
+           types::kLeAudioCodingFormatLC3},
+          {::bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LE,
+           types::kLeAudioCodingFormatVendorSpecific},
+          {::bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX,
+           types::kLeAudioCodingFormatVendorSpecific}};
 
   std::vector<btle_audio_codec_config_t> codec_input_capa = {};
   std::vector<btle_audio_codec_config_t> codec_output_capa = {};
@@ -710,12 +721,12 @@ CodecManager::GetLocalAudioInputCodecCapa() {
 
 void CodecManager::UpdateActiveAudioConfig(
     const types::BidirectionalPair<stream_parameters>& stream_params,
-    types::BidirectionalPair<uint16_t> delays_ms,
+    types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,
     std::function<void(const offload_config& config, uint8_t direction)>
         update_receiver) {
   if (pimpl_->IsRunning())
     pimpl_->codec_manager_impl_->UpdateActiveAudioConfig(
-        stream_params, delays_ms, update_receiver);
+        stream_params, delays_ms, id, update_receiver);
 }
 
 const AudioSetConfigurations* CodecManager::GetOffloadCodecConfig(

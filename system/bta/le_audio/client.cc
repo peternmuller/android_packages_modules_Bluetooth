@@ -109,7 +109,8 @@ using le_audio::utils::GetAudioContextsFromSourceMetadata;
 enum class AudioReconfigurationResult {
   RECONFIGURATION_NEEDED = 0x00,
   RECONFIGURATION_NOT_NEEDED,
-  RECONFIGURATION_NOT_POSSIBLE
+  RECONFIGURATION_NOT_POSSIBLE,
+  RECONFIGURATION_BY_HAL,
 };
 
 enum class AudioState {
@@ -131,6 +132,9 @@ std::ostream& operator<<(std::ostream& os,
       break;
     case AudioReconfigurationResult::RECONFIGURATION_NOT_POSSIBLE:
       os << "RECONFIGRATION_NOT_POSSIBLE";
+      break;
+    case AudioReconfigurationResult::RECONFIGURATION_BY_HAL:
+      os << "RECONFIGURATION_BY_HAL";
       break;
     default:
       os << "UNKNOWN";
@@ -233,8 +237,8 @@ class LeAudioClientImpl : public LeAudioClient {
         audio_sender_state_(AudioState::IDLE),
         in_call_(false),
         in_voip_call_(false),
-        current_source_codec_config({0, 0, 0, 0}),
-        current_sink_codec_config({0, 0, 0, 0}),
+        current_source_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
+        current_sink_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
         le_audio_source_hal_client_(nullptr),
         le_audio_sink_hal_client_(nullptr),
         close_vbc_timeout_(alarm_new("LeAudioCloseVbcTimeout")),
@@ -999,7 +1003,21 @@ class LeAudioClientImpl : public LeAudioClient {
       bluetooth::le_audio::btle_audio_codec_config_t input_codec_config,
       bluetooth::le_audio::btle_audio_codec_config_t output_codec_config)
       override {
-    // TODO Implement
+    LeAudioDeviceGroup* group = aseGroups_.FindById(group_id);
+
+    if (!group) {
+      LOG_ERROR("unknown group id: %d", group_id);
+      return;
+    }
+
+    // set configuration and check if streaming
+    if (SetConfigurationAndStopStreamWhenNeeded(
+            group, group->GetConfigurationContextType())) {
+      LOG_DEBUG("group id %d stops streaming and do the reconfiguration",
+                group_id);
+    } else {
+      LOG_DEBUG("group id %d is not streaming", group_id);
+    }
   }
 
   void SetCcidInformation(int ccid, int context_type) override {
@@ -1042,6 +1060,59 @@ class LeAudioClientImpl : public LeAudioClient {
 
     group->is_output_preference_le_audio = is_output_preference_le_audio;
     group->is_duplex_preference_le_audio = is_duplex_preference_le_audio;
+  }
+
+  void ReStartAudioSession(LeAudioDeviceGroup* group,
+                           LeAudioCodecConfiguration* source_config,
+                           LeAudioCodecConfiguration* sink_config) {
+    /* Restart audio session when bluetooth frame duration
+     * is different from audio framework to avoid audio choppy
+     * this is called when we bluetooth frame duration is changed
+     */
+    ASSERT_LOG(active_group_id_ != bluetooth::groups::kGroupUnknown,
+               "Active group is not set.");
+    ASSERT_LOG(le_audio_source_hal_client_, "Source session not acquired");
+    ASSERT_LOG(le_audio_sink_hal_client_, "Sink session not acquired");
+
+    /* We assume that peer device always use same frame duration */
+    uint32_t frame_duration_us = 0;
+    if (!source_config->IsInvalid()) {
+      frame_duration_us = source_config->data_interval_us;
+    } else if (!sink_config->IsInvalid()) {
+      frame_duration_us = sink_config->data_interval_us;
+    } else {
+      ASSERT_LOG(true, "Both configs are invalid");
+    }
+
+    if (alarm_is_scheduled(suspend_timeout_)) alarm_cancel(suspend_timeout_);
+
+    StopAudio();
+
+    le_audio_source_hal_client_->Stop();
+    le_audio_sink_hal_client_->Stop();
+
+    audio_framework_source_config.data_interval_us = frame_duration_us;
+    le_audio_source_hal_client_->Start(audio_framework_source_config,
+                                       audioSinkReceiver);
+
+    /* We use same frame duration for sink/source */
+    audio_framework_sink_config.data_interval_us = frame_duration_us;
+
+    /* If group supports more than 16kHz for the microphone in converstional
+     * case let's use that also for Audio Framework.
+     */
+    std::optional<LeAudioCodecConfiguration> sink_configuration =
+        group->GetCodecConfigurationByDirection(
+            LeAudioContextType::CONVERSATIONAL,
+            le_audio::types::kLeAudioDirectionSource);
+    if (sink_configuration &&
+        sink_configuration->sample_rate >
+            bluetooth::audio::le_audio::kSampleRate16000) {
+      audio_framework_sink_config.sample_rate = sink_configuration->sample_rate;
+    }
+
+    le_audio_sink_hal_client_->Start(audio_framework_sink_config,
+                                     audioSourceReceiver);
   }
 
   void StartAudioSession(LeAudioDeviceGroup* group,
@@ -3585,7 +3656,7 @@ class LeAudioClientImpl : public LeAudioClient {
           .source =
               group->GetRemoteDelay(le_audio::types::kLeAudioDirectionSource)};
       CodecManager::GetInstance()->UpdateActiveAudioConfig(
-          group->stream_conf.stream_params, delays_pair,
+          group->stream_conf.stream_params, delays_pair, group->stream_conf.codec_id,
           std::bind(&LeAudioClientImpl::UpdateAudioConfigToHal,
                     weak_factory_.GetWeakPtr(), std::placeholders::_1,
                     std::placeholders::_2));
@@ -3659,7 +3730,7 @@ class LeAudioClientImpl : public LeAudioClient {
           .source =
               group->GetRemoteDelay(le_audio::types::kLeAudioDirectionSource)};
       CodecManager::GetInstance()->UpdateActiveAudioConfig(
-          group->stream_conf.stream_params, delays_pair,
+          group->stream_conf.stream_params, delays_pair, group->stream_conf.codec_id,
           std::bind(&LeAudioClientImpl::UpdateAudioConfigToHal,
                     weak_factory_.GetWeakPtr(), std::placeholders::_1,
                     std::placeholders::_2));
@@ -3779,6 +3850,7 @@ class LeAudioClientImpl : public LeAudioClient {
     bool reconfiguration_needed = false;
     bool sink_cfg_available = true;
     bool source_cfg_available = true;
+    bool is_frame_duration_changed = false;
 
     LOG_DEBUG("Checking whether to reconfigure from %s to %s",
               ToString(configuration_context_type_).c_str(),
@@ -3791,6 +3863,10 @@ class LeAudioClientImpl : public LeAudioClient {
       return AudioReconfigurationResult::RECONFIGURATION_NOT_NEEDED;
     }
 
+    if (group->IsSeamlessSupported()) {
+      return AudioReconfigurationResult::RECONFIGURATION_NOT_NEEDED;
+    }
+
     std::optional<LeAudioCodecConfiguration> source_configuration =
         group->GetCodecConfigurationByDirection(
             context_type, le_audio::types::kLeAudioDirectionSink);
@@ -3800,12 +3876,18 @@ class LeAudioClientImpl : public LeAudioClient {
 
     if (source_configuration) {
       if (*source_configuration != current_source_codec_config) {
+        // change only happens on different framduration and not the first time
+        // setting
+        is_frame_duration_changed |=
+            ((*source_configuration).data_interval_us !=
+                 current_source_codec_config.data_interval_us &&
+             !current_source_codec_config.IsInvalid());
         current_source_codec_config = *source_configuration;
         reconfiguration_needed = true;
       }
     } else {
       if (!current_source_codec_config.IsInvalid()) {
-        current_source_codec_config = {0, 0, 0, 0};
+        current_source_codec_config = {{0, 0, 0}, 0, 0, 0, 0, 0};
         reconfiguration_needed = true;
       }
       source_cfg_available = false;
@@ -3813,12 +3895,18 @@ class LeAudioClientImpl : public LeAudioClient {
 
     if (sink_configuration) {
       if (*sink_configuration != current_sink_codec_config) {
+        // change only happens on different framduration and not the first time
+        // setting
+        is_frame_duration_changed |=
+            ((*sink_configuration).data_interval_us !=
+                 current_sink_codec_config.data_interval_us &&
+             !current_sink_codec_config.IsInvalid());
         current_sink_codec_config = *sink_configuration;
         reconfiguration_needed = true;
       }
     } else {
       if (!current_sink_codec_config.IsInvalid()) {
-        current_sink_codec_config = {0, 0, 0, 0};
+        current_sink_codec_config = {{0, 0, 0}, 0, 0, 0, 0, 0};
         reconfiguration_needed = true;
       }
 
@@ -3850,6 +3938,11 @@ class LeAudioClientImpl : public LeAudioClient {
              group->group_id_, ToHexString(context_type).c_str());
 
     configuration_context_type_ = context_type;
+ 
+    if (is_frame_duration_changed) {
+      return AudioReconfigurationResult::RECONFIGURATION_BY_HAL;
+    }
+
     return AudioReconfigurationResult::RECONFIGURATION_NEEDED;
   }
 
@@ -5385,7 +5478,7 @@ class LeAudioClientImpl : public LeAudioClient {
             .source = group->GetRemoteDelay(
                 le_audio::types::kLeAudioDirectionSource)};
         CodecManager::GetInstance()->UpdateActiveAudioConfig(
-            group->stream_conf.stream_params, delays_pair,
+            group->stream_conf.stream_params, delays_pair, group->stream_conf.codec_id,
             std::bind(&LeAudioClientImpl::UpdateAudioConfigToHal,
                       weak_factory_.GetWeakPtr(), std::placeholders::_1,
                       std::placeholders::_2));
