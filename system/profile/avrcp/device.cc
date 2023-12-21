@@ -21,6 +21,7 @@
 #include "avrcp_common.h"
 #include "connection_handler.h"
 #include "os/logging/log_adapter.h"
+#include "internal_include/stack_config.h"
 #include "packet/avrcp/avrcp_reject_packet.h"
 #include "packet/avrcp/general_reject_packet.h"
 #include "packet/avrcp/get_current_player_application_setting_value.h"
@@ -31,7 +32,6 @@
 #include "packet/avrcp/set_absolute_volume.h"
 #include "packet/avrcp/set_addressed_player.h"
 #include "packet/avrcp/set_player_application_setting_value.h"
-#include "stack_config.h"
 #include "types/raw_address.h"
 
 extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);

@@ -683,9 +683,22 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     if (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING &&
         !group->GetFirstActiveDeviceByCisAndDataPathState(
             CisState::CONNECTED, DataPathState::IDLE)) {
-      /* No more transition for group */
+      /* No more transition for group. Here we are for the late join device
+       * scenario */
       cancel_watchdog_if_needed(group->group_id_);
     }
+
+    if (group->GetNotifyStreamingWhenCisesAreReadyFlag() &&
+        group->IsGroupStreamReady()) {
+      group->SetNotifyStreamingWhenCisesAreReadyFlag(false);
+      LOG_INFO("Ready to notify Group Streaming.");
+      cancel_watchdog_if_needed(group->group_id_);
+      if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+        group->SetState(AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING);
+      }
+      state_machine_callbacks_->StatusReportCb(group->group_id_,
+                                               GroupStreamStatus::STREAMING);
+    };
   }
 
   void ProcessHciNotifRemoveIsoDataPath(LeAudioDeviceGroup* group,
@@ -914,6 +927,13 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                  leAudioDevice->cis_failed_to_be_established_retry_cnt_,
                  ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_));
         return;
+      }
+
+      if (event->status == HCI_ERR_UNSUPPORTED_REM_FEATURE &&
+          group->asymmetric_phy_for_unidirectional_cis_supported == true &&
+          group->GetSduInterval(le_audio::types::kLeAudioDirectionSource) ==
+              0) {
+        group->asymmetric_phy_for_unidirectional_cis_supported = false;
       }
 
       LOG_ERROR("CIS creation failed %d times, stopping the stream",
@@ -1442,8 +1462,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     // Use 1M Phy for the ACK packet from remote device to phone for better
     // sensitivity
-    if (IS_FLAG_ENABLED(asymmetric_phy_for_unidirectional_cis) &&
-        max_sdu_size_stom == 0 &&
+    if (group->asymmetric_phy_for_unidirectional_cis_supported &&
+        sdu_interval_stom == 0 &&
         (phy_stom & bluetooth::hci::kIsoCigPhy1M) != 0) {
       LOG_INFO("Use asymmetric PHY for unidirectional CIS");
       phy_stom = bluetooth::hci::kIsoCigPhy1M;
@@ -2869,7 +2889,11 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         }
 
         /* Not all CISes establish events will came */
-        if (!group->IsGroupStreamReady()) return;
+        if (!group->IsGroupStreamReady()) {
+          LOG_INFO("CISes are not yet ready, wait for it.");
+          group->SetNotifyStreamingWhenCisesAreReadyFlag(true);
+          return;
+        }
 
         if (group->GetTargetState() ==
             AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {

@@ -30,6 +30,7 @@ import android.util.ArrayMap;
 import android.util.SparseArray;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -269,7 +270,7 @@ public final class AdvertiseData implements Parcelable {
                 mIncludePublicBroadcastDeviceName,
                 mPublicBroadcastDeviceName,
                 mPublicBroadcastDeviceNameEnc,
-                mEncryptedKeyMaterialValue);
+                Arrays.hashCode(mEncryptedKeyMaterialValue));
     }
 
     /** @hide */
