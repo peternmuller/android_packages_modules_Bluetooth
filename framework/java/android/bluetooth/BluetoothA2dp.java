@@ -308,6 +308,7 @@ public final class BluetoothA2dp implements BluetoothProfile {
     }
 
     @Override
+    @SuppressWarnings("Finalize") // empty finalize for api signature
     public void finalize() {
         // The empty finalize needs to be kept or the
         // cts signature tests would fail.
@@ -543,7 +544,6 @@ public final class BluetoothA2dp implements BluetoothProfile {
      * #PRIORITY_OFF}
      *
      * @param device Paired bluetooth device
-     * @param priority
      * @return true if priority is set, false on error
      * @hide
      */
