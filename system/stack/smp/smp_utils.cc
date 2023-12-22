@@ -28,6 +28,8 @@
 
 #include "crypto_toolbox/crypto_toolbox.h"
 #include "device/include/controller.h"
+#include "internal_include/bt_target.h"
+#include "internal_include/stack_config.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
@@ -38,13 +40,13 @@
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_octets.h"
+#include "stack/include/bt_types.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_sec_api.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/l2c_api.h"
 #include "stack/include/smp_status.h"
 #include "stack/include/stack_metrics_logging.h"
-#include "stack_config.h"
 #include "types/raw_address.h"
 
 #define SMP_PAIRING_REQ_SIZE 7

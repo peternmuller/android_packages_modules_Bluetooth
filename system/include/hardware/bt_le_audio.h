@@ -431,7 +431,7 @@ struct BasicAudioAnnouncementSubgroup {
 
 struct BasicAudioAnnouncementData {
   /* Announcement Header fields */
-  uint32_t presentation_delay;
+  uint32_t presentation_delay_us;
 
   /* Subgroup specific configurations */
   std::vector<BasicAudioAnnouncementSubgroup> subgroup_configs;

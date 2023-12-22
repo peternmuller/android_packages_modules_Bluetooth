@@ -446,9 +446,6 @@ public final class BluetoothUuid {
     /**
      * Extract the Service Identifier or the actual uuid from the Parcel Uuid. For example, if
      * 0000110B-0000-1000-8000-00805F9B34FB is the parcel Uuid, this function will return 110B
-     *
-     * @param parcelUuid
-     * @return the service identifier.
      */
     private static int getServiceIdentifierFromParcelUuid(ParcelUuid parcelUuid) {
         UUID uuid = parcelUuid.getUuid();
@@ -549,7 +546,6 @@ public final class BluetoothUuid {
     /**
      * Check whether the given parcelUuid can be converted to 16 bit bluetooth uuid.
      *
-     * @param parcelUuid
      * @return true if the parcelUuid can be converted to 16 bit uuid, false otherwise.
      * @hide
      */
@@ -565,7 +561,6 @@ public final class BluetoothUuid {
     /**
      * Check whether the given parcelUuid can be converted to 32 bit bluetooth uuid.
      *
-     * @param parcelUuid
      * @return true if the parcelUuid can be converted to 32 bit uuid, false otherwise.
      * @hide
      */

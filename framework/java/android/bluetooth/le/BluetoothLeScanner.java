@@ -96,9 +96,6 @@ public final class BluetoothLeScanner {
     /**
      * Use {@link BluetoothAdapter#getBluetoothLeScanner()} instead.
      *
-     * @param bluetoothManager BluetoothManager that conducts overall Bluetooth Management.
-     * @param opPackageName The opPackageName of the context this object was created from
-     * @param featureId The featureId of the context this object was created from
      * @hide
      */
     public BluetoothLeScanner(BluetoothAdapter bluetoothAdapter) {
@@ -309,8 +306,6 @@ public final class BluetoothLeScanner {
 
     /**
      * Stops an ongoing Bluetooth LE scan.
-     *
-     * @param callback
      */
     @RequiresLegacyBluetoothAdminPermission
     @RequiresBluetoothScanPermission
@@ -347,6 +342,7 @@ public final class BluetoothLeScanner {
             gatt.stopScanForIntent(callbackIntent, mAttributionSource, recv);
             recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(null);
         } catch (TimeoutException | RemoteException e) {
+            Log.e(TAG, "Failed to stop scan", e);
         }
     }
 
@@ -438,6 +434,7 @@ public final class BluetoothLeScanner {
             mScannerId = 0;
         }
 
+        @SuppressWarnings("WaitNotInLoop") // TODO(b/314811467)
         public void startRegistration() {
             synchronized (this) {
                 // Scan stopped.
