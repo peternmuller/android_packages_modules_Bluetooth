@@ -30,11 +30,12 @@
 
 #include <cerrno>
 
-#include "bta_api.h"
 #include "bta_hh_api.h"
 #include "btif_hh.h"
 #include "device/include/controller.h"
 #include "device/include/interop.h"
+#include "include/check.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
 #include "osi/include/osi.h"

@@ -31,6 +31,7 @@
 #include "btif_common.h"
 #include "common/message_loop_thread.h"
 #include "core_callbacks.h"
+#include "include/check.h"
 #include "main/shim/shim.h"
 #include "os/log.h"
 #include "osi/include/osi.h"
@@ -106,8 +107,6 @@ static_assert(
     "  Host interface device profile is always enabled in the bluetooth stack"
     "*** Conditional Compilation Directive error");
 
-void main_thread_shut_down();
-void main_thread_start_up();
 void BTA_dm_on_hw_on();
 void BTA_dm_on_hw_off();
 

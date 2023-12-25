@@ -19,8 +19,8 @@
 
 #include "abstract_message_loop.h"
 #include "avrcp_common.h"
-#include "connection_handler.h"
 #include "os/logging/log_adapter.h"
+#include "include/check.h"
 #include "internal_include/stack_config.h"
 #include "packet/avrcp/avrcp_reject_packet.h"
 #include "packet/avrcp/general_reject_packet.h"

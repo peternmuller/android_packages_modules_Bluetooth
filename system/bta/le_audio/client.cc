@@ -41,6 +41,8 @@
 #include "device/include/controller.h"
 #include "devices.h"
 #include "gd/common/strings.h"
+#include "include/check.h"
+#include "internal_include/bt_trace.h"
 #include "internal_include/stack_config.h"
 #include "le_audio_health_status.h"
 #include "le_audio_set_configuration_provider.h"
@@ -2064,7 +2066,7 @@ class LeAudioClientImpl : public LeAudioClient {
     BTA_GATTC_CancelOpen(gatt_if_, address, false);
     BTA_GATTC_Open(gatt_if_, address, reconnection_mode_, false);
 
-    if (controller_get_interface()->supports_ble_2m_phy()) {
+    if (controller_get_interface()->SupportsBle2mPhy()) {
       LOG(INFO) << ADDRESS_TO_LOGGABLE_STR(address)
                 << " set preferred PHY to 2M";
       BTM_BleSetPhy(address, PHY_LE_2M, PHY_LE_2M, 0);
@@ -2282,12 +2284,7 @@ class LeAudioClientImpl : public LeAudioClient {
         base::BindOnce(
             &LeAudioClientImpl::checkGroupConnectionStateAfterMemberDisconnect,
             weak_factory_.GetWeakPtr(), group_id),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kGroupConnectedWatchDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kGroupConnectedWatchDelayMs));
   }
 
   void autoConnect(RawAddress address) {
@@ -2307,12 +2304,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::autoConnect,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kAutoConnectAfterOwnDisconnectDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kAutoConnectAfterOwnDisconnectDelayMs));
   }
 
   void recoveryReconnect(RawAddress address) {
@@ -2346,12 +2338,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::recoveryReconnect,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kRecoveryReconnectDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kRecoveryReconnectDelayMs));
   }
 
   void checkIfGroupMember(RawAddress address) {
@@ -2387,12 +2374,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::checkIfGroupMember,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kCsisGroupMemberDelayMs)
-#else
-        base::Milliseconds(kCsisGroupMemberDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kCsisGroupMemberDelayMs));
   }
 
   void OnGattDisconnected(uint16_t conn_id, tGATT_IF client_if,
@@ -3198,12 +3180,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::restartAttachToTheStream,
                        weak_factory_.GetWeakPtr(), addr),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kDeviceAttachDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kDeviceAttachDelayMs));
   }
 
   void SendAudioGroupSelectableCodecConfigChanged(LeAudioDeviceGroup* group) {
@@ -6059,9 +6036,9 @@ void LeAudioClient::Initialize(
   }
 
   if (!controller_get_interface()
-           ->supports_ble_connected_isochronous_stream_central() &&
+           ->SupportsBleConnectedIsochronousStreamCentral() &&
       !controller_get_interface()
-           ->supports_ble_connected_isochronous_stream_peripheral()) {
+           ->SupportsBleConnectedIsochronousStreamPeripheral()) {
     LOG(ERROR) << "Controller reports no ISO support."
                   " LeAudioClient Init aborted.";
     return;
