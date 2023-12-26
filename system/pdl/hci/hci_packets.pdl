@@ -459,6 +459,7 @@ enum OpCode : 16 {
   // MSFT_OPCODE_xxxx below are needed for the tests.
   MSFT_OPCODE_MEDIATEK = 0xFD30,
   MSFT_OPCODE_QUALCOMM = 0xFD70,
+  HCI_VS_QBCE_OCF = 0xFC51,
 }
 
 // For mapping Local Supported Commands command
@@ -906,6 +907,8 @@ enum SubeventCode : 8 {
 
 // Vendor specific events
 enum VseSubeventCode : 8 {
+  QBCE_VS_PARAM_REPORT_EVENT = 0x12,
+  QBCE_VS_EVENT = 0x51,
   BLE_THRESHOLD = 0x54,
   BLE_STCHANGE = 0x55,
   BLE_TRACKING = 0x56,
@@ -6841,6 +6844,12 @@ packet VendorSpecificEvent : Event (event_code = VENDOR_SPECIFIC) {
 packet StorageThresholdBreachEvent : VendorSpecificEvent (subevent_code = BLE_THRESHOLD) {
 }
 
+packet QBCEVendorSpecificEvent : VendorSpecificEvent (subevent_code = QBCE_VS_EVENT) {
+  msg_type : 8,
+  status : ErrorCode,
+  connection_handle : 16,
+}
+
 enum AdvtInfoPresent : 8 {
   ADVT_INFO_PRESENT = 0x00,
   NO_ADVT_INFO_PRESENT = 0x01,
@@ -7213,3 +7222,59 @@ test MsftLeMonitorDeviceEventPayload {
   "\x02\x01\x00\x01\x02\x03\x04\x05\x10\x00",
   "\x02\x02\xf0\xf1\xf2\xf3\xf4\xf5\xaa\x02",
 }
+
+enum QBCESubcommandOpcode : 8 {
+  QBCE_SET_QHS_HOST_MODE = 0x01,
+  QBCE_SET_QLL_EVENT_MASK = 0x10,
+  QBCE_SET_QLM_EVENT_MASK = 0x0f,
+  QBCE_READ_LOCAL_QLL_SUPPORTED_FEATURES = 0x0b,
+  QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURES = 0x0c,
+  QBCE_QLE_SET_HOST_FEATURE = 0x14,
+}
+
+packet QBCECommand : Command {
+  subcommand_opcode: QBCESubcommandOpcode,
+  _payload_,
+}
+
+packet QBCECommandComplete : CommandComplete {
+  status: ErrorCode,
+  subcommand_opcode: QBCESubcommandOpcode,
+  _payload_,
+}
+
+packet QBCESetQHSHostMode : QBCECommand (subcommand_opcode = QBCE_SET_QHS_HOST_MODE) {
+  transport: 8,
+  mode: 8,
+}
+
+packet QBCESetQHSHostModeCommandComplete : QBCECommandComplete (subcommand_opcode = QBCE_SET_QHS_HOST_MODE) {}
+
+packet QBCESetQLLEvtMask : QBCECommand (subcommand_opcode = QBCE_SET_QLL_EVENT_MASK) {
+  mask: 8[8],
+}
+
+packet QBCESetQLLEvtMaskCommandComplete : QBCECommandComplete (subcommand_opcode = QBCE_SET_QLL_EVENT_MASK) {}
+
+packet QBCESetQLMEvtMask : QBCECommand (subcommand_opcode = QBCE_SET_QLM_EVENT_MASK) {
+  mask: 8[8],
+}
+
+packet QBCESetQLMEvtMaskCommandComplete : QBCECommandComplete (subcommand_opcode = QBCE_SET_QLM_EVENT_MASK) {}
+
+packet QBCEReadLocalQLLSupportedFeatures : QBCECommand (subcommand_opcode = QBCE_READ_LOCAL_QLL_SUPPORTED_FEATURES) {}
+
+packet QBCEReadLocalQLLSupportedFeaturesCommandComplete : QBCECommandComplete (subcommand_opcode = QBCE_READ_LOCAL_QLL_SUPPORTED_FEATURES) {}
+
+packet QBCEQLESetHostFeature : QBCECommand (subcommand_opcode = QBCE_QLE_SET_HOST_FEATURE) {
+  bit_num: 8,
+  bit_val: 8,
+}
+
+packet QBCEQLESetHostFeatureCommandComplete : QBCECommandComplete (subcommand_opcode = QBCE_QLE_SET_HOST_FEATURE) {}
+
+packet QBCEReadRemoteQLLSupportedFeatures : QBCECommand (subcommand_opcode = QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURES) {
+  connection_handle : 16,
+}
+
+packet QBCECommandStatus : CommandStatus (command_op_code = HCI_VS_QBCE_OCF) {}

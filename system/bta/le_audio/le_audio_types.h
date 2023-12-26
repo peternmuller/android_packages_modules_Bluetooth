@@ -1145,7 +1145,7 @@ static constexpr uint32_t kChannelAllocationStereo =
     codec_spec_conf::kLeAudioLocationFrontRight;
 
 /* Declarations */
-void get_cis_count(const AudioSetConfigurations& audio_set_configurations,
+void get_cis_count(types::LeAudioContextType context_type,
                    int expected_device_cnt,
                    types::LeAudioConfigurationStrategy strategy,
                    int group_ase_snk_cnt, int group_ase_src_count,
@@ -1175,7 +1175,8 @@ struct stream_parameters {
   /* Total number of channels we request from the audio framework */
   uint8_t num_of_channels;
   int num_of_devices;
-
+  uint8_t mode;
+  uint16_t delay;
   std::vector<uint8_t> codec_spec_metadata;
 
   /* cis_handle, audio location*/

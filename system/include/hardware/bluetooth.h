@@ -27,6 +27,8 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
+#include <vector>
+
 #include "avrcp/avrcp.h"
 #include "base/functional/callback.h"
 #include "bluetooth/uuid.h"
@@ -749,6 +751,8 @@ typedef struct {
 
   /** Cancel Bond */
   int (*cancel_bond)(const RawAddress* bd_addr);
+
+  bool (*pairing_is_busy)();
 
   /**
    * Get the connection status for a given remote device.

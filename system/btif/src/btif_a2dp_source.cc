@@ -36,21 +36,19 @@
 #include "audio_a2dp_hw/include/audio_a2dp_hw.h"
 #include "audio_hal_interface/a2dp_encoding.h"
 #include "bta_av_ci.h"
-#include "btif_a2dp.h"
 #include "btif_a2dp_control.h"
 #include "btif_a2dp_source.h"
 #include "btif_av.h"
 #include "btif_av_co.h"
 #include "btif_metrics_logging.h"
-#include "btif_util.h"
 #include "common/message_loop_thread.h"
 #include "common/metrics.h"
 #include "common/repeating_timer.h"
 #include "common/time_util.h"
+#include "include/check.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/fixed_queue.h"
-#include "osi/include/log.h"
-#include "osi/include/osi.h"
 #include "osi/include/wakelock.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/acl_api_types.h"
@@ -826,11 +824,7 @@ static void btif_a2dp_source_audio_tx_start_event(void) {
   btif_a2dp_source_cb.media_alarm.SchedulePeriodic(
       btif_a2dp_source_thread.GetWeakPtr(), FROM_HERE,
       base::BindRepeating(&btif_a2dp_source_audio_handle_timer),
-#if BASE_VER < 931007
-      base::TimeDelta::FromMilliseconds(
-#else
-      base::Milliseconds(
-#endif
+      std::chrono::milliseconds(
           btif_a2dp_source_cb.encoder_interface->get_encoder_interval_ms()));
   btif_a2dp_source_cb.sw_audio_is_encoding = true;
 

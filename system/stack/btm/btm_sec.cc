@@ -43,6 +43,7 @@
 #include "common/time_util.h"
 #include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
+#include "device/include/interop.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
 #include "osi/include/allocator.h"
@@ -80,6 +81,7 @@ constexpr char kBtmLogTag[] = "SEC";
 extern tBTM_CB btm_cb;
 
 #define BTM_SEC_MAX_COLLISION_DELAY (5000)
+#define BTM_SEC_START_AUTH_DELAY (200)
 
 #define BTM_SEC_IS_SM4(sm) ((bool)(BTM_SM4_TRUE == ((sm)&BTM_SM4_TRUE)))
 #define BTM_SEC_IS_SM4_LEGACY(sm) ((bool)(BTM_SM4_KNOWN == ((sm)&BTM_SM4_TRUE)))
@@ -671,7 +673,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
         BTM_SEC_ROLE_SWITCHED | BTM_SEC_LINK_KEY_AUTHED);
 
   LOG_VERBOSE("after update sec_flags=0x%x", p_dev_rec->sec_rec.sec_flags);
-  if (!controller_get_interface()->supports_simple_pairing()) {
+  if (!controller_get_interface()->SupportsSimplePairing()) {
     /* The special case when we authenticate keyboard.  Set pin type to fixed */
     /* It would be probably better to do it from the application, but it is */
     /* complicated */
@@ -703,7 +705,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
   }
 
   LOG_VERBOSE("sec mode: %d sm4:x%x", btm_sec_cb.security_mode, p_dev_rec->sm4);
-  if (!controller_get_interface()->supports_simple_pairing() ||
+  if (!controller_get_interface()->SupportsSimplePairing() ||
       (p_dev_rec->sm4 == BTM_SM4_KNOWN)) {
     if (btm_sec_check_prefetch_pin(p_dev_rec)) return (BTM_CMD_STARTED);
   }
@@ -1305,7 +1307,7 @@ void BTM_RemoteOobDataReply(tBTM_STATUS res, const RawAddress& bd_addr,
  *
  ******************************************************************************/
 bool BTM_BothEndsSupportSecureConnections(const RawAddress& bd_addr) {
-  return ((controller_get_interface()->supports_secure_connections()) &&
+  return ((controller_get_interface()->SupportsSecureConnections()) &&
           (BTM_PeerSupportsSecureConnections(bd_addr)));
 }
 
@@ -1478,7 +1480,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
 
   if ((!is_originator) && (security_required & BTM_SEC_MODE4_LEVEL4)) {
     bool local_supports_sc =
-        controller_get_interface()->supports_secure_connections();
+        controller_get_interface()->SupportsSecureConnections();
     /* acceptor receives L2CAP Channel Connect Request for Secure Connections
      * Only service */
     if (!local_supports_sc || !p_dev_rec->SupportsSecureConnections()) {
@@ -1824,7 +1826,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
   if ((!is_originator) && ((security_required & BTM_SEC_MODE4_LEVEL4) ||
                            (btm_sec_cb.security_mode == BTM_SEC_MODE_SC))) {
     bool local_supports_sc =
-        controller_get_interface()->supports_secure_connections();
+        controller_get_interface()->SupportsSecureConnections();
     /* acceptor receives service connection establishment Request for */
     /* Secure Connections Only service */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
@@ -2057,7 +2059,7 @@ void btm_sec_check_pending_reqs(void) {
  *
  ******************************************************************************/
 void btm_sec_dev_reset(void) {
-  ASSERT_LOG(controller_get_interface()->supports_simple_pairing(),
+  ASSERT_LOG(controller_get_interface()->SupportsSimplePairing(),
              "only controllers with SSP is supported");
 
   /* set the default IO capabilities */
@@ -2516,7 +2518,7 @@ void btm_io_capabilities_req(RawAddress p) {
     err_code = HCI_ERR_PAIRING_NOT_ALLOWED;
   } else if (btm_sec_cb.security_mode == BTM_SEC_MODE_SC) {
     bool local_supports_sc =
-        controller_get_interface()->supports_secure_connections();
+        controller_get_interface()->SupportsSecureConnections();
     /* device in Secure Connections Only mode */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
       LOG_DEBUG(
@@ -4488,17 +4490,18 @@ static bool btm_sec_start_get_name(tBTM_SEC_DEV_REC* p_dev_rec) {
  ******************************************************************************/
 static void btm_sec_wait_and_start_authentication(tBTM_SEC_DEV_REC* p_dev_rec) {
   auto addr = new RawAddress(p_dev_rec->bd_addr);
-
-  static const int32_t delay_auth =
+  int32_t delay_auth =
       osi_property_get_int32("bluetooth.btm.sec.delay_auth_ms.value", 0);
+
+  /* Overwrite the system-wide authentication delay if device-specific
+   * interoperability delay is needed. */
+  if (interop_match_addr(INTEROP_DELAY_AUTH, addr)) {
+    delay_auth = BTM_SEC_START_AUTH_DELAY;
+  }
 
   bt_status_t status = do_in_main_thread_delayed(
       FROM_HERE, base::Bind(&btm_sec_auth_timer_timeout, addr),
-#if BASE_VER < 931007
-      base::TimeDelta::FromMilliseconds(delay_auth));
-#else
-      base::Milliseconds(delay_auth));
-#endif
+      std::chrono::milliseconds(delay_auth));
   if (status != BT_STATUS_SUCCESS) {
     LOG_ERROR("do_in_main_thread_delayed failed. directly calling");
     btm_sec_auth_timer_timeout(addr);

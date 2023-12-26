@@ -240,7 +240,7 @@ class LeAudioDevice {
   void PrintDebugState(void);
   void DumpPacsDebugState(std::stringstream& stream);
   void Dump(int fd);
-
+  RawAddress GetBdAddress(void);
   void DisconnectAcl(void);
   std::vector<uint8_t> GetMetadata(types::AudioContexts context_type,
                                    const std::vector<uint8_t>& ccid_list);

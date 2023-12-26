@@ -287,7 +287,7 @@ bool l2cble_conn_comp(uint16_t handle, uint8_t role, const RawAddress& bda,
 
   if (role == HCI_ROLE_PERIPHERAL) {
     if (!controller_get_interface()
-             ->supports_ble_peripheral_initiated_feature_exchange()) {
+             ->SupportsBlePeripheralInitiatedFeaturesExchange()) {
       p_lcb->link_state = LST_CONNECTED;
       l2cu_process_fixed_chnl_resp(p_lcb);
     }
@@ -341,12 +341,11 @@ static void l2cble_start_conn_update(tL2C_LCB* p_lcb) {
       supervision_tout = BTM_BLE_CONN_TIMEOUT_DEF;
 
       /* if both side 4.1, or we are central device, send HCI command */
-      if (p_lcb->IsLinkRoleCentral()
-          || (controller_get_interface()
-                  ->supports_ble_connection_parameter_request() &&
-              acl_peer_supports_ble_connection_parameters_request(
-                  p_lcb->remote_bd_addr))
-      ) {
+      if (p_lcb->IsLinkRoleCentral() ||
+          (controller_get_interface()
+               ->SupportsBleConnectionParametersRequest() &&
+           acl_peer_supports_ble_connection_parameters_request(
+               p_lcb->remote_bd_addr))) {
         btsnd_hcic_ble_upd_ll_conn_params(p_lcb->Handle(), min_conn_int,
                                           max_conn_int, peripheral_latency,
                                           supervision_tout, 0, 0);
@@ -362,12 +361,11 @@ static void l2cble_start_conn_update(tL2C_LCB* p_lcb) {
     /* application allows to do update, if we were delaying one do it now */
     if (p_lcb->conn_update_mask & L2C_BLE_NEW_CONN_PARAM) {
       /* if both side 4.1, or we are central device, send HCI command */
-      if (p_lcb->IsLinkRoleCentral()
-          || (controller_get_interface()
-                  ->supports_ble_connection_parameter_request() &&
-              acl_peer_supports_ble_connection_parameters_request(
-                  p_lcb->remote_bd_addr))
-      ) {
+      if (p_lcb->IsLinkRoleCentral() ||
+          (controller_get_interface()
+               ->SupportsBleConnectionParametersRequest() &&
+           acl_peer_supports_ble_connection_parameters_request(
+               p_lcb->remote_bd_addr))) {
         btsnd_hcic_ble_upd_ll_conn_params(p_lcb->Handle(), p_lcb->min_interval,
                                           p_lcb->max_interval, p_lcb->latency,
                                           p_lcb->timeout, p_lcb->min_ce_len,
@@ -1780,15 +1778,15 @@ static void l2cble_start_subrate_change(tL2C_LCB* p_lcb) {
     return;
   }
 
-  if (!controller_get_interface()->supports_ble_connection_subrating() ||
+  if (!controller_get_interface()->SupportsBleConnectionSubrating() ||
       !acl_peer_supports_ble_connection_subrating(p_lcb->remote_bd_addr) ||
       !acl_peer_supports_ble_connection_subrating_host(p_lcb->remote_bd_addr)) {
     LOG_VERBOSE(
         "%s: returning L2C_BLE_NEW_SUBRATE_PARAM local_host_sup=%d, "
         "local_conn_subrarte_sup=%d, peer_subrate_sup=%d, peer_host_sup=%d",
         __func__,
-        controller_get_interface()->supports_ble_connection_subrating_host(),
-        controller_get_interface()->supports_ble_connection_subrating(),
+        controller_get_interface()->SupportsBleConnectionSubratingHost(),
+        controller_get_interface()->SupportsBleConnectionSubrating(),
         acl_peer_supports_ble_connection_subrating(p_lcb->remote_bd_addr),
         acl_peer_supports_ble_connection_subrating_host(p_lcb->remote_bd_addr));
     return;

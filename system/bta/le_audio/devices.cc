@@ -23,6 +23,7 @@
 #include "android_bluetooth_flags.h"
 #include "bta_gatt_queue.h"
 #include "btif_storage.h"
+#include "internal_include/bt_trace.h"
 
 using bluetooth::hci::kIsoCigPhy1M;
 using bluetooth::hci::kIsoCigPhy2M;
@@ -899,6 +900,10 @@ void LeAudioDevice::Dump(int fd) {
   stream << "\n\t====";
 
   dprintf(fd, "%s", stream.str().c_str());
+}
+
+RawAddress LeAudioDevice::GetBdAddress(void) {
+  return address_;
 }
 
 void LeAudioDevice::DisconnectAcl(void) {

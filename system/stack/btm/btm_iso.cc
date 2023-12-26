@@ -23,6 +23,7 @@
 
 using bluetooth::hci::iso_manager::BigCallbacks;
 using bluetooth::hci::iso_manager::CigCallbacks;
+using bluetooth::hci::iso_manager::VscCallback;
 using bluetooth::hci::iso_manager::iso_impl;
 
 namespace bluetooth {
@@ -59,6 +60,10 @@ void IsoManager::RegisterCigCallbacks(CigCallbacks* callbacks) const {
 
 void IsoManager::RegisterBigCallbacks(BigCallbacks* callbacks) const {
   pimpl_->iso_impl_->handle_register_big_callbacks(callbacks);
+}
+
+void IsoManager::RegisterVscCallback(VscCallback* callback) const {
+  pimpl_->iso_impl_->handle_register_vsc_callback(callback);
 }
 
 void IsoManager::RegisterOnIsoTrafficActiveCallback(void callback(bool)) const {
@@ -140,6 +145,12 @@ void IsoManager::HandleHciEvent(uint8_t sub_code, uint8_t* params,
                                 uint16_t length) {
   if (pimpl_->IsRunning())
     pimpl_->iso_impl_->on_iso_event(sub_code, params, length);
+}
+
+void IsoManager::HandleVscHciEvent(uint8_t sub_code, uint8_t* params,
+                                uint16_t length) {
+  if (pimpl_->IsRunning())
+    pimpl_->iso_impl_->on_vsc_event(sub_code, params, length);
 }
 
 void IsoManager::Start() {

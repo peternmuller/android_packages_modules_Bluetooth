@@ -27,6 +27,7 @@
 #include "a2dp_ext.h"
 #include "a2dp_sbc.h"
 #include "a2dp_vendor.h"
+#include "include/check.h"
 
 #if !defined(EXCLUDE_NONSTANDARD_CODECS)
 #include "a2dp_vendor_aptx.h"
@@ -38,7 +39,8 @@
 #include "audio_hal_interface/a2dp_encoding.h"
 #include "bta/av/bta_av_int.h"
 #include "device/include/device_iot_config.h"
-#include "osi/include/log.h"
+#include "internal_include/bt_trace.h"
+#include "os/log.h"
 #include "osi/include/properties.h"
 #include "stack/include/bt_hdr.h"
 

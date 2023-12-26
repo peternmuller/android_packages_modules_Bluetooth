@@ -38,6 +38,7 @@
 #include "common/init_flags.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
+#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "main/shim/hci_layer.h"
@@ -397,7 +398,11 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id,
     } break;
 
     case HCI_VENDOR_SPECIFIC_EVT:
+      uint8_t vsc_sub_code;
       btm_vendor_specific_evt(const_cast<const uint8_t*>(p), hci_evt_len);
+      STREAM_TO_UINT8(vsc_sub_code, p);
+      IsoManager::GetInstance()->HandleVscHciEvent(vsc_sub_code, p,
+                                                hci_evt_len - 1);
       break;
 
       // Events now captured by gd::hci_layer module
@@ -1660,7 +1665,7 @@ static void btu_ble_data_length_change_evt(uint8_t* p, uint16_t evt_len) {
   uint16_t tx_data_len;
   uint16_t rx_data_len;
 
-  if (!controller_get_interface()->supports_ble_packet_extension()) {
+  if (!controller_get_interface()->SupportsBleDataPacketLengthExtension()) {
     LOG_WARN("%s, request not supported", __func__);
     return;
   }

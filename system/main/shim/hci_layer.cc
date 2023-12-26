@@ -26,10 +26,12 @@
 #include "common/bidi_queue.h"
 #include "common/init_flags.h"
 #include "hci/acl_connection_interface.h"
+#include "hci/controller.h"
 #include "hci/hci_layer.h"
 #include "hci/hci_packets.h"
 #include "hci/include/packet_fragmenter.h"
 #include "hci/vendor_specific_event_manager.h"
+#include "include/check.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
@@ -300,6 +302,21 @@ static BT_HDR* WrapPacketAndCopy(
   return packet;
 }
 
+void vs_event_callback(
+               bluetooth::hci::VendorSpecificEventView event) {
+  auto view = bluetooth::hci::QBCEVendorSpecificEventView::Create(event);
+  ASSERT(view.IsValid());
+  uint8_t msg_type = view.GetMsgType();
+  if (msg_type == 0x09) {
+    uint16_t conn_handle = view.GetConnectionHandle();
+    bluetooth::shim::GetHciLayer()->EnqueueCommand(
+      bluetooth::hci::QBCEReadRemoteQLLSupportedFeaturesBuilder::Create(bluetooth::hci::OpCode::HCI_VS_QBCE_OCF, conn_handle),
+       bluetooth::shim::GetGdShimHandler()->BindOnce([](bluetooth::hci::CommandStatusView command_status) {
+          LOG_INFO("command_status=%hhu ", command_status.GetStatus());
+       }));
+  }
+}
+
 static void event_callback(bluetooth::hci::EventView event_packet_view) {
   if (!send_data_upwards) {
     return;
@@ -412,6 +429,16 @@ static void register_event(bluetooth::hci::EventCode event_code) {
       event_code, handler->Bind(event_callback));
 }
 
+static void register_vs_event(){
+    auto handler = bluetooth::shim::GetGdShimHandler();
+    bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
+        bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
+        handler->Bind(cpp::vs_event_callback));
+    bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
+        bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
+        handler->Bind(cpp::vendor_specific_event_callback));
+}
+
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {
   auto handler = bluetooth::shim::GetGdShimHandler();
   bluetooth::shim::GetHciLayer()->RegisterLeEventHandler(
@@ -514,9 +541,10 @@ static void dispatch_reassembled(BT_HDR* packet) {
 static const packet_fragmenter_callbacks_t packet_fragmenter_callbacks = {
     transmit_fragment, dispatch_reassembled};
 
-static void transmit_downward(uint16_t type, void* raw_data) {
+static void transmit_downward(void* raw_data, uint16_t iso_buffer_size) {
   bluetooth::shim::GetGdShimHandler()->Call(
-      packet_fragmenter->fragment_and_dispatch, static_cast<BT_HDR*>(raw_data));
+      packet_fragmenter->fragment_and_dispatch, static_cast<BT_HDR*>(raw_data),
+      iso_buffer_size);
 }
 
 static hci_t interface = {.set_data_cb = set_data_cb,
@@ -572,6 +600,7 @@ void bluetooth::shim::hci_on_reset_complete() {
       bluetooth::hci::VseSubeventCode::BQR_EVENT,
       handler->Bind(cpp::vendor_specific_event_callback));
 
+  cpp::register_vs_event();
   cpp::register_for_iso();
 }
 
