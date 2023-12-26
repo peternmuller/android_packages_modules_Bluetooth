@@ -160,6 +160,11 @@ struct codec_manager_impl {
       if (stream_params.get(direction).stream_locations.empty()) {
         continue;
       }
+      uint16_t delay = 0;
+      if (stream_params.get(direction).delay != 0xFFFF)
+        delay = stream_params.get(direction).delay;
+      else
+	delay = delays_ms.get(direction);
 
       le_audio::offload_config unicast_cfg = {
           .stream_map = (stream_map.is_initial ||
@@ -177,6 +182,8 @@ struct codec_manager_impl {
           .blocks_per_sdu =
               stream_params.get(direction).codec_frames_blocks_per_sdu,
           .peer_delay_ms = delays_ms.get(direction),
+          .mode = stream_params.get(direction).mode,
+          .delay = delay,
           .codec_metadata = stream_params.get(direction).codec_spec_metadata,
       };
       update_receiver(unicast_cfg, direction);
@@ -616,6 +623,11 @@ struct codec_manager_impl {
         if (IsAudioSetConfigurationMatched(software_audio_set_conf,
                                            offload_preference_set,
                                            adsp_capabilities)) {
+	  if (!osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) &&
+	    software_audio_set_conf->confs[0].codec.id ==
+	      le_audio::set_configurations::LeAudioCodecIdAptxLeX){
+            continue;
+	  }
           LOG(INFO) << "Offload supported conf, context type: " << (int)ctx_type
                     << ", settings -> " << software_audio_set_conf->name;
           if (AudioSetConfigurationProvider::Get()

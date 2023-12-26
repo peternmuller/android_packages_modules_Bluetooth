@@ -65,7 +65,6 @@ void btm_pm_reset(void);
                 */
 
 #define BTM_INFO_TIMEOUT 5 /* 5 seconds for info response */
-
 /******************************************************************************/
 /*            L O C A L    F U N C T I O N     P R O T O T Y P E S            */
 /******************************************************************************/
@@ -507,6 +506,17 @@ tBTM_STATUS BTM_RegisterForVSEvents(tBTM_VS_EVT_CB* p_cb, bool is_register) {
   }
 
   return (retval);
+}
+
+void btm_ble_read_remote_supported_qll_features_status_cback(tBTM_VSC_CMPL* param) {
+  uint8_t status;
+
+  LOG_VERBOSE("%s, op: %x, param_len: %d", __func__, param->opcode,
+                     param->param_len);
+  if (param->param_len == 1) {
+    status = *param->p_param_buf;
+    LOG_VERBOSE("%s, status = %d", __func__, status);
+  }
 }
 
 /*******************************************************************************

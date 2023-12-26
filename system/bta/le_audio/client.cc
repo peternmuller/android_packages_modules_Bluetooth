@@ -58,6 +58,9 @@
 #include "state_machine.h"
 #include "storage_helper.h"
 
+#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
+#define VS_QHCI_USECASE_UPDATE 0x15
+
 using base::Closure;
 using bluetooth::Uuid;
 using bluetooth::common::ToString;
@@ -67,6 +70,7 @@ using bluetooth::hci::IsoManager;
 using bluetooth::hci::iso_manager::cig_create_cmpl_evt;
 using bluetooth::hci::iso_manager::cig_remove_cmpl_evt;
 using bluetooth::hci::iso_manager::CigCallbacks;
+using bluetooth::hci::iso_manager::VscCallback;
 using bluetooth::le_audio::ConnectionState;
 using bluetooth::le_audio::GroupNodeStatus;
 using bluetooth::le_audio::GroupStatus;
@@ -181,6 +185,7 @@ std::mutex instance_mutex;
 LeAudioSourceAudioHalClient::Callbacks* audioSinkReceiver;
 LeAudioSinkAudioHalClient::Callbacks* audioSourceReceiver;
 CigCallbacks* stateMachineHciCallbacks;
+VscCallback* stateMachineVscHciCallback;
 LeAudioGroupStateMachine::Callbacks* stateMachineCallbacks;
 DeviceGroupsCallbacks* device_group_callbacks;
 
@@ -4994,6 +4999,16 @@ class LeAudioClientImpl : public LeAudioClient {
     return remote_metadata;
   }
 
+  void btif_acm_send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type) {
+    uint8_t param[4] = {0};
+    param[0] = VS_QHCI_USECASE_UPDATE;
+    param[1] = (BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0x00FF;
+    param[2] = ((BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0xFF00) >> 8;
+    param[3] = (uint8_t)content_type;
+    //BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+    btsnd_hcic_vendor_spec_cmd(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+  }
+
   /* Return true if stream is started */
   bool ReconfigureOrUpdateRemote(LeAudioDeviceGroup* group,
                                  int remote_direction) {
@@ -5086,6 +5101,9 @@ class LeAudioClientImpl : public LeAudioClient {
         new_config_context = configuration_context_type_;
       }
     }
+
+    btif_acm_send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+        static_cast<uint16_t>(new_config_context));
 
     /* Note that the remote device metadata was so far unfiltered when it comes
      * to group context availability, or multiple contexts support flag, so that
@@ -5357,6 +5375,19 @@ class LeAudioClientImpl : public LeAudioClient {
 
     instance->groupStateMachine_->ProcessHciNotifRemoveIsoDataPath(
         group, leAudioDevice, status, conn_handle);
+  }
+
+  void QhciVscEvt(uint16_t delay, uint8_t mode) {
+    auto group = aseGroups_.FindById(active_group_id_);
+    if (!group) {
+      LOG_ERROR("Invalid group: %d", active_group_id_);
+      return;
+    }
+    LOG_WARN("QhciVscEvt: %d delay %d mode.", delay, mode);
+    if (delay != 0xFFFF)
+      group->stream_conf.stream_params.sink.delay = delay;
+    if (mode != 0xFF)
+      group->stream_conf.stream_params.sink.mode = mode;
   }
 
   void IsoLinkQualityReadCb(
@@ -5871,6 +5902,15 @@ class LeAudioStateMachineHciCallbacksImpl : public CigCallbacks {
 
 LeAudioStateMachineHciCallbacksImpl stateMachineHciCallbacksImpl;
 
+class LeAudioStateMachineVscHciCallbackImpl : public VscCallback {
+  public:
+    void OnVscEvent(uint16_t delay, uint8_t mode) override {
+      if (instance) instance->QhciVscEvt(delay, mode);
+    }
+};
+
+LeAudioStateMachineVscHciCallbackImpl stateMachineVscHciCallbackImpl;
+
 class CallbacksImpl : public LeAudioGroupStateMachine::Callbacks {
  public:
   void StatusReportCb(int group_id, GroupStreamStatus status) override {
@@ -6055,10 +6095,12 @@ void LeAudioClient::Initialize(
   audioSourceReceiver = &audioSourceReceiverImpl;
   stateMachineHciCallbacks = &stateMachineHciCallbacksImpl;
   stateMachineCallbacks = &stateMachineCallbacksImpl;
+  stateMachineVscHciCallback = &stateMachineVscHciCallbackImpl;
   device_group_callbacks = &deviceGroupsCallbacksImpl;
   instance = new LeAudioClientImpl(callbacks_, stateMachineCallbacks, initCb);
 
   IsoManager::GetInstance()->RegisterCigCallbacks(stateMachineHciCallbacks);
+  IsoManager::GetInstance()->RegisterVscCallback(stateMachineVscHciCallback);
   CodecManager::GetInstance()->Start(offloading_preference);
   ContentControlIdKeeper::GetInstance()->Start();
 

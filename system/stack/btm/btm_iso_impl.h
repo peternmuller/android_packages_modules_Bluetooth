@@ -110,6 +110,11 @@ struct iso_impl {
     big_callbacks_ = callbacks;
   }
 
+  void handle_register_vsc_callback(VscCallback* callback) {
+    LOG_ASSERT(callback != nullptr) << "Invalid VSC callback";
+    vsc_callback_ = callback;
+  }
+
   void handle_register_on_iso_traffic_active_callback(void callback(bool)) {
     LOG_ASSERT(callback != nullptr) << "Invalid OnIsoTrafficActive callback";
     const std::lock_guard<std::mutex> lock(
@@ -837,6 +842,25 @@ struct iso_impl {
     }
   }
 
+  void process_param_report(uint16_t packet_len, uint8_t* packet) {
+    uint16_t delay;
+    uint8_t mode;
+    LOG_ASSERT(vsc_callback_ != nullptr) << "Invalid VSC callback";
+    STREAM_TO_UINT16(delay, packet);
+    STREAM_TO_UINT8(mode, packet);
+    vsc_callback_->OnVscEvent(delay, mode);
+  }
+
+  void on_vsc_event(uint8_t code, uint8_t* packet, uint16_t packet_len) {
+    switch (code) {
+      case HCI_VSE_SUBCODE_PARAMS_REPORT:
+        process_param_report(packet_len, packet);
+        break;
+      default:
+        LOG_ERROR("Unhandled event code %d", +code);
+    }
+  }
+
   void handle_iso_data(BT_HDR* p_msg) {
     const uint8_t* stream = p_msg->data;
     cis_data_evt evt;
@@ -994,6 +1018,7 @@ struct iso_impl {
   uint32_t last_big_create_req_sdu_itv_;
 
   CigCallbacks* cig_callbacks_ = nullptr;
+  VscCallback* vsc_callback_ = nullptr;
   BigCallbacks* big_callbacks_ = nullptr;
   std::mutex on_iso_traffic_active_callbacks_list_mutex_;
   std::list<void (*)(bool)> on_iso_traffic_active_callbacks_list_;

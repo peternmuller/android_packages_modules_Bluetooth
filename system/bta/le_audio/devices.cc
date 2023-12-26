@@ -902,6 +902,10 @@ void LeAudioDevice::Dump(int fd) {
   dprintf(fd, "%s", stream.str().c_str());
 }
 
+RawAddress LeAudioDevice::GetBdAddress(void) {
+  return address_;
+}
+
 void LeAudioDevice::DisconnectAcl(void) {
   if (conn_id_ == GATT_INVALID_CONN_ID) return;
 
