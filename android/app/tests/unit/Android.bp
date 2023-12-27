@@ -28,6 +28,7 @@ java_defaults {
         "frameworks-base-testutils",
         "gson",
         "mockito-target",
+        "platform-test-annotations",
         "truth",
     ],
 
