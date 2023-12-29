@@ -691,11 +691,36 @@ class tBT_A2DP_OFFLOAD {
   uint16_t acl_hdl;               /* connection handle */
   uint16_t l2c_rcid;              /* l2cap channel id */
   uint16_t mtu;                   /* MTU size */
-  uint8_t codec_info[32];         /* Codec specific information */
+  uint8_t codec_info[AVDT_CODEC_SIZE];         /* Codec specific information */
 };
 
+typedef struct {
+  uint8_t codec_type;
+  uint8_t transport_type;
+  uint8_t stream_type;
+  uint8_t dev_index;
+  uint8_t max_latency;
+  uint8_t delay_reporting;
+  uint8_t cp_active;
+  uint8_t cp_flag;
+  uint16_t sample_rate;
+  uint16_t acl_hdl;
+  uint16_t l2c_rcid;
+  uint16_t mtu;
+//#ifdef TWS_ENABLED
+  uint8_t stream_start;// Start Stream:1
+  uint8_t split_acl; // BR-EDR Device:0 TWS Device:1
+  uint8_t ch_mode; //None:0 Left:1 Right:2
+  uint16_t ttp; //time to play
+//#endif
+  uint8_t codec_info[AVDT_CODEC_SIZE];
+  tBTA_AV_SCB* p_scb;
+}tBT_QTI_A2DP_OFFLOAD;
+
+
 /* Vendor OFFLOAD VSC */
-#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
+#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x0A
+#define HCI_VSQC_CONTROLLER_A2DP_STOP_OPCODE 0x05
 
 #define VS_HCI_A2DP_OFFLOAD_START 0x01
 #define VS_HCI_A2DP_OFFLOAD_STOP 0x02

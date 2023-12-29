@@ -26,6 +26,7 @@
 #include "a2dp_vendor_aptx_constants.h"
 #include "a2dp_vendor_aptx_hd_constants.h"
 #include "a2dp_vendor_ldac_constants.h"
+#include"a2dp_vendor_aptx_adaptive.h"
 #include "bta/av/bta_av_int.h"
 #include "client_interface_aidl.h"
 #include "provider_info.h"
@@ -40,6 +41,10 @@ using ::aidl::android::hardware::bluetooth::audio::AacConfiguration;
 using ::aidl::android::hardware::bluetooth::audio::AacObjectType;
 using ::aidl::android::hardware::bluetooth::audio::AptxCapabilities;
 using ::aidl::android::hardware::bluetooth::audio::AptxConfiguration;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveCapabilities;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveConfiguration;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveChannelMode;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveInputMode;
 using ::aidl::android::hardware::bluetooth::audio::AudioCapabilities;
 using ::aidl::android::hardware::bluetooth::audio::ChannelMode;
 using ::aidl::android::hardware::bluetooth::audio::CodecCapabilities;
@@ -54,6 +59,7 @@ using ::aidl::android::hardware::bluetooth::audio::SbcAllocMethod;
 using ::aidl::android::hardware::bluetooth::audio::SbcCapabilities;
 using ::aidl::android::hardware::bluetooth::audio::SbcChannelMode;
 using ::aidl::android::hardware::bluetooth::audio::SbcConfiguration;
+using ::aidl::android::hardware::bluetooth::audio::AptxMode;
 
 namespace {
 
@@ -129,6 +135,23 @@ bool aptx_offloading_capability_match(const AptxCapabilities& aptx_capability,
   }
   LOG(INFO) << __func__ << ": offloading codec=" << aptx_config.toString()
             << " capability=" << aptx_capability.toString();
+  return true;
+}
+
+bool aptx_ad_offloading_capability_match(const AptxAdaptiveCapabilities& aptx_ad_capability,
+                                      const AptxAdaptiveConfiguration& aptx_ad_config) {
+  if (!ContainedInVector(aptx_ad_capability.channelMode,
+                         aptx_ad_config.channelMode) ||
+      !ContainedInVector(aptx_ad_capability.bitsPerSample,
+                         aptx_ad_config.bitsPerSample) ||
+      !ContainedInVector(aptx_ad_capability.sampleRateHz,
+                         aptx_ad_config.sampleRateHz)) {
+    LOG(WARNING) << __func__ << ": software codec=" << aptx_ad_config.toString()
+                 << " capability=" << aptx_ad_capability.toString();
+    return false;
+  }
+  LOG(INFO) << __func__ << ": offloading codec=" << aptx_ad_config.toString()
+            << " capability=" << aptx_ad_capability.toString();
   return true;
 }
 
@@ -415,6 +438,122 @@ bool A2dpAptxToHalConfig(CodecConfiguration* codec_config,
   return true;
 }
 
+AptxAdaptiveChannelMode AptxAdaptiveCodecToHalChannelMode(
+    const btav_a2dp_codec_config_t& a2dp_codec_config) {
+  switch (a2dp_codec_config.channel_mode) {
+    case BTAV_A2DP_CODEC_CHANNEL_MODE_MONO:
+      return AptxAdaptiveChannelMode::MONO;
+    case BTAV_A2DP_CODEC_CHANNEL_MODE_STEREO:
+      return AptxAdaptiveChannelMode::JOINT_STEREO;
+    default:
+      return AptxAdaptiveChannelMode::UNKNOWN;
+   }
+}
+
+bool A2dpAptxAdaptiveToHalConfig(CodecConfiguration* codec_config,
+                         A2dpCodecConfig* a2dp_config) {
+  tA2DP_APTX_ADAPTIVE_CIE aptx_ad_cie;
+  uint8_t p_ota_codec_config[AVDT_CODEC_SIZE];
+  btav_a2dp_codec_config_t current_codec = a2dp_config->getCodecConfig();
+  if (current_codec.codec_type != BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+    return false;
+  }
+
+  codec_config->codecType = CodecType::APTX_ADAPTIVE;
+
+  AptxAdaptiveConfiguration aptx_adaptive_config = {};
+
+  aptx_adaptive_config.sampleRateHz = A2dpCodecToHalSampleRate(current_codec);
+  LOG(ERROR) << __func__ << ": sampleRateHz " << aptx_adaptive_config.sampleRateHz;
+  if (aptx_adaptive_config.sampleRateHz <= 0) {
+    LOG(ERROR) << __func__
+               << ": Unknown aptX Adaptive sample_rate=" << current_codec.sample_rate;
+    return false;
+  }
+
+  LOG(ERROR) << __func__
+               << ": Current codec channel mode = " << current_codec.channel_mode;
+  aptx_adaptive_config.channelMode =  AptxAdaptiveCodecToHalChannelMode(current_codec);
+  if (aptx_adaptive_config.channelMode ==
+             AptxAdaptiveChannelMode::UNKNOWN) {
+    LOG(ERROR) << __func__ << ": Unknown aptX adaptive channel_mode=";
+    return false;
+  }
+
+  LOG(ERROR) << __func__
+               << ": Aptx Adaptive channel mode = " << (float)aptx_adaptive_config.channelMode
+               << " Current Codec bitspersample = " << current_codec.bits_per_sample;
+
+  aptx_adaptive_config.bitsPerSample = A2dpCodecToHalBitsPerSample(current_codec);
+  if (aptx_adaptive_config.bitsPerSample == 0) {
+    LOG(ERROR) << __func__ << ": Unknown aptX bits_per_sample = "
+               << current_codec.bits_per_sample
+               << " aptx_adaptive_config.bitsPerSample: "
+               << aptx_adaptive_config.bitsPerSample;
+    return false;
+  }
+  LOG(ERROR) << __func__
+               << ": Aptx Adaptive bitspersample = " << current_codec.bits_per_sample;
+
+  aptx_adaptive_config.aptxMode = static_cast<AptxMode>(0x1000);
+
+  aptx_adaptive_config.sinkBufferingMs = { 20, 50, 20, 50, 20, 50 };
+
+  memset(p_ota_codec_config, 0x0, AVDT_CODEC_SIZE);
+  if(!a2dp_config->copyOutOtaCodecConfig(p_ota_codec_config)) {
+    LOG(ERROR) << __func__
+               << ": Aptx Adaptive ota codec config copy failed";
+  }
+  LOG(ERROR) << __func__
+               << ": Aptx Adaptive ota codec config copy success";
+
+  if(!A2DP_GetAptxAdaptiveCIE(p_ota_codec_config, &aptx_ad_cie)) {
+    LOG(ERROR) << __func__
+               << ": Aptx Adaptive cie fetch failed";
+    return false;
+  }
+  LOG(ERROR) << __func__
+               << ": Aptx Adaptive cie fetch success";
+
+  aptx_adaptive_config.ttp = {
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_ll_0 - 128),
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_ll_1 - 128),
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_hq_0 - 128),
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_hq_1 - 128),
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_tws_0 - 128),
+      static_cast<int8_t> (aptx_ad_cie.aptx_data.ttp_tws_1 - 128)
+  };
+
+  aptx_adaptive_config.inputMode = (AptxAdaptiveInputMode)0;
+
+  aptx_adaptive_config.inputFadeDurationMs = 0xff;
+
+  aptx_adaptive_config.aptxAdaptiveConfigStream = {
+    aptx_ad_cie.aptx_data.cap_ext_ver_num,
+    (uint8_t) (aptx_ad_cie.aptx_data.aptx_adaptive_sup_features & 0x000000FF),
+    (uint8_t) ((aptx_ad_cie.aptx_data.aptx_adaptive_sup_features & 0x0000FF00) >> 8),
+    (uint8_t) ((aptx_ad_cie.aptx_data.aptx_adaptive_sup_features & 0x00FF0000) >> 16),
+    (uint8_t) ((aptx_ad_cie.aptx_data.aptx_adaptive_sup_features & 0xFF000000) >> 24),
+    aptx_ad_cie.aptx_data.first_setup_pref,
+    aptx_ad_cie.aptx_data.second_setup_pref,
+    aptx_ad_cie.aptx_data.third_setup_pref,
+    aptx_ad_cie.aptx_data.fourth_setup_pref,
+    aptx_ad_cie.aptx_data.eoc0,
+    aptx_ad_cie.aptx_data.eoc1
+  };
+
+  LOG(ERROR) << __func__
+             << ": Aptx Adaptive aptxAdaptiveConfig data fill complete ";
+
+  codec_config->config.set<CodecConfiguration::CodecSpecific::aptxAdaptiveConfig>(
+        aptx_adaptive_config);
+
+  LOG(ERROR) << __func__
+              << ": Aptx Adaptive config set complete ";
+
+  return true;
+}
+
 bool A2dpLdacToHalConfig(CodecConfiguration* codec_config,
                          A2dpCodecConfig* a2dp_config) {
   btav_a2dp_codec_config_t current_codec = a2dp_config->getCodecConfig();
@@ -540,6 +679,9 @@ bool UpdateOffloadingCapabilities(
       case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_HD:
         codec_type_set.insert(CodecType::APTX_HD);
         break;
+      case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+        codec_type_set.insert(CodecType::APTX_ADAPTIVE);
+        break;
       case BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC:
         codec_type_set.insert(CodecType::LDAC);
         break;
@@ -628,6 +770,15 @@ bool IsCodecOffloadingEnabled(const CodecConfiguration& codec_config) {
             codec_config.config
                 .get<CodecConfiguration::CodecSpecific::aptxConfig>();
         return aptx_offloading_capability_match(aptx_capability, aptx_config);
+      }
+      case CodecType::APTX_ADAPTIVE: {
+        auto aptx_ad_capability =
+            codec_capability.capabilities
+                .get<CodecCapabilities::Capabilities::aptxAdaptiveCapabilities>();
+        auto aptx_ad_config =
+            codec_config.config
+                .get<CodecConfiguration::CodecSpecific::aptxAdaptiveConfig>();
+        return aptx_ad_offloading_capability_match(aptx_ad_capability, aptx_ad_config);
       }
       case CodecType::LDAC: {
         auto ldac_capability =

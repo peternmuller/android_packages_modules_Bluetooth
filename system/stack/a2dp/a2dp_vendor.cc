@@ -24,6 +24,7 @@
 
 #include "a2dp_vendor_aptx.h"
 #include "a2dp_vendor_aptx_hd.h"
+#include "a2dp_vendor_aptx_adaptive.h"
 #include "a2dp_vendor_ldac.h"
 #include "a2dp_vendor_opus.h"
 #include "internal_include/bt_trace.h"
@@ -784,7 +785,7 @@ const char* A2DP_VendorCodecIndexStr(btav_a2dp_codec_index_t codec_index) {
     case BTAV_A2DP_CODEC_INDEX_SINK_SBC:
     case BTAV_A2DP_CODEC_INDEX_SOURCE_AAC:
     case BTAV_A2DP_CODEC_INDEX_SINK_AAC:
-    case BTAV_A2DP_CODEC_INDEX_SOURCE_MAX:
+    //scase BTAV_A2DP_CODEC_INDEX_SOURCE_MAX:
     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_TWS:
       break;  // These are not vendor-specific codecs
     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX:
@@ -821,7 +822,7 @@ bool A2DP_VendorInitCodecConfig(btav_a2dp_codec_index_t codec_index,
     case BTAV_A2DP_CODEC_INDEX_SINK_SBC:
     case BTAV_A2DP_CODEC_INDEX_SOURCE_AAC:
     case BTAV_A2DP_CODEC_INDEX_SINK_AAC:
-    case BTAV_A2DP_CODEC_INDEX_SOURCE_MAX:
+    //case BTAV_A2DP_CODEC_INDEX_SOURCE_MAX:
     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_TWS:
       break;  // These are not vendor-specific codecs
     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX:
@@ -864,6 +865,11 @@ std::string A2DP_VendorCodecInfoString(const uint8_t* p_codec_info) {
   if (vendor_id == A2DP_APTX_HD_VENDOR_ID &&
       codec_id == A2DP_APTX_HD_CODEC_ID_BLUETOOTH) {
     return A2DP_VendorCodecInfoStringAptxHd(p_codec_info);
+  }
+
+  if (vendor_id == A2DP_APTX_ADAPTIVE_VENDOR_ID &&
+      codec_id == A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH) {
+    return A2DP_VendorCodecInfoStringAptxAd(p_codec_info);
   }
 
   // Check for LDAC

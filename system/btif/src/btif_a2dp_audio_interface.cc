@@ -230,6 +230,11 @@ static void btif_a2dp_get_codec_configuration(
           (::android::hardware::bluetooth::a2dp::V1_0::CodecType)
               BTA_AV_CODEC_TYPE_APTXHD;
       break;
+    case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+      p_codec_info->codecType =
+          (::android::hardware::bluetooth::a2dp::V1_0::CodecType)
+              BTA_AV_CODEC_TYPE_APTX_ADAPTIVE;
+      break;
     case BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC:
       p_codec_info->codecType =
           (::android::hardware::bluetooth::a2dp::V1_0::CodecType)
