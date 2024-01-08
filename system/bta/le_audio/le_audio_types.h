@@ -657,6 +657,14 @@ struct LeAudioCoreCodecConfig {
     return 0;
   }
 
+  /** Returns the frame duration representation in us */
+  uint16_t GetOctetsPerFrame() const {
+    if (octets_per_codec_frame)
+      return *octets_per_codec_frame;
+
+    return 0;
+  }
+
   /** Channel count per CIS or BIS */
   uint8_t GetChannelCountPerIsoStream(void) const {
     return allocated_channel_count;
