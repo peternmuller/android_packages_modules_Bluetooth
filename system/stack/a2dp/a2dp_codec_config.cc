@@ -32,6 +32,7 @@
 #if !defined(EXCLUDE_NONSTANDARD_CODECS)
 #include "a2dp_vendor_aptx.h"
 #include "a2dp_vendor_aptx_hd.h"
+#include "a2dp_vendor_aptx_adaptive.h"
 #include "a2dp_vendor_ldac.h"
 #include "a2dp_vendor_opus.h"
 #endif
@@ -142,6 +143,9 @@ A2dpCodecConfig* A2dpCodecConfig::createCodec(
       break;
     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_HD:
       codec_config = new A2dpCodecConfigAptxHd(codec_priority);
+      break;
+    case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+      codec_config = new A2dpCodecConfigAptxAdaptive(codec_priority);
       break;
     case BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC:
       codec_config = new A2dpCodecConfigLdacSource(codec_priority);
@@ -276,13 +280,23 @@ bool A2dpCodecConfig::isValid() const { return true; }
 
 bool A2dpCodecConfig::copyOutOtaCodecConfig(uint8_t* p_codec_info) {
   std::lock_guard<std::recursive_mutex> lock(codec_mutex_);
-
+  for (int i = 0; i < AVDT_CODEC_SIZE; i++)
+    LOG(ERROR) << __func__ << ": type of ota_codec_config_[" << i <<"]: "
+               <<", ota_codec_config_float_ + " << i <<": " << (float) *(ota_codec_config_+i)
+               <<", ota_codec_config_hex_ + " << i <<": " << std::hex << *(ota_codec_config_+i);
   // TODO: We should use a mechanism to verify codec config,
   // not codec capability.
   if (!A2DP_IsSourceCodecValid(ota_codec_config_)) {
     return false;
   }
+  LOG(ERROR) << __func__ << ": sizeof(ota_codec_config_): " << sizeof(ota_codec_config_);
+  for (int i = 0; i < AVDT_CODEC_SIZE; i++)
+    LOG(ERROR) << __func__ << ": type of ota_codec_config___[" << i <<"]: "
+               <<", ota_codec_config_float_ + " << i <<": " << (float) *(ota_codec_config_+i);
   memcpy(p_codec_info, ota_codec_config_, sizeof(ota_codec_config_));
+  for (int i = 0; i < AVDT_CODEC_SIZE; i++)
+    LOG(ERROR) << __func__ << ": type of p_codec_info[" << i <<"]: "
+               <<", p_codec_info[" << i <<"]: " << (float)p_codec_info[i] ;
   return true;
 }
 
@@ -558,6 +572,9 @@ int A2DP_IotGetPeerSinkCodecType(const uint8_t* p_codec_info) {
       } else if (codec_id == A2DP_LDAC_CODEC_ID &&
                  vendor_id == A2DP_LDAC_VENDOR_ID) {
         peer_codec_type = IOT_CONF_VAL_A2DP_CODECTYPE_LDAC;
+      } else if (codec_id == A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH &&
+                 vendor_id == A2DP_APTX_ADAPTIVE_VENDOR_ID) {
+        peer_codec_type = IOT_CONF_VAL_A2DP_CODECTYPE_APTXADAPTIVE;
       }
       break;
     }
@@ -657,7 +674,7 @@ bool A2dpCodecs::init() {
 
     indexed_codecs_.insert(std::make_pair(codec_index, codec_config));
 
-    if (codec_index < BTAV_A2DP_CODEC_INDEX_SOURCE_MAX) {
+    if (codec_index < BTAV_A2DP_CODEC_INDEX_SOURCE_EXT_MIN) {
       ordered_source_codecs_.push_back(codec_config);
       ordered_source_codecs_.sort(compare_codec_priority);
     } else {
@@ -1060,6 +1077,7 @@ bool A2DP_IsSourceCodecValid(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
   LOG_VERBOSE("%s: codec_type = 0x%x", __func__, codec_type);
+  LOG(INFO) << __func__ << ": codec_type = " << codec_type;
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:

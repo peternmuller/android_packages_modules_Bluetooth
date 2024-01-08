@@ -44,7 +44,6 @@
 
 #include "a2dp_vendor.h"
 #include "a2dp_vendor_aptx_adaptive.h"
-#include "bt_common.h"
 #include "osi/include/log.h"
 
 #include <time.h>
@@ -81,7 +80,7 @@ static tA2DP_APTX_ADAPTIVE_ENCODER_CB a2dp_aptx_adaptive_encoder_cb;
 
 
 bool A2DP_VendorLoadEncoderAptxAdaptive(void) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return true;
   }
@@ -90,7 +89,7 @@ bool A2DP_VendorLoadEncoderAptxAdaptive(void) {
 }
 
 void A2DP_VendorUnloadEncoderAptxAdaptive(void) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return;
   }
@@ -101,7 +100,7 @@ void a2dp_vendor_aptx_adaptive_encoder_init(
     A2dpCodecConfig* a2dp_codec_config,
     a2dp_source_read_callback_t read_callback,
     a2dp_source_enqueue_callback_t enqueue_callback) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return;
   }
@@ -109,7 +108,7 @@ void a2dp_vendor_aptx_adaptive_encoder_init(
 
 
 
-bool A2dpCodecConfigAptxAdaptive::updateEncoderUserConfig(
+/*bool A2dpCodecConfigAptxAdaptive::updateEncoderUserConfig(
     const tA2DP_ENCODER_INIT_PEER_PARAMS* p_peer_params, bool* p_restart_input,
     bool* p_restart_output, bool* p_config_updated) {
 
@@ -146,11 +145,11 @@ bool A2dpCodecConfigAptxAdaptive::updateEncoderUserConfig(
   previous_codec_config = codec_config;
 
   return true;
-}
+}*/
 
 
 void a2dp_vendor_aptx_adaptive_feeding_reset(void) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
                                   "aptX-Adaptive is running in offload mode");
     return;
@@ -159,20 +158,23 @@ void a2dp_vendor_aptx_adaptive_feeding_reset(void) {
 
 
 void a2dp_vendor_aptx_adaptive_feeding_flush(void) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
                                   "aptX-Adaptive is running in offload mode");
     return;
   }
 }
 
-period_ms_t a2dp_vendor_aptx_adaptive_get_encoder_interval_ms(void) {
+uint64_t a2dp_vendor_aptx_adaptive_get_encoder_interval_ms(void) {
   return 0;
 }
 
+int a2dp_vendor_aptx_adaptive_get_effective_frame_size() {
+  return 0;
+}
 
 void a2dp_vendor_aptx_adaptive_send_frames(uint64_t timestamp_us) {
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
         "aptX-Adaptive is running in offload mode");
     return;
@@ -184,10 +186,9 @@ void a2dp_vendor_aptx_adaptive_encoder_cleanup(void) {
   memset(&a2dp_aptx_adaptive_encoder_cb, 0, sizeof(a2dp_aptx_adaptive_encoder_cb));
 }
 
-
-period_ms_t A2dpCodecConfigAptxAdaptive::encoderIntervalMs() const {
+/*uint64_t A2dpCodecConfigAptxAdaptive::encoderIntervalMs() const {
   return 0;
-}
+}*/
 
 
 void A2dpCodecConfigAptxAdaptive::debug_codec_dump(int fd) {

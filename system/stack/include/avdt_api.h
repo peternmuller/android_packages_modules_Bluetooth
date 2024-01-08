@@ -44,7 +44,7 @@
 #define AVDTP_VERSION_CONFIG_KEY "AvdtpVersion"
 
 /* Maximum size in bytes of the codec capabilities information element. */
-#define AVDT_CODEC_SIZE 20
+#define AVDT_CODEC_SIZE 45
 
 /* API function return value result codes. */
 typedef enum : uint16_t {

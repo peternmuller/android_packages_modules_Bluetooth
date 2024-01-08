@@ -751,6 +751,10 @@ int A2DP_GetEecoderEffectiveFrameSize(const uint8_t* p_codec_info);
 // Returns a string describing the codec information.
 std::string A2DP_CodecInfoString(const uint8_t* p_codec_info);
 
+bool A2DP_Get_Aptx_AdaptiveR2_1_Supported();
+bool A2DP_Get_Aptx_AdaptiveR2_2_Supported();
+bool A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported();
+
 // Add enum-based flag operators to the btav_a2dp_codec_config_t fields
 #ifndef DEFINE_ENUM_FLAG_OPERATORS
 // Use NOLINT to suppress missing parentheses warnings around bitmask.
