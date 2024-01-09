@@ -11,6 +11,7 @@ rust_defaults {
     name: "bt_topshim_facade.defaults",
     defaults: [
         "gd_rust_defaults",
+        "libbtconfigstore_qti_rs_defaults",
     ],
     crate_name: "bt_topshim_facade",
     srcs: ["src/main.rs"],

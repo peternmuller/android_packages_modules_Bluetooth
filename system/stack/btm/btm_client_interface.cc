@@ -22,6 +22,7 @@
 #include "stack/include/btm_api.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_sec_api.h"
+#include "stack/include/btm_vendor_api.h"
 
 struct btm_client_interface_t btm_client_interface = {
     .lifecycle =
@@ -130,6 +131,13 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_InqDbNext = BTM_InqDbNext,
             .BTM_ClearInqDb = BTM_ClearInqDb,
         },
+    .vendor =
+        {
+            .BTM_ReadVendorAddOnFeatures = BTM_ReadVendorAddOnFeatures,
+            .BTM_GetSocAddOnFeatures = BTM_GetSocAddOnFeatures,
+            .BTM_GetHostAddOnFeatures = BTM_GetHostAddOnFeatures,
+        }
+
 };
 
 struct btm_client_interface_t& get_btm_client_interface() {

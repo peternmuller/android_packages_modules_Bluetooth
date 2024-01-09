@@ -62,6 +62,7 @@
 #include "btif_profile_storage.h"
 #include "btif_storage.h"
 #include "btif_util.h"
+#include "btif_vendor.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
 #include "device/include/interop.h"
@@ -2135,6 +2136,7 @@ void BTIF_dm_enable() {
   ** and bonded_devices_info_cb
   */
   btif_storage_load_bonded_devices();
+  btif_vendor_update_add_on_features();
   bluetooth::bqr::EnableBtQualityReport(true);
   btif_dm_update_allowlisted_media_players();
   btif_enable_bluetooth_evt();

@@ -66,6 +66,7 @@ cc_library_shared {
         "latest_android_hardware_audio_common_ndk_static",
         "latest_android_hardware_bluetooth_audio_ndk_static",
         "latest_android_media_audio_common_types_ndk_static",
+        "libbtconfigstore_qti_defaults",
     ],
     srcs: ["jni/**/*.cpp"],
     version_script: "libbluetooth_jni.map",
