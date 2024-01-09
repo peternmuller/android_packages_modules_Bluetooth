@@ -44,6 +44,8 @@ bool A2dpAacToHalConfig(CodecConfiguration* codec_config,
                         A2dpCodecConfig* a2dp_config);
 bool A2dpAptxToHalConfig(CodecConfiguration* codec_config,
                          A2dpCodecConfig* a2dp_config);
+bool A2dpAptxAdaptiveToHalConfig(CodecConfiguration* codec_config,
+                         A2dpCodecConfig* a2dp_config);
 bool A2dpLdacToHalConfig(CodecConfiguration* codec_config,
                          A2dpCodecConfig* a2dp_config);
 bool A2dpOpusToHalConfig(CodecConfiguration* codec_config,

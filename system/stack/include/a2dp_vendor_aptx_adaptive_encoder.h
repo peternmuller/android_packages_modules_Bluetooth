@@ -40,7 +40,7 @@
 #define A2DP_VENDOR_APTX_ADAPTIVE_ENCODER_H
 
 #include "a2dp_codec_api.h"
-#include "osi/include/time.h"
+//#include "osi/include/time.h"
 
 // Loads the A2DP aptX-adaptive encoder.
 // Return true on success, otherwise false.
@@ -70,11 +70,12 @@ void a2dp_vendor_aptx_adaptive_feeding_reset(void);
 void a2dp_vendor_aptx_adaptive_feeding_flush(void);
 
 // Get the A2DP aptX-adaptive encoder interval (in milliseconds).
-period_ms_t a2dp_vendor_aptx_adaptive_get_encoder_interval_ms(void);
+uint64_t a2dp_vendor_aptx_adaptive_get_encoder_interval_ms(void);
 
 // Prepare and send A2DP aptX-adaptive encoded frames.
 // |timestamp_us| is the current timestamp (in microseconds).
 void a2dp_vendor_aptx_adaptive_send_frames(uint64_t timestamp_us);
 
+int a2dp_vendor_aptx_adaptive_get_effective_frame_size();
 
 #endif  // A2DP_VENDOR_APTX_ADAPTIVE_ENCODER_H

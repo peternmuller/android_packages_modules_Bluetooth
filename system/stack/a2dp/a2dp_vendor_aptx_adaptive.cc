@@ -51,7 +51,8 @@
 #include <base/logging.h>
 #include "a2dp_vendor.h"
 #include "a2dp_vendor_aptx_adaptive_encoder.h"
-#include "bt_utils.h"
+#include "internal_include/bt_trace.h"
+//#include "bt_utils.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "hardware/bt_av.h"
@@ -372,8 +373,9 @@ static const tA2DP_ENCODER_INTERFACE a2dp_encoder_interface_aptx_adaptive = {
     a2dp_vendor_aptx_adaptive_feeding_reset,
     a2dp_vendor_aptx_adaptive_feeding_flush,
     a2dp_vendor_aptx_adaptive_get_encoder_interval_ms, // _get_encoder_interval_ms
+    a2dp_vendor_aptx_adaptive_get_effective_frame_size,
     a2dp_vendor_aptx_adaptive_send_frames,
-    nullptr,  // set_transmit_queue_length
+    nullptr  // set_transmit_queue_length
 };
 
 UNUSED_ATTR static tA2DP_STATUS A2DP_CodecInfoMatchesCapabilityAptxAdaptive(
@@ -425,22 +427,25 @@ static tA2DP_STATUS A2DP_ParseInfoAptxAdaptive(tA2DP_APTX_ADAPTIVE_CIE* p_ie,
   uint8_t media_type;
   tA2DP_CODEC_TYPE codec_type;
 
+  LOG_INFO("%s: p_ie = %d, p_codec_info = %d", __func__, p_ie, p_codec_info);
   if (p_ie == NULL || p_codec_info == NULL) return A2DP_INVALID_PARAMS;
 
   // Check the codec capability length
   losc = *p_codec_info++;
+  LOG_INFO("%s: losc: %d", __func__, losc);
 
   if (losc != A2DP_APTX_ADAPTIVE_CODEC_LEN) {
-    LOG_ERROR(LOG_TAG, "%s: A2DP_APTX_ADAPTIVE_CODEC_LEN fail", __func__);
+    LOG_INFO("%s: A2DP_APTX_ADAPTIVE_CODEC_LEN fail", __func__);
     return A2DP_WRONG_CODEC;
   }
 
   media_type = (*p_codec_info++) >> 4;
   codec_type = *p_codec_info++;
+  LOG_INFO("%s: media_type: %d, codec_type: %d", __func__, media_type, codec_type);
   /* Check the Media Type and Media Codec Type */
   if (media_type != AVDT_MEDIA_TYPE_AUDIO ||
       codec_type != A2DP_MEDIA_CT_NON_A2DP) {
-    LOG_ERROR(LOG_TAG, "%s: A2DP_MEDIA_CT_NON_A2DP ID", __func__);
+    LOG_INFO("%s: A2DP_MEDIA_CT_NON_A2DP ID", __func__);
     return A2DP_WRONG_CODEC;
   }
 
@@ -453,9 +458,10 @@ static tA2DP_STATUS A2DP_ParseInfoAptxAdaptive(tA2DP_APTX_ADAPTIVE_CIE* p_ie,
   p_ie->codecId =
       (*p_codec_info & 0x00FF) | (*(p_codec_info + 1) << 8 & 0xFF00);
   p_codec_info += 2;
+  LOG_INFO("%s: codecId: %d, vendorId: %d", __func__, p_ie->codecId, p_ie->vendorId);
   if (p_ie->vendorId != A2DP_APTX_ADAPTIVE_VENDOR_ID ||
       p_ie->codecId != A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH) {
-      LOG_ERROR(LOG_TAG, "%s: A2DP_APTX_ADAPTIVE ID WRONG CODEC", __func__);
+      LOG_INFO("%s: A2DP_APTX_ADAPTIVE ID WRONG CODEC", __func__);
     return A2DP_WRONG_CODEC;
   }
 
@@ -465,6 +471,7 @@ static tA2DP_STATUS A2DP_ParseInfoAptxAdaptive(tA2DP_APTX_ADAPTIVE_CIE* p_ie,
 
   p_ie->channelMode = *p_codec_info & 0x3F;
   p_codec_info++;
+  LOG_INFO("%s: channelMode: %d, sourceType: %d, sampleRate: %d", __func__, p_ie->channelMode, p_ie->sourceType, p_ie->sampleRate);
 
   memcpy(&(p_ie->aptx_data), p_codec_info, sizeof(p_ie->aptx_data));
   p_codec_info += 18;
@@ -473,8 +480,12 @@ static tA2DP_STATUS A2DP_ParseInfoAptxAdaptive(tA2DP_APTX_ADAPTIVE_CIE* p_ie,
 
 //  if (A2DP_BitsSet(p_ie->sampleRate) != A2DP_SET_ONE_BIT)
 //    return A2DP_BAD_SAMP_FREQ;
-  if (A2DP_BitsSet(p_ie->channelMode) != A2DP_SET_ONE_BIT)
+  if (A2DP_BitsSet(p_ie->channelMode) != A2DP_SET_ONE_BIT) {
+    LOG_INFO(LOG_TAG, "%s: channelMode = %d", __func__, p_ie->channelMode);
     return A2DP_BAD_CH_MODE;
+  }
+
+  LOG_INFO("%s: btav_a2dp_codec_bits_per_sample_t: %d", __func__, sizeof(btav_a2dp_codec_bits_per_sample_t));
 
   return A2DP_SUCCESS;
 }
@@ -490,8 +501,15 @@ bool A2DP_IsVendorSourceCodecValidAptxAdaptive(const uint8_t* p_codec_info) {
 
 bool A2DP_GetAptxAdaptiveCIE(const uint8_t* p_codec_info,
                         tA2DP_APTX_ADAPTIVE_CIE *cfg_cie) {
-  return (A2DP_ParseInfoAptxAdaptive(cfg_cie, p_codec_info, false) ==
-          A2DP_SUCCESS);
+  tA2DP_STATUS status = A2DP_ParseInfoAptxAdaptive(cfg_cie, p_codec_info, false);
+  LOG_INFO("%s: status: %d", __func__, status);
+  if (status == A2DP_SUCCESS) {
+    return true;
+  }
+  LOG_ERROR("%s: returning false", __func__);
+  return false;
+  //return (A2DP_ParseInfoAptxAdaptive(cfg_cie, p_codec_info, false) ==
+  //        A2DP_SUCCESS);
 }
 bool A2DP_IsVendorPeerSinkCodecValidAptxAdaptive(const uint8_t* p_codec_info) {
   tA2DP_APTX_ADAPTIVE_CIE cfg_cie;
@@ -719,6 +737,48 @@ bool A2DP_VendorDumpCodecInfoAptxAdaptive(const uint8_t* p_codec_info) {
   return true;
 }
 
+std::string A2DP_VendorCodecInfoStringAptxAd(const uint8_t* p_codec_info) {
+  std::stringstream res;
+  std::string field;
+  tA2DP_STATUS a2dp_status;
+  tA2DP_APTX_ADAPTIVE_CIE aptxAd_cie;
+
+  a2dp_status = A2DP_ParseInfoAptxAdaptive(&aptxAd_cie, p_codec_info, true);
+  if (a2dp_status != A2DP_SUCCESS) {
+    res << "A2DP_ParseInfoAptxAdaptive fail: " << loghex(a2dp_status);
+    return res.str();
+  }
+
+  res << "\tname: Aptx Adaptive\n";
+
+  // Sample frequency
+  field.clear();
+  AppendField(&field, (aptxAd_cie.sampleRate == 0), "NONE");
+  AppendField(&field, (aptxAd_cie.sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_44100 ),
+              "44100");
+  AppendField(&field, (aptxAd_cie.sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_48000),
+              "48000");
+  AppendField(&field, (aptxAd_cie.sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_96000),
+              "96000");
+  res << "\tsamp_freq: " << field << " (" << loghex(aptxAd_cie.sampleRate)
+      << ")\n";
+
+  // Channel mode
+  field.clear();
+  AppendField(&field, (aptxAd_cie.channelMode == 0), "NONE");
+  AppendField(&field, (aptxAd_cie.channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_MONO ),
+              "Mono");
+  AppendField(&field, (aptxAd_cie.channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_STEREO),
+              "Stereo");
+  AppendField(&field, (aptxAd_cie.channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO),
+              "Joint Stereo");
+  res << "\tch_mode: " << field << " (" << loghex(aptxAd_cie.channelMode)
+      << ")\n";
+
+  return res.str();
+}
+
+
 const tA2DP_ENCODER_INTERFACE* A2DP_VendorGetEncoderInterfaceAptxAdaptive(
     const uint8_t* p_codec_info) {
   if (!A2DP_IsVendorSourceCodecValidAptxAdaptive(p_codec_info)) return NULL;
@@ -753,12 +813,12 @@ btav_a2dp_codec_index_t A2DP_VendorSourceCodecIndexAptxAdaptive(
 
 const char* A2DP_VendorCodecIndexStrAptxAdaptive(void) { return "aptX-adaptive"; }
 
-bool A2DP_VendorInitCodecConfigAptxAdaptive(tAVDT_CFG* p_cfg) {
-  if (!A2DP_IsCodecEnabled(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+bool A2DP_VendorInitCodecConfigAptxAdaptive(AvdtpSepConfig* p_cfg) {
+  /*if (!A2DP_IsCodecEnabled(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
     LOG_ERROR(LOG_TAG, "%s: APTX-ADAPTIVE disabled in both SW and HW mode",
                                                         __func__);
     return false;
-  }
+  }*/
 
   if (A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &a2dp_aptx_adaptive_caps,
                            p_cfg->codec_info) != A2DP_SUCCESS) {
@@ -778,14 +838,14 @@ bool A2DP_VendorInitCodecConfigAptxAdaptive(tAVDT_CFG* p_cfg) {
 
 A2dpCodecConfigAptxAdaptive::A2dpCodecConfigAptxAdaptive(
     btav_a2dp_codec_priority_t codec_priority)
-    : A2dpCodecConfig(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE, "aptX-adaptive",
-                      codec_priority) {
+    : A2dpCodecConfig(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE, A2DP_CODEC_ID_APTX_AD,
+                "aptX-adaptive", codec_priority) {
   // Compute the local capability
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
-    if (A2DP_Get_Aptx_AdaptiveR2_2_Supported()) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
+    if (/*A2DP_Get_Aptx_AdaptiveR2_2_Supported()*/true) {
       a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_2_offload_caps;
       a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_2_default_offload_config;
-    } else if (A2DP_Get_Aptx_AdaptiveR2_1_Supported()) {
+    } else if (/*A2DP_Get_Aptx_AdaptiveR2_1_Supported()*/true) {
       a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_1_offload_caps;
       a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_1_default_offload_config;
       if (A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported()) {
@@ -796,7 +856,7 @@ A2dpCodecConfigAptxAdaptive::A2dpCodecConfigAptxAdaptive(
             A2DP_APTX_ADAPTIVE_SOURCE_SPILT_TX_SUPPORTED;
       }
     } else {
-      if (getOffloadCaps().find("aptxadaptiver2") == std::string::npos) {
+      if (/*getOffloadCaps().find("aptxadaptiver2") == std::string::npos*/false) {
         LOG_INFO(LOG_TAG, "%s: Using Aptx Adaptive R1 config", __func__);
         a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r1_offload_caps;
         a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r1_default_offload_config;
@@ -843,15 +903,15 @@ A2dpCodecConfigAptxAdaptive::~A2dpCodecConfigAptxAdaptive() {}
 bool A2dpCodecConfigAptxAdaptive::init() {
   if (!isValid()) return false;
 
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
+  if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
     LOG_DEBUG(LOG_TAG, "%s: APTX-Adaptive enabled in HW mode", __func__);
     return true;
-  } else if(!A2DP_IsCodecEnabledInSoftware(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)){
+  } /*else if(!A2DP_IsCodecEnabledInSoftware(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)){
     LOG_DEBUG(LOG_TAG, "%s: APTX-Adaptive disabled in both SW and HW mode", __func__);
     return false;
   } else {
     LOG_DEBUG(LOG_TAG, "%s: APTX-Adaptive enabled in SW mode", __func__);
-  }
+  }*/
 
   // Load the encoder
   if (!A2DP_VendorLoadEncoderAptxAdaptive()) {
@@ -1113,7 +1173,7 @@ bool A2dpCodecConfigAptxAdaptive::setCodecConfig(const uint8_t* p_peer_codec_inf
             sink_info_cie.aptx_data.aptx_adaptive_sup_features);
   LOG_INFO(LOG_TAG, "sink cap ext ver num: 0x%x", sink_info_cie.aptx_data.cap_ext_ver_num);
 
-  if ((getOffloadCaps().find("aptxadaptiver2") == std::string::npos)
+  if (/*(getOffloadCaps().find("aptxadaptiver2") == std::string::npos)*/false
       || (sink_info_cie.aptx_data.cap_ext_ver_num == 0)) {
     result_config_cie.aptx_data = a2dp_aptx_adaptive_r1_offload_caps.aptx_data;
     if (sink_info_cie.aptx_data.cap_ext_ver_num == 0) {
@@ -1128,7 +1188,7 @@ bool A2dpCodecConfigAptxAdaptive::setCodecConfig(const uint8_t* p_peer_codec_inf
                            ((sink_byte_17th & src_byte_17th) & 0x0F);
     LOG_INFO(LOG_TAG, "sink byte: 0x%x, src byte: 0x%x, byte negotiated: 0x%x",
                        sink_byte_17th, src_byte_17th, byte_negotiated_17th);
-    if (A2DP_Get_Aptx_AdaptiveR2_2_Supported()) {
+    if (true/*A2DP_Get_Aptx_AdaptiveR2_2_Supported()*/) {
       LOG_INFO(LOG_TAG, "%s: Select Aptx Adaptive R2.2 config", __func__);
       result_config_cie.aptx_data = a2dp_aptx_adaptive_r2_2_offload_caps.aptx_data;
       if((sink_info_cie.aptx_data.aptx_adaptive_sup_features &APTX_ADAPTIVE_SINK_R2_2_SUPPORT_CAP)
@@ -1151,7 +1211,7 @@ bool A2dpCodecConfigAptxAdaptive::setCodecConfig(const uint8_t* p_peer_codec_inf
         codec_config_.codec_specific_3 &= ~(int64_t) APTX_ADAPTIVE_R2_2_SUPPORT_MASK;
         codec_config_.codec_specific_3 |= (int64_t) APTX_ADAPTIVE_R2_2_SUPPORT_NOT_AVAILABLE;
       }
-    } else if (A2DP_Get_Aptx_AdaptiveR2_1_Supported()) {
+    }else if (true/*A2DP_Get_Aptx_AdaptiveR2_1_Supported()*/) {
       LOG_INFO(LOG_TAG, "%s: Select Aptx Adaptive R2.1 config", __func__);
       result_config_cie.aptx_data = a2dp_aptx_adaptive_r2_1_offload_caps.aptx_data;
       result_config_cie.aptx_data.aptx_adaptive_sup_features =
@@ -1493,3 +1553,63 @@ fail:
          sizeof(ota_codec_peer_config_));
   return false;
 }
+
+bool A2dpCodecConfigAptxAdaptive::setPeerCodecCapabilities(const uint8_t *p_peer_codec_cap) {
+  std::lock_guard<std::recursive_mutex> lock(codec_mutex_);
+tA2DP_APTX_ADAPTIVE_CIE sink_info_cie;
+  uint8_t channelMode = BTAV_A2DP_CODEC_CHANNEL_MODE_NONE;
+  uint8_t sampleRate = BTAV_A2DP_CODEC_SAMPLE_RATE_NONE;
+  uint8_t saved_ota_codec_peer_capability[AVDT_CODEC_SIZE];
+
+  const tA2DP_APTX_ADAPTIVE_CIE *p_saved_aptx_ad_caps = &a2dp_aptx_adaptive_caps;
+
+  btav_a2dp_codec_config_t saved_codec_selectable_capability = codec_selectable_capability_;
+  memcpy(saved_ota_codec_peer_capability, ota_codec_peer_capability_, sizeof(ota_codec_peer_capability_));
+
+  tA2DP_STATUS status = A2DP_ParseInfoAptxAdaptive(&sink_info_cie, p_peer_codec_cap, true);
+  if (status != A2DP_SUCCESS) {
+    LOG_ERROR("%s: failed to parse remote capability: error = %d", __func__, status);
+    goto fail;
+  }
+
+  // Compute the selectable Sampling Rate
+  sampleRate = p_saved_aptx_ad_caps->sampleRate & sink_info_cie.sampleRate;
+  if(sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_44100) {
+    codec_selectable_capability_.sample_rate |= BTAV_A2DP_CODEC_SAMPLE_RATE_44100;
+  }
+
+  if(sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_48000) {
+    codec_selectable_capability_.sample_rate |= BTAV_A2DP_CODEC_SAMPLE_RATE_48000;
+  }
+
+  if(sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_96000) {
+    codec_selectable_capability_.sample_rate |= BTAV_A2DP_CODEC_SAMPLE_RATE_96000;
+  }
+
+  // Compute the selectable bps
+  codec_selectable_capability_.bits_per_sample = p_saved_aptx_ad_caps->bits_per_sample;
+
+  // Compute the selectable channel mode
+  channelMode = p_saved_aptx_ad_caps->channelMode & sink_info_cie.channelMode;
+  if(channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_MONO) {
+    codec_selectable_capability_.channel_mode |= BTAV_A2DP_CODEC_CHANNEL_MODE_MONO;
+  }
+
+  if(channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_STEREO) {
+    codec_selectable_capability_.channel_mode |= BTAV_A2DP_CODEC_CHANNEL_MODE_STEREO;
+  }
+
+  if(channelMode & A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO) {
+    codec_selectable_capability_.channel_mode |= BTAV_A2DP_CODEC_CHANNEL_MODE_STEREO;
+  }
+
+  status = A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &sink_info_cie, ota_codec_peer_capability_);
+  CHECK(status == A2DP_SUCCESS);
+  return true;
+
+fail:
+    codec_selectable_capability_ = saved_codec_selectable_capability;
+    memcpy(ota_codec_peer_capability_, saved_ota_codec_peer_capability, sizeof(ota_codec_peer_capability_));
+    return false;
+}
+

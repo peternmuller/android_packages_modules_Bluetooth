@@ -42,6 +42,7 @@
 #include "a2dp_codec_api.h"
 #include "a2dp_vendor_aptx_adaptive_constants.h"
 #include "avdt_api.h"
+#include "internal_include/bt_target.h"
 
 class A2dpCodecConfigAptxAdaptive: public A2dpCodecConfig {
  public:
@@ -49,16 +50,14 @@ class A2dpCodecConfigAptxAdaptive: public A2dpCodecConfig {
   virtual ~A2dpCodecConfigAptxAdaptive();
 
   bool init() override;
-  period_ms_t encoderIntervalMs() const override;
   bool setCodecConfig(const uint8_t* p_peer_codec_info, bool is_capability,
                       uint8_t* p_result_codec_config) override;
 
+  bool setPeerCodecCapabilities(
+       const uint8_t* p_peer_codec_capabilities) override;
+
  private:
   bool useRtpHeaderMarkerBit() const override;
-  bool updateEncoderUserConfig(
-      const tA2DP_ENCODER_INIT_PEER_PARAMS* p_peer_params,
-      bool* p_restart_input, bool* p_restart_output,
-      bool* p_config_updated) override;
 
   btav_a2dp_codec_config_t previous_codec_config;
 
@@ -179,6 +178,10 @@ bool A2DP_VendorBuildCodecHeaderAptxAdaptive(const uint8_t* p_codec_info,
 // |p_codec_info| is a pointer to the aptX-adaptive codec_info to decode and display.
 bool A2DP_VendorDumpCodecInfoAptxAdaptive(const uint8_t* p_codec_info);
 
+// Decodes and return aptX-adaptive codec info string.
+// |p_codec_info| is a pointer to the aptX-adaptive codec_info to decode and display.
+std::string A2DP_VendorCodecInfoStringAptxAd(const uint8_t* p_codec_info);
+
 // Gets the A2DP aptX-adaptive encoder interface that can be used to encode and
 // prepare A2DP packets for transmission - see |tA2DP_ENCODER_INTERFACE|.
 // |p_codec_info| contains the codec information.
@@ -204,7 +207,7 @@ const char* A2DP_VendorCodecIndexStrAptxAdaptive(void);
 
 // Initializes A2DP aptX-adaptive Source codec information into |tAVDT_CFG|
 // configuration entry pointed by |p_cfg|.
-bool A2DP_VendorInitCodecConfigAptxAdaptive(tAVDT_CFG* p_cfg);
+bool A2DP_VendorInitCodecConfigAptxAdaptive(AvdtpSepConfig* p_cfg);
 
 // Checks peer initiated setconfig with DUT supported config
 // and returns proper status.
