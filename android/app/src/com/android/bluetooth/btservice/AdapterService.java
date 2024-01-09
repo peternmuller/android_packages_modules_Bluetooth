@@ -331,6 +331,7 @@ public class AdapterService extends Service {
     private AdapterState mAdapterStateMachine;
     private BondStateMachine mBondStateMachine;
     private RemoteDevices mRemoteDevices;
+    private Vendor mVendor;
 
     /* TODO: Consider to remove the search API from this class, if changed to use call-back */
     private SdpManager mSdpManager = null;
@@ -636,6 +637,7 @@ public class AdapterService extends Service {
         mBatteryStatsManager = getNonNullSystemService(BatteryStatsManager.class);
         mCompanionDeviceManager = getNonNullSystemService(CompanionDeviceManager.class);
 
+        mVendor = new Vendor(this);
         mRemoteDevices = new RemoteDevices(this, mLooper);
         mRemoteDevices.init();
         clearDiscoveringPackages();
@@ -759,6 +761,7 @@ public class AdapterService extends Service {
             // Some platforms, such as wearables do not have a system ui.
             Log.w(TAG, "Unable to resolve SystemUI's UID.", e);
         }
+        mVendor.init();
     }
 
     @Override
@@ -1304,6 +1307,10 @@ public class AdapterService extends Service {
                 }
                 mWakeLock = null;
             }
+        }
+
+        if (mVendor != null) {
+            mVendor.cleanup();
         }
 
         if (mDatabaseManager != null) {
@@ -6939,6 +6946,10 @@ public class AdapterService extends Service {
     @VisibleForTesting
     int getScanMode() {
         return mAdapterProperties.getScanMode();
+    }
+
+    public Vendor getVendorIntf() {
+        return mVendor;
     }
 
     public String[] getAllowlistedMediaPlayers() {

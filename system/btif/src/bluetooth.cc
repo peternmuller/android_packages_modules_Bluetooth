@@ -44,6 +44,7 @@
 #include <hardware/bt_sdp.h>
 #include <hardware/bt_sock.h>
 #include <hardware/bt_vc.h>
+#include <hardware/bt_vendor.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,8 @@ extern LeAudioBroadcasterInterface* btif_le_audio_broadcaster_get_interface();
 extern CsisClientInterface* btif_csis_client_get_interface();
 /* Volume Control client */
 extern VolumeControlInterface* btif_volume_control_get_interface();
+/* vendor  */
+extern btvendor_interface_t* btif_vendor_get_interface();
 
 bt_status_t btif_av_sink_execute_service(bool b_enable);
 bt_status_t btif_hh_execute_service(bool b_enable);
@@ -905,6 +908,9 @@ static const void* get_profile_interface(const char* profile_id) {
 
   if (is_profile(profile_id, BT_PROFILE_CSIS_CLIENT_ID))
     return btif_csis_client_get_interface();
+
+  if (is_profile(profile_id, BT_PROFILE_VENDOR_ID))
+    return btif_vendor_get_interface();
 
   bool isBqrEnabled =
       bluetooth::common::InitFlags::IsBluetoothQualityReportCallbackEnabled();
