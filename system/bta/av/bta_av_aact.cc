@@ -3306,6 +3306,51 @@ void bta_av_vendor_offload_stop() {
                             offload_vendor_callback);
 }
 
+void update_sub_band_info(uint8_t **param, int *p_param_len, uint8_t id, uint16_t data)
+{
+  uint8_t *p_param = *param;
+  *p_param++ = BTA_AV_ENCODER_MODE_CHANGE_ID;
+  *p_param_len += 1;
+
+  *p_param++ = 2; /* size of uint16_t */
+  *p_param_len += 1;
+
+  UINT16_TO_STREAM(p_param, data);
+  *p_param_len += 2;
+  *param = p_param;
+}
+
+/*******************************************************************************
+ *
+ * Function         bta_av_update_codec_mode
+ *
+ * Description      Sends Vendor Specific Command to SoC
+ *                  with codec mode based on metadata.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void bta_av_set_codec_mode(tBTA_AV_DATA* p_data) {
+  uint8_t param[48];
+  uint8_t *p_param;
+  uint8_t *num_sub_band;
+  int param_len = 0;
+  uint16_t enc_mode = p_data->set_codec_mode.enc_mode;
+
+  memset(param, 0, 48);
+  p_param = param;
+
+  *p_param++ = VS_QHCI_ENCODER_MODE_CHANGE;
+  param_len++;
+  num_sub_band = p_param++;
+  param_len++;
+
+  update_sub_band_info(&p_param, &param_len, BTA_AV_ENCODER_MODE_CHANGE_ID, enc_mode);
+  *num_sub_band += 1;
+  BTM_VendorSpecificCommand(HCI_QTI_CONTROLLER_A2DP_OPCODE, param_len,
+                                param, NULL);
+}
+
 /*******************************************************************************
  *
  * Function         bta_av_offload_req

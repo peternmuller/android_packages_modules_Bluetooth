@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "audio_hal_interface/a2dp_encoding.h"
+#include "bta/include/bta_av_api.h"
 #include "btif/include/btif_a2dp.h"
 #include "btif/include/btif_a2dp_control.h"
 #include "btif/include/btif_a2dp_sink.h"
@@ -91,6 +92,10 @@ typedef struct {
   bool is_low_latency;
 } btif_av_set_latency_req_t;
 
+typedef struct {
+  int enc_mode;
+} btif_av_codec_mode_change_t;
+
 /**
  * BTIF AV events
  */
@@ -108,6 +113,7 @@ typedef enum {
   BTIF_AV_AVRCP_CLOSE_EVT,
   BTIF_AV_AVRCP_REMOTE_PLAY_EVT,
   BTIF_AV_SET_LATENCY_REQ_EVT,
+  BTIF_AV_SET_CODEC_MODE_EVT
 } btif_av_sm_event_t;
 
 class BtifAvEvent {
@@ -911,6 +917,7 @@ const char* dump_av_sm_event_name(btif_av_sm_event_t event) {
     CASE_RETURN_STR(BTIF_AV_AVRCP_CLOSE_EVT)
     CASE_RETURN_STR(BTIF_AV_AVRCP_REMOTE_PLAY_EVT)
     CASE_RETURN_STR(BTIF_AV_SET_LATENCY_REQ_EVT)
+    CASE_RETURN_STR(BTIF_AV_SET_CODEC_MODE_EVT)
     default:
       return "UNKNOWN_EVENT";
   }
@@ -2523,6 +2530,18 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
       BTA_AvSetLatency(peer_.BtaHandle(), p_set_latency_req->is_low_latency);
     } break;
 
+    case BTIF_AV_SET_CODEC_MODE_EVT: {
+      const btif_av_codec_mode_change_t* p_codec_mode_change =
+          static_cast<const btif_av_codec_mode_change_t*>(p_data);
+      LOG_INFO("Peer %s : event=%s flags=%s enc_mode=%d",
+               ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
+               BtifAvEvent::EventName(event).c_str(),
+               peer_.FlagsToString().c_str(),
+               p_codec_mode_change->enc_mode);
+
+      BTA_AvSetCodecMode(peer_.BtaHandle(), p_codec_mode_change->enc_mode);
+    } break;
+
     default:
       LOG_WARN("%s: Peer %s : Unhandled event=%s", __PRETTY_FUNCTION__,
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
@@ -2749,6 +2768,18 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
                p_set_latency_req->is_low_latency ? "true" : "false");
 
       BTA_AvSetLatency(peer_.BtaHandle(), p_set_latency_req->is_low_latency);
+    } break;
+
+    case BTIF_AV_SET_CODEC_MODE_EVT: {
+      const btif_av_codec_mode_change_t* p_codec_mode_change =
+          static_cast<const btif_av_codec_mode_change_t*>(p_data);
+      LOG_INFO("Peer %s : event=%s flags=%s enc_mode=%d",
+               ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
+               BtifAvEvent::EventName(event).c_str(),
+               peer_.FlagsToString().c_str(),
+               p_codec_mode_change->enc_mode);
+
+      BTA_AvSetCodecMode(peer_.BtaHandle(), p_codec_mode_change->enc_mode);
     } break;
 
       CHECK_RC_EVENT(event, (tBTA_AV*)p_data);
@@ -4333,4 +4364,43 @@ bool btif_av_peer_is_source(const RawAddress& peer_address) {
   }
 
   return true;
+}
+
+void btif_av_update_codec_mode(bool is_Gaming_Latency) {
+  btif_av_codec_mode_change_t codec_mode_change;
+  A2dpCodecConfig* current_codec = bta_av_get_a2dp_current_codec();
+  if (current_codec != nullptr) {
+    btav_a2dp_codec_config_t codec_config;
+    codec_config = current_codec->getCodecConfig();
+    if(codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+      if (is_Gaming_Latency) {
+        LOG_INFO(" Is game/low latency, going for Low Latency Mode");
+        codec_mode_change.enc_mode = APTX_LL;
+      } else {
+        LOG_INFO(" Isn't game/low latency, going for High Quality Mode");
+        codec_mode_change.enc_mode = APTX_HQ;
+      }
+    }
+  }
+  BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
+                            sizeof(codec_mode_change));
+  LOG_INFO("peer_address=%s event=%s",
+            ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
+            btif_av_event.ToString().c_str());
+  do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
+                                          AVDT_TSEP_SNK,  // peer_sep
+                                          btif_av_source_active_peer(),
+                                          kBtaHandleUnknown, btif_av_event));
+}
+
+void btif_av_update_source_metadata(bool is_Gaming_Enabled) {
+  LOG_INFO("btif_av_update_source_metadata");
+
+  btif_av_update_codec_mode(is_Gaming_Enabled);
+}
+
+void btif_av_set_low_latency_spatial_audio(bool is_low_latency) {
+  LOG_INFO("is_low_latency: %s", is_low_latency ? "true" : "false");
+
+  btif_av_update_codec_mode(is_low_latency);
 }
