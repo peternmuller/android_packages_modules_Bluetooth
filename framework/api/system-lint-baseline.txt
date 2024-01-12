@@ -69,3 +69,11 @@ UnflaggedApi: android.bluetooth.BluetoothHapClient#switchToPreviousPreset(androi
     New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothHapClient.switchToPreviousPreset(android.bluetooth.BluetoothDevice)
 UnflaggedApi: android.bluetooth.BluetoothHapClient#switchToPreviousPresetForGroup(int):
     New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothHapClient.switchToPreviousPresetForGroup(int)
+UnflaggedApi: android.bluetooth.le.ScanSettings#getRssiHighThreshold():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.le.ScanSettings.getRssiHighThreshold()
+UnflaggedApi: android.bluetooth.le.ScanSettings#getRssiLowThreshold():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.le.ScanSettings.getRssiLowThreshold()
+UnflaggedApi: android.bluetooth.le.ScanSettings.Builder#setRssiHighThreshold(int):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.le.ScanSettings.Builder.setRssiHighThreshold(int)
+UnflaggedApi: android.bluetooth.le.ScanSettings.Builder#setRssiLowThreshold(int):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.le.ScanSettings.Builder.setRssiLowThreshold(int)
