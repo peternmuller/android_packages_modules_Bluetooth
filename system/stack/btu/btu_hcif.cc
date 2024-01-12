@@ -45,6 +45,8 @@
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "stack/btm/neighbor_inquiry.h"
+#include "osi/include/log.h"
+#include "stack/btm/btm_int.h"
 #include "stack/include/acl_hci_link_interface.h"
 #include "stack/include/ble_acl_interface.h"
 #include "stack/include/ble_hci_link_interface.h"
@@ -93,6 +95,7 @@ static void btu_hcif_hardware_error_evt(uint8_t* p);
 static void btu_hcif_mode_change_evt(uint8_t* p);
 static void btu_hcif_link_key_notification_evt(const uint8_t* p);
 static void btu_hcif_read_clock_off_comp_evt(uint8_t* p);
+static void btu_hcif_flow_spec_comp_evt(uint8_t* p);
 static void btu_hcif_esco_connection_comp_evt(const uint8_t* p);
 static void btu_hcif_esco_connection_chg_evt(uint8_t* p);
 
@@ -295,6 +298,9 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id,
       break;
     case HCI_READ_CLOCK_OFF_COMP_EVT:
       btu_hcif_read_clock_off_comp_evt(p);
+      break;
+    case HCI_FLOW_SPECIFICATION_COMP_EVT:
+      btu_hcif_flow_spec_comp_evt(p);
       break;
     case HCI_ESCO_CONNECTION_COMP_EVT:
       btu_hcif_esco_connection_comp_evt(p);
@@ -1704,4 +1710,30 @@ static void btu_ble_rc_param_req_evt(uint8_t* p, uint8_t len) {
 
   l2cble_process_rc_param_request_evt(handle, int_min, int_max, latency,
                                       timeout);
+}
+
+/*******************************************************************************
+ *
+ * Function         btu_hcif_flow_spec_comp_evt
+ *
+ * Description      Process event HCI_FLOW_SPECIFICATION_COMP_EVT
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static void btu_hcif_flow_spec_comp_evt(uint8_t* p) {
+  uint8_t status;
+  uint16_t handle;
+  tBT_FLOW_SPEC flow;
+
+  STREAM_TO_UINT8(status, p);
+  STREAM_TO_UINT16(handle, p);
+  STREAM_TO_UINT8(flow.qos_unused, p);
+  STREAM_TO_UINT8(flow.flow_direction, p);
+  STREAM_TO_UINT8(flow.service_type, p);
+  STREAM_TO_UINT32(flow.token_rate, p);
+  STREAM_TO_UINT32(flow.peak_bandwidth, p);
+  STREAM_TO_UINT32(flow.latency, p);
+
+  btm_flow_spec_complete(status, handle, &flow);
 }

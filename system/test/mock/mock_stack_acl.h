@@ -32,6 +32,7 @@
 #include "stack/include/acl_client_callbacks.h"
 #include "stack/include/bt_hdr.h"
 #include "types/class_of_device.h"
+#include "stack/include/bt_types.h"
 #include "types/raw_address.h"
 
 // Mocked compile conditionals, if any
@@ -1191,6 +1192,30 @@ struct BTM_unblock_role_switch_and_sniff_mode_for {
 };
 extern struct BTM_unblock_role_switch_and_sniff_mode_for
     BTM_unblock_role_switch_and_sniff_mode_for;
+
+struct btm_flow_spec_complete {
+  std::function<void(uint8_t status, uint16_t handle, tBT_FLOW_SPEC* p_flow)> body{
+      [](uint8_t /*status*/, uint16_t /*handle*/, tBT_FLOW_SPEC* /*p_flow*/) {}};
+  void operator()(uint8_t status, uint16_t handle, tBT_FLOW_SPEC* p_flow)
+        { body(status, handle, p_flow); };
+};
+extern struct btm_flow_spec_complete btm_flow_spec_complete;
+
+// Name: BTM_FlowSpec
+// Params: const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+// tBTM_CMPL_CB* p_cb Returns: tBTM_STATUS
+struct BTM_FlowSpec {
+  std::function<tBTM_STATUS(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                            tBTM_CMPL_CB* p_cb)> body{
+      [](const RawAddress& /*addr*/, tBT_FLOW_SPEC* /*p_flow*/, tBTM_CMPL_CB* /*p_cb*/) {
+        return 0; 
+      }};
+  tBTM_STATUS operator()(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                         tBTM_CMPL_CB* p_cb) {
+    return body(addr, p_flow, p_cb);
+  };
+};
+extern struct BTM_FlowSpec BTM_FlowSpec;
 
 }  // namespace stack_acl
 }  // namespace mock

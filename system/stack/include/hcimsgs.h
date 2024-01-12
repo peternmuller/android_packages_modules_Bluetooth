@@ -307,6 +307,13 @@ void btsnd_hcic_vendor_spec_cmd(uint16_t opcode, uint8_t len, uint8_t* p_data,
 #define HCIC_PARAM_SIZE_BLE_READ_PHY 2
 #define HCIC_PARAM_SIZE_BLE_SET_PHY 7
 
+extern void btsnd_hcic_flow_spec(uint16_t handle, uint8_t unused, uint8_t direction,
+                          uint8_t service_type, uint32_t token_rate,
+                          uint32_t token_size, uint32_t peak, uint32_t latency);
+
+#define HCIC_PARAM_SIZE_FLOW_SPECIFICATION 21
+/* flow specification */
+
 /* ULP HCI command */
 void btsnd_hcic_ble_set_local_used_feat(uint8_t feat_set[8]);
 

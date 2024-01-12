@@ -26,6 +26,8 @@
 
 #include <cstdint>
 
+#include "bt_types.h"
+
 #include "device/include/esco_parameters.h"
 #include "stack/btm/neighbor_inquiry.h"
 #include "stack/include/btm_api_types.h"
@@ -442,6 +444,9 @@ tBTM_INQ_INFO* BTM_InqDbNext(tBTM_INQ_INFO* p_cur);
  *
  ******************************************************************************/
 tBTM_STATUS BTM_ClearInqDb(const RawAddress* p_bda);
+
+extern tBTM_STATUS BTM_FlowSpec(const RawAddress& bd, tBT_FLOW_SPEC* p_flow,
+                              tBTM_CMPL_CB* p_cb);
 
 /*****************************************************************************
  *  (e)SCO CHANNEL MANAGEMENT FUNCTIONS
