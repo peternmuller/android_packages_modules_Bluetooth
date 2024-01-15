@@ -18,10 +18,16 @@
 #include <string.h>
 
 #include <include/hardware/bt_av.h>
+#include "acl_api.h"
 #include "btconfigstore/bt_configstore.h"
+#include "btif/include/btif_config.h"
 #include "btm_api.h"
+#include "btm_int_types.h"
 #include "osi/include/log.h"
+#include "stack/acl/acl.h"
+#include "stack/acl/peer_packet_types.h"
 #include "stack/include/bt_types.h"
+#include "stack/include/btm_iso_api.h"
 #include "stack/include/btm_vendor_api.h"
 #include "stack/include/btm_vendor_types.h"
 
@@ -67,6 +73,9 @@ char qhs_value[PROPERTY_VALUE_MAX] = "0";
 uint8_t qhs_support_mask = 0;
 static bt_device_qll_local_supported_features_t qll_features;
 static bt_configstore_interface_t* bt_configstore_intf = NULL;
+tBTM_VS_EVT_CB* p_vnd_qle_cig_latency_changed_cb = nullptr;
+
+extern tBTM_CB btm_cb;
 
 void BTM_ConfigQHS();
 
@@ -128,6 +137,11 @@ uint8_t* BTM_GetScramblingSupportedFreqs(uint8_t* number_of_freqs) {
   return NULL;
 }
 
+void BTM_RegisterForQleCigLatencyChangedEvt(
+    tBTM_VS_EVT_CB* qle_cig_latency_changed_cb) {
+  p_vnd_qle_cig_latency_changed_cb = qle_cig_latency_changed_cb;
+}
+
 /*******************************************************************************
  *
  * Function         BTM_GetHostAddOnFeatures
@@ -180,6 +194,64 @@ bool BTM_BleIsCisParamUpdateLocalHostSupported() {
   LOG_INFO(": supported=%d", supported);
 
   return supported;
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_GetRemoteQLLFeatures
+ *
+ * Description      This function is called to get remote QLL features
+ *
+ * Parameters       features - 8 bytes array for features value
+ *
+ * Returns          true if feature value is available
+ *
+ ******************************************************************************/
+bool BTM_GetRemoteQLLFeatures(uint16_t handle, uint8_t* features) {
+  int idx;
+  bool res = false;
+
+  tACL_CONN* p_acl;
+
+  if (!BTM_QBCE_QLE_HCI_SUPPORTED(soc_add_on_features.as_array)) {
+    LOG_INFO("QHS not support");
+    return false;
+  }
+
+  const RawAddress remote_bd_addr = acl_address_from_handle(handle);
+  if (remote_bd_addr == RawAddress::kEmpty) {
+    LOG_ERROR("can't find acl for handle: 0x%04x", handle);
+    return false;
+  }
+
+  p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
+
+  if (p_acl == nullptr) {
+    LOG_ERROR("can't find acl for handle: 0x%04x", handle);
+    return false;
+  }
+
+  LOG_INFO(" : qll_features_state = %x", p_acl->qll_features_state);
+
+  if (p_acl->qll_features_state != BTM_QLL_FEATURES_STATE_FEATURE_COMPLETE) {
+    BD_FEATURES value;
+    size_t length = sizeof(value);
+
+    if (btif_config_get_bin(p_acl->remote_addr.ToString().c_str(),
+                            "QLL_FEATURES", value, &length)) {
+      LOG_INFO("reading feature from config file");
+      p_acl->qll_features_state = BTM_QLL_FEATURES_STATE_FEATURE_COMPLETE;
+      memcpy(p_acl->remote_qll_features, value, BD_FEATURES_LEN);
+      res = true;
+    }
+  } else {
+    res = true;
+  }
+
+  if (res && features) {
+    memcpy(features, p_acl->remote_qll_features, BD_FEATURES_LEN);
+  }
+  return res;
 }
 
 static void qbce_set_qhs_host_mode_hci_cmd_complete(tBTM_VSC_CMPL* p_data) {
@@ -296,10 +368,14 @@ static void parse_controller_addon_features_response(tBTM_VSC_CMPL* p_data) {
       soc_add_on_features_length = length - 5;
       STREAM_TO_ARRAY(soc_add_on_features.as_array, stream,
                       soc_add_on_features_length);
+      soc_add_on_features.as_array[soc_add_on_features_length] = '\0';
     }
 
-    LOG_INFO(": opcode = 0x%04X, length = %d, status = %d, product_id:%d",
-             opcode, length, status, product_id);
+    LOG_INFO(
+        " ::opcode = 0x%04X, length = %d, soc_add_on_features_length=%d status "
+        "= %d, product_id:%d, feature=%s",
+        opcode, length, soc_add_on_features_length, status, product_id,
+        soc_add_on_features.as_array);
     if (status == HCI_SUCCESS) {
       LOG_INFO(": status success");
 
@@ -323,11 +399,283 @@ static void parse_controller_addon_features_response(tBTM_VSC_CMPL* p_data) {
   }
 }
 
+void btm_ble_read_remote_supported_qll_features_status_cback(
+    tBTM_VSC_CMPL* param) {
+  uint8_t status;
+
+  LOG_INFO(" :: op: %x, param_len: %d", param->opcode, param->param_len);
+  if (param->param_len == 1) {
+    status = *param->p_param_buf;
+    LOG_INFO(" :: status = %d", status);
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_ble_qll_connection_complete
+ *
+ * Description      This function process the QLL connection complete event.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_ble_qll_connection_complete(uint8_t* p) {
+  uint16_t handle;
+  uint8_t status, param[3] = {0}, *p_param = param;
+  int idx;
+  tACL_CONN* p_acl;
+
+  STREAM_TO_UINT8(status, p);
+  STREAM_TO_UINT16(handle, p);
+  handle = handle & 0x0FFF;
+
+  const RawAddress remote_bd_addr = acl_address_from_handle(handle);
+  if (remote_bd_addr == RawAddress::kEmpty) {
+    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
+
+  if (p_acl == nullptr) {
+    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  if (status != HCI_SUCCESS) {
+    LOG_ERROR(" :: failed for handle: 0x%04x, status 0x%02x", handle, status);
+    p_acl->qll_features_state = BTM_QLL_FEATURES_STATE_ERROR;
+    return;
+  }
+
+  p_acl->qll_features_state = BTM_QLL_FEATURES_STATE_CONN_COMPLETE;
+
+  UINT8_TO_STREAM(p_param, QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE);
+  UINT16_TO_STREAM(p_param, handle);
+  BTM_VendorSpecificCommand(
+      HCI_VS_QBCE_OCF, BTM_QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE_LEN, param,
+      btm_ble_read_remote_supported_qll_features_status_cback);
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_ble_read_remote_supported_qll_features_complete
+ *
+ * Description      This function process the read remote supported QLL features
+ *                  complete event.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_ble_read_remote_supported_qll_features_complete(uint8_t* p) {
+  uint16_t handle;
+  uint8_t status;
+  int idx;
+  tACL_CONN* p_acl;
+
+  STREAM_TO_UINT8(status, p);
+  STREAM_TO_UINT16(handle, p);
+  handle = handle & 0x0FFF;
+
+  const RawAddress remote_bd_addr = acl_address_from_handle(handle);
+  if (remote_bd_addr == RawAddress::kEmpty) {
+    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
+
+  if (p_acl == nullptr) {
+    LOG_ERROR(":: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  if (status != HCI_SUCCESS) {
+    LOG_ERROR(":: failed for handle: 0x%04x, status 0x%02x", handle, status);
+    p_acl->qll_features_state = BTM_QLL_FEATURES_STATE_ERROR;
+    return;
+  }
+
+  p_acl->qll_features_state = BTM_QLL_FEATURES_STATE_FEATURE_COMPLETE;
+  STREAM_TO_ARRAY(p_acl->remote_qll_features, p, BD_FEATURES_LEN);
+  btif_config_set_bin(p_acl->remote_addr.ToString(), "QLL_FEATURES",
+                      p_acl->remote_qll_features, BD_FEATURES_LEN);
+}
+
+/*******************************************************************************
+ *
+ * Function        BTM_GetQcmPhyState
+ *
+ * Description     This function returns the phy state of ACL connection.
+ *
+ *
+ * Parameters      bda : BD address of the remote device
+ *
+ * Returns         Returns qcm phy state of ACL connection.
+ *                 Returns default value as BR/EDR if it fails.
+ *
+ *
+ ******************************************************************************/
+uint8_t BTM_GetQcmPhyState(const RawAddress& bda) {
+  bool ret;
+  // Default value for QCM PHY state
+  int qcm_phy_state = QCM_PHY_STATE_BR_EDR;
+
+  ret = btif_config_get_int(bda.ToString(), "QCM_PHY_STATE", &qcm_phy_state);
+  if (ret == 0) {
+    LOG_ERROR(" :: can't find phy state for BdAddr %s in btconfig file",
+              bda.ToString().c_str());
+  }
+  return (uint8_t)qcm_phy_state;
+}
+
+/*******************************************************************************
+ *
+ * Function        btm_acl_update_qcm_phy_state
+ *
+ * Description     This function updates the qcm phy state of ACL connection.
+ *
+ * Returns         void
+ *
+ ******************************************************************************/
+void btm_acl_update_qcm_phy_state(uint8_t* p) {
+  uint16_t handle;
+  uint8_t status, qcm_phy_state;
+  int idx;
+  tACL_CONN* p_acl;
+
+  STREAM_TO_UINT8(status, p);
+  STREAM_TO_UINT16(handle, p);
+
+  handle = handle & 0x0FFF;
+
+  const RawAddress remote_bd_addr = acl_address_from_handle(handle);
+  if (remote_bd_addr == RawAddress::kEmpty) {
+    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
+
+  if (p_acl == nullptr) {
+    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+    return;
+  }
+
+  if (status != HCI_SUCCESS) {
+    LOG_ERROR(" :: failed for handle: 0x%04x, status 0x%02x", handle, status);
+    // Setting qcm phy state to default value: 0x00 BR/EDR
+    btif_config_set_int(p_acl->remote_addr.ToString(), "QCM_PHY_STATE",
+                        QCM_PHY_STATE_BR_EDR);
+    return;
+  }
+
+  STREAM_TO_UINT8(qcm_phy_state, p);
+  // Setting qcm phy state as 0x00 BR/EDR, 0x01 QHS
+  btif_config_set_int(p_acl->remote_addr.ToString(), "QCM_PHY_STATE",
+                      qcm_phy_state);
+}
+
+/*******************************************************************************
+ *
+ * Function        BTM_IsQHSPhySupported
+ *
+ * Description     This function is called to determine if QHS is supported or
+ *not.
+ *
+ * Parameters      bda : BD address of the remote device
+ *                 transport : Physical transport used for ACL connection
+ *                 (BR/EDR or LE)
+ *
+ * Returns         True if qhs phy can be used, false otherwise.
+ *
+ ******************************************************************************/
+bool BTM_IsQHSPhySupported(const RawAddress& bda, tBT_TRANSPORT transport) {
+  bool qhs_phy = false;
+  if (transport == BT_TRANSPORT_LE) {
+    tACL_CONN* p_acl = btm_acl_for_bda(bda, BT_TRANSPORT_LE);
+    if (p_acl == NULL) {
+      LOG_ERROR("invalid bda %s", bda.ToString().c_str());
+      qhs_phy = false;
+    } else {
+      bool ret;
+      BD_FEATURES features;
+
+      ret = BTM_GetRemoteQLLFeatures(p_acl->hci_handle, (uint8_t*)&features);
+      if (ret && (features[2] & 0x40)) qhs_phy = true;
+    }
+  }
+
+  if (transport == BT_TRANSPORT_BR_EDR) {
+    uint8_t qcm_phy_state = BTM_GetQcmPhyState(bda);
+    if (qcm_phy_state == QCM_PHY_STATE_QHS) {
+      qhs_phy = true;
+    }
+  }
+  if (qhs_phy == false) {
+    LOG_DEBUG(": QHS not supported for transport = %d and BdAddr = %s",
+              transport, bda.ToString().c_str());
+  }
+  return qhs_phy;
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_vendor_vse_cback
+ *
+ * Description      Process event VENDOR_SPECIFIC_EVT
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_vendor_vse_cback(uint8_t* p, uint8_t evt_len) {
+  uint8_t i;
+  uint8_t* pp = p;
+  uint8_t vse_subcode;
+
+  if (evt_len >= 2) {
+    STREAM_TO_UINT8(vse_subcode, pp);
+
+    if (HCI_VSE_SUBCODE_QBCE == vse_subcode) {
+      uint8_t vse_msg_type;
+
+      STREAM_TO_UINT8(vse_msg_type, pp);
+      LOG_INFO(" :: QBCE VSE event received, msg = %x", vse_msg_type);
+      switch (vse_msg_type) {
+        case MSG_QBCE_QLL_CONNECTION_COMPLETE:
+          btm_ble_qll_connection_complete(pp);
+          break;
+        case MSG_QBCE_REMOTE_SUPPORTED_QLL_FEATURES_COMPLETE:
+          btm_ble_read_remote_supported_qll_features_complete(pp);
+          break;
+        case MSG_QBCE_QCM_PHY_CHANGE:
+          btm_acl_update_qcm_phy_state(pp);
+          break;
+        case MSG_QBCE_QLE_CIG_LATENCY_CHANGED:
+          if (p_vnd_qle_cig_latency_changed_cb != nullptr) {
+            LOG_INFO("Calling qle_cig_latency_changed_cb");
+            (*p_vnd_qle_cig_latency_changed_cb)((evt_len - 2), pp);
+            return;
+          }
+          break;
+        case MSG_QBCE_VS_PARAM_REPORT_EVENT:
+          bluetooth::hci::IsoManager::GetInstance()->HandleVscHciEvent(
+              vse_msg_type, p, evt_len - 1);
+        default:
+          LOG_INFO(" :: unknown msg type: %d", vse_msg_type);
+          break;
+      }
+      return;
+    }
+  }
+  LOG_DEBUG("BTM Event: Vendor Specific event from controller");
+}
+
 void BTM_ConfigQHS() {
   if (BTM_QBCE_QLE_HCI_SUPPORTED(soc_add_on_features.as_array)) {
     BT_HDR* response;
     char qhs_iso[PROPERTY_VALUE_MAX] = "false";
-    property_get("persist.vendor.btstack.qhs_enable", qhs_iso, "false");
+    property_get("persist.vendor.btstack.qhs_enable", qhs_iso, "true");
     uint8_t cmd[3];
     uint8_t sub_cmd = QBCE_SET_QHS_HOST_MODE;
 
@@ -336,8 +684,6 @@ void BTM_ConfigQHS() {
     cmd[0] = sub_cmd;
     cmd[1] = QHS_TRANSPORT_LE_ISO;
 
-    BTM_VendorSpecificCommand(HCI_VS_QBCE_OCF, sizeof(cmd), cmd,
-                              qbce_set_qhs_host_mode_hci_cmd_complete);
     if (!strncmp("true", qhs_iso, 4)) {
       cmd[2] = QHS_HOST_MODE_HOST_AWARE;
     } else {
@@ -410,6 +756,7 @@ void BTM_ConfigQHS() {
 
 void BTM_ReadVendorAddOnFeaturesInternal() {
   bt_configstore_intf = get_btConfigStore_interface();
+  BTM_RegisterForVSEvents((tBTM_VS_EVT_CB*)btm_vendor_vse_cback, true);
   if (bt_configstore_intf != NULL) {
     std::vector<vendor_property_t> vPropList;
     bt_configstore_intf->get_vendor_properties(BT_PROP_ALL, vPropList);
@@ -524,12 +871,83 @@ void BTM_ReadVendorAddOnFeaturesInternal() {
  ******************************************************************************/
 void BTM_ReadVendorAddOnFeatures() {
   bool btConfigStore = true;
+  char bt_config_store_prop[PROPERTY_VALUE_MAX] = {'\0'};
+  int ret = 0;
+
+  ret = property_get("ro.vendor.bluetooth.btconfigstore", bt_config_store_prop,
+                     "true");
+
+  if (ret != 0) {
+    if (!strncasecmp(bt_config_store_prop, "true", sizeof("true"))) {
+      btConfigStore = true;
+    } else {
+      btConfigStore = false;
+    }
+    LOG_INFO(":: btConfigStore = %d", spilt_a2dp_supported);
+  }
 
   if (btConfigStore) {
     BTM_ReadVendorAddOnFeaturesInternal();
   } else {
     LOG_INFO(": Soc Add On");
-    if (true) {
+
+    char soc_name[PROPERTY_VALUE_MAX] = {'\0'};
+    char splita2dp[PROPERTY_VALUE_MAX];
+    char aac_frame_ctl[PROPERTY_VALUE_MAX];
+    char max_pow_support[PROPERTY_VALUE_MAX];
+
+    ret = property_get("persist.vendor.qcom.bluetooth.soc", soc_name, "");
+    LOG_INFO(" :: Bluetooth soc type set to: %s, ret: %d", soc_name, ret);
+
+    if (ret != 0) {
+      bt_configstore_intf = get_btConfigStore_interface();
+      soc_type = bt_configstore_intf->convert_bt_soc_name_to_soc_type(soc_name);
+      LOG_INFO(": soc_name:%s, soc_type = %d", soc_name, soc_type);
+    }
+
+    ret = property_get("persist.vendor.qcom.bluetooth.enable.splita2dp",
+                       splita2dp, "true");
+    LOG_INFO(":: persist.vendor.qcom.bluetooth.enable.splita2dp: %s, ret: %d",
+             splita2dp, ret);
+
+    if (ret != 0) {
+      if (!strncasecmp(splita2dp, "true", sizeof("true"))) {
+        spilt_a2dp_supported = true;
+      } else {
+        spilt_a2dp_supported = false;
+      }
+      LOG_INFO(":: spilt_a2dp_supported = %d", spilt_a2dp_supported);
+    }
+
+    ret = property_get("persist.vendor.qcom.bluetooth.a2dp_offload_cap",
+                       a2dp_offload_Cap, "");
+    LOG_INFO(" :: a2dp_offload_Cap = %s", a2dp_offload_Cap);
+
+    ret = property_get("persist.vendor.qcom.bluetooth.aac_frm_ctl.enabled",
+                       aac_frame_ctl, "false");
+    LOG_INFO(
+        " :: persist.vendor.qcom.bluetooth.aac_frm_ctl.enabled: %s, ret: %d",
+        aac_frame_ctl, ret);
+
+    if (ret != 0) {
+      if (!strncasecmp(aac_frame_ctl, "true", sizeof("true"))) {
+        aac_frame_ctl_enabled = true;
+      } else {
+        aac_frame_ctl_enabled = false;
+      }
+    }
+
+    ret = property_get("persist.vendor.qcom.bluetooth.max_power_support",
+                       max_pow_support, "false");
+    LOG_INFO(":: persist.vendor.qcom.bluetooth.max_power_support: %s, ret: %d",
+             max_pow_support, ret);
+
+    if (ret != 0) {
+      max_power_prop_enabled = decode_max_power_values((char*)max_pow_support);
+      LOG_INFO(": max_power_prop_enabled = %d", max_power_prop_enabled);
+    }
+
+    if (soc_type >= BT_SOC_TYPE_CHEROKEE) {
       BTM_VendorSpecificCommand(HCI_VS_GET_ADDON_FEATURES_SUPPORT, 0, NULL,
                                 parse_controller_addon_features_response);
     }

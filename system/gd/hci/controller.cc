@@ -19,7 +19,6 @@
 #include <future>
 #include <memory>
 #include <string>
-#include <array>
 #include <utility>
 
 #include "common/init_flags.h"
@@ -204,23 +203,6 @@ struct Controller::impl {
       vendor_capabilities_.is_supported_ = 0x00;
     }
 
-    const std::array<uint8_t, 8> arr = {0x4a, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    hci_->EnqueueCommand(
-         QBCESetQHSHostModeBuilder::Create(OpCode::HCI_VS_QBCE_OCF, 0x02, 0x03),
-	 handler->BindOnceOn(this, &Controller::impl::qbce_set_qhs_host_mode_handler));
-    hci_->EnqueueCommand(
-         QBCESetQLLEvtMaskBuilder::Create(OpCode::HCI_VS_QBCE_OCF, arr),
-         handler->BindOnceOn(this, &Controller::impl::qbce_set_qll_event_mask_handler));
-    hci_->EnqueueCommand(
-         QBCESetQLMEvtMaskBuilder::Create(OpCode::HCI_VS_QBCE_OCF, arr),
-         handler->BindOnceOn(this, &Controller::impl::qbce_set_qlm_event_mask_handler));
-    hci_->EnqueueCommand(
-         QBCEReadLocalQLLSupportedFeaturesBuilder::Create(OpCode::HCI_VS_QBCE_OCF),
-         handler->BindOnceOn(this, &Controller::impl::qbce_read_local_qll_supported_features_handler));
-    hci_->EnqueueCommand(
-         QBCEQLESetHostFeatureBuilder::Create(OpCode::HCI_VS_QBCE_OCF, 0x3a, 0x01),
-         handler->BindOnceOn(this, &Controller::impl::qbce_qle_set_host_feature_handler));
-
     // We only need to synchronize the last read. Make BD_ADDR to be the last one.
     std::promise<void> promise;
     auto future = promise.get_future();
@@ -280,16 +262,6 @@ struct Controller::impl {
     ASSERT(!acl_monitor_credits_callback_.IsEmpty());
     acl_monitor_credits_callback_ = {};
   }
-
-  void qbce_set_qhs_host_mode_handler(CommandCompleteView view) {}
-
-  void qbce_set_qll_event_mask_handler(CommandCompleteView view) {}
-
-  void qbce_set_qlm_event_mask_handler(CommandCompleteView view) {}
-
-  void qbce_read_local_qll_supported_features_handler(CommandCompleteView view) {}
-
-  void qbce_qle_set_host_feature_handler(CommandCompleteView view) {}
 
   void write_secure_connections_host_support_complete_handler(CommandCompleteView view) {
     auto complete_view = WriteSecureConnectionsHostSupportCompleteView::Create(view);
@@ -1070,8 +1042,6 @@ struct Controller::impl {
         return false;
       // undefined in local_supported_commands_
       case OpCode::READ_LOCAL_SUPPORTED_COMMANDS:
-        return true;
-      case OpCode::HCI_VS_QBCE_OCF:
         return true;
       case OpCode::NONE:
         return false;

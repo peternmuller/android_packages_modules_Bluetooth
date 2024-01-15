@@ -302,21 +302,6 @@ static BT_HDR* WrapPacketAndCopy(
   return packet;
 }
 
-void vs_event_callback(
-               bluetooth::hci::VendorSpecificEventView event) {
-  auto view = bluetooth::hci::QBCEVendorSpecificEventView::Create(event);
-  ASSERT(view.IsValid());
-  uint8_t msg_type = view.GetMsgType();
-  if (msg_type == 0x09) {
-    uint16_t conn_handle = view.GetConnectionHandle();
-    bluetooth::shim::GetHciLayer()->EnqueueCommand(
-      bluetooth::hci::QBCEReadRemoteQLLSupportedFeaturesBuilder::Create(bluetooth::hci::OpCode::HCI_VS_QBCE_OCF, conn_handle),
-       bluetooth::shim::GetGdShimHandler()->BindOnce([](bluetooth::hci::CommandStatusView command_status) {
-          LOG_INFO("command_status=%hhu ", command_status.GetStatus());
-       }));
-  }
-}
-
 static void event_callback(bluetooth::hci::EventView event_packet_view) {
   if (!send_data_upwards) {
     return;
@@ -427,16 +412,6 @@ static void register_event(bluetooth::hci::EventCode event_code) {
   auto handler = bluetooth::shim::GetGdShimHandler();
   bluetooth::shim::GetHciLayer()->RegisterEventHandler(
       event_code, handler->Bind(event_callback));
-}
-
-static void register_vs_event(){
-    auto handler = bluetooth::shim::GetGdShimHandler();
-    bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-        bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
-        handler->Bind(cpp::vs_event_callback));
-    bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-        bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
-        handler->Bind(cpp::vendor_specific_event_callback));
 }
 
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {
@@ -600,7 +575,6 @@ void bluetooth::shim::hci_on_reset_complete() {
       bluetooth::hci::VseSubeventCode::BQR_EVENT,
       handler->Bind(cpp::vendor_specific_event_callback));
 
-  cpp::register_vs_event();
   cpp::register_for_iso();
 }
 

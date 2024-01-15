@@ -136,6 +136,13 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_ReadVendorAddOnFeatures = BTM_ReadVendorAddOnFeatures,
             .BTM_GetSocAddOnFeatures = BTM_GetSocAddOnFeatures,
             .BTM_GetHostAddOnFeatures = BTM_GetHostAddOnFeatures,
+            .BTM_GetA2dpOffloadCapablity = BTM_GetA2dpOffloadCapablity,
+            .BTM_IsSpiltA2dpSupported = BTM_IsSpiltA2dpSupported,
+            .BTM_IsAACFrameCtrlEnabled = BTM_IsAACFrameCtrlEnabled,
+            .BTM_GetScramblingSupportedFreqs = BTM_GetScramblingSupportedFreqs,
+            .BTM_IsQHSPhySupported = BTM_IsQHSPhySupported,
+            .BTM_RegisterForQleCigLatencyChangedEvt =
+                BTM_RegisterForQleCigLatencyChangedEvt,
         }
 
 };
