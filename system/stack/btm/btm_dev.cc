@@ -22,28 +22,29 @@
  *
  ******************************************************************************/
 
+#define LOG_TAG "btm_dev"
+
 #include "stack/btm/btm_dev.h"
 
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <string>
 
 #include "btm_api.h"
-#include "btm_ble_int.h"
-#include "btm_ble_sec_api.h"
+#include "btm_int_types.h"
 #include "btm_sec_api.h"
-#include "btm_sec_int_types.h"
+#include "btm_sec_cb.h"
+#include "common/init_flags.h"
 #include "device/include/controller.h"
+#include "internal_include/bt_target.h"
 #include "l2c_api.h"
-#include "main/shim/btm_api.h"
-#include "main/shim/dumpsys.h"
-#include "main/shim/shim.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
 #include "rust/src/connection/ffi/connection_shim.h"
+#include "stack/btm/btm_sec.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_octets.h"
+#include "stack/include/btm_ble_privacy.h"
+#include "stack/include/btm_log_history.h"
 #include "types/raw_address.h"
 
 extern tBTM_CB btm_cb;
@@ -53,6 +54,12 @@ namespace {
 
 constexpr char kBtmLogTag[] = "BOND";
 
+}
+
+static void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
+  p_dev_rec->sec_rec.link_key.fill(0);
+  memset(&p_dev_rec->sec_rec.ble_keys, 0, sizeof(tBTM_SEC_BLE_KEYS));
+  list_remove(btm_sec_cb.sec_dev_rec, p_dev_rec);
 }
 
 /*******************************************************************************
@@ -105,7 +112,7 @@ bool BTM_SecAddDevice(const RawAddress& bd_addr, DEV_CLASS dev_class,
      * bond state for an existing device here? This logic should be verified
      * as part of a larger refactor.
      */
-    p_dev_rec->bond_type = tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN;
+    p_dev_rec->sec_rec.bond_type = BOND_TYPE_UNKNOWN;
   }
 
   if (dev_class) memcpy(p_dev_rec->dev_class, dev_class, DEV_CLASS_LEN);
@@ -115,37 +122,31 @@ bool BTM_SecAddDevice(const RawAddress& bd_addr, DEV_CLASS dev_class,
   if (bd_name && bd_name[0]) {
     LOG_DEBUG("  Remote name known for device:%s name:%s",
               ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bd_name);
-    p_dev_rec->sec_flags |= BTM_SEC_NAME_KNOWN;
+    p_dev_rec->sec_rec.sec_flags |= BTM_SEC_NAME_KNOWN;
     strlcpy((char*)p_dev_rec->sec_bd_name, (char*)bd_name,
             BTM_MAX_REM_BD_NAME_LEN + 1);
   }
 
   if (p_link_key) {
     LOG_DEBUG("  Link key known for device:%s", ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
-    p_dev_rec->sec_flags |= BTM_SEC_LINK_KEY_KNOWN;
-    p_dev_rec->link_key = *p_link_key;
-    p_dev_rec->link_key_type = key_type;
-    p_dev_rec->pin_code_length = pin_length;
+    p_dev_rec->sec_rec.sec_flags |= BTM_SEC_LINK_KEY_KNOWN;
+    p_dev_rec->sec_rec.link_key = *p_link_key;
+    p_dev_rec->sec_rec.link_key_type = key_type;
+    p_dev_rec->sec_rec.pin_code_length = pin_length;
 
     if (pin_length >= 16 || key_type == BTM_LKEY_TYPE_AUTH_COMB ||
         key_type == BTM_LKEY_TYPE_AUTH_COMB_P_256) {
       // Set the flag if the link key was made by using either a 16 digit
       // pin or MITM.
-      p_dev_rec->sec_flags |=
+      p_dev_rec->sec_rec.sec_flags |=
           BTM_SEC_16_DIGIT_PIN_AUTHED | BTM_SEC_LINK_KEY_AUTHED;
     }
   }
 
-  p_dev_rec->rmt_io_caps = BTM_IO_CAP_OUT;
+  p_dev_rec->sec_rec.rmt_io_caps = BTM_IO_CAP_OUT;
   p_dev_rec->device_type |= BT_DEVICE_TYPE_BREDR;
 
   return true;
-}
-
-void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
-  p_dev_rec->link_key.fill(0);
-  memset(&p_dev_rec->ble.keys, 0, sizeof(tBTM_SEC_BLE_KEYS));
-  list_remove(btm_sec_cb.sec_dev_rec, p_dev_rec);
 }
 
 /** Removes the device from acceptlist */
@@ -170,8 +171,8 @@ bool BTM_SecDeleteDevice(const RawAddress& bd_addr) {
   }
 
   /* Invalidate bonded status */
-  p_dev_rec->sec_flags &= ~BTM_SEC_LINK_KEY_KNOWN;
-  p_dev_rec->sec_flags &= ~BTM_SEC_LE_LINK_KEY_KNOWN;
+  p_dev_rec->sec_rec.sec_flags &= ~BTM_SEC_LINK_KEY_KNOWN;
+  p_dev_rec->sec_rec.sec_flags &= ~BTM_SEC_LE_LINK_KEY_KNOWN;
 
   if (BTM_IsAclConnectionUp(bd_addr, BT_TRANSPORT_LE) ||
       BTM_IsAclConnectionUp(bd_addr, BT_TRANSPORT_BR_EDR)) {
@@ -194,7 +195,7 @@ bool BTM_SecDeleteDevice(const RawAddress& bd_addr) {
   }
 
   const auto device_type = p_dev_rec->device_type;
-  const auto bond_type = p_dev_rec->bond_type;
+  const auto bond_type = p_dev_rec->sec_rec.bond_type;
 
   /* Clear out any saved BLE keys */
   btm_sec_clear_ble_keys(p_dev_rec);
@@ -222,8 +223,8 @@ void BTM_SecClearSecurityFlags(const RawAddress& bd_addr) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
   if (p_dev_rec == NULL) return;
 
-  p_dev_rec->sec_flags = 0;
-  p_dev_rec->sec_state = BTM_SEC_STATE_IDLE;
+  p_dev_rec->sec_rec.sec_flags = 0;
+  p_dev_rec->sec_rec.sec_state = BTM_SEC_STATE_IDLE;
   p_dev_rec->sm4 = BTM_SM4_UNKNOWN;
 }
 
@@ -251,8 +252,9 @@ const char* BTM_SecReadDevName(const RawAddress& bd_addr) {
  *
  * Function         btm_sec_alloc_dev
  *
- * Description      Look for the record in the device database for the record
- *                  with specified address
+ * Description      Allocate a security device record with specified address,
+ *                  fill device type and device class from inquiry database or
+ *                  btm_sec_cb (if the address is the connecting device)
  *
  * Returns          Pointer to the record or NULL
  *
@@ -337,7 +339,7 @@ bool btm_dev_support_role_switch(const RawAddress& bd_addr) {
   return false;
 }
 
-bool is_handle_equal(void* data, void* context) {
+static bool is_handle_equal(void* data, void* context) {
   tBTM_SEC_DEV_REC* p_dev_rec = static_cast<tBTM_SEC_DEV_REC*>(data);
   uint16_t* handle = static_cast<uint16_t*>(context);
 
@@ -365,7 +367,7 @@ tBTM_SEC_DEV_REC* btm_find_dev_by_handle(uint16_t handle) {
   return NULL;
 }
 
-bool is_address_equal(void* data, void* context) {
+static bool is_address_equal(void* data, void* context) {
   tBTM_SEC_DEV_REC* p_dev_rec = static_cast<tBTM_SEC_DEV_REC*>(data);
   const RawAddress* bd_addr = ((RawAddress*)context);
 
@@ -399,7 +401,7 @@ tBTM_SEC_DEV_REC* btm_find_dev(const RawAddress& bd_addr) {
 
 static bool has_lenc_and_address_is_equal(void* data, void* context) {
   tBTM_SEC_DEV_REC* p_dev_rec = static_cast<tBTM_SEC_DEV_REC*>(data);
-  if (!(p_dev_rec->ble.key_type & BTM_LE_KEY_LENC)) return true;
+  if (!(p_dev_rec->sec_rec.ble_keys.key_type & BTM_LE_KEY_LENC)) return true;
 
   return is_address_equal(data, context);
 }
@@ -426,7 +428,7 @@ tBTM_SEC_DEV_REC* btm_find_dev_with_lenc(const RawAddress& bd_addr) {
 /*******************************************************************************
  *
  * Function         btm_consolidate_dev
-5**
+ *
  * Description      combine security records if identified as same peer
  *
  * Returns          none
@@ -452,14 +454,14 @@ void btm_consolidate_dev(tBTM_SEC_DEV_REC* p_target_rec) {
       memcpy(p_target_rec, p_dev_rec, sizeof(tBTM_SEC_DEV_REC));
       p_target_rec->ble = temp_rec.ble;
       p_target_rec->ble_hci_handle = temp_rec.ble_hci_handle;
-      p_target_rec->enc_key_size = temp_rec.enc_key_size;
+      p_target_rec->sec_rec.enc_key_size = temp_rec.sec_rec.enc_key_size;
       p_target_rec->conn_params = temp_rec.conn_params;
       p_target_rec->device_type |= temp_rec.device_type;
-      p_target_rec->sec_flags |= temp_rec.sec_flags;
+      p_target_rec->sec_rec.sec_flags |= temp_rec.sec_rec.sec_flags;
 
-      p_target_rec->new_encryption_key_is_p256 =
-          temp_rec.new_encryption_key_is_p256;
-      p_target_rec->bond_type = temp_rec.bond_type;
+      p_target_rec->sec_rec.new_encryption_key_is_p256 =
+          temp_rec.sec_rec.new_encryption_key_is_p256;
+      p_target_rec->sec_rec.bond_type = temp_rec.sec_rec.bond_type;
 
       /* remove the combined record */
       wipe_secrets_and_remove(p_dev_rec);
@@ -480,7 +482,7 @@ void btm_consolidate_dev(tBTM_SEC_DEV_REC* p_target_rec) {
   }
 }
 
-BTM_CONSOLIDATION_CB* btm_consolidate_cb = nullptr;
+static BTM_CONSOLIDATION_CB* btm_consolidate_cb = nullptr;
 
 void BTM_SetConsolidationCallback(BTM_CONSOLIDATION_CB* cb) {
   btm_consolidate_cb = cb;
@@ -553,7 +555,8 @@ void btm_dev_consolidate_existing_connections(const RawAddress& bd_addr) {
  * Function         btm_find_or_alloc_dev
  *
  * Description      Look for the record in the device database for the record
- *                  with specified BD address
+ *                  with specified BD address, if not found, allocate a new
+ *                  record
  *
  * Returns          Pointer to the record or NULL
  *
@@ -573,7 +576,7 @@ tBTM_SEC_DEV_REC* btm_find_or_alloc_dev(const RawAddress& bd_addr) {
  *
  * Function         btm_find_oldest_dev_rec
  *
- * Description      Locates the oldest device in use. It first looks for
+ * Description      Locates the oldest device record in use. It first looks for
  *                  the oldest non-paired device.  If all devices are paired it
  *                  returns the oldest paired device.
  *
@@ -592,7 +595,7 @@ static tBTM_SEC_DEV_REC* btm_find_oldest_dev_rec(void) {
     tBTM_SEC_DEV_REC* p_dev_rec =
         static_cast<tBTM_SEC_DEV_REC*>(list_node(node));
 
-    if ((p_dev_rec->sec_flags &
+    if ((p_dev_rec->sec_rec.sec_flags &
          (BTM_SEC_LINK_KEY_KNOWN | BTM_SEC_LE_LINK_KEY_KNOWN)) == 0) {
       // Device is not paired
       if (p_dev_rec->timestamp < ts_oldest) {
@@ -639,10 +642,10 @@ tBTM_SEC_DEV_REC* btm_sec_allocate_dev_rec(void) {
   list_append(btm_sec_cb.sec_dev_rec, p_dev_rec);
 
   // Initialize defaults
-  p_dev_rec->sec_flags = BTM_SEC_IN_USE;
-  p_dev_rec->bond_type = tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN;
+  p_dev_rec->sec_rec.sec_flags = BTM_SEC_IN_USE;
+  p_dev_rec->sec_rec.bond_type = BOND_TYPE_UNKNOWN;
   p_dev_rec->timestamp = btm_sec_cb.dev_rec_count++;
-  p_dev_rec->rmt_io_caps = BTM_IO_CAP_UNKNOWN;
+  p_dev_rec->sec_rec.rmt_io_caps = BTM_IO_CAP_UNKNOWN;
   p_dev_rec->suggested_tx_octets = 0;
 
   return p_dev_rec;
@@ -658,13 +661,12 @@ tBTM_SEC_DEV_REC* btm_sec_allocate_dev_rec(void) {
  * Returns          The device bond type if known, otherwise BOND_TYPE_UNKNOWN
  *
  ******************************************************************************/
-tBTM_SEC_DEV_REC::tBTM_BOND_TYPE btm_get_bond_type_dev(
-    const RawAddress& bd_addr) {
+tBTM_BOND_TYPE btm_get_bond_type_dev(const RawAddress& bd_addr) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
 
-  if (p_dev_rec == NULL) return tBTM_SEC_DEV_REC::BOND_TYPE_UNKNOWN;
+  if (p_dev_rec == NULL) return BOND_TYPE_UNKNOWN;
 
-  return p_dev_rec->bond_type;
+  return p_dev_rec->sec_rec.bond_type;
 }
 
 /*******************************************************************************
@@ -678,12 +680,12 @@ tBTM_SEC_DEV_REC::tBTM_BOND_TYPE btm_get_bond_type_dev(
  *
  ******************************************************************************/
 bool btm_set_bond_type_dev(const RawAddress& bd_addr,
-                           tBTM_SEC_DEV_REC::tBTM_BOND_TYPE bond_type) {
+                           tBTM_BOND_TYPE bond_type) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
 
   if (p_dev_rec == NULL) return false;
 
-  p_dev_rec->bond_type = bond_type;
+  p_dev_rec->sec_rec.bond_type = bond_type;
   return true;
 }
 
@@ -691,9 +693,9 @@ bool btm_set_bond_type_dev(const RawAddress& bd_addr,
  *
  * Function         btm_get_sec_dev_rec
  *
- * Description      Get security device records satisfying given filter
+ * Description      Get all security device records
  *
- * Returns          A vector containing pointers of security device records
+ * Returns          A vector containing pointers to all security device records
  *
  ******************************************************************************/
 std::vector<tBTM_SEC_DEV_REC*> btm_get_sec_dev_rec() {
@@ -708,3 +710,97 @@ std::vector<tBTM_SEC_DEV_REC*> btm_get_sec_dev_rec() {
   }
   return result;
 }
+
+/*******************************************************************************
+ *
+ * Function         BTM_Sec_AddressKnown
+ *
+ * Description      Query the secure device database and check
+ *                  whether the device associated with address has
+ *                  its address resolved
+ *
+ * Returns          True if
+ *                     - the device is unknown, or
+ *                     - the device is classic, or
+ *                     - the device is ble and has a public address
+ *                     - the device is ble with a resolved identity address
+ *                  False, otherwise
+ *
+ ******************************************************************************/
+bool BTM_Sec_AddressKnown(const RawAddress& address) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(address);
+
+  //  not a known device, or a classic device, we assume public address
+  if (p_dev_rec == NULL || (p_dev_rec->device_type & BT_DEVICE_TYPE_BLE) == 0)
+    return true;
+
+  LOG_WARN("%s, device type not BLE: 0x%02x", ADDRESS_TO_LOGGABLE_CSTR(address),
+           p_dev_rec->device_type);
+
+  // bonded device with identity address known
+  if (!p_dev_rec->ble.identity_address_with_type.bda.IsEmpty()) {
+    return true;
+  }
+
+  // Public address, Random Static, or Random Non-Resolvable Address known
+  if (p_dev_rec->ble.AddressType() == BLE_ADDR_PUBLIC ||
+      !BTM_BLE_IS_RESOLVE_BDA(address)) {
+    return true;
+  }
+
+  LOG_WARN("%s, the address type is 0x%02x", ADDRESS_TO_LOGGABLE_CSTR(address),
+           p_dev_rec->ble.AddressType());
+
+  // Only Resolvable Private Address (RPA) is known, we don't allow it into
+  // the background connection procedure.
+  return false;
+}
+
+const tBLE_BD_ADDR BTM_Sec_GetAddressWithType(const RawAddress& bd_addr) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
+  if (p_dev_rec == nullptr || !p_dev_rec->is_device_type_has_ble()) {
+    return {
+        .type = BLE_ADDR_PUBLIC,
+        .bda = bd_addr,
+    };
+  }
+
+  if (p_dev_rec->ble.identity_address_with_type.bda.IsEmpty()) {
+    return {
+        .type = p_dev_rec->ble.AddressType(),
+        .bda = bd_addr,
+    };
+  } else {
+    // Floss doesn't support LL Privacy (yet). To expedite ARC testing, always
+    // connect to the latest LE random address (if available and LL Privacy is
+    // not enabled) rather than redesign.
+    // TODO(b/235218533): Remove when LL Privacy is implemented.
+#if TARGET_FLOSS
+    if (!p_dev_rec->ble.cur_rand_addr.IsEmpty() &&
+        btm_cb.ble_ctr_cb.privacy_mode < BTM_PRIVACY_1_2) {
+      return {
+          .type = BLE_ADDR_RANDOM,
+          .bda = p_dev_rec->ble.cur_rand_addr,
+      };
+    }
+#endif
+    return p_dev_rec->ble.identity_address_with_type;
+  }
+}
+
+bool BTM_IsRemoteNameKnown(const RawAddress& bd_addr, tBT_TRANSPORT transport) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
+  return (p_dev_rec == nullptr) ? false : p_dev_rec->sec_rec.is_name_known();
+}
+
+namespace bluetooth {
+namespace testing {
+namespace legacy {
+
+void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
+  ::wipe_secrets_and_remove(p_dev_rec);
+}
+
+}  // namespace legacy
+}  // namespace testing
+}  // namespace bluetooth

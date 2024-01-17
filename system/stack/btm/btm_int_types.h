@@ -25,17 +25,13 @@
 #include <string>
 
 #include "gd/common/circular_buffer.h"
-#include "osi/include/allocator.h"
+#include "internal_include/bt_target.h"
 #include "osi/include/fixed_queue.h"
-#include "osi/include/list.h"
 #include "stack/acl/acl.h"
 #include "stack/btm/btm_ble_int_types.h"
 #include "stack/btm/btm_sco.h"
 #include "stack/btm/neighbor_inquiry.h"
-#include "stack/btm/security_device_record.h"
-#include "stack/include/bt_octets.h"
 #include "stack/include/btm_ble_api_types.h"
-#include "stack/include/rfcdefs.h"
 #include "stack/include/security_client_callbacks.h"
 #include "types/raw_address.h"
 
@@ -131,9 +127,14 @@ typedef struct tBTM_DEVCB {
 
 typedef struct tBTM_CB {
   /*****************************************************
-  **      Device control
+  **      Control block for local device
   *****************************************************/
   tBTM_DEVCB devcb;
+
+  /*****************************************************
+  **      Control block for local LE device
+  *****************************************************/
+  tBTM_BLE_CB ble_ctr_cb;
 
  public:
   tBTM_BLE_VSC_CB cmn_ble_vsc_cb;
@@ -186,6 +187,7 @@ typedef struct tBTM_CB {
 
   void Init() {
     memset(&devcb, 0, sizeof(devcb));
+    memset(&ble_ctr_cb, 0, sizeof(ble_ctr_cb));
     memset(&cmn_ble_vsc_cb, 0, sizeof(cmn_ble_vsc_cb));
     memset(&btm_inq_vars, 0, sizeof(btm_inq_vars));
     memset(&sco_cb, 0, sizeof(sco_cb));

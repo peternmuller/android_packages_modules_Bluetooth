@@ -34,13 +34,16 @@ using ::aidl::android::hardware::bluetooth::audio::PcmConfiguration;
 using ::aidl::android::hardware::bluetooth::audio::SessionType;
 using ::aidl::android::hardware::bluetooth::audio::UnicastCapability;
 using ::bluetooth::audio::aidl::BluetoothAudioCtrlAck;
+using ::bluetooth::audio::aidl::LatencyMode;
 using ::bluetooth::audio::le_audio::StartRequestState;
+using ::le_audio::DsaMode;
 using ::le_audio::set_configurations::AudioSetConfiguration;
-using ::le_audio::set_configurations::CodecCapabilitySetting;
+using ::le_audio::set_configurations::CodecConfigSetting;
 
 constexpr uint8_t kChannelNumberMono = 1;
 constexpr uint8_t kChannelNumberStereo = 2;
 
+constexpr uint32_t kSampleRate96000 = 96000;
 constexpr uint32_t kSampleRate48000 = 48000;
 constexpr uint32_t kSampleRate44100 = 44100;
 constexpr uint32_t kSampleRate32000 = 32000;
@@ -54,16 +57,12 @@ constexpr uint8_t kBitsPerSample32 = 32;
 
 using ::bluetooth::audio::le_audio::StreamCallbacks;
 
-void flush_sink();
 void flush_source();
 bool hal_ucast_capability_to_stack_format(
     const UnicastCapability& ucast_capability,
-    CodecCapabilitySetting& stack_capability);
+    CodecConfigSetting& stack_capability);
 AudioConfiguration offload_config_to_hal_audio_config(
     const ::le_audio::offload_config& offload_config);
-
-bool is_source_hal_enabled();
-bool is_sink_hal_enabled();
 
 std::vector<AudioSetConfiguration> get_offload_capabilities();
 
@@ -78,7 +77,7 @@ class LeAudioTransport {
 
   void StopRequest();
 
-  void SetLowLatency(bool is_low_latency);
+  void SetLatencyMode(LatencyMode latency_mode);
 
   bool GetPresentationPosition(uint64_t* remote_delay_report_ns,
                                uint64_t* total_bytes_processed,
@@ -118,6 +117,7 @@ class LeAudioTransport {
   PcmConfiguration pcm_config_;
   LeAudioBroadcastConfiguration broadcast_config_;
   std::atomic<StartRequestState> start_request_state_;
+  DsaMode dsa_mode_;
 };
 
 // Sink transport implementation for Le Audio
@@ -134,7 +134,7 @@ class LeAudioSinkTransport
 
   void StopRequest() override;
 
-  void SetLowLatency(bool is_low_latency) override;
+  void SetLatencyMode(LatencyMode latency_mode) override;
 
   bool GetPresentationPosition(uint64_t* remote_delay_report_ns,
                                uint64_t* total_bytes_read,
@@ -190,7 +190,7 @@ class LeAudioSourceTransport
 
   void StopRequest() override;
 
-  void SetLowLatency(bool is_low_latency) override;
+  void SetLatencyMode(LatencyMode latency_mode) override;
 
   bool GetPresentationPosition(uint64_t* remote_delay_report_ns,
                                uint64_t* total_bytes_written,

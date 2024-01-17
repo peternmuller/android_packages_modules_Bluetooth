@@ -23,29 +23,27 @@
  *
  ******************************************************************************/
 
+#define LOG_TAG "devctl"
 #include <base/logging.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "bta/dm/bta_dm_int.h"
-#include "bta/sys/bta_sys.h"
-#include "btcore/include/module.h"
+#include "acl_api_types.h"
 #include "btif/include/btif_bqr.h"
-#include "btm_ble_int.h"
+#include "btm_sec_cb.h"
 #include "btm_sec_int_types.h"
-#include "common/message_loop_thread.h"
-#include "hci/include/hci_layer.h"
+#include "internal_include/bt_target.h"
 #include "main/shim/btm_api.h"
-#include "main/shim/controller.h"
-#include "main/shim/entry.h"
-#include "main/shim/hci_layer.h"
-#include "main/shim/shim.h"
-#include "osi/include/compat.h"
-#include "osi/include/osi.h"
+#include "os/log.h"
+#include "stack/btm/btm_int_types.h"
+#include "stack/btm/btm_sec.h"
 #include "stack/gatt/connection_manager.h"
 #include "stack/include/acl_api.h"
-#include "stack/include/bt_hdr.h"
+#include "stack/include/acl_api_types.h"
+#include "stack/include/bt_types.h"
+#include "stack/include/btm_api.h"
+#include "stack/include/btm_ble_privacy.h"
 #include "stack/include/l2cap_controller_interface.h"
 #include "types/raw_address.h"
 
@@ -164,7 +162,7 @@ void BTM_db_reset(void) {
 
 static bool set_sec_state_idle(void* data, void* context) {
   tBTM_SEC_DEV_REC* p_dev_rec = static_cast<tBTM_SEC_DEV_REC*>(data);
-  p_dev_rec->sec_state = BTM_SEC_STATE_IDLE;
+  p_dev_rec->sec_rec.sec_state = BTM_SEC_STATE_IDLE;
   return true;
 }
 
@@ -187,7 +185,7 @@ void BTM_reset_complete() {
   btm_cb.btm_inq_vars.page_scan_period = HCI_DEF_PAGESCAN_INTERVAL;
   btm_cb.btm_inq_vars.page_scan_type = HCI_DEF_SCAN_TYPE;
 
-  btm_sec_cb.ble_ctr_cb.set_connection_state_idle();
+  btm_cb.ble_ctr_cb.set_connection_state_idle();
   connection_manager::reset(true);
 
   btm_pm_reset();

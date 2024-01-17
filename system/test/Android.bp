@@ -13,6 +13,11 @@ subdirs = [
 ]
 
 filegroup {
+    name: "TestMockAudioHalInterface",
+    srcs: ["mock/mock_audio_hal_interface*.cc"],
+}
+
+filegroup {
     name: "TestMockAudioA2dp",
     srcs: ["mock/mock_audio_a2dp*.cc"],
 }
@@ -190,13 +195,6 @@ filegroup {
 }
 
 filegroup {
-    name: "TestMockCommon",
-    srcs: [
-        "mock/mock_common_*.cc",
-    ],
-}
-
-filegroup {
     name: "TestMockStackA2dp",
     srcs: [
         "mock/mock_stack_a2dp_*.cc",
@@ -235,6 +233,13 @@ filegroup {
     name: "TestMockStackAvrc",
     srcs: [
         "mock/mock_stack_avrc_*.cc",
+    ],
+}
+
+filegroup {
+    name: "TestMockStackBnep",
+    srcs: [
+        "mock/mock_stack_bnep_*.cc",
     ],
 }
 
@@ -281,23 +286,9 @@ filegroup {
 }
 
 filegroup {
-    name: "TestMockSystemLibfmq",
-    srcs: [
-        "mock/mock_system_libfmq_*.cc",
-    ],
-}
-
-filegroup {
     name: "TestMockUdrv",
     srcs: [
         "mock/mock_udrv_*.cc",
-    ],
-}
-
-filegroup {
-    name: "TestMockAndroidHardware",
-    srcs: [
-        "mock/mock_android_hardware_*.cc",
     ],
 }
 
@@ -453,23 +444,9 @@ filegroup {
 }
 
 filegroup {
-    name: "TestMockStackCryptotoolbox",
-    srcs: [
-        "mock/mock_stack_crypto_toolbox*.cc",
-    ],
-}
-
-filegroup {
     name: "TestMockBtu",
     srcs: [
         "mock/mock_btu_*cc",
-    ],
-}
-
-filegroup {
-    name: "TestMockUtils",
-    srcs: [
-        "mock/mock_utils_*cc",
     ],
 }
 
@@ -490,8 +467,14 @@ filegroup {
 filegroup {
     name: "TestCommonMainHandler",
     srcs: [
+        ":TestCommonSyncMainHandler",
         "common/main_handler.cc",
     ],
+}
+
+filegroup {
+    name: "TestCommonSyncMainHandler",
+    srcs: ["common/sync_main_handler.cc"],
 }
 
 filegroup {
@@ -532,7 +515,7 @@ filegroup {
 filegroup {
     name: "TestMockLegacyHciInterface",
     srcs: [
-        "mock/mock_legacy_hci_iterface.cc",
+        "mock/mock_legacy_hci_interface.cc",
     ],
 }
 

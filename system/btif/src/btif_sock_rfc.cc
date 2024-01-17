@@ -26,27 +26,22 @@
 #include <cstdint>
 #include <mutex>
 
-#include "bt_target.h"  // Must be first to define build configuration
 #include "bta/include/bta_jv_api.h"
 #include "bta/include/bta_rfcomm_scn.h"
 #include "btif/include/btif_metrics_logging.h"
-/* The JV interface can have only one user, hence we need to call a few
- * L2CAP functions from this file. */
 #include "btif/include/btif_sock.h"
 #include "btif/include/btif_sock_l2cap.h"
 #include "btif/include/btif_sock_sdp.h"
 #include "btif/include/btif_sock_thread.h"
 #include "btif/include/btif_sock_util.h"
-#include "btif/include/btif_uid.h"
 #include "include/hardware/bt_sock.h"
+#include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
 #include "osi/include/list.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"  // INVALID_FD
 #include "stack/include/bt_hdr.h"
-#include "stack/include/btm_api.h"
-#include "stack/include/btm_api_types.h"
 #include "stack/include/port_api.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
@@ -79,8 +74,8 @@ typedef struct {
   Uuid service_uuid;
   char service_name[256];
   int fd;
-  int app_fd;   // Temporary storage for the half of the socketpair that's sent
-                // back to upper layers.
+  int app_fd;   // Temporary storage for the half of the socketpair that's
+                // sent back to upper layers.
   int app_uid;  // UID of the app for which this socket was created.
   int mtu;
   uint8_t* packet;
@@ -228,6 +223,7 @@ static rfc_slot_t* alloc_rfc_slot(const RawAddress* addr, const char* name,
   }
   slot->id = rfc_slot_id;
   slot->f.server = server;
+  slot->role = server;
   slot->tx_bytes = 0;
   slot->rx_bytes = 0;
   return slot;
@@ -292,8 +288,8 @@ bt_status_t btsock_rfc_listen(const char* service_name,
 
   // TODO(sharvil): not sure that this check makes sense; seems like a logic
   // error to call
-  // functions on RFCOMM sockets before initializing the module. Probably should
-  // be an assert.
+  // functions on RFCOMM sockets before initializing the module. Probably
+  // should be an assert.
   if (!is_init_done()) return BT_STATUS_NOT_READY;
 
   if ((flags & BTSOCK_FLAG_NO_SDP) == 0) {
@@ -422,8 +418,10 @@ static void cleanup_rfc_slot(rfc_slot_t* slot) {
     close(slot->fd);
     btif_sock_connection_logger(
         SOCKET_CONNECTION_STATE_DISCONNECTED,
-        slot->f.server ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION,
-        slot->addr);
+        slot->role ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION, slot->addr,
+        slot->scn,
+        slot->role ? slot->service_name
+                   : slot->service_uuid.ToString().c_str());
     log_socket_connection_state(
         slot->addr, slot->id, BTSOCK_RFCOMM,
         android::bluetooth::SOCKET_CONNECTION_STATE_DISCONNECTED,
@@ -517,7 +515,8 @@ static void on_srv_rfc_listen_started(tBTA_JV_RFCOMM_START* p_start,
   slot->rfc_handle = p_start->handle;
   btif_sock_connection_logger(
       SOCKET_CONNECTION_STATE_LISTENING,
-      slot->f.server ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION, slot->addr);
+      slot->role ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION, slot->addr,
+      slot->scn, slot->service_name);
   log_socket_connection_state(slot->addr, slot->id, BTSOCK_RFCOMM,
                               android::bluetooth::SocketConnectionstateEnum::
                                   SOCKET_CONNECTION_STATE_LISTENING,
@@ -543,8 +542,8 @@ static uint32_t on_srv_rfc_connect(tBTA_JV_RFCOMM_SRV_OPEN* p_open,
 
   btif_sock_connection_logger(
       SOCKET_CONNECTION_STATE_CONNECTED,
-      accept_rs->f.server ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION,
-      accept_rs->addr);
+      accept_rs->role ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION,
+      accept_rs->addr, accept_rs->scn, accept_rs->service_name);
   log_socket_connection_state(
       accept_rs->addr, accept_rs->id, BTSOCK_RFCOMM,
       android::bluetooth::SOCKET_CONNECTION_STATE_CONNECTED, 0, 0,
@@ -584,7 +583,8 @@ static void on_cli_rfc_connect(tBTA_JV_RFCOMM_OPEN* p_open, uint32_t id) {
 
   btif_sock_connection_logger(
       SOCKET_CONNECTION_STATE_CONNECTED,
-      slot->f.server ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION, slot->addr);
+      slot->role ? SOCKET_ROLE_LISTEN : SOCKET_ROLE_CONNECTION, slot->addr,
+      slot->scn, slot->service_uuid.ToString().c_str());
   log_socket_connection_state(
       slot->addr, slot->id, BTSOCK_RFCOMM,
       android::bluetooth::SOCKET_CONNECTION_STATE_CONNECTED, 0, 0,

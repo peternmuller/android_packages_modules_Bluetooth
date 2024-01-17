@@ -201,30 +201,9 @@ public class BluetoothOppService extends ProfileService implements IObexConnecti
      */
     private BluetoothOppObexServerSession mServerSession;
 
-    public static boolean isEnabled() {
-        return BluetoothProperties.isProfileOppEnabled().orElse(false);
-    }
+    public BluetoothOppService(Context ctx) {
+        super(ctx);
 
-    @Override
-    protected IProfileServiceBinder initBinder() {
-        return new OppBinder(this);
-    }
-
-    private static class OppBinder extends Binder implements IProfileServiceBinder {
-
-        OppBinder(BluetoothOppService service) {
-        }
-
-        @Override
-        public void cleanup() {
-        }
-    }
-
-    @Override
-    protected void create() {
-        if (V) {
-            Log.v(TAG, "onCreate");
-        }
         mShares = new ArrayList();
         mBatches = new ArrayList();
         mBatchId = 1;
@@ -241,6 +220,23 @@ public class BluetoothOppService extends ProfileService implements IObexConnecti
                 Log.w(TAG, "BluetoothOppPreference.getInstance returned null.");
             }
         }
+    }
+
+    public static boolean isEnabled() {
+        return BluetoothProperties.isProfileOppEnabled().orElse(false);
+    }
+
+    @Override
+    protected IProfileServiceBinder initBinder() {
+        return new OppBinder(this);
+    }
+
+    private static class OppBinder extends Binder implements IProfileServiceBinder {
+
+        OppBinder(BluetoothOppService service) {}
+
+        @Override
+        public void cleanup() {}
     }
 
     @Override

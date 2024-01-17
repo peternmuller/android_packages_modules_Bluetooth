@@ -26,21 +26,20 @@
  *****************************************************************************/
 
 #define LOG_TAG "bluetooth"
-#ifdef __ANDROID__
-#include <a2dp.sysprop.h>
-#endif
+
+#include <android_bluetooth_sysprop.h>
 #include <string.h>
 
 #include "avct_api.h"
 #include "avct_int.h"
-#include "bt_target.h"
 #include "bta/include/bta_sec_api.h"
-#include "btm_api.h"
+#include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
-#include "stack/btm/btm_sec.h"
+#include "stack/avct/avct_defs.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/bt_types.h"
 
 /* action function list */
 const tAVCT_BCB_ACTION avct_bcb_action[] = {
@@ -548,15 +547,12 @@ void avct_bcb_msg_ind(tAVCT_BCB* p_bcb, tAVCT_LCB_EVT* p_data) {
     return;
   }
 
-#ifdef __ANDROID__
   bool bind = false;
-  if (android::sysprop::bluetooth::A2dp::src_sink_coexist().value_or(false)) {
+  if (GET_SYSPROP(A2dp, src_sink_coexist, false)) {
     bind = avct_msg_ind_for_src_sink_coexist(p_lcb, p_data, label, cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     if (bind) return;
-  } else
-#endif
-  {
+  } else {
     /* lookup PID */
     p_ccb = avct_lcb_has_pid(p_lcb, pid);
     if (p_ccb) {

@@ -24,12 +24,12 @@
 
 #include <base/logging.h>
 
-#include "bt_target.h"
 #include "btif/include/btif_dm.h"
 #include "btif/include/btif_storage.h"
 #include "btif/include/stack_manager.h"
 #include "connection_manager.h"
 #include "device/include/interop.h"
+#include "internal_include/bt_target.h"
 #include "internal_include/stack_config.h"
 #include "l2c_api.h"
 #include "main/shim/acl_api.h"
@@ -44,6 +44,7 @@
 #include "stack/gatt/gatt_int.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_psm_types.h"
+#include "stack/include/bt_types.h"
 #include "stack/include/l2cap_acl_interface.h"
 #include "stack/include/srvc_api.h"  // tDIS_VALUE
 #include "types/raw_address.h"
@@ -196,26 +197,6 @@ void gatt_free(void) {
   gatt_cb.srv_list_info = nullptr;
 
   EattExtension::GetInstance()->Stop();
-}
-
-void gatt_find_in_device_record(const RawAddress& bd_addr,
-                                tBLE_BD_ADDR* address_with_type) {
-  const tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
-  if (p_dev_rec == nullptr) {
-    return;
-  }
-
-  if (p_dev_rec->device_type & BT_DEVICE_TYPE_BLE) {
-    if (p_dev_rec->ble.identity_address_with_type.bda.IsEmpty()) {
-      *address_with_type = {.type = p_dev_rec->ble.AddressType(),
-                            .bda = bd_addr};
-      return;
-    }
-    *address_with_type = p_dev_rec->ble.identity_address_with_type;
-    return;
-  }
-  *address_with_type = {.type = BLE_ADDR_PUBLIC, .bda = bd_addr};
-  return;
 }
 
 /*******************************************************************************

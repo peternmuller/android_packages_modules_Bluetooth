@@ -25,18 +25,16 @@
 #include <base/strings/string_number_conversions.h>
 #include <endian.h>
 #include <hardware/bt_common_types.h>
+#include <hardware/bt_gatt_types.h>
 
 #include <map>
-#include <memory>
 #include <numeric>
 
-#include "bta_le_audio_api.h"
-#include "gap_api.h"
-#include "gatt_api.h"
-#include "gd/common/strings.h"
+#include "internal_include/bt_trace.h"
 #include "le_audio_types.h"
-#include "osi/include/allocator.h"
-#include "osi/include/log.h"
+#include "os/log.h"
+#include "stack/include/bt_types.h"
+#include "osi/include/properties.h"
 
 using le_audio::types::acs_ac_record;
 
@@ -313,10 +311,26 @@ bool ParseAseCtpNotification(struct ctp_ntf& ntf, uint16_t len,
   return true;
 }
 
-bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs,
-                              std::vector<uint8_t>& value) {
-  if (confs.size() == 0) return false;
+void PrepareAseCtpAptxCodecConfig(std::vector<struct ctp_codec_conf>& confs) {
+  for (auto& conf : confs) {
+     if (conf.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
+          (conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
+          conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
+       types::LeAudioLtvMap ltvmap;
+       ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq,
+                 conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq).value());
+       ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
+                 conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation).value());
+       conf.codec_config = ltvmap;
+     }
+  }
+}
 
+bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
+                              std::vector<uint8_t>& value) {
+  if (confs_.size() == 0) return false;
+  std::vector<struct ctp_codec_conf> confs = confs_;
+  PrepareAseCtpAptxCodecConfig(confs);
   std::string conf_ents_str;
   size_t msg_len = std::accumulate(
       confs.begin(), confs.end(),
@@ -346,7 +360,6 @@ bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs,
     UINT16_TO_STREAM(msg, conf.codec_id.vendor_codec_id);
 
     auto codec_spec_conf_len = conf.codec_config.RawPacketSize();
-
     UINT8_TO_STREAM(msg, codec_spec_conf_len);
     msg = conf.codec_config.RawPacket(msg);
 
@@ -572,6 +585,21 @@ bool PrepareAseCtpRelease(const std::vector<uint8_t>& ase_ids,
 
 namespace pacs {
 
+void TestSinkPacRecords(uint8_t *pp,  uint16_t codec) {
+  if (codec == 0x01AD) {
+    char new_values[PROPERTY_VALUE_MAX] = {'\0'};
+    int st, cv, fd, fm, pc;
+    osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, "0 41 0 1 5");
+    sscanf(new_values, "%x %x %x %x %x", &st, &cv, &fd, &fm, &pc);
+    *(pp+9) = 0x11;
+    *(pp+10) = st;
+    *(pp+11) = cv;
+    *(pp+12) = fd;
+    *(pp+13) = fm;
+    *(pp+14) = pc;
+  }
+}
+
 int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
                    const uint8_t* value) {
   struct acs_ac_record rec;
@@ -613,7 +641,12 @@ int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
     return -1;
   }
 
-  rec.metadata = std::vector<uint8_t>(value, value + metadata_len);
+  // To-DO: Remove once remote AAR4 pac records available
+  TestSinkPacRecords(const_cast<uint8_t *>(value), rec.codec_id.vendor_codec_id);
+
+  rec.metadata.assign(value, value+metadata_len);
+  if (!parsed) return -1;
+
   value += metadata_len;
   len -= metadata_len;
 

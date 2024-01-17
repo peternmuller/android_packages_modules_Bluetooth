@@ -19,12 +19,12 @@
 #include <atomic>
 #include <future>
 #include <mutex>
-#include <set>
 
 #include "common/bidi_queue.h"
+#include "common/byte_array.h"
+#include "dumpsys_data_generated.h"
 #include "hci/acl_manager/acl_scheduler.h"
 #include "hci/acl_manager/classic_impl.h"
-#include "hci/acl_manager/connection_management_callbacks.h"
 #include "hci/acl_manager/le_acceptlist_callbacks.h"
 #include "hci/acl_manager/le_acl_connection.h"
 #include "hci/acl_manager/le_impl.h"
@@ -280,7 +280,7 @@ void AclManager::SetPrivacyPolicyForInitiatorAddress(
     AddressWithType fixed_address,
     std::chrono::milliseconds minimum_rotation_time,
     std::chrono::milliseconds maximum_rotation_time) {
-  crypto_toolbox::Octet16 rotation_irk{};
+  Octet16 rotation_irk{};
   auto irk_prop =
       GetDependency<storage::StorageModule>()->GetProperty("Adapter", "LE_LOCAL_KEY_IRK");
   if (irk_prop.has_value()) {
@@ -303,7 +303,7 @@ void AclManager::SetPrivacyPolicyForInitiatorAddress(
 void AclManager::SetPrivacyPolicyForInitiatorAddressForTest(
     LeAddressManager::AddressPolicy address_policy,
     AddressWithType fixed_address,
-    crypto_toolbox::Octet16 rotation_irk,
+    Octet16 rotation_irk,
     std::chrono::milliseconds minimum_rotation_time,
     std::chrono::milliseconds maximum_rotation_time) {
   CallOn(
@@ -409,10 +409,6 @@ uint16_t AclManager::HACK_GetHandle(Address address) {
 
 uint16_t AclManager::HACK_GetLeHandle(Address address) {
   return pimpl_->le_impl_->HACK_get_handle(address);
-}
-
-void AclManager::HACK_SetNonAclDisconnectCallback(std::function<void(uint16_t, uint8_t)> callback) {
-  pimpl_->classic_impl_->HACK_SetNonAclDisconnectCallback(callback);
 }
 
 void AclManager::HACK_SetAclTxPriority(uint8_t handle, bool high_priority) {

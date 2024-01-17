@@ -47,12 +47,12 @@ bool CodecManager::IsOffloadDualBiDirSwbSupported(void) const {
 
 void CodecManager::UpdateActiveAudioConfig(
     const types::BidirectionalPair<stream_parameters>& stream_params,
-    types::BidirectionalPair<uint16_t> delays_ms,
+    types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,
     std::function<void(const ::le_audio::offload_config& config,
                        uint8_t direction)>
         update_receiver) {
   if (pimpl_)
-    return pimpl_->UpdateActiveAudioConfig(stream_params, delays_ms,
+    return pimpl_->UpdateActiveAudioConfig(stream_params, delays_ms, id,
                                            update_receiver);
 }
 
@@ -66,6 +66,20 @@ const ::le_audio::broadcast_offload_config*
 CodecManager::GetBroadcastOffloadConfig() {
   if (!pimpl_) return nullptr;
   return pimpl_->GetBroadcastOffloadConfig();
+}
+
+std::vector<bluetooth::le_audio::btle_audio_codec_config_t>
+CodecManager::GetLocalAudioOutputCodecCapa() {
+  if (!pimpl_)
+    return std::vector<bluetooth::le_audio::btle_audio_codec_config_t>{};
+  return pimpl_->GetLocalAudioOutputCodecCapa();
+}
+
+std::vector<bluetooth::le_audio::btle_audio_codec_config_t>
+CodecManager::GetLocalAudioInputCodecCapa() {
+  if (!pimpl_)
+    return std::vector<bluetooth::le_audio::btle_audio_codec_config_t>{};
+  return pimpl_->GetLocalAudioInputCodecCapa();
 }
 
 void CodecManager::UpdateBroadcastConnHandle(

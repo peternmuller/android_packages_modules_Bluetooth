@@ -18,14 +18,17 @@
 
 #pragma once
 
+#include <base/strings/stringprintf.h>
+
 #include <cstdint>
 #include <string>
-#include "internal_include/bt_target.h"
-#include "stack/include/bt_octets.h"
+
+#include "macros.h"
+#include "stack/include/bt_dev_class.h"
 #include "stack/include/bt_name.h"
+#include "stack/include/bt_octets.h"
 #include "stack/include/hcidefs.h"
 #include "stack/include/smp_api_types.h"
-#include "types/ble_address_with_type.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
 
@@ -259,12 +262,6 @@ enum {
 
 typedef uint8_t tBTM_OOB_DATA;
 
-#ifndef CASE_RETURN_TEXT
-#define CASE_RETURN_TEXT(code) \
-  case code:                   \
-    return #code
-#endif
-
 inline std::string btm_oob_data_text(const tBTM_OOB_DATA& data) {
   switch (data) {
     CASE_RETURN_TEXT(BTM_OOB_NONE);
@@ -276,8 +273,6 @@ inline std::string btm_oob_data_text(const tBTM_OOB_DATA& data) {
       return std::string("UNKNOWN[") + std::to_string(data) + std::string("]");
   }
 }
-
-#undef CASE_RETURN_TEXT
 
 /* data type for BTM_SP_IO_REQ_EVT */
 typedef struct {
@@ -471,3 +466,18 @@ typedef struct {
   uint16_t num_keys;
 } tBTM_DELETE_STORED_LINK_KEY_COMPLETE;
 
+enum tBTM_BOND_TYPE : uint8_t {
+  BOND_TYPE_UNKNOWN = 0,
+  BOND_TYPE_PERSISTENT = 1,
+  BOND_TYPE_TEMPORARY = 2
+};
+
+inline std::string bond_type_text(const tBTM_BOND_TYPE& bond_type) {
+  switch (bond_type) {
+    CASE_RETURN_TEXT(BOND_TYPE_UNKNOWN);
+    CASE_RETURN_TEXT(BOND_TYPE_PERSISTENT);
+    CASE_RETURN_TEXT(BOND_TYPE_TEMPORARY);
+    default:
+      return base::StringPrintf("UNKNOWN[%hhu]", bond_type);
+  }
+}

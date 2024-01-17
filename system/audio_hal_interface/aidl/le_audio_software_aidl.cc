@@ -22,10 +22,13 @@
 #include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 #include "codec_status_aidl.h"
 #include "hal_version_manager.h"
 #include "osi/include/log.h"
+#include <aidl/vendor/qti/hardware/bluetooth/audio/LeAudioVendorConfiguration.h>
+#include <aidl/vendor/qti/hardware/bluetooth/audio/VendorCodecType.h>
 
 namespace bluetooth {
 namespace audio {
@@ -45,7 +48,13 @@ using ::bluetooth::audio::le_audio::LeAudioClientInterface;
 using ::bluetooth::audio::le_audio::StartRequestState;
 using ::bluetooth::audio::le_audio::StreamCallbacks;
 using ::le_audio::set_configurations::SetConfiguration;
-using ::le_audio::types::LeAudioLc3Config;
+using ::le_audio::types::LeAudioCoreCodecConfig;
+
+using VendorConfiguration =
+    ::aidl::android::hardware::bluetooth::audio::LeAudioCodecConfiguration::VendorConfiguration;
+using ::aidl::android::hardware::bluetooth::audio::AptxAdaptiveLeConfiguration;
+using ::aidl::vendor::qti::hardware::bluetooth::audio::LeAudioVendorConfiguration;
+using VendorCodecType = ::aidl::vendor::qti::hardware::bluetooth::audio::VendorCodecType;
 
 static ChannelMode le_audio_channel_mode2audio_hal(uint8_t channels_count) {
   switch (channels_count) {
@@ -124,7 +133,25 @@ void LeAudioTransport::StopRequest() {
   }
 }
 
-void LeAudioTransport::SetLowLatency(bool is_low_latency) {}
+void LeAudioTransport::SetLatencyMode(LatencyMode latency_mode) {
+  switch (latency_mode) {
+    case LatencyMode::FREE:
+      dsa_mode_ = DsaMode::DISABLED;
+      break;
+    case LatencyMode::LOW_LATENCY:
+      dsa_mode_ = DsaMode::ACL;
+      break;
+    case LatencyMode::DYNAMIC_SPATIAL_AUDIO_SOFTWARE:
+      dsa_mode_ = DsaMode::ISO_SW;
+      break;
+    case LatencyMode::DYNAMIC_SPATIAL_AUDIO_HARDWARE:
+      dsa_mode_ = DsaMode::ISO_HW;
+      break;
+    default:
+      LOG(WARNING) << ", invalid latency mode: " << (int)latency_mode;
+      break;
+  }
+}
 
 bool LeAudioTransport::GetPresentationPosition(uint64_t* remote_delay_report_ns,
                                                uint64_t* total_bytes_processed,
@@ -152,7 +179,7 @@ void LeAudioTransport::SourceMetadataChanged(
     return;
   }
 
-  stream_cb_.on_metadata_update_(source_metadata);
+  stream_cb_.on_metadata_update_(source_metadata, dsa_mode_);
 }
 
 void LeAudioTransport::SinkMetadataChanged(
@@ -280,8 +307,8 @@ BluetoothAudioCtrlAck LeAudioSinkTransport::SuspendRequest() {
 
 void LeAudioSinkTransport::StopRequest() { transport_->StopRequest(); }
 
-void LeAudioSinkTransport::SetLowLatency(bool is_low_latency) {
-  transport_->SetLowLatency(is_low_latency);
+void LeAudioSinkTransport::SetLatencyMode(LatencyMode latency_mode) {
+  transport_->SetLatencyMode(latency_mode);
 }
 
 bool LeAudioSinkTransport::GetPresentationPosition(
@@ -370,8 +397,8 @@ BluetoothAudioCtrlAck LeAudioSourceTransport::SuspendRequest() {
 
 void LeAudioSourceTransport::StopRequest() { transport_->StopRequest(); }
 
-void LeAudioSourceTransport::SetLowLatency(bool is_low_latency) {
-  transport_->SetLowLatency(is_low_latency);
+void LeAudioSourceTransport::SetLatencyMode(LatencyMode latency_mode) {
+  transport_->SetLatencyMode(latency_mode);
 }
 
 bool LeAudioSourceTransport::GetPresentationPosition(
@@ -440,15 +467,21 @@ std::unordered_map<int32_t, uint8_t> sampling_freq_map{
 
 std::unordered_map<int32_t, uint8_t> frame_duration_map{
     {7500, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur7500us},
-    {10000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur10000us}};
+    {10000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur10000us},
+    {15000, ::le_audio::codec_spec_conf::kLeAudioCodecFrameDur15000us}};
 
 std::unordered_map<int32_t, uint16_t> octets_per_frame_map{
     {30, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen30},
     {40, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen40},
+    {45, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen45},
     {60, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen60},
+    {75, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen75},
     {80, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen80},
+    {90, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen90},
     {100, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen100},
-    {120, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen120}};
+    {117, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen117},
+    {120, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen120},
+    {155, ::le_audio::codec_spec_conf::kLeAudioCodecFrameLen155}};
 
 std::unordered_map<AudioLocation, uint32_t> audio_location_map{
     {AudioLocation::UNKNOWN,
@@ -465,7 +498,7 @@ std::unordered_map<AudioLocation, uint32_t> audio_location_map{
 
 bool hal_ucast_capability_to_stack_format(
     const UnicastCapability& hal_capability,
-    CodecCapabilitySetting& stack_capability) {
+    CodecConfigSetting& stack_capability) {
   if (hal_capability.codecType != CodecType::LC3) {
     LOG(WARNING) << "Unsupported codecType: "
                  << toString(hal_capability.codecType);
@@ -492,28 +525,37 @@ bool hal_ucast_capability_to_stack_format(
           octets_per_frame_map.end() ||
       audio_location_map.find(supported_channel) == audio_location_map.end()) {
     LOG(ERROR) << __func__ << ": Failed to convert HAL format to stack format"
-               << "\nsample rate = " << sample_rate_hz
-               << "\nframe duration = " << frame_duration_us
+               << "\nsample rate hz = " << sample_rate_hz
+               << "\nframe duration us = " << frame_duration_us
                << "\noctets per frame= " << octets_per_frame
-               << "\naudio location = " << toString(supported_channel);
+               << "\nsupported channel = " << toString(supported_channel)
+               << "\nchannel count per device = " << channel_count
+               << "\ndevice count = " << hal_capability.deviceCount;
 
     return false;
   }
 
-  stack_capability = {
-      .id = ::le_audio::set_configurations::LeAudioCodecIdLc3,
-      .config = LeAudioLc3Config(
-          {.sampling_frequency = sampling_freq_map[sample_rate_hz],
-           .frame_duration = frame_duration_map[frame_duration_us],
-           .audio_channel_allocation = audio_location_map[supported_channel],
-           .octets_per_codec_frame = octets_per_frame_map[octets_per_frame],
-           .channel_count = static_cast<uint8_t>(channel_count)})};
+  stack_capability.id = ::le_audio::set_configurations::LeAudioCodecIdLc3;
+  stack_capability.channel_count_per_iso_stream = channel_count;
+
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeSamplingFreq,
+      sampling_freq_map[sample_rate_hz]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeFrameDuration,
+      frame_duration_map[frame_duration_us]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
+      audio_location_map[supported_channel]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeOctetsPerCodecFrame,
+      octets_per_frame_map[octets_per_frame]);
   return true;
 }
 
 bool hal_bcast_capability_to_stack_format(
     const BroadcastCapability& hal_bcast_capability,
-    CodecCapabilitySetting& stack_capability) {
+    CodecConfigSetting& stack_capability) {
   if (hal_bcast_capability.codecType != CodecType::LC3) {
     LOG(WARNING) << "Unsupported codecType: "
                  << toString(hal_bcast_capability.codecType);
@@ -546,22 +588,30 @@ bool hal_bcast_capability_to_stack_format(
       audio_location_map.find(supported_channel) == audio_location_map.end()) {
     LOG(WARNING) << __func__
                  << " : Failed to convert HAL format to stack format"
-                 << "\nsample rate = " << sample_rate_hz
-                 << "\nframe duration = " << frame_duration_us
+                 << "\nsample rate hz = " << sample_rate_hz
+                 << "\nframe duration us = " << frame_duration_us
                  << "\noctets per frame= " << octets_per_frame
-                 << "\naudio location = " << toString(supported_channel);
+                 << "\nsupported channel = " << toString(supported_channel)
+                 << "\nchannel count per stream = " << channel_count;
 
     return false;
   }
 
-  stack_capability = {
-      .id = ::le_audio::set_configurations::LeAudioCodecIdLc3,
-      .config = LeAudioLc3Config(
-          {.sampling_frequency = sampling_freq_map[sample_rate_hz],
-           .frame_duration = frame_duration_map[frame_duration_us],
-           .audio_channel_allocation = audio_location_map[supported_channel],
-           .octets_per_codec_frame = octets_per_frame_map[octets_per_frame],
-           .channel_count = static_cast<uint8_t>(channel_count)})};
+  stack_capability.id = ::le_audio::set_configurations::LeAudioCodecIdLc3;
+  stack_capability.channel_count_per_iso_stream = channel_count;
+
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeSamplingFreq,
+      sampling_freq_map[sample_rate_hz]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeFrameDuration,
+      frame_duration_map[frame_duration_us]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
+      audio_location_map[supported_channel]);
+  stack_capability.params.Add(
+      ::le_audio::codec_spec_conf::kLeAudioLtvTypeOctetsPerCodecFrame,
+      octets_per_frame_map[octets_per_frame]);
   return true;
 }
 
@@ -574,7 +624,7 @@ std::vector<AudioSetConfiguration> get_offload_capabilities() {
   std::string str_capability_log;
 
   for (auto hal_cap : le_audio_hal_capabilities) {
-    CodecCapabilitySetting encode_cap, decode_cap, bcast_cap;
+    CodecConfigSetting encode_cap, decode_cap, bcast_cap;
     UnicastCapability hal_encode_cap =
         hal_cap.get<AudioCapabilities::leAudioCapabilities>()
             .unicastEncodeCapability;
@@ -628,26 +678,101 @@ std::vector<AudioSetConfiguration> get_offload_capabilities() {
 
 AudioConfiguration offload_config_to_hal_audio_config(
     const ::le_audio::offload_config& offload_config) {
-  Lc3Configuration lc3_config{
-      .pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample),
-      .samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate),
-      .frameDurationUs = static_cast<int32_t>(offload_config.frame_duration),
-      .octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame),
-      .blocksPerSdu = static_cast<int8_t>(offload_config.blocks_per_sdu),
-  };
-  LeAudioConfiguration ucast_config = {
-      .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
-      .leAudioCodecConfig = LeAudioCodecConfiguration(lc3_config)};
+  if (offload_config.codec_id.coding_format == ::le_audio::types::kLeAudioCodingFormatLC3) {
+    if (offload_config.codec_metadata.empty()) {
+      LOG(INFO) << __func__ << " LC3";
+      Lc3Configuration lc3_config{
+          .pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample),
+          .samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate),
+          .frameDurationUs = static_cast<int32_t>(offload_config.frame_duration),
+          .octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame),
+          .blocksPerSdu = static_cast<int8_t>(offload_config.blocks_per_sdu),
+      };
+      LeAudioConfiguration ucast_config = {
+          .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+          .leAudioCodecConfig = LeAudioCodecConfiguration(lc3_config)};
 
-  for (auto& [handle, location, state] : offload_config.stream_map) {
-    ucast_config.streamMap.push_back({
+      for (auto& [handle, location, state] : offload_config.stream_map) {
+        ucast_config.streamMap.push_back({
+            .streamHandle = handle,
+            .audioChannelAllocation = static_cast<int32_t>(location),
+            .isStreamActive = state,
+        });
+      }
+      return AudioConfiguration(ucast_config);
+    } else {
+      LOG(INFO) << __func__ << " LC3Q";
+      VendorConfiguration vendor_config;
+      LeAudioVendorConfiguration lc3q_config;
+      lc3q_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);
+      lc3q_config.samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate);
+      lc3q_config.frameDurationUs = static_cast<int32_t>(offload_config.frame_duration);
+      lc3q_config.octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame);
+      lc3q_config.blocksPerSdu = 1;
+      std::vector<uint8_t> vs_metadata;
+      vs_metadata.assign(offload_config.codec_metadata.begin(),
+                         offload_config.codec_metadata.end());
+      lc3q_config.vendorCodecType = VendorCodecType::LC3Q;
+      lc3q_config.codecSpecificData = vs_metadata;
+      vendor_config.extension.setParcelable(lc3q_config);
+      LeAudioConfiguration ucast_config = {
+       .codecType = CodecType::VENDOR,
+       .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+       .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
+      for (auto& [handle, location, state] : offload_config.stream_map) {
+        ucast_config.streamMap.push_back({
+          .streamHandle = handle,
+          .audioChannelAllocation = static_cast<int32_t>(location),
+          .isStreamActive = state,
+        });
+      }
+      return AudioConfiguration(ucast_config);
+    }
+  } else {
+    LOG(INFO) << __func__ << " APTX";
+    VendorConfiguration vendor_config;
+    LeAudioVendorConfiguration  aptx_config;
+    aptx_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);
+    aptx_config.samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate);
+    aptx_config.frameDurationUs = static_cast<int32_t>(offload_config.frame_duration);
+    aptx_config.octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame);
+    aptx_config.blocksPerSdu = 1;
+    std::vector<uint8_t> vs_metadata;
+    vs_metadata.assign(offload_config.codec_metadata.begin(),
+                       offload_config.codec_metadata.end());
+    if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+      aptx_config.vendorCodecType = VendorCodecType::APTX_ADAPTIVE_R4;
+    } else if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLe) {
+      aptx_config.vendorCodecType = VendorCodecType::APTX_ADAPTIVE_R3;
+    }
+    if (offload_config.codec_id.vendor_codec_id ==
+        ::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+      for (int i = 0; i < 4; i++) {
+            vs_metadata.push_back((2 &
+         (0xff <<((3 - i)*8))) >> ((3 - i)*8));
+      }
+      for (int i = 4; i < 6; i++) {
+            vs_metadata.push_back((25 &
+         (0xff <<((5 - i)*8))) >> ((5 - i)*8));
+      }
+    }
+    aptx_config.codecSpecificData = vs_metadata;
+    vendor_config.extension.setParcelable(aptx_config);
+    LeAudioConfiguration ucast_config = {
+     .codecType = CodecType::VENDOR,
+     .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+     .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
+    for (auto& [handle, location, state] : offload_config.stream_map) {
+      ucast_config.streamMap.push_back({
         .streamHandle = handle,
         .audioChannelAllocation = static_cast<int32_t>(location),
         .isStreamActive = state,
-    });
+      });
+    }
+    return AudioConfiguration(ucast_config);
   }
-
-  return AudioConfiguration(ucast_config);
 }
 
 }  // namespace le_audio

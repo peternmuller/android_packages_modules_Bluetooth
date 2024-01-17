@@ -33,11 +33,11 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Looper;
 import android.provider.CallLog;
 
 import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
-import androidx.test.rule.ServiceTestRule;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.bluetooth.BluetoothMethodProxy;
@@ -49,7 +49,6 @@ import com.android.bluetooth.x.com.android.modules.utils.SynchronousResultReceiv
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -68,8 +67,6 @@ public class PbapClientServiceTest {
     boolean mIsAdapterServiceSet;
     boolean mIsPbapClientServiceStarted;
 
-    @Rule public final ServiceTestRule mServiceRule = new ServiceTestRule();
-
     @Mock private AdapterService mAdapterService;
 
     @Mock private DatabaseManager mDatabaseManager;
@@ -81,11 +78,9 @@ public class PbapClientServiceTest {
         TestUtils.setAdapterService(mAdapterService);
         mIsAdapterServiceSet = true;
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
-        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
-        TestUtils.startService(mServiceRule, PbapClientService.class);
+        mService = new PbapClientService(mTargetContext);
+        mService.doStart();
         mIsPbapClientServiceStarted = true;
-        mService = PbapClientService.getPbapClientService();
-        Assert.assertNotNull(mService);
         // Try getting the Bluetooth adapter
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         Assert.assertNotNull(mAdapter);
@@ -98,7 +93,7 @@ public class PbapClientServiceTest {
             return;
         }
         if (mIsPbapClientServiceStarted) {
-            TestUtils.stopService(mServiceRule, PbapClientService.class);
+            mService.doStop();
             mService = PbapClientService.getPbapClientService();
             Assert.assertNull(mService);
         }
@@ -317,30 +312,14 @@ public class PbapClientServiceTest {
     }
 
     @Test
-    public void broadcastReceiver_withActionAclDisconnectedNoTransport_doesNotCallDisconnect() {
-        int connectionState = BluetoothProfile.STATE_CONNECTED;
-        PbapClientStateMachine sm = mock(PbapClientStateMachine.class);
-        mService.mPbapClientStateMachineMap.put(mRemoteDevice, sm);
-        when(sm.getConnectionState(mRemoteDevice)).thenReturn(connectionState);
-
-        Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
-        mService.mPbapBroadcastReceiver.onReceive(mService, intent);
-
-        verify(sm, never()).disconnect(mRemoteDevice);
-    }
-
-    @Test
     public void broadcastReceiver_withActionAclDisconnectedLeTransport_doesNotCallDisconnect() {
         int connectionState = BluetoothProfile.STATE_CONNECTED;
         PbapClientStateMachine sm = mock(PbapClientStateMachine.class);
         mService.mPbapClientStateMachineMap.put(mRemoteDevice, sm);
         when(sm.getConnectionState(mRemoteDevice)).thenReturn(connectionState);
 
-        Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
-        intent.putExtra(BluetoothDevice.EXTRA_TRANSPORT, BluetoothDevice.TRANSPORT_LE);
-        mService.mPbapBroadcastReceiver.onReceive(mService, intent);
+        mService.aclDisconnected(mRemoteDevice, BluetoothDevice.TRANSPORT_LE);
+        TestUtils.waitForLooperToFinishScheduledTask(Looper.getMainLooper());
 
         verify(sm, never()).disconnect(mRemoteDevice);
     }
@@ -352,10 +331,8 @@ public class PbapClientServiceTest {
         mService.mPbapClientStateMachineMap.put(mRemoteDevice, sm);
         when(sm.getConnectionState(mRemoteDevice)).thenReturn(connectionState);
 
-        Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
-        intent.putExtra(BluetoothDevice.EXTRA_TRANSPORT, BluetoothDevice.TRANSPORT_BREDR);
-        mService.mPbapBroadcastReceiver.onReceive(mService, intent);
+        mService.aclDisconnected(mRemoteDevice, BluetoothDevice.TRANSPORT_BREDR);
+        TestUtils.waitForLooperToFinishScheduledTask(Looper.getMainLooper());
 
         verify(sm).disconnect(mRemoteDevice);
     }

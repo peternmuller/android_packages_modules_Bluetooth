@@ -16,7 +16,7 @@
  *  limitations under the License.
  *
  ******************************************************************************/
-#include "bt_target.h"
+#include "internal_include/bt_target.h"
 
 #define LOG_TAG "device_iot_config"
 #include <base/logging.h>
@@ -29,7 +29,6 @@
 #include <mutex>
 #include <string>
 
-#include "bt_types.h"
 #include "btcore/include/module.h"
 #include "btif/include/btif_api.h"
 #include "btif/include/btif_util.h"

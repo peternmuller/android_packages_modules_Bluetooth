@@ -24,20 +24,19 @@
 
 #define LOG_TAG "bluetooth"
 
+#include <base/logging.h>
 #include <string.h>
 
-#include "bt_target.h"
 #include "gatt_int.h"
-#include "l2c_api.h"
+#include "hardware/bt_gatt_types.h"
+#include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "stack/arbiter/acl_arbiter.h"
 #include "stack/eatt/eatt.h"
 #include "stack/include/bt_types.h"
 #include "types/bluetooth/uuid.h"
-
-#include <base/logging.h>
 
 #define GATT_WRITE_LONG_HDR_SIZE 5 /* 1 opcode + 2 handle + 2 offset */
 #define GATT_READ_CHAR_VALUE_HDL (GATT_READ_CHAR_VALUE | 0x80)
@@ -1127,6 +1126,8 @@ void gatt_process_mtu_rsp(tGATT_TCB& tcb, tGATT_CLCB* p_clcb, uint16_t len,
     if (tcb.pending_user_mtu_exchange_value > tcb.max_user_mtu) {
       tcb.max_user_mtu =
           std::min(tcb.pending_user_mtu_exchange_value, tcb.payload_size);
+    } else if (tcb.pending_user_mtu_exchange_value == 0) {
+      tcb.max_user_mtu = tcb.payload_size;
     }
     tcb.pending_user_mtu_exchange_value = 0;
 

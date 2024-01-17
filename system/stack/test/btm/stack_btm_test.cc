@@ -18,30 +18,29 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 
+#include "gd/common/init_flags.h"
 #include "hci/hci_layer_mock.h"
 #include "hci/include/hci_layer.h"
+#include "internal_include/bt_target.h"
 #include "stack/btm/btm_dev.h"
 #include "stack/btm/btm_int_types.h"
 #include "stack/btm/btm_sco.h"
 #include "stack/btm/btm_sec.h"
-#include "stack/btm/btm_sec_int_types.h"
+#include "stack/btm/btm_sec_cb.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/acl_hci_link_interface.h"
 #include "stack/include/btm_client_interface.h"
 #include "stack/l2cap/l2c_int.h"
 #include "test/common/mock_functions.h"
+#include "test/mock/mock_legacy_hci_interface.h"
 #include "test/mock/mock_main_shim_entry.h"
-#include "test/mock/mock_stack_hcic_hcicmds.h"
 #include "types/raw_address.h"
 
 using testing::Each;
 using testing::Eq;
-
-namespace mock = test::mock::stack_hcic_hcicmds;
 
 extern tBTM_CB btm_cb;
 
@@ -57,12 +56,6 @@ namespace {
 
 using testing::Return;
 using testing::Test;
-
-std::string Hex16(int n) {
-  std::ostringstream oss;
-  oss << "0x" << std::hex << std::setw(4) << std::setfill('0') << n;
-  return oss.str();
-}
 
 class StackBtmTest : public Test {
  public:
@@ -86,6 +79,7 @@ class StackBtmWithQueuesTest : public StackBtmTest {
     down_handler_ = new bluetooth::os::Handler(down_thread_);
     bluetooth::hci::testing::mock_hci_layer_ = &mock_hci_;
     bluetooth::hci::testing::mock_gd_shim_handler_ = up_handler_;
+    bluetooth::legacy::hci::testing::SetMock(legacy_hci_mock_);
   }
   void TearDown() override {
     up_handler_->Clear();
@@ -100,6 +94,7 @@ class StackBtmWithQueuesTest : public StackBtmTest {
                                bluetooth::hci::ScoBuilder>
       sco_queue_{10};
   bluetooth::hci::testing::MockHciLayer mock_hci_;
+  bluetooth::legacy::hci::testing::MockInterface legacy_hci_mock_;
   bluetooth::os::Thread* up_thread_;
   bluetooth::os::Handler* up_handler_;
   bluetooth::os::Thread* down_thread_;
@@ -192,43 +187,31 @@ TEST_F(StackBtmWithQueuesTest, default_packet_type) {
 TEST_F(StackBtmWithQueuesTest, change_packet_type) {
   EXPECT_CALL(mock_hci_, GetScoQueueEnd())
       .WillOnce(Return(sco_queue_.GetUpEnd()));
-  int cnt = 0;
   get_btm_client_interface().lifecycle.btm_init();
+
+  uint16_t handle = 0x123;
 
   btm_cb.acl_cb_.SetDefaultPacketTypeMask(0xffff);
   ASSERT_EQ(0xffff, btm_cb.acl_cb_.DefaultPacketTypes());
 
   // Create connection
   RawAddress bda({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
-  btm_acl_created(bda, 0x123, HCI_ROLE_CENTRAL, BT_TRANSPORT_BR_EDR);
+  btm_acl_created(bda, handle, HCI_ROLE_CENTRAL, BT_TRANSPORT_BR_EDR);
 
   uint64_t features = 0xffffffffffffffff;
   acl_process_supported_features(0x123, features);
 
-  uint16_t handle{0};
-  uint16_t packet_types{0};
+  EXPECT_CALL(legacy_hci_mock_, ChangeConnectionPacketType(
+                                    handle, 0x4400 | HCI_PKT_TYPES_MASK_DM1));
+  EXPECT_CALL(legacy_hci_mock_, ChangeConnectionPacketType(
+                                    handle, (0xcc00 | HCI_PKT_TYPES_MASK_DM1 |
+                                             HCI_PKT_TYPES_MASK_DH1)));
 
-  mock::btsnd_hcic_change_conn_type.body = [&handle, &packet_types](
-                                               uint16_t h, uint16_t p) {
-    handle = h;
-    packet_types = p;
-  };
   btm_set_packet_types_from_address(bda, 0x55aa);
-  ASSERT_EQ(++cnt, get_func_call_count("btsnd_hcic_change_conn_type"));
-  ASSERT_EQ(0x123, handle);
-  ASSERT_EQ(Hex16(0x4400 | HCI_PKT_TYPES_MASK_DM1), Hex16(packet_types));
-
   btm_set_packet_types_from_address(bda, 0xffff);
-  ASSERT_EQ(++cnt, get_func_call_count("btsnd_hcic_change_conn_type"));
-  ASSERT_EQ(0x123, handle);
-  ASSERT_EQ(Hex16(0xcc00 | HCI_PKT_TYPES_MASK_DM1 | HCI_PKT_TYPES_MASK_DH1),
-            Hex16(packet_types));
-
+  // Illegal mask, won't be sent.
   btm_set_packet_types_from_address(bda, 0x0);
-  ASSERT_EQ(0x123, handle);
-  ASSERT_EQ(Hex16(0xcc18), Hex16(packet_types));
 
-  mock::btsnd_hcic_change_conn_type = {};
   get_btm_client_interface().lifecycle.btm_free();
 }
 
@@ -316,4 +299,8 @@ TEST_F(StackBtmWithInitFreeTest, is_disconnect_reason_valid) {
     else
       ASSERT_FALSE(is_disconnect_reason_valid(reason));
   }
+}
+
+TEST_F(StackBtmWithInitFreeTest, Init) {
+  ASSERT_FALSE(btm_cb.btm_inq_vars.remname_active);
 }

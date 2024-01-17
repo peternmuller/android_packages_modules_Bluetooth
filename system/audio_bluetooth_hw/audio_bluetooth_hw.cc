@@ -17,7 +17,6 @@
 #define LOG_TAG "BTAudioHw"
 
 #include <android-base/logging.h>
-#include <errno.h>
 #include <hardware/hardware.h>
 #include <log/log.h>
 #include <malloc.h>
@@ -153,6 +152,14 @@ static int adev_get_audio_port_v7(struct audio_hw_device* device,
   return -ENOSYS;
 }
 
+static int adev_get_audio_port(struct audio_hw_device* device,
+                               struct audio_port* port) {
+  if (device == nullptr || port == nullptr) {
+    return -EINVAL;
+  }
+  return -ENOSYS;
+}
+
 static int adev_dump(const audio_hw_device_t* device, int fd) { return 0; }
 
 static int adev_close(hw_device_t* device) {
@@ -195,6 +202,7 @@ static int adev_open(const hw_module_t* module, const char* name,
   adev->create_audio_patch = adev_create_audio_patch;
   adev->release_audio_patch = adev_release_audio_patch;
   adev->get_audio_port_v7 = adev_get_audio_port_v7;
+  adev->get_audio_port = adev_get_audio_port;
 
   *device = &adev->common;
   return 0;

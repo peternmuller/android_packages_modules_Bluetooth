@@ -24,6 +24,7 @@
 
 #include "avrc_defs.h"
 #include "avrcp_message_converter.h"
+#include "internal_include/bt_target.h"
 #include "packet/avrcp/avrcp_packet.h"
 // TODO (apanicke): Remove dependency on this header once we cleanup feature
 // handling.
@@ -344,7 +345,10 @@ void ConnectionHandler::AcceptorControlCb(uint8_t handle, uint8_t event,
   switch (event) {
     case AVRC_OPEN_IND_EVT: {
       LOG(INFO) << __PRETTY_FUNCTION__ << ": Connection Opened Event";
-      if (btif_av_src_sink_coexist_enabled() && peer_addr != NULL &&
+      if (peer_addr == NULL) {
+        return;
+      }
+      if (btif_av_src_sink_coexist_enabled() &&
           btif_av_peer_is_connected_source(*peer_addr)) {
         LOG(WARNING) << "peer is src, close new avrcp cback";
         if (device_map_.find(handle) != device_map_.end()) {

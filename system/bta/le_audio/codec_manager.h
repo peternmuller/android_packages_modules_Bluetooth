@@ -34,12 +34,14 @@ struct stream_map_info {
 
 struct offload_config {
   std::vector<stream_map_info> stream_map;
+  types::LeAudioCodecId codec_id;
   uint8_t bits_per_sample;
   uint32_t sampling_rate;
   uint32_t frame_duration;
   uint16_t octets_per_frame;
   uint8_t blocks_per_sdu;
   uint16_t peer_delay_ms;
+  std::vector<uint8_t> codec_metadata;
 };
 
 struct broadcast_offload_config {
@@ -49,7 +51,6 @@ struct broadcast_offload_config {
   uint32_t frame_duration;
   uint16_t octets_per_frame;
   uint8_t blocks_per_sdu;
-  uint32_t codec_bitrate;
   uint8_t retransmission_number;
   uint16_t max_transport_latency;
 };
@@ -72,7 +73,7 @@ class CodecManager {
   virtual void ClearCisConfiguration(uint8_t direction);
   virtual void UpdateActiveAudioConfig(
       const types::BidirectionalPair<stream_parameters>& stream_params,
-      types::BidirectionalPair<uint16_t> delays_ms,
+      types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,
       std::function<void(const offload_config& config, uint8_t direction)>
           update_receiver);
   virtual const ::le_audio::set_configurations::AudioSetConfigurations*
@@ -83,6 +84,10 @@ class CodecManager {
       const std::vector<uint16_t>& conn_handle,
       std::function<void(const ::le_audio::broadcast_offload_config& config)>
           update_receiver);
+  virtual std::vector<bluetooth::le_audio::btle_audio_codec_config_t>
+  GetLocalAudioOutputCodecCapa();
+  virtual std::vector<bluetooth::le_audio::btle_audio_codec_config_t>
+  GetLocalAudioInputCodecCapa();
 
  private:
   CodecManager();

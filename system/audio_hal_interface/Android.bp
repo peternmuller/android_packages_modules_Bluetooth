@@ -33,7 +33,8 @@ cc_library_static {
     target: {
         android: {
             shared_libs: [
-                "android.hardware.bluetooth.audio-V3-ndk",
+                "android.hardware.bluetooth.audio-V4-ndk",
+                "vendor.qti.hardware.bluetooth.audio-V1-ndk",
                 "libbinder_ndk",
                 "libfmq",
             ],
@@ -44,9 +45,12 @@ cc_library_static {
                 "aidl/client_interface_aidl.cc",
                 "aidl/codec_status_aidl.cc",
                 "aidl/hearing_aid_software_encoding_aidl.cc",
+                "aidl/hfp_client_interface_aidl.cc",
                 "aidl/le_audio_software_aidl.cc",
+                "aidl/provider_info.cc",
                 "hal_version_manager.cc",
                 "hearing_aid_software_encoding.cc",
+                "hfp_client_interface.cc",
                 "hidl/a2dp_encoding_hidl.cc",
                 "hidl/client_interface_hidl.cc",
                 "hidl/codec_status_hidl.cc",
@@ -79,7 +83,10 @@ cc_library_static {
 // Bluetooth Audio client interface library unit tests for target and host
 cc_test {
     name: "bluetooth-test-audio-hal-interface",
-    defaults: ["fluoride_defaults"],
+    defaults: [
+        "fluoride_defaults",
+        "latest_android_hardware_bluetooth_audio_ndk_shared",
+    ],
     include_dirs: [
         "packages/modules/Bluetooth/system",
         "packages/modules/Bluetooth/system/gd",
@@ -89,9 +96,9 @@ cc_test {
         "hidl/client_interface_hidl_unittest.cc",
     ],
     shared_libs: [
-        "android.hardware.bluetooth.audio-V3-ndk",
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
+        "vendor.qti.hardware.bluetooth.audio-V1-ndk",
         "libbinder_ndk",
         "libcutils",
         "libfmq",

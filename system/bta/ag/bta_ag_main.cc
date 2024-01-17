@@ -22,20 +22,21 @@
  *
  ******************************************************************************/
 
+#include <base/logging.h>
+
 #include <string>
 #include <vector>
 
 #include "bta/ag/bta_ag_int.h"
-#include "main/shim/dumpsys.h"
+#include "bta/include/bta_hfp_api.h"
+#include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/alarm.h"
 #include "osi/include/compat.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/btm_api.h"
 #include "types/raw_address.h"
-
-#include <base/logging.h>
 
 /*****************************************************************************
  * Constants and types
@@ -160,6 +161,9 @@ static tBTA_AG_SCB* bta_ag_scb_alloc(void) {
       /* set eSCO mSBC setting to T2 as the preferred */
       p_scb->codec_msbc_settings = BTA_AG_SCO_MSBC_SETTINGS_T2;
       p_scb->codec_lc3_settings = BTA_AG_SCO_LC3_SETTINGS_T2;
+      /* set eSCO SWB setting to Q0 as the preferred */
+      p_scb->codec_aptx_settings = BTA_AG_SCO_APTX_SWB_SETTINGS_Q0;
+      p_scb->is_aptx_swb_codec = false;
       LOG_VERBOSE("bta_ag_scb_alloc %d", bta_ag_scb_to_idx(p_scb));
       break;
     }

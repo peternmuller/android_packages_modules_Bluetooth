@@ -25,11 +25,12 @@ import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_BLUET
 import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_BLUETOOTH_STATE_CHANGE;
 import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_DISABLE;
 import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_ENABLE;
-import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_REGISTER_STATE_CHANGE_CALLBACK;
 import static com.android.server.bluetooth.BluetoothManagerService.MESSAGE_TIMEOUT_BIND;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.junit.runners.Parameterized.Parameter;
+import static org.junit.runners.Parameterized.Parameters;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
@@ -58,27 +59,34 @@ import android.os.test.TestLooper;
 import android.provider.Settings;
 
 import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.runner.AndroidJUnit4;
 
-import com.android.bluetooth.flags.FeatureFlags;
-import com.android.bluetooth.flags.FeatureFlagsImpl;
+import com.android.bluetooth.flags.FakeFeatureFlagsImpl;
+import com.android.bluetooth.flags.Flags;
+
+import com.google.common.collect.Lists;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(Parameterized.class)
 public class BluetoothManagerServiceTest {
     private static final String TAG = BluetoothManagerServiceTest.class.getSimpleName();
-    static final int STATE_BLE_TURNING_ON = 14; // can't find the symbol because hidden api
-    static final int TIMEOUT_MS = 1000; // TO use to wait for handler execution
+    private static final int STATE_BLE_TURNING_ON = 14; // can't find the symbol because hidden api
+    private static final int TIMEOUT_MS = 1000; // TO use to wait for handler execution
 
     BluetoothManagerService mManagerService;
 
@@ -88,6 +96,7 @@ public class BluetoothManagerServiceTest {
 
     @Spy BluetoothServerProxy mBluetoothServerProxy;
     @Mock UserManager mUserManager;
+    @Mock UserHandle mUserHandle;
 
     @Mock IBinder mBinder;
     @Mock IBluetoothManagerCallback mManagerCallback;
@@ -95,7 +104,64 @@ public class BluetoothManagerServiceTest {
 
     @Mock IBluetooth mAdapterService;
     @Mock AdapterBinder mAdapterBinder;
-    @Spy private final FeatureFlags mFeatureFlags = new FeatureFlagsImpl();
+    private FakeFeatureFlagsImpl mFakeFlagsImpl;
+
+    @Parameter public FlagsValue mFlagsValue;
+
+    static class FlagsValue {
+        final Map<String, Boolean> mFlagsValue;
+
+        FlagsValue(Map<String, Boolean> flagsValue) {
+            mFlagsValue = flagsValue;
+        }
+
+        private static String formatFlag(String key) {
+            return key.substring(key.lastIndexOf(".") + 1);
+        }
+
+        @Override
+        public String toString() {
+            return mFlagsValue.entrySet().stream()
+                    .filter(Map.Entry::getValue)
+                    .map(Map.Entry::getKey)
+                    .map(FlagsValue::formatFlag)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+        }
+    }
+
+    private static boolean filterFlags(Map<String, Boolean> map) {
+        if (map.get(Flags.FLAG_USE_NEW_AIRPLANE_MODE)) {
+            return !map.get(Flags.FLAG_AIRPLANE_RESSOURCES_IN_APP);
+        }
+        return true;
+    }
+
+    /** Generate the Map of flag for this test Suite */
+    @Parameters(name = "{0}")
+    public static Iterable<? extends Object> generateParameterizedFlagsValue() {
+        final String[] flags = {
+            Flags.FLAG_AIRPLANE_RESSOURCES_IN_APP,
+            Flags.FLAG_USE_NEW_AIRPLANE_MODE,
+            Flags.FLAG_USE_NEW_SATELLITE_MODE,
+        };
+        final Boolean[] values = {true, false};
+
+        List<List<Map.Entry<String, Boolean>>> flagValues =
+                Arrays.stream(flags)
+                        .map(flag -> Arrays.stream(values).map(val -> Map.entry(flag, val)))
+                        .map(Stream::toList)
+                        .toList();
+
+        return Lists.cartesianProduct(flagValues).stream()
+                .map(list -> list.toArray(new Map.Entry[0]))
+                .map(Map::ofEntries)
+                .filter(BluetoothManagerServiceTest::filterFlags)
+                .map(FlagsValue::new)
+                .map(List::of)
+                .map(List::toArray)
+                .toList();
+    }
 
     TestLooper mLooper;
 
@@ -125,7 +191,6 @@ public class BluetoothManagerServiceTest {
         doReturn(mUserManager).when(mContext).getSystemService(UserManager.class);
 
         doReturn(mBinder).when(mManagerCallback).asBinder();
-        doReturn(mBinder).when(mStateChangeCallback).asBinder();
 
         doReturn(mAdapterBinder).when(mBluetoothServerProxy).createAdapterBinder(any());
         doReturn(mAdapterService).when(mAdapterBinder).getAdapterBinder();
@@ -146,19 +211,27 @@ public class BluetoothManagerServiceTest {
 
         mLooper = new TestLooper();
 
-        mManagerService = new BluetoothManagerService(mContext, mLooper.getLooper(), mFeatureFlags);
+        mFakeFlagsImpl = new FakeFeatureFlagsImpl();
+        mFlagsValue.mFlagsValue.forEach(mFakeFlagsImpl::setFlag);
+
+        mManagerService =
+                new BluetoothManagerService(mContext, mLooper.getLooper(), mFakeFlagsImpl);
+        mManagerService.initialize(mUserHandle);
+
         mManagerService.registerAdapter(mManagerCallback);
     }
 
     @After
     public void tearDown() {
-        mManagerService.unregisterAdapter(mManagerCallback);
+        if (mManagerService != null) {
+            mManagerService.unregisterAdapter(mManagerCallback);
+            mManagerService = null;
+        }
         mLooper.moveTimeForward(120_000); // 120 seconds
         // Do not try to assert if `syncHandler()` already raised an exception for it
         if (!mHasException) {
             assertThat(mLooper.nextMessage()).isNull();
         }
-        mManagerService = null;
         validateMockitoUsage();
     }
 
@@ -345,15 +418,11 @@ public class BluetoothManagerServiceTest {
                 .when(mBluetoothServerProxy)
                 .getBluetoothPersistedState(any(), anyInt());
 
-        mManagerService.registerStateChangeCallback(mStateChangeCallback);
-        syncHandler(MESSAGE_REGISTER_STATE_CHANGE_CALLBACK);
-
         mManagerService.enable("test_offToOn");
         syncHandler(MESSAGE_ENABLE);
 
         transition_offToOn();
 
-        verify(mStateChangeCallback).onBluetoothStateChange(eq(true));
         assertThat(mManagerService.getState()).isEqualTo(STATE_ON);
     }
 }

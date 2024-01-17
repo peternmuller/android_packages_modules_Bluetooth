@@ -16,19 +16,18 @@
 
 package com.android.bluetooth.btservice;
 
+import static android.bluetooth.IBluetoothLeAudio.LE_AUDIO_GROUP_ID_INVALID;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,13 +78,12 @@ public class AudioRoutingManagerTest {
     private BluetoothDevice mHearingAidDevice;
     private BluetoothDevice mLeAudioDevice;
     private BluetoothDevice mLeAudioDevice2;
-    private BluetoothDevice mLeHearingAidDevice;
     private BluetoothDevice mSecondaryAudioDevice;
     private BluetoothDevice mDualModeAudioDevice;
     private ArrayList<BluetoothDevice> mDeviceConnectionStack;
     private BluetoothDevice mMostRecentDevice;
     private AudioRoutingManager mAudioRoutingManager;
-    private long mHearingAidHiSyncId = 1010;
+    private static final long HEARING_AID_HISYNC_ID = 1010;
 
     private static final int TIMEOUT_MS = 1_000;
     private static final int A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS =
@@ -93,6 +91,7 @@ public class AudioRoutingManagerTest {
     private boolean mOriginalDualModeAudioState;
     private TestDatabaseManager mDatabaseManager;
     private TestLooper mTestLooper;
+    private FakeFeatureFlagsImpl mFakeFlagsImpl;
 
     @Mock private AdapterService mAdapterService;
     @Mock private ServiceFactory mServiceFactory;
@@ -111,10 +110,10 @@ public class AudioRoutingManagerTest {
         BluetoothMethodProxy.setInstanceForTesting(mMethodProxy);
         doReturn(mTestLooper.getLooper()).when(mMethodProxy).handlerThreadGetLooper(any());
         doNothing().when(mMethodProxy).threadStart(any());
-        mTestLooper.startAutoDispatch();
         TestUtils.setAdapterService(mAdapterService);
 
-        mDatabaseManager = new TestDatabaseManager(mAdapterService, new FakeFeatureFlagsImpl());
+        mFakeFlagsImpl = new FakeFeatureFlagsImpl();
+        mDatabaseManager = new TestDatabaseManager(mAdapterService, mFakeFlagsImpl);
 
         when(mAdapterService.getSystemService(Context.AUDIO_SERVICE)).thenReturn(mAudioManager);
         when(mAdapterService.getSystemServiceName(AudioManager.class))
@@ -125,7 +124,8 @@ public class AudioRoutingManagerTest {
         when(mServiceFactory.getHearingAidService()).thenReturn(mHearingAidService);
         when(mServiceFactory.getLeAudioService()).thenReturn(mLeAudioService);
 
-        mAudioRoutingManager = new AudioRoutingManager(mAdapterService, mServiceFactory);
+        mAudioRoutingManager =
+                new AudioRoutingManager(mAdapterService, mServiceFactory, mFakeFlagsImpl);
         mAudioRoutingManager.start();
         mAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -135,10 +135,9 @@ public class AudioRoutingManagerTest {
         mA2dpHeadsetDevice = TestUtils.getTestDevice(mAdapter, 2);
         mHearingAidDevice = TestUtils.getTestDevice(mAdapter, 3);
         mLeAudioDevice = TestUtils.getTestDevice(mAdapter, 4);
-        mLeHearingAidDevice = TestUtils.getTestDevice(mAdapter, 5);
-        mSecondaryAudioDevice = TestUtils.getTestDevice(mAdapter, 6);
-        mDualModeAudioDevice = TestUtils.getTestDevice(mAdapter, 7);
-        mLeAudioDevice2 = TestUtils.getTestDevice(mAdapter, 8);
+        mSecondaryAudioDevice = TestUtils.getTestDevice(mAdapter, 5);
+        mDualModeAudioDevice = TestUtils.getTestDevice(mAdapter, 6);
+        mLeAudioDevice2 = TestUtils.getTestDevice(mAdapter, 7);
         mDeviceConnectionStack = new ArrayList<>();
         mMostRecentDevice = null;
         mOriginalDualModeAudioState = Utils.isDualModeAudioEnabled();
@@ -150,17 +149,17 @@ public class AudioRoutingManagerTest {
         when(mHearingAidService.setActiveDevice(any())).thenReturn(true);
         when(mLeAudioService.setActiveDevice(any())).thenReturn(true);
         when(mLeAudioService.removeActiveDevice(anyBoolean())).thenReturn(true);
+        when(mLeAudioService.getGroupId(any())).thenReturn(LE_AUDIO_GROUP_ID_INVALID);
 
         List<BluetoothDevice> connectedHearingAidDevices = new ArrayList<>();
         connectedHearingAidDevices.add(mHearingAidDevice);
-        when(mHearingAidService.getHiSyncId(mHearingAidDevice)).thenReturn(mHearingAidHiSyncId);
-        when(mHearingAidService.getConnectedPeerDevices(mHearingAidHiSyncId))
+        when(mHearingAidService.getHiSyncId(mHearingAidDevice)).thenReturn(HEARING_AID_HISYNC_ID);
+        when(mHearingAidService.getConnectedPeerDevices(HEARING_AID_HISYNC_ID))
                 .thenReturn(connectedHearingAidDevices);
     }
 
     @After
     public void tearDown() throws Exception {
-        mTestLooper.stopAutoDispatchAndIgnoreExceptions();
         BluetoothMethodProxy.setInstanceForTesting(null);
         mAudioRoutingManager.cleanup();
         TestUtils.clearAdapterService(mAdapterService);
@@ -174,7 +173,8 @@ public class AudioRoutingManagerTest {
     @Test
     public void onlyA2dpConnected_setA2dpActive() {
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
     }
 
     @Test
@@ -182,15 +182,17 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_IN_CALL);
 
         a2dpConnected(mA2dpHeadsetDevice, true);
-        verify(mA2dpService, after(TIMEOUT_MS).never()).setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
+
         headsetConnected(mA2dpHeadsetDevice, true);
+        mTestLooper.dispatchAll();
         verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpHeadsetDevice);
         verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpHeadsetDevice);
     }
 
     @Test
     public void a2dpAndHfpConnectedAtTheSameTime_setA2dpActiveShouldBeCalled() {
-        mTestLooper.stopAutoDispatchAndIgnoreExceptions();
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_IN_CALL);
 
         a2dpConnected(mA2dpHeadsetDevice, true);
@@ -204,36 +206,43 @@ public class AudioRoutingManagerTest {
     @Test
     public void secondA2dpConnected_setSecondA2dpActive() {
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         a2dpConnected(mSecondaryAudioDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mSecondaryAudioDevice);
     }
 
     /** One A2DP is connected and disconnected later. Should then set active device to null. */
     @Test
     public void lastA2dpDisconnected_clearA2dpActive() {
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         a2dpDisconnected(mA2dpDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(true);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(true);
     }
 
     /** Two A2DP are connected and active device is explicitly set. */
     @Test
     public void a2dpActiveDeviceSelected_setActive() {
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         a2dpConnected(mSecondaryAudioDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mSecondaryAudioDevice);
 
-        a2dpActiveDeviceChanged(mA2dpDevice);
-        // Don't call mA2dpService.setActiveDevice()
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, times(1)).setActiveDevice(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpDevice);
+        Mockito.clearInvocations(mA2dpService);
+        switchA2dpActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpDevice);
     }
 
     /**
@@ -243,57 +252,68 @@ public class AudioRoutingManagerTest {
     @Test
     public void a2dpSecondDeviceDisconnected_fallbackDeviceActive() {
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         a2dpConnected(mSecondaryAudioDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mA2dpService);
         a2dpDisconnected(mSecondaryAudioDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
     }
 
     /** One Headset is connected. */
     @Test
     public void onlyHeadsetConnected_setHeadsetActive() {
         headsetConnected(mHeadsetDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
     }
 
     /** Two Headset are connected. Should set the second one active. */
     @Test
     public void secondHeadsetConnected_setSecondHeadsetActive() {
         headsetConnected(mHeadsetDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
 
         headsetConnected(mSecondaryAudioDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mSecondaryAudioDevice);
     }
 
     /** One Headset is connected and disconnected later. Should then set active device to null. */
     @Test
     public void lastHeadsetDisconnected_clearHeadsetActive() {
         headsetConnected(mHeadsetDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
 
         headsetDisconnected(mHeadsetDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(isNull());
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(isNull());
     }
 
     /** Two Headset are connected and active device is explicitly set. */
     @Test
     public void headsetActiveDeviceSelected_setActive() {
         headsetConnected(mHeadsetDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
 
         headsetConnected(mSecondaryAudioDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mSecondaryAudioDevice);
 
-        headsetActiveDeviceChanged(mHeadsetDevice);
-        // Don't call mHeadsetService.setActiveDevice()
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mHeadsetService, times(1)).setActiveDevice(mHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mHeadsetDevice);
+        Mockito.clearInvocations(mHeadsetService);
+        switchHeadsetActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mHeadsetDevice);
     }
 
     /**
@@ -305,25 +325,46 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_IN_CALL);
 
         headsetConnected(mHeadsetDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
 
         headsetConnected(mSecondaryAudioDevice, false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mHeadsetService);
         headsetDisconnected(mSecondaryAudioDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
+    }
+
+    @Test
+    public void headsetSecondDeviceDisconnected_fallbackDeviceActiveWhileRinging() {
+        when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_RINGTONE);
+
+        headsetConnected(mHeadsetDevice, false);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
+
+        headsetConnected(mSecondaryAudioDevice, false);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mSecondaryAudioDevice);
+
+        Mockito.clearInvocations(mHeadsetService);
+        headsetDisconnected(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
     }
 
     @Test
     public void a2dpConnectedButHeadsetNotConnected_setA2dpActive() {
-        mTestLooper.stopAutoDispatchAndIgnoreExceptions();
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_IN_CALL);
         a2dpConnected(mA2dpHeadsetDevice, true);
 
         mTestLooper.moveTimeForward(AudioRoutingManager.A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS / 2);
         mTestLooper.dispatchAll();
         verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
+
         mTestLooper.moveTimeForward(A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS);
         mTestLooper.dispatchAll();
         verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
@@ -331,13 +372,13 @@ public class AudioRoutingManagerTest {
 
     @Test
     public void headsetConnectedButA2dpNotConnected_setHeadsetActive() {
-        mTestLooper.stopAutoDispatchAndIgnoreExceptions();
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
         headsetConnected(mA2dpHeadsetDevice, true);
 
         mTestLooper.moveTimeForward(AudioRoutingManager.A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS / 2);
         mTestLooper.dispatchAll();
         verify(mHeadsetService, never()).setActiveDevice(mA2dpHeadsetDevice);
+
         mTestLooper.moveTimeForward(A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS);
         mTestLooper.dispatchAll();
         verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
@@ -350,183 +391,120 @@ public class AudioRoutingManagerTest {
         headsetConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mSecondaryAudioDevice, true);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mSecondaryAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mHeadsetService);
         Mockito.clearInvocations(mA2dpService);
-
         // When A2DP is activated, then it should activate HFP
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        switchA2dpActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
         verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
 
+        Mockito.clearInvocations(mHeadsetService);
+        Mockito.clearInvocations(mA2dpService);
         // If HFP activated already, it should not activate A2DP again
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        switchHeadsetActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
         verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
     }
 
     @Test
-    public void hfpActivatedAfterTimeout_shouldActivateA2dpAgain() {
+    public void hfpConnectedAfterTimeout_shouldActivateA2dpAndHeadsetWhenConnected() {
         mTestLooper.stopAutoDispatchAndIgnoreExceptions();
         a2dpConnected(mA2dpHeadsetDevice, true);
-        headsetConnected(mA2dpHeadsetDevice, true);
-        a2dpActiveDeviceChanged(null);
-        headsetActiveDeviceChanged(null);
-
         mTestLooper.dispatchAll();
-        Mockito.clearInvocations(mHeadsetService);
-        Mockito.clearInvocations(mA2dpService);
-
-        // When A2DP is activated, then it should activate HFP
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
         mTestLooper.moveTimeForward(A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS);
         mTestLooper.dispatchAll();
-        verify(mA2dpService, never()).setActiveDevice(any());
-        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
-
-        a2dpActiveDeviceChanged(null);
-        // When HFP activated after timeout, it should activate A2DP again
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        mTestLooper.dispatchAll();
         verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService, never()).setActiveDevice(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET)).isEmpty();
+
+        Mockito.clearInvocations(mHeadsetService);
+        Mockito.clearInvocations(mA2dpService);
+        headsetConnected(mA2dpHeadsetDevice, true);
+        mTestLooper.dispatchAll();
+        mTestLooper.moveTimeForward(A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mA2dpHeadsetDevice);
     }
 
     @Test
     public void a2dpHeadsetActivated_whileActivatingAnotherA2dpHeadset() {
+        // Test HS1 A2DP -> HS2 A2DP -> HS1 HFP -> HS2 HFP
         a2dpConnected(mA2dpHeadsetDevice, true);
         a2dpConnected(mSecondaryAudioDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mSecondaryAudioDevice, true);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mSecondaryAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mSecondaryAudioDevice);
 
-        Mockito.clearInvocations(mHeadsetService);
-        Mockito.clearInvocations(mA2dpService);
-
-        // Test HS1 A2DP -> HS2 A2DP -> HS1 HFP -> HS2 HFP
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
-
-        a2dpActiveDeviceChanged(mSecondaryAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        verify(mHeadsetService).setActiveDevice(mSecondaryAudioDevice);
-
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        verify(mA2dpService, never()).setActiveDevice(any());
-
-        headsetActiveDeviceChanged(mSecondaryAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        verify(mA2dpService, never()).setActiveDevice(any());
+        a2dpDisconnected(mA2dpHeadsetDevice);
+        a2dpDisconnected(mSecondaryAudioDevice);
+        headsetDisconnected(mA2dpHeadsetDevice);
+        headsetDisconnected(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mHeadsetService);
         Mockito.clearInvocations(mA2dpService);
 
         // Test HS1 HFP -> HS2 HFP -> HS1 A2DP -> HS2 A2DP
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        headsetConnected(mA2dpHeadsetDevice, true);
+        headsetConnected(mSecondaryAudioDevice, true);
+        a2dpConnected(mA2dpHeadsetDevice, true);
+        a2dpConnected(mSecondaryAudioDevice, true);
 
-        headsetActiveDeviceChanged(mSecondaryAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        verify(mA2dpService).setActiveDevice(mSecondaryAudioDevice);
-
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        verify(mHeadsetService, never()).setActiveDevice(any());
-
-        a2dpActiveDeviceChanged(mSecondaryAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mSecondaryAudioDevice);
-        verify(mHeadsetService, never()).setActiveDevice(any());
-
-        Mockito.clearInvocations(mHeadsetService);
-        Mockito.clearInvocations(mA2dpService);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mSecondaryAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mSecondaryAudioDevice);
     }
 
     @Test
     public void hfpActivated_whileActivatingA2dpHeadset() {
-        headsetConnected(mHeadsetDevice, false);
         a2dpConnected(mA2dpHeadsetDevice, true);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
+
+        headsetConnected(mHeadsetDevice, false);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mHeadsetDevice);
+
         headsetConnected(mA2dpHeadsetDevice, true);
-        a2dpActiveDeviceChanged(null);
-        headsetActiveDeviceChanged(null);
-
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        Mockito.clearInvocations(mHeadsetService);
-        Mockito.clearInvocations(mA2dpService);
-
-        // Test HS1 HFP -> HFP only -> HS1 A2DP
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
         verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
-
-        headsetActiveDeviceChanged(mHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mHeadsetDevice);
-        verify(mA2dpService, never()).setActiveDevice(mHeadsetDevice);
-
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mHeadsetDevice);
-        verify(mHeadsetService, never()).setActiveDevice(any());
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
     }
 
     @Test
     public void a2dpActivated_whileActivatingA2dpHeadset() {
-        a2dpConnected(mA2dpDevice, false);
-        a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
-        a2dpActiveDeviceChanged(null);
-        headsetActiveDeviceChanged(null);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        Mockito.clearInvocations(mHeadsetService);
-        Mockito.clearInvocations(mA2dpService);
+        a2dpConnected(mA2dpDevice, false);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
-        // Test HS1 HFP -> A2DP only -> HS1 A2DP
-        headsetActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
+        a2dpConnected(mA2dpHeadsetDevice, true);
+        mTestLooper.dispatchAll();
         verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
-
-        a2dpActiveDeviceChanged(mA2dpDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        verify(mHeadsetService, never()).setActiveDevice(mA2dpDevice);
-
-        a2dpActiveDeviceChanged(mA2dpHeadsetDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mA2dpHeadsetDevice);
-        verify(mHeadsetService, never()).setActiveDevice(any());
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
     }
 
     /** A headset device with connecting audio policy set to NOT ALLOWED. */
@@ -543,6 +521,7 @@ public class AudioRoutingManagerTest {
                                 .build());
 
         headsetConnected(mHeadsetDevice, false);
+        mTestLooper.dispatchAll();
         verify(mHeadsetService, never()).setActiveDevice(mHeadsetDevice);
     }
 
@@ -554,14 +533,18 @@ public class AudioRoutingManagerTest {
         List<BluetoothDevice> connectedHearingAidDevices = new ArrayList<>();
         connectedHearingAidDevices.add(mHearingAidDevice);
         connectedHearingAidDevices.add(mSecondaryAudioDevice);
-        when(mHearingAidService.getHiSyncId(mSecondaryAudioDevice)).thenReturn(mHearingAidHiSyncId);
-        when(mHearingAidService.getConnectedPeerDevices(mHearingAidHiSyncId))
+        when(mHearingAidService.getHiSyncId(mSecondaryAudioDevice))
+                .thenReturn(HEARING_AID_HISYNC_ID);
+        when(mHearingAidService.getConnectedPeerDevices(HEARING_AID_HISYNC_ID))
                 .thenReturn(connectedHearingAidDevices);
 
         hearingAidConnected(mHearingAidDevice);
         hearingAidConnected(mSecondaryAudioDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
-        verify(mHearingAidService, never()).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mHearingAidDevice);
+        verify(mHearingAidService).setActiveDevice(mSecondaryAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEARING_AID))
+                .containsExactly(mHearingAidDevice, mSecondaryAudioDevice);
     }
 
     /** A combo (A2DP + Headset) device is connected. Then a Hearing Aid is connected. */
@@ -569,110 +552,112 @@ public class AudioRoutingManagerTest {
     public void hearingAidActive_clearA2dpAndHeadsetActive() {
         a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeastOnce()).setActiveDevice(mA2dpHeadsetDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS).atLeastOnce())
-                .setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
 
-        hearingAidActiveDeviceChanged(mHearingAidDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(null);
+        hearingAidConnected(mHearingAidDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(false);
+        verify(mHeadsetService).setActiveDevice(null);
     }
 
     /** A Hearing Aid is connected. Then a combo (A2DP + Headset) device is connected. */
     @Test
-    public void hearingAidActive_dontSetA2dpAndHeadsetActive() {
-        hearingAidActiveDeviceChanged(mHearingAidDevice);
+    public void hearingAidAndA2dpHeadsetConnected_setA2dpHeadsetActive() {
+        switchHearingAidActiveDevice(mHearingAidDevice);
         a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, never()).setActiveDevice(mA2dpHeadsetDevice);
-        verify(mHeadsetService, never()).setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).removeActiveDevice(false);
+        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
     }
 
-    /** A Hearing Aid is connected. Then an A2DP active device is explicitly set. */
+    /** A Hearing Aid is connected. Then an A2DP connected. */
     @Test
     public void hearingAidActive_setA2dpActiveExplicitly() {
         when(mHearingAidService.removeActiveDevice(anyBoolean())).thenReturn(true);
-
-        hearingAidActiveDeviceChanged(mHearingAidDevice);
+        hearingAidConnected(mHearingAidDevice);
         a2dpConnected(mA2dpDevice, false);
-        a2dpActiveDeviceChanged(mA2dpDevice);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        mTestLooper.dispatchAll();
         verify(mHearingAidService).removeActiveDevice(false);
-        // Don't call mA2dpService.setActiveDevice()
-        verify(mA2dpService, never()).setActiveDevice(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getHearingAidActiveDevices().isEmpty()).isTrue();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEARING_AID)).isEmpty();
     }
 
     /** A Hearing Aid is connected. Then a Headset active device is explicitly set. */
     @Test
     public void hearingAidActive_setHeadsetActiveExplicitly() {
         when(mHearingAidService.removeActiveDevice(anyBoolean())).thenReturn(true);
-
-        hearingAidActiveDeviceChanged(mHearingAidDevice);
+        hearingAidConnected(mHearingAidDevice);
         headsetConnected(mHeadsetDevice, false);
-        headsetActiveDeviceChanged(mHeadsetDevice);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        mTestLooper.dispatchAll();
         verify(mHearingAidService).removeActiveDevice(false);
-        // Don't call mHeadsetService.setActiveDevice()
-        verify(mHeadsetService, never()).setActiveDevice(mHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHearingAidActiveDevices().isEmpty()).isTrue();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEARING_AID)).isEmpty();
     }
 
     @Test
     public void hearingAidActiveWithNull_clearHearingAidActiveDevices() {
-        hearingAidActiveDeviceChanged(null);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getHearingAidActiveDevices()).isEmpty();
+        switchHearingAidActiveDevice(null);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEARING_AID)).isEmpty();
     }
 
     /** One LE Audio is connected. */
     @Test
     public void onlyLeAudioConnected_setHeadsetActive() {
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
     }
 
     /** Two LE Audio are connected. Should set the second one active. */
     @Test
     public void secondLeAudioConnected_setSecondLeAudioActive() {
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mSecondaryAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mSecondaryAudioDevice);
     }
 
     /** One LE Audio is connected and disconnected later. Should then set active device to null. */
     @Test
     public void lastLeAudioDisconnected_clearLeAudioActive() {
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioDisconnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).removeActiveDevice(false);
     }
 
     /** Two LE Audio are connected and active device is explicitly set. */
     @Test
     public void leAudioActiveDeviceSelected_setActive() {
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mSecondaryAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mLeAudioService);
-        leAudioActiveDeviceChanged(mLeAudioDevice);
-        // Don't call mLeAudioService.setActiveDevice()
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, never()).setActiveDevice(any(BluetoothDevice.class));
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isEqualTo(mLeAudioDevice);
+        switchLeAudioActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
     }
 
     /**
@@ -682,14 +667,17 @@ public class AudioRoutingManagerTest {
     @Test
     public void leAudioSecondDeviceDisconnected_fallbackDeviceActive() {
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mSecondaryAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mLeAudioService);
         leAudioDisconnected(mSecondaryAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
     }
 
     /** A combo (A2DP + Headset) device is connected. Then an LE Audio is connected. */
@@ -697,53 +685,60 @@ public class AudioRoutingManagerTest {
     public void leAudioActive_clearA2dpAndHeadsetActive() {
         a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeastOnce()).setActiveDevice(mA2dpHeadsetDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS).atLeastOnce())
-                .setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mA2dpHeadsetDevice);
 
-        leAudioActiveDeviceChanged(mLeAudioDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(isNull());
+        leAudioConnected(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(false);
+        verify(mHeadsetService).setActiveDevice(isNull());
     }
 
     /** An LE Audio is connected. Then a combo (A2DP + Headset) device is connected. */
     @Test
     public void leAudioActive_setA2dpAndHeadsetActive() {
-        leAudioActiveDeviceChanged(mLeAudioDevice);
+        switchLeAudioActiveDevice(mLeAudioDevice);
         a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, atLeastOnce()).setActiveDevice(mA2dpHeadsetDevice);
-        verify(mHeadsetService, atLeastOnce()).setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
     }
 
     /** An LE Audio is connected. Then an A2DP active device is explicitly set. */
     @Test
     public void leAudioActive_setA2dpActiveExplicitly() {
-        leAudioActiveDeviceChanged(mLeAudioDevice);
+        leAudioConnected(mLeAudioDevice);
         a2dpConnected(mA2dpDevice, false);
-        a2dpActiveDeviceChanged(mA2dpDevice);
+        switchA2dpActiveDevice(mA2dpDevice);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        mTestLooper.dispatchAll();
         verify(mLeAudioService).removeActiveDevice(true);
         verify(mA2dpService).setActiveDevice(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mA2dpDevice);
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isNull();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mA2dpDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO)).isEmpty();
     }
 
     /** An LE Audio is connected. Then a Headset active device is explicitly set. */
     @Test
     public void leAudioActive_setHeadsetActiveExplicitly() {
-        leAudioActiveDeviceChanged(mLeAudioDevice);
+        switchLeAudioActiveDevice(mLeAudioDevice);
         headsetConnected(mHeadsetDevice, false);
-        headsetActiveDeviceChanged(mHeadsetDevice);
+        switchHeadsetActiveDevice(mHeadsetDevice);
 
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        mTestLooper.dispatchAll();
         verify(mLeAudioService).removeActiveDevice(true);
         verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mHeadsetDevice);
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isNull();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mHeadsetDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO)).isEmpty();
     }
 
     /**
@@ -755,15 +750,18 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
 
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         Mockito.clearInvocations(mLeAudioService);
         a2dpDisconnected(mA2dpDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeast(1)).removeActiveDevice(false);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(false);
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
     }
 
     /**
@@ -775,18 +773,19 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
 
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mLeAudioDevice2);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice2);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice2);
 
         Mockito.clearInvocations(mLeAudioService);
-
         leAudioDisconnected(mLeAudioDevice);
+        mTestLooper.dispatchAll();
 
         verify(mLeAudioService, never()).removeActiveDevice(false);
         verify(mLeAudioService, never()).setActiveDevice(mLeAudioDevice2);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).deviceDisconnected(mLeAudioDevice, false);
     }
 
     /**
@@ -799,21 +798,21 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
 
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mLeAudioDevice2);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice2);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice2);
 
         Mockito.clearInvocations(mLeAudioService);
-
         // Return false to indicate an issue when setting new active device
         // (e.g. the other device disconnected as well).
         when(mLeAudioService.setActiveDevice(any())).thenReturn(false);
 
         leAudioDisconnected(mLeAudioDevice2);
-
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).deviceDisconnected(mLeAudioDevice2, false);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).removeActiveDevice(false);
     }
 
     /**
@@ -826,17 +825,17 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
 
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         leAudioConnected(mLeAudioDevice2);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice2);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice2);
 
         Mockito.clearInvocations(mLeAudioService);
-
         leAudioDisconnected(mLeAudioDevice2);
-
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).deviceDisconnected(mLeAudioDevice2, true);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
     }
 
     /**
@@ -848,15 +847,18 @@ public class AudioRoutingManagerTest {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
 
         a2dpConnected(mA2dpDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
 
         leAudioConnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
 
         Mockito.clearInvocations(mA2dpService);
         leAudioDisconnected(mLeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS).atLeast(1)).removeActiveDevice(true);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).removeActiveDevice(true);
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
     }
 
     /**
@@ -866,104 +868,55 @@ public class AudioRoutingManagerTest {
     @Test
     public void hearingAidSecondDeviceDisconnected_fallbackDeviceActive() {
         hearingAidConnected(mHearingAidDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mHearingAidDevice);
 
         List<BluetoothDevice> connectedHearingAidDevices = new ArrayList<>();
         connectedHearingAidDevices.add(mSecondaryAudioDevice);
         when(mHearingAidService.getHiSyncId(mSecondaryAudioDevice))
-                .thenReturn(mHearingAidHiSyncId + 1);
-        when(mHearingAidService.getConnectedPeerDevices(mHearingAidHiSyncId + 1))
+                .thenReturn(HEARING_AID_HISYNC_ID + 1);
+        when(mHearingAidService.getConnectedPeerDevices(HEARING_AID_HISYNC_ID + 1))
                 .thenReturn(connectedHearingAidDevices);
 
         hearingAidConnected(mSecondaryAudioDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mSecondaryAudioDevice);
 
         Mockito.clearInvocations(mHearingAidService);
         hearingAidDisconnected(mSecondaryAudioDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mHearingAidDevice);
     }
 
     /**
-     * Hearing aid is connected, but active device is different BT. When the active device is
-     * disconnected, the hearing aid should be the active one.
+     * Test connect/disconnect of devices. Hearing Aid, A2DP connected, LE audio, then LE audio
+     * disconnected.
      */
     @Test
-    public void activeDeviceDisconnected_fallbackToHearingAid() {
+    public void activeDeviceChange_withHearingAidLeAudioAndA2dpDevices() {
         when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
-        when(mA2dpService.setActiveDevice(any())).thenReturn(true);
-        when(mLeAudioService.setActiveDevice(any())).thenReturn(true);
-        when(mHearingAidService.setActiveDevice(any())).thenReturn(true);
         when(mHearingAidService.removeActiveDevice(anyBoolean())).thenReturn(true);
 
         hearingAidConnected(mHearingAidDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mHearingAidDevice);
 
-        leAudioConnected(mLeAudioDevice);
         a2dpConnected(mA2dpDevice, false);
-
-        a2dpActiveDeviceChanged(mA2dpDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
         verify(mHearingAidService).removeActiveDevice(false);
-        verify(mLeAudioService, never()).setActiveDevice(mLeAudioDevice);
-        verify(mA2dpService, never()).setActiveDevice(mA2dpDevice);
 
-        a2dpDisconnected(mA2dpDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeast(1)).removeActiveDevice(false);
-        verify(mHearingAidService, timeout(TIMEOUT_MS).times(2)).setActiveDevice(mHearingAidDevice);
-    }
-
-    /** One LE Hearing Aid is connected. */
-    @Test
-    public void onlyLeHearingAidConnected_setLeAudioActive() {
-        leHearingAidConnected(mLeHearingAidDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, never()).setActiveDevice(mLeHearingAidDevice);
-
-        leAudioConnected(mLeHearingAidDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeHearingAidDevice);
-    }
-
-    /** LE audio is connected after LE Hearing Aid device. Keep LE hearing Aid active. */
-    @Test
-    public void leAudioConnectedAfterLeHearingAid_setLeAudioActiveShouldNotBeCalled() {
-        leHearingAidConnected(mLeHearingAidDevice);
-        leAudioConnected(mLeHearingAidDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeHearingAidDevice);
-
+        Mockito.clearInvocations(mHearingAidService, mA2dpService, mLeAudioService);
         leAudioConnected(mLeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, never()).setActiveDevice(mLeAudioDevice);
-    }
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
+        verify(mA2dpService).removeActiveDevice(false);
 
-    /**
-     * Test connect/disconnect of devices. Hearing Aid, LE Hearing Aid, A2DP connected, then LE
-     * hearing Aid and hearing aid disconnected.
-     */
-    @Test
-    public void activeDeviceChange_withHearingAidLeHearingAidAndA2dpDevices() {
-        when(mAudioManager.getMode()).thenReturn(AudioManager.MODE_NORMAL);
-        when(mHearingAidService.removeActiveDevice(anyBoolean())).thenReturn(true);
-
-        hearingAidConnected(mHearingAidDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
-
-        leHearingAidConnected(mLeHearingAidDevice);
-        leAudioConnected(mLeHearingAidDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mLeHearingAidDevice);
-
-        a2dpConnected(mA2dpDevice, false);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, never()).setActiveDevice(mA2dpDevice);
-
-        Mockito.clearInvocations(mHearingAidService, mA2dpService);
-        leHearingAidDisconnected(mLeHearingAidDevice);
-        leAudioDisconnected(mLeHearingAidDevice);
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-
-        hearingAidDisconnected(mHearingAidDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        Mockito.clearInvocations(mHearingAidService, mA2dpService, mLeAudioService);
+        leAudioDisconnected(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
+        verify(mLeAudioService).removeActiveDevice(true);
     }
 
     /**
@@ -978,20 +931,24 @@ public class AudioRoutingManagerTest {
         // Ensure we remove the LEA active device when classic audio profiles are made active
         a2dpConnected(mDualModeAudioDevice, true);
         headsetConnected(mDualModeAudioDevice, true);
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeastOnce())
-                .setActiveDevice(mDualModeAudioDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS).atLeastOnce())
-                .setActiveDevice(mDualModeAudioDevice);
-        verify(mLeAudioService, timeout(TIMEOUT_MS).atLeastOnce()).removeActiveDevice(true);
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mDualModeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mDualModeAudioDevice);
+        verify(mHeadsetService).setActiveDevice(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mDualModeAudioDevice);
 
         // Ensure we make classic audio profiles inactive when LEA is made active
         leAudioConnected(mDualModeAudioDevice);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(isNull());
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isEqualTo(mDualModeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(false);
+        verify(mHeadsetService).setActiveDevice(isNull());
+        verify(mLeAudioService).setActiveDevice(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET)).isEmpty();
     }
 
     /**
@@ -1002,38 +959,45 @@ public class AudioRoutingManagerTest {
     public void dualModeAudioDeviceConnected_withDualModeFeatureEnabled() {
         // Turn on the dual mode audio flag
         Utils.setDualModeAudioStateForTesting(true);
+        mDatabaseManager.setProfileConnectionPolicy(
+                mDualModeAudioDevice,
+                BluetoothProfile.A2DP,
+                BluetoothProfile.CONNECTION_POLICY_ALLOWED);
+        mDatabaseManager.setProfileConnectionPolicy(
+                mDualModeAudioDevice,
+                BluetoothProfile.HEADSET,
+                BluetoothProfile.CONNECTION_POLICY_ALLOWED);
         reset(mLeAudioService);
-        when(mAdapterService.isAllSupportedClassicAudioProfilesActive(mDualModeAudioDevice))
-                .thenReturn(false);
-
         leAudioConnected(mDualModeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
+        mTestLooper.dispatchAll();
         // Verify setting LEA active fails when all supported classic audio profiles are not active
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isNull();
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isNull();
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isNull();
+        verify(mLeAudioService, never()).setActiveDevice(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET)).isEmpty();
 
         when(mLeAudioService.setActiveDevice(any())).thenReturn(true);
         when(mLeAudioService.removeActiveDevice(anyBoolean())).thenReturn(true);
+        when(mA2dpService.setActiveDevice(any())).thenReturn(true);
+        when(mA2dpService.removeActiveDevice(anyBoolean())).thenReturn(true);
+        when(mHeadsetService.setActiveDevice(any())).thenReturn(true);
 
-        // Ensure we make LEA active after all supported classic profiles are active
-        a2dpActiveDeviceChanged(mDualModeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        when(mAdapterService.isAllSupportedClassicAudioProfilesActive(mDualModeAudioDevice))
-                .thenReturn(true);
-        headsetActiveDeviceChanged(mDualModeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, times(2)).setActiveDevice(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isEqualTo(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getHfpActiveDevice()).isEqualTo(mDualModeAudioDevice);
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isEqualTo(mDualModeAudioDevice);
+        a2dpConnected(mDualModeAudioDevice, true);
+        headsetConnected(mDualModeAudioDevice, true);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP))
+                .contains(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET))
+                .contains(mDualModeAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mDualModeAudioDevice);
 
-        // Verify LEA made inactive when a supported classic audio profile is made inactive
-        a2dpActiveDeviceChanged(null);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        assertThat(mAudioRoutingManager.getA2dpActiveDevice()).isNull();
-        assertThat(mAudioRoutingManager.getLeAudioActiveDevice()).isNull();
+        switchA2dpActiveDevice(null);
+        mTestLooper.dispatchAll();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mDualModeAudioDevice);
     }
 
     /**
@@ -1043,53 +1007,60 @@ public class AudioRoutingManagerTest {
     @Test
     public void setActiveDeviceFailsUponConnection() {
         Utils.setDualModeAudioStateForTesting(false);
+
+        leAudioConnected(mLeAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mLeAudioDevice);
+
         when(mHeadsetService.setActiveDevice(any())).thenReturn(false);
         when(mA2dpService.setActiveDevice(any())).thenReturn(false);
         when(mHearingAidService.setActiveDevice(any())).thenReturn(false);
         when(mLeAudioService.setActiveDevice(any())).thenReturn(false);
 
-        leAudioConnected(mDualModeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, timeout(TIMEOUT_MS)).setActiveDevice(mDualModeAudioDevice);
-
-        leAudioActiveDeviceChanged(mDualModeAudioDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, times(1)).removeActiveDevice(anyBoolean());
-        verify(mHeadsetService, times(1)).setActiveDevice(null);
-        verify(mHearingAidService, times(1)).removeActiveDevice(anyBoolean());
-
         a2dpConnected(mA2dpDevice, false);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
         verify(mLeAudioService, never()).removeActiveDevice(anyBoolean());
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
 
+        Mockito.clearInvocations(mA2dpService, mHeadsetService, mLeAudioService);
         a2dpConnected(mA2dpHeadsetDevice, true);
         headsetConnected(mA2dpHeadsetDevice, true);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mA2dpService, timeout(TIMEOUT_MS).atLeastOnce()).setActiveDevice(mA2dpHeadsetDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS).atLeastOnce())
-                .setActiveDevice(mA2dpHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpHeadsetDevice);
+        verify(mHeadsetService).setActiveDevice(mA2dpHeadsetDevice);
         verify(mLeAudioService, never()).removeActiveDevice(anyBoolean());
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.A2DP)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
 
+        Mockito.clearInvocations(mHeadsetService, mLeAudioService);
         headsetConnected(mHeadsetDevice, false);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
         verify(mLeAudioService, never()).removeActiveDevice(anyBoolean());
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEADSET)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
 
+        Mockito.clearInvocations(mLeAudioService);
         hearingAidConnected(mHearingAidDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).setActiveDevice(mHearingAidDevice);
+        mTestLooper.dispatchAll();
+        verify(mHearingAidService).setActiveDevice(mHearingAidDevice);
         verify(mLeAudioService, never()).removeActiveDevice(anyBoolean());
-        verify(mA2dpService, times(1)).removeActiveDevice(anyBoolean());
-        verify(mHeadsetService, times(1)).setActiveDevice(null);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.HEARING_AID)).isEmpty();
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
 
-        leAudioConnected(mLeHearingAidDevice);
-        leHearingAidConnected(mLeHearingAidDevice);
-        TestUtils.waitForLooperToFinishScheduledTask(mAudioRoutingManager.getHandlerLooper());
-        verify(mLeAudioService, times(2)).setActiveDevice(mLeHearingAidDevice);
-        verify(mA2dpService, times(1)).removeActiveDevice(anyBoolean());
-        verify(mHeadsetService, times(1)).setActiveDevice(null);
-        verify(mHearingAidService, times(1)).removeActiveDevice(anyBoolean());
+        Mockito.clearInvocations(mLeAudioService);
+        leAudioConnected(mSecondaryAudioDevice);
+        mTestLooper.dispatchAll();
+        verify(mLeAudioService).setActiveDevice(mSecondaryAudioDevice);
+        assertThat(mAudioRoutingManager.getActiveDevices(BluetoothProfile.LE_AUDIO))
+                .contains(mLeAudioDevice);
     }
 
     /** A wired audio device is connected. Then all active devices are set to null. */
@@ -1097,13 +1068,15 @@ public class AudioRoutingManagerTest {
     public void wiredAudioDeviceConnected_setAllActiveDevicesNull() {
         a2dpConnected(mA2dpDevice, false);
         headsetConnected(mHeadsetDevice, false);
-        verify(mA2dpService, timeout(TIMEOUT_MS)).setActiveDevice(mA2dpDevice);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(mHeadsetDevice);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).setActiveDevice(mA2dpDevice);
+        verify(mHeadsetService).setActiveDevice(mHeadsetDevice);
 
         mAudioRoutingManager.wiredAudioDeviceConnected();
-        verify(mA2dpService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
-        verify(mHeadsetService, timeout(TIMEOUT_MS)).setActiveDevice(isNull());
-        verify(mHearingAidService, timeout(TIMEOUT_MS)).removeActiveDevice(false);
+        mTestLooper.dispatchAll();
+        verify(mA2dpService).removeActiveDevice(false);
+        verify(mHeadsetService).setActiveDevice(isNull());
+        verify(mHearingAidService).removeActiveDevice(false);
     }
 
     /** Helper to indicate A2dp connected for a device. */
@@ -1141,12 +1114,16 @@ public class AudioRoutingManagerTest {
     }
 
     /** Helper to indicate A2dp active device changed for a device. */
-    private void a2dpActiveDeviceChanged(BluetoothDevice device) {
+    private void switchA2dpActiveDevice(BluetoothDevice device) {
         mDeviceConnectionStack.remove(device);
         mDeviceConnectionStack.add(device);
         mMostRecentDevice = device;
 
-        mAudioRoutingManager.profileActiveDeviceChanged(BluetoothProfile.A2DP, device);
+        if (device == null) {
+            mAudioRoutingManager.removeActiveDevice(BluetoothProfile.A2DP, false);
+        } else {
+            mAudioRoutingManager.activateDeviceProfile(device, BluetoothProfile.A2DP, null);
+        }
     }
 
     /** Helper to indicate Headset connected for a device. */
@@ -1184,12 +1161,16 @@ public class AudioRoutingManagerTest {
     }
 
     /** Helper to indicate Headset active device changed for a device. */
-    private void headsetActiveDeviceChanged(BluetoothDevice device) {
+    private void switchHeadsetActiveDevice(BluetoothDevice device) {
         mDeviceConnectionStack.remove(device);
         mDeviceConnectionStack.add(device);
         mMostRecentDevice = device;
 
-        mAudioRoutingManager.profileActiveDeviceChanged(BluetoothProfile.HEADSET, device);
+        if (device == null) {
+            mAudioRoutingManager.removeActiveDevice(BluetoothProfile.HEADSET, false);
+        } else {
+            mAudioRoutingManager.activateDeviceProfile(device, BluetoothProfile.HEADSET, null);
+        }
     }
 
     /** Helper to indicate Hearing Aid connected for a device. */
@@ -1220,12 +1201,16 @@ public class AudioRoutingManagerTest {
     }
 
     /** Helper to indicate Hearing Aid active device changed for a device. */
-    private void hearingAidActiveDeviceChanged(BluetoothDevice device) {
+    private void switchHearingAidActiveDevice(BluetoothDevice device) {
         mDeviceConnectionStack.remove(device);
         mDeviceConnectionStack.add(device);
         mMostRecentDevice = device;
 
-        mAudioRoutingManager.profileActiveDeviceChanged(BluetoothProfile.HEARING_AID, device);
+        if (device == null) {
+            mAudioRoutingManager.removeActiveDevice(BluetoothProfile.HEARING_AID, false);
+        } else {
+            mAudioRoutingManager.activateDeviceProfile(device, BluetoothProfile.HEARING_AID, null);
+        }
     }
 
     /** Helper to indicate LE Audio connected for a device. */
@@ -1255,39 +1240,16 @@ public class AudioRoutingManagerTest {
     }
 
     /** Helper to indicate LE Audio active device changed for a device. */
-    private void leAudioActiveDeviceChanged(BluetoothDevice device) {
+    private void switchLeAudioActiveDevice(BluetoothDevice device) {
         mDeviceConnectionStack.remove(device);
         mDeviceConnectionStack.add(device);
         mMostRecentDevice = device;
 
-        mAudioRoutingManager.profileActiveDeviceChanged(BluetoothProfile.LE_AUDIO, device);
-    }
-
-    /** Helper to indicate LE Hearing Aid connected for a device. */
-    private void leHearingAidConnected(BluetoothDevice device) {
-        mDeviceConnectionStack.add(device);
-        mMostRecentDevice = device;
-
-        mAudioRoutingManager.profileConnectionStateChanged(
-                BluetoothProfile.HAP_CLIENT,
-                device,
-                BluetoothProfile.STATE_DISCONNECTED,
-                BluetoothProfile.STATE_CONNECTED);
-    }
-
-    /** Helper to indicate LE Hearing Aid disconnected for a device. */
-    private void leHearingAidDisconnected(BluetoothDevice device) {
-        mDeviceConnectionStack.remove(device);
-        mMostRecentDevice =
-                (mDeviceConnectionStack.size() > 0)
-                        ? mDeviceConnectionStack.get(mDeviceConnectionStack.size() - 1)
-                        : null;
-
-        mAudioRoutingManager.profileConnectionStateChanged(
-                BluetoothProfile.HAP_CLIENT,
-                device,
-                BluetoothProfile.STATE_CONNECTED,
-                BluetoothProfile.STATE_DISCONNECTED);
+        if (device == null) {
+            mAudioRoutingManager.removeActiveDevice(BluetoothProfile.LE_AUDIO, false);
+        } else {
+            mAudioRoutingManager.activateDeviceProfile(device, BluetoothProfile.LE_AUDIO, null);
+        }
     }
 
     private class TestDatabaseManager extends DatabaseManager {
@@ -1303,10 +1265,6 @@ public class AudioRoutingManagerTest {
                 List<BluetoothDevice> devices) {
             if (devices == null || devices.size() == 0) {
                 return null;
-            } else if (devices.contains(mLeHearingAidDevice)) {
-                return mLeHearingAidDevice;
-            } else if (devices.contains(mHearingAidDevice)) {
-                return mHearingAidDevice;
             } else if (mMostRecentDevice != null && devices.contains(mMostRecentDevice)) {
                 return mMostRecentDevice;
             }

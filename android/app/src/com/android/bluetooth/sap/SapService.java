@@ -93,7 +93,7 @@ public class SapService extends ProfileService implements AdapterService.Bluetoo
     private BluetoothDevice mRemoteDevice = null;
     private static String sRemoteDeviceName = null;
     private volatile boolean mInterrupted;
-    private int mState;
+    private int mState = BluetoothSap.STATE_DISCONNECTED;
     private SapServer mSapServer = null;
     private AlarmManager mAlarmManager = null;
     private boolean mRemoveTimeoutMsg = false;
@@ -107,13 +107,13 @@ public class SapService extends ProfileService implements AdapterService.Bluetoo
             BluetoothUuid.SAP,
     };
 
-    public static boolean isEnabled() {
-        return BluetoothProperties.isProfileSapServerEnabled().orElse(false);
+    public SapService(Context ctx) {
+        super(ctx);
+        BluetoothSap.invalidateBluetoothGetConnectionStateCache();
     }
 
-    public SapService() {
-        mState = BluetoothSap.STATE_DISCONNECTED;
-        BluetoothSap.invalidateBluetoothGetConnectionStateCache();
+    public static boolean isEnabled() {
+        return BluetoothProperties.isProfileSapServerEnabled().orElse(false);
     }
 
     /***
@@ -685,7 +685,6 @@ public class SapService extends ProfileService implements AdapterService.Bluetoo
         IntentFilter filter = new IntentFilter();
         filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
-        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction(USER_CONFIRM_TIMEOUT_ACTION);
 
         try {
@@ -910,34 +909,37 @@ public class SapService extends ProfileService implements AdapterService.Bluetoo
                 sendConnectTimeoutMessage();
                 return;
             }
-
-            if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED) && mIsWaitingAuthorization) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-
-                if (mRemoteDevice == null || device == null) {
-                    Log.i(TAG, "Unexpected error!");
-                    return;
-                }
-
-                if (DEBUG) {
-                    Log.d(TAG, "ACL disconnected for " + device);
-                }
-
-                if (mRemoteDevice.equals(device)) {
-                    if (mRemoveTimeoutMsg) {
-                        // Send any pending timeout now, as ACL got disconnected.
-                        mSessionStatusHandler.removeMessages(USER_TIMEOUT);
-                        mSessionStatusHandler.obtainMessage(USER_TIMEOUT).sendToTarget();
-                    }
-                    setState(BluetoothSap.STATE_DISCONNECTED);
-                    // Ensure proper cleanup, and prepare for new connect.
-                    mSessionStatusHandler.sendEmptyMessage(MSG_SERVERSESSION_CLOSE);
-                }
-            }
         }
     }
 
-    ;
+    public void aclDisconnected(BluetoothDevice device) {
+        mSessionStatusHandler.post(() -> handleAclDisconnected(device));
+    }
+
+    private void handleAclDisconnected(BluetoothDevice device) {
+        if (!mIsWaitingAuthorization) {
+            return;
+        }
+        if (mRemoteDevice == null || device == null) {
+            Log.i(TAG, "Unexpected error!");
+            return;
+        }
+
+        if (DEBUG) {
+            Log.d(TAG, "ACL disconnected for " + device);
+        }
+
+        if (mRemoteDevice.equals(device)) {
+            if (mRemoveTimeoutMsg) {
+                // Send any pending timeout now, as ACL got disconnected.
+                mSessionStatusHandler.removeMessages(USER_TIMEOUT);
+                mSessionStatusHandler.obtainMessage(USER_TIMEOUT).sendToTarget();
+            }
+            setState(BluetoothSap.STATE_DISCONNECTED);
+            // Ensure proper cleanup, and prepare for new connect.
+            mSessionStatusHandler.sendEmptyMessage(MSG_SERVERSESSION_CLOSE);
+        }
+    }
 
     //Binder object: Must be static class or memory leak may occur
 

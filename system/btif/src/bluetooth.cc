@@ -82,7 +82,6 @@
 #include "btif_sock.h"
 #include "btif_storage.h"
 #include "common/address_obfuscator.h"
-#include "common/metric_id_allocator.h"
 #include "common/metrics.h"
 #include "common/os_utils.h"
 #include "device/include/device_iot_config.h"
@@ -90,12 +89,11 @@
 #include "device/include/interop_config.h"
 #include "gd/common/init_flags.h"
 #include "gd/os/parameter_provider.h"
+#include "internal_include/bt_target.h"
 #include "main/shim/dumpsys.h"
-#include "main/shim/shim.h"
+#include "os/log.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
-#include "osi/include/osi.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "osi/include/wakelock.h"
 #include "stack/btm/btm_sco_hfp_hal.h"
@@ -110,7 +108,6 @@
 #include "stack/include/hidh_api.h"
 #include "stack/include/main_thread.h"
 #include "stack/include/pan_api.h"
-#include "stack_config.h"
 #include "types/raw_address.h"
 
 using bluetooth::csis::CsisClientInterface;
@@ -328,61 +325,47 @@ struct CoreInterfaceImpl : bluetooth::core::CoreInterface {
 };
 
 static bluetooth::core::CoreInterface* CreateInterfaceToProfiles() {
-  static auto eventCallbacks = bluetooth::core::EventCallbacks();
-  static bool eventCallbacks_initialized;
-  if (!eventCallbacks_initialized) {
-    eventCallbacks.invoke_adapter_state_changed_cb =
-        invoke_adapter_state_changed_cb;
-    eventCallbacks.invoke_adapter_properties_cb = invoke_adapter_properties_cb;
-    eventCallbacks.invoke_remote_device_properties_cb =
-        invoke_remote_device_properties_cb;
-    eventCallbacks.invoke_device_found_cb = invoke_device_found_cb;
-    eventCallbacks.invoke_discovery_state_changed_cb =
-        invoke_discovery_state_changed_cb;
-    eventCallbacks.invoke_pin_request_cb = invoke_pin_request_cb;
-    eventCallbacks.invoke_ssp_request_cb = invoke_ssp_request_cb;
-    eventCallbacks.invoke_oob_data_request_cb = invoke_oob_data_request_cb;
-    eventCallbacks.invoke_bond_state_changed_cb = invoke_bond_state_changed_cb;
-    eventCallbacks.invoke_address_consolidate_cb =
-        invoke_address_consolidate_cb;
-    eventCallbacks.invoke_le_address_associate_cb =
-        invoke_le_address_associate_cb;
-    eventCallbacks.invoke_acl_state_changed_cb = invoke_acl_state_changed_cb;
-    eventCallbacks.invoke_thread_evt_cb = invoke_thread_evt_cb;
-    eventCallbacks.invoke_le_test_mode_cb = invoke_le_test_mode_cb;
-    eventCallbacks.invoke_energy_info_cb = invoke_energy_info_cb;
-    eventCallbacks.invoke_link_quality_report_cb =
-        invoke_link_quality_report_cb;
+  static bluetooth::core::EventCallbacks eventCallbacks{
+      .invoke_adapter_state_changed_cb = invoke_adapter_state_changed_cb,
+      .invoke_adapter_properties_cb = invoke_adapter_properties_cb,
+      .invoke_remote_device_properties_cb = invoke_remote_device_properties_cb,
+      .invoke_device_found_cb = invoke_device_found_cb,
+      .invoke_discovery_state_changed_cb = invoke_discovery_state_changed_cb,
+      .invoke_pin_request_cb = invoke_pin_request_cb,
+      .invoke_ssp_request_cb = invoke_ssp_request_cb,
+      .invoke_oob_data_request_cb = invoke_oob_data_request_cb,
+      .invoke_bond_state_changed_cb = invoke_bond_state_changed_cb,
+      .invoke_address_consolidate_cb = invoke_address_consolidate_cb,
+      .invoke_le_address_associate_cb = invoke_le_address_associate_cb,
+      .invoke_acl_state_changed_cb = invoke_acl_state_changed_cb,
+      .invoke_thread_evt_cb = invoke_thread_evt_cb,
+      .invoke_le_test_mode_cb = invoke_le_test_mode_cb,
+      .invoke_energy_info_cb = invoke_energy_info_cb,
+      .invoke_link_quality_report_cb = invoke_link_quality_report_cb,
+  };
+  static bluetooth::core::HACK_ProfileInterface profileInterface{
+      // HID
+      .btif_hh_connect = btif_hh_connect,
+      .btif_hh_virtual_unplug = btif_hh_virtual_unplug,
+      .bta_hh_read_ssr_param = bta_hh_read_ssr_param,
 
-    eventCallbacks_initialized = true;
-  }
+      // AVDTP
+      .btif_av_set_dynamic_audio_buffer_size =
+          btif_av_set_dynamic_audio_buffer_size,
+
+      // ASHA
+      .GetHearingAidDeviceCount = HearingAid::GetDeviceCount,
+
+      // LE Audio
+      .IsLeAudioClientRunning = LeAudioClient::IsLeAudioClientRunning,
+
+      // AVRCP
+      .AVRC_GetProfileVersion = AVRC_GetProfileVersion,
+  };
+
   static auto configInterface = ConfigInterfaceImpl();
   static auto msbcCodecInterface = MSBCCodec();
   static auto lc3CodecInterface = LC3Codec();
-  static auto profileInterface = bluetooth::core::HACK_ProfileInterface();
-  static bool profileInterface_initialized;
-  if (!profileInterface_initialized) {
-    // HID
-    profileInterface.btif_hh_connect = btif_hh_connect;
-    profileInterface.btif_hh_virtual_unplug = btif_hh_virtual_unplug;
-    profileInterface.bta_hh_read_ssr_param = bta_hh_read_ssr_param;
-
-    // AVDTP
-    profileInterface.btif_av_set_dynamic_audio_buffer_size =
-        btif_av_set_dynamic_audio_buffer_size;
-
-    // ASHA
-    profileInterface.GetHearingAidDeviceCount = HearingAid::GetDeviceCount;
-
-    // LE Audio
-    profileInterface.IsLeAudioClientRunning =
-        LeAudioClient::IsLeAudioClientRunning;
-
-    // AVRCP
-    profileInterface.AVRC_GetProfileVersion = AVRC_GetProfileVersion;
-
-    profileInterface_initialized = true;
-  }
 
   static auto interfaceForCore =
       CoreInterfaceImpl(&eventCallbacks, &configInterface, &msbcCodecInterface,

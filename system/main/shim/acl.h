@@ -29,7 +29,6 @@
 #include "main/shim/acl_legacy_interface.h"
 #include "main/shim/link_connection_interface.h"
 #include "main/shim/link_policy_interface.h"
-#include "stack/include/bt_types.h"
 #include "types/raw_address.h"
 
 using LeRandCallback = base::OnceCallback<void(uint64_t)>;
@@ -57,9 +56,6 @@ class Acl : public hci::acl_manager::ConnectionCallbacks,
   void OnConnectRequest(hci::Address, hci::ClassOfDevice) override;
   void OnConnectFail(hci::Address, hci::ErrorCode reason,
                      bool locally_initiated) override;
-
-  void HACK_OnEscoConnectRequest(hci::Address, hci::ClassOfDevice) override;
-  void HACK_OnScoConnectRequest(hci::Address, hci::ClassOfDevice) override;
 
   void OnClassicLinkDisconnected(uint16_t handle, hci::ErrorCode reason);
 

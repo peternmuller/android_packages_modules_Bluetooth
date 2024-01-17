@@ -33,7 +33,6 @@
 
 #include "btm_api.h"
 #include "btm_ble_api_types.h"
-#include "osi/include/alarm.h"
 #include "stack/btm/neighbor_inquiry.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -44,14 +43,6 @@ void btm_ble_free();
 /*****************************************************************************
  *  EXTERNAL FUNCTION DECLARATIONS
  ****************************************************************************/
-
-/**
- * This function is called to set scan parameters. |cb| is called with operation
- * status
- **/
-void BTM_BleSetScanParams(std::vector<uint32_t> scan_interval, std::vector<uint32_t> scan_window,
-                                 tBLE_SCAN_MODE scan_type,
-                                 base::Callback<void(uint8_t)> cb);
 
 /*******************************************************************************
  *
@@ -480,8 +471,9 @@ void btm_ble_periodic_adv_report(uint16_t sync_handle, uint8_t tx_power,
                                  const uint8_t* periodic_data);
 void btm_ble_periodic_adv_sync_lost(uint16_t sync_handle);
 
-void btm_ble_biginfo_adv_report_rcvd(uint8_t* param, uint16_t param_len);
-void btm_ble_periodic_adv_sync_tx_rcvd(uint8_t* param, uint16_t param_len);
+void btm_ble_biginfo_adv_report_rcvd(const uint8_t* param, uint16_t param_len);
+void btm_ble_periodic_adv_sync_tx_rcvd(const uint8_t* param,
+                                       uint16_t param_len);
 /*******************************************************************************
  *
  * Function         BTM_BleStartPeriodicSync
@@ -581,4 +573,30 @@ void BTM_BlePeriodicSyncSetInfo(RawAddress addr, uint16_t service_data,
 void BTM_BlePeriodicSyncTxParameters(RawAddress addr, uint8_t mode,
                                      uint16_t skip, uint16_t timeout,
                                      StartSyncCb syncCb);
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleConfigPrivacy
+ *
+ * Description      This function is called to enable or disable the privacy in
+ *                  the local device.
+ *
+ * Parameters       enable: true to enable it; false to disable it.
+ *
+ * Returns          bool    privacy mode set success; otherwise failed.
+ *
+ ******************************************************************************/
+bool BTM_BleConfigPrivacy(bool enable);
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleLocalPrivacyEnabled
+ *
+ * Description        Checks if local device supports private address
+ *
+ * Returns          Return true if local privacy is enabled else false
+ *
+ ******************************************************************************/
+bool BTM_BleLocalPrivacyEnabled(void);
+
 #endif

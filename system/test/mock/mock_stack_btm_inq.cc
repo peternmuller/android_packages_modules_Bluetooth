@@ -48,7 +48,6 @@ struct BTM_InqDbFirst BTM_InqDbFirst;
 struct BTM_InqDbNext BTM_InqDbNext;
 struct BTM_InqDbRead BTM_InqDbRead;
 struct BTM_IsInquiryActive BTM_IsInquiryActive;
-struct BTM_IsRemoteNameKnown BTM_IsRemoteNameKnown;
 struct BTM_ReadRemoteDeviceName BTM_ReadRemoteDeviceName;
 struct BTM_RemoveEirService BTM_RemoveEirService;
 struct BTM_SetConnectability BTM_SetConnectability;
@@ -60,7 +59,6 @@ struct SendRemoteNameRequest SendRemoteNameRequest;
 struct btm_clear_all_pending_le_entry btm_clear_all_pending_le_entry;
 struct btm_clr_inq_db btm_clr_inq_db;
 struct btm_clr_inq_result_flt btm_clr_inq_result_flt;
-struct btm_initiate_rem_name btm_initiate_rem_name;
 struct btm_inq_clear_ssp btm_inq_clear_ssp;
 struct btm_inq_db_find btm_inq_db_find;
 struct btm_inq_db_free btm_inq_db_free;
@@ -96,14 +94,12 @@ tBTM_INQ_INFO* BTM_InqDbFirst::return_value = nullptr;
 tBTM_INQ_INFO* BTM_InqDbNext::return_value = nullptr;
 tBTM_INQ_INFO* BTM_InqDbRead::return_value = nullptr;
 uint16_t BTM_IsInquiryActive::return_value = 0;
-bool BTM_IsRemoteNameKnown::return_value = false;
 tBTM_STATUS BTM_ReadRemoteDeviceName::return_value = 0;
 tBTM_STATUS BTM_SetConnectability::return_value = 0;
 tBTM_STATUS BTM_SetDiscoverability::return_value = 0;
 tBTM_STATUS BTM_SetInquiryMode::return_value = 0;
 tBTM_STATUS BTM_StartInquiry::return_value = 0;
 tBTM_STATUS BTM_WriteEIR::return_value = 0;
-tBTM_STATUS btm_initiate_rem_name::return_value = 0;
 tINQ_DB_ENT* btm_inq_db_find::return_value = nullptr;
 tINQ_DB_ENT* btm_inq_db_new::return_value = nullptr;
 bool btm_inq_find_bdaddr::return_value = false;
@@ -171,10 +167,7 @@ uint16_t BTM_IsInquiryActive(void) {
   inc_func_call_count(__func__);
   return test::mock::stack_btm_inq::BTM_IsInquiryActive();
 }
-bool BTM_IsRemoteNameKnown(const RawAddress& bd_addr, tBT_TRANSPORT transport) {
-  inc_func_call_count(__func__);
-  return test::mock::stack_btm_inq::BTM_IsRemoteNameKnown(bd_addr, transport);
-}
+
 tBTM_STATUS BTM_ReadRemoteDeviceName(const RawAddress& remote_bda,
                                      tBTM_NAME_CMPL_CB* p_cb,
                                      tBT_TRANSPORT transport) {
@@ -222,13 +215,6 @@ void btm_clr_inq_db(const RawAddress* p_bda) {
 void btm_clr_inq_result_flt(void) {
   inc_func_call_count(__func__);
   test::mock::stack_btm_inq::btm_clr_inq_result_flt();
-}
-tBTM_STATUS btm_initiate_rem_name(const RawAddress& remote_bda, uint8_t origin,
-                                  uint64_t timeout_ms,
-                                  tBTM_NAME_CMPL_CB* p_cb) {
-  inc_func_call_count(__func__);
-  return test::mock::stack_btm_inq::btm_initiate_rem_name(remote_bda, origin,
-                                                          timeout_ms, p_cb);
 }
 void btm_inq_clear_ssp(void) {
   inc_func_call_count(__func__);

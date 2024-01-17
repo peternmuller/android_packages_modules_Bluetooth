@@ -24,7 +24,7 @@
 #define BUILDCFG
 #endif
 
-#include "bt_types.h" /* This must be defined AFTER buildcfg.h */
+#include "stack/include/bt_types.h" /* This must be defined AFTER buildcfg.h */
 
 #ifndef FALSE
 #define FALSE false
@@ -89,10 +89,6 @@
 #define BTA_DM_SDP_DB_SIZE 20000
 #endif
 
-#ifndef HL_INCLUDED
-#define HL_INCLUDED TRUE
-#endif
-
 #ifndef AG_VOICE_SETTINGS
 #define AG_VOICE_SETTINGS HCI_DEFAULT_VOICE_SETTINGS
 #endif
@@ -154,10 +150,6 @@
 #define L2CAP_CMD_BUF_SIZE BT_SMALL_BUFFER_SIZE
 #endif
 
-#ifndef L2CAP_FCR_ERTM_BUF_SIZE
-#define L2CAP_FCR_ERTM_BUF_SIZE (10240 + 24)
-#endif
-
 /* Number of ACL buffers to assign to LE */
 /*
  * TODO: Do we need this?
@@ -170,10 +162,6 @@
 /* Used by BTM when it sends HCI commands to the controller. */
 #ifndef BTM_CMD_BUF_SIZE
 #define BTM_CMD_BUF_SIZE BT_SMALL_BUFFER_SIZE
-#endif
-
-#ifndef OBX_LRG_DATA_BUF_SIZE
-#define OBX_LRG_DATA_BUF_SIZE (8080 + 26)
 #endif
 
 /* BNEP data and protocol messages. */
@@ -210,10 +198,6 @@
 #define AVRC_META_CMD_BUF_SIZE BT_SMALL_BUFFER_SIZE
 #endif
 
-#ifndef BTA_HL_LRG_DATA_BUF_SIZE
-#define BTA_HL_LRG_DATA_BUF_SIZE (10240 + 24)
-#endif
-
 /* GATT Data sending buffer size */
 #ifndef GATT_DATA_BUF_SIZE
 #define GATT_DATA_BUF_SIZE BT_DEFAULT_BUFFER_SIZE
@@ -232,13 +216,6 @@
 
 #ifndef DISABLE_WBS
 #define DISABLE_WBS FALSE
-#endif
-
-/*  This is used to work around a controller bug that doesn't like Disconnect
- *  issued while there is a role switch in progress
-*/
-#ifndef BTM_DISC_DURING_RS
-#define BTM_DISC_DURING_RS TRUE
 #endif
 
 /**************************
@@ -266,7 +243,6 @@
 #ifndef BTM_DEFAULT_CONN_INTERVAL
 #define BTM_DEFAULT_CONN_INTERVAL 0x0400
 #endif
-#define BTM_PAGE_SCAN_INTERVAL_PROPERTY "bluetooth.btm.pagescan_interval"
 
 /* When automatic inquiry scan is enabled, this sets the inquiry scan window. */
 #ifndef BTM_DEFAULT_DISC_WINDOW
@@ -351,28 +327,9 @@
 #define BTM_LOCAL_IO_CAPS BTM_IO_CAP_IO
 #endif
 
-#ifndef BTM_LOCAL_IO_CAPS_BLE
-#define BTM_LOCAL_IO_CAPS_BLE BTM_IO_CAP_KBDISP
-#endif
-
-/* TRUE to include Sniff Subrating */
-#ifndef BTM_SSR_INCLUDED
-#define BTM_SSR_INCLUDED TRUE
-#endif
-
 /*************************
  * End of Lisbon Features
  *************************/
-
-/* 4.1/4.2 secure connections feature */
-#ifndef SC_MODE_INCLUDED
-#define SC_MODE_INCLUDED TRUE
-#endif
-
-/* Used for conformance testing ONLY */
-#ifndef BTM_BLE_CONFORMANCE_TESTING
-#define BTM_BLE_CONFORMANCE_TESTING FALSE
-#endif
 
 /******************************************************************************
  *
@@ -418,34 +375,9 @@
 #define L2CAP_MTU_SIZE 1691
 #endif
 
-/*
- * The L2CAP MPS over Bluetooth; must be in accord with the FCR tx buffer size
- * and ACL down buffer size.
- */
-#ifndef L2CAP_MPS_OVER_BR_EDR
-#define L2CAP_MPS_OVER_BR_EDR 1010
-#endif
-
-/* If host flow control enabled, this is the number of buffers the controller
- * can have unacknowledged. */
-#ifndef L2CAP_HOST_FC_ACL_BUFS
-#define L2CAP_HOST_FC_ACL_BUFS 20
-#endif
-
-/* This is set to enable L2CAP to  take the ACL link out of park mode when ACL
- * data is to be sent. */
-#ifndef L2CAP_WAKE_PARKED_LINK
-#define L2CAP_WAKE_PARKED_LINK TRUE
-#endif
-
 /* Minimum number of ACL credit for high priority link */
 #ifndef L2CAP_HIGH_PRI_MIN_XMIT_QUOTA
 #define L2CAP_HIGH_PRI_MIN_XMIT_QUOTA 5
-#endif
-
-/* used for monitoring HCI ACL credit management */
-#ifndef L2CAP_HCI_FLOW_CONTROL_DEBUG
-#define L2CAP_HCI_FLOW_CONTROL_DEBUG TRUE
 #endif
 
 /* Used for features using fixed channels; set to zero if no fixed channels
@@ -463,11 +395,6 @@
 #ifndef L2CAP_LAST_FIXED_CHNL
 #define L2CAP_LAST_FIXED_CHNL \
   (L2CAP_FIRST_FIXED_CHNL + L2CAP_NUM_FIXED_CHNLS - 1)
-#endif
-
-/* Round Robin service channels in link */
-#ifndef L2CAP_ROUND_ROBIN_CHANNEL_SERVICE
-#define L2CAP_ROUND_ROBIN_CHANNEL_SERVICE TRUE
 #endif
 
 /* Used for conformance testing ONLY:  When TRUE lets scriptwrapper overwrite
@@ -553,10 +480,6 @@
  * SMP
  *
  *****************************************************************************/
-#ifndef SMP_DEBUG
-#define SMP_DEBUG FALSE
-#endif
-
 #ifndef SMP_DEFAULT_AUTH_REQ
 #define SMP_DEFAULT_AUTH_REQ SMP_AUTH_NB_ENC_ONLY
 #endif
@@ -635,11 +558,6 @@
 /* The MTU size for the L2CAP configuration. */
 #ifndef SDP_MTU_SIZE
 #define SDP_MTU_SIZE 1024
-#endif
-
-/* The name for security authorization. */
-#ifndef SDP_SERVICE_NAME
-#define SDP_SERVICE_NAME "Service Discovery"
 #endif
 
 /******************************************************************************
@@ -723,11 +641,6 @@
 #define BNEP_INCLUDED TRUE
 #endif
 
-/* BNEP status API call is used mainly to get the L2CAP handle */
-#ifndef BNEP_SUPPORTS_STATUS_API
-#define BNEP_SUPPORTS_STATUS_API TRUE
-#endif
-
 /* Maximum number of protocol filters supported. */
 #ifndef BNEP_MAX_PROT_FILTERS
 #define BNEP_MAX_PROT_FILTERS 5
@@ -794,10 +707,6 @@
 #define PAN_INCLUDED TRUE
 #endif
 
-#ifndef PANU_DISABLED
-#define PANU_DISABLED FALSE
-#endif
-
 /* This will enable the PANU role */
 #ifndef PAN_SUPPORTS_ROLE_PANU
 #define PAN_SUPPORTS_ROLE_PANU TRUE
@@ -844,23 +753,9 @@
  *
  *****************************************************************************/
 
-#ifndef GAP_INCLUDED
-#define GAP_INCLUDED TRUE
-#endif
-
 /* The maximum number of simultaneous GAP L2CAP connections. */
 #ifndef GAP_MAX_CONNECTIONS
 #define GAP_MAX_CONNECTIONS 30
-#endif
-
-/* keep the raw data received from SDP server in database. */
-#ifndef SDP_RAW_DATA_INCLUDED
-#define SDP_RAW_DATA_INCLUDED TRUE
-#endif
-
-/* Inquiry duration in 1.28 second units. */
-#ifndef SDP_DEBUG
-#define SDP_DEBUG TRUE
 #endif
 
 /******************************************************************************
@@ -965,33 +860,12 @@
 #define BTA_EIR_SERVER_NUM_CUSTOM_UUID 8
 #endif
 
-/* CHLD override */
-#ifndef BTA_AG_CHLD_VAL_ECC
-#define BTA_AG_CHLD_VAL_ECC "(0,1,1x,2,2x,3)"
-#endif
-
-#ifndef BTA_AG_CHLD_VAL
-#define BTA_AG_CHLD_VAL "(0,1,2,3)"
-#endif
-
-/* Set the CIND to match HFP 1.5 */
-#ifndef BTA_AG_CIND_INFO
-#define BTA_AG_CIND_INFO                                                       \
-  "(\"call\",(0,1)),(\"callsetup\",(0-3)),(\"service\",(0-1)),(\"signal\",(0-" \
-  "5)),(\"roam\",(0,1)),(\"battchg\",(0-5)),(\"callheld\",(0-2))"
-#endif
-
 /******************************************************************************
  *
  * Tracing:  Include trace header file here.
  *
  *****************************************************************************/
 
-/* Enable/disable BTSnoop memory logging */
-#ifndef BTSNOOP_MEM
-#define BTSNOOP_MEM TRUE
-#endif
-
-#include "bt_trace.h"
+#include "internal_include/bt_trace.h"
 
 #endif /* BT_TARGET_H */

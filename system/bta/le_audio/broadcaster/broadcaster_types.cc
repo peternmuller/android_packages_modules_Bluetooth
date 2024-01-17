@@ -21,11 +21,11 @@
 
 #include <vector>
 
-#include "bt_types.h"
 #include "bta_le_audio_broadcaster_api.h"
 #include "btm_ble_api_types.h"
 #include "internal_include/stack_config.h"
 #include "osi/include/properties.h"
+#include "stack/include/bt_types.h"
 
 using bluetooth::le_audio::BasicAudioAnnouncementBisConfig;
 using bluetooth::le_audio::BasicAudioAnnouncementCodecConfig;
@@ -44,7 +44,7 @@ static void EmitHeader(const BasicAudioAnnouncementData& announcement_data,
   // Set the cursor behind the old data
   uint8_t* p_value = data.data() + old_size;
 
-  UINT24_TO_STREAM(p_value, announcement_data.presentation_delay);
+  UINT24_TO_STREAM(p_value, announcement_data.presentation_delay_us);
 }
 
 static void EmitCodecConfiguration(
@@ -238,8 +238,6 @@ static const BroadcastCodecWrapper lc3_mono_16_2 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate16000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval10000Us},
-    // Bitrate
-    32000,
     // Frame len.
     40);
 
@@ -250,8 +248,6 @@ static const BroadcastCodecWrapper lc3_stereo_16_2 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate16000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval10000Us},
-    // Bitrate
-    32000,
     // Frame len.
     40);
 
@@ -262,8 +258,6 @@ static const BroadcastCodecWrapper lc3_stereo_24_2 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate24000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval10000Us},
-    // Bitrate
-    48000,
     // Frame len.
     60);
 
@@ -274,8 +268,6 @@ static const BroadcastCodecWrapper lc3_stereo_48_1 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate48000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval7500Us},
-    // Bitrate
-    80000,
     // Frame len.
     75);
 
@@ -286,8 +278,6 @@ static const BroadcastCodecWrapper lc3_stereo_48_2 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate48000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval10000Us},
-    // Bitrate
-    80000,
     // Frame len.
     100);
 
@@ -298,8 +288,6 @@ static const BroadcastCodecWrapper lc3_stereo_48_3 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate48000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval7500Us},
-    // Bitrate
-    96000,
     // Frame len.
     90);
 
@@ -310,8 +298,6 @@ static const BroadcastCodecWrapper lc3_stereo_48_4 = BroadcastCodecWrapper(
      .sample_rate = LeAudioCodecConfiguration::kSampleRate48000,
      .bits_per_sample = LeAudioCodecConfiguration::kBitsPerSample16,
      .data_interval_us = LeAudioCodecConfiguration::kInterval10000Us},
-    // Bitrate
-    96000,
     // Frame len.
     120);
 
@@ -376,7 +362,7 @@ types::LeAudioLtvMap BroadcastCodecWrapper::GetSubgroupCodecSpecData() const {
 
   if (codec_id.coding_format == kLeAudioCodecIdLc3.coding_format) {
     codec_spec_ltvs[codec_spec_conf::kLeAudioLtvTypeOctetsPerCodecFrame] =
-        UINT16_TO_VEC_UINT8(codec_frame_len);
+        UINT16_TO_VEC_UINT8(octets_per_codec_frame);
   }
 
   if (source_codec_config.num_channels == 1) {
@@ -400,7 +386,6 @@ std::ostream& operator<<(
      << ", SampleRate=" << +config.GetSampleRate()
      << ", BitsPerSample=" << +config.GetBitsPerSample()
      << ", DataIntervalUs=" << +config.GetDataIntervalUs() << "}";
-  os << ", Bitrate=" << +config.GetBitrate();
   os << "]";
   return os;
 }
@@ -502,7 +487,7 @@ static bool isMetadataSame(std::map<uint8_t, std::vector<uint8_t>> m1,
 
 bool operator==(const BasicAudioAnnouncementData& lhs,
                 const BasicAudioAnnouncementData& rhs) {
-  if (lhs.presentation_delay != rhs.presentation_delay) return false;
+  if (lhs.presentation_delay_us != rhs.presentation_delay_us) return false;
 
   if (lhs.subgroup_configs.size() != rhs.subgroup_configs.size()) return false;
 

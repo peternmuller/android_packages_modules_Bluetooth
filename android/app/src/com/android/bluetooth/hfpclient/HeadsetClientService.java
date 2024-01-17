@@ -87,12 +87,8 @@ public class HeadsetClientService extends ProfileService {
 
     public static final String HFP_CLIENT_STOP_TAG = "hfp_client_stop_tag";
 
-    HeadsetClientService() {}
-
-    @VisibleForTesting
-    HeadsetClientService(Context ctx) {
-        attachBaseContext(ctx);
-        onCreate();
+    public HeadsetClientService(Context ctx) {
+        super(ctx);
     }
 
     public static boolean isEnabled() {

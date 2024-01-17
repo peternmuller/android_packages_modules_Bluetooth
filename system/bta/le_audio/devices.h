@@ -31,7 +31,6 @@
 #endif
 
 #include "audio_hal_client/audio_hal_client.h"
-#include "bt_types.h"
 #include "bta_groups.h"
 #include "btm_iso_api_types.h"
 #include "gatt_api.h"
@@ -101,6 +100,7 @@ class LeAudioDevice {
   bool encrypted_;
   int group_id_;
   bool csis_member_;
+  int cis_failed_to_be_established_retry_cnt_;
   std::bitset<16> tmap_role_;
 
   uint8_t audio_directions_;
@@ -136,10 +136,12 @@ class LeAudioDevice {
         encrypted_(false),
         group_id_(group_id),
         csis_member_(false),
+        cis_failed_to_be_established_retry_cnt_(0),
         audio_directions_(0),
         model_name_(""),
         allowlist_flag_(false),
-        link_quality_timer(nullptr) {}
+        link_quality_timer(nullptr),
+        dsa_modes_({DsaMode::DISABLED}) {}
   ~LeAudioDevice(void);
 
   void SetConnectionState(DeviceConnectState state);
@@ -168,17 +170,21 @@ class LeAudioDevice {
   types::BidirectionalPair<struct types::ase*> GetAsesByCisId(uint8_t cis_id);
   bool HaveActiveAse(void);
   bool HaveAllActiveAsesSameState(types::AseState state);
+  bool HaveAllActiveAsesSameDataPathState(types::DataPathState state) const;
   bool HaveAnyUnconfiguredAses(void);
   bool IsReadyToCreateStream(void);
+  bool IsReadyToStream(void) const {
+    return HaveAllActiveAsesCisEst() &&
+           HaveAllActiveAsesSameDataPathState(types::DataPathState::CONFIGURED);
+  }
+  uint8_t GetSupportedAudioChannelCounts(uint8_t direction) const;
   bool IsReadyToSuspendStream(void);
-  bool HaveAllActiveAsesCisEst(void);
+  bool HaveAllActiveAsesCisEst(void) const;
   bool HaveAnyCisConnected(void);
-  bool HasCisId(uint8_t id);
-  uint8_t GetMatchingBidirectionCisId(const struct types::ase* base_ase);
   const struct types::acs_ac_record* GetCodecConfigurationSupportedPac(
-      uint8_t direction, const set_configurations::CodecCapabilitySetting&
-                             codec_capability_setting);
-  uint8_t GetLc3SupportedChannelCount(uint8_t direction);
+    types::LeAudioContextType context_type, uint8_t direction,
+	const set_configurations::CodecConfigSetting& codec_capability_setting,
+	std::optional<set_configurations::CodecMetadataSetting> metadata);
   uint8_t GetPhyBitmask(void);
   bool ConfigureAses(
       const le_audio::set_configurations::SetConfiguration& ent,
@@ -238,16 +244,19 @@ class LeAudioDevice {
   void DisconnectAcl(void);
   std::vector<uint8_t> GetMetadata(types::AudioContexts context_type,
                                    const std::vector<uint8_t>& ccid_list);
+  std::vector<uint8_t> GetVsMetadata();
   bool IsMetadataChanged(
       const types::BidirectionalPair<types::AudioContexts>& context_types,
       const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists);
 
   void GetDeviceModelName(void);
   void UpdateDeviceAllowlistFlag(void);
+  DsaModes GetDsaModes(void);
 
  private:
   types::BidirectionalPair<types::AudioContexts> avail_contexts_;
   types::BidirectionalPair<types::AudioContexts> supp_contexts_;
+  DsaModes dsa_modes_;
   static constexpr char kLeAudioDeviceAllowListProp[] =
       "persist.bluetooth.leaudio.allow_list";
 

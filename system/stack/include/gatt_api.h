@@ -24,9 +24,14 @@
 #include <list>
 #include <string>
 
-#include "bt_target.h"
 #include "btm_ble_api.h"
 #include "gattdefs.h"
+#include "hardware/bt_gatt_types.h"
+#include "include/hardware/bt_common_types.h"
+#include "internal_include/bt_target.h"
+#include "macros.h"
+#include "stack/include/btm_ble_api_types.h"
+#include "stack/include/hci_error_code.h"
 #include "types/bluetooth/uuid.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -87,12 +92,6 @@ typedef enum GattStatus : uint8_t {
   GATT_OUT_OF_RANGE = 0xFF,
 } tGATT_STATUS;
 
-#ifndef CASE_RETURN_TEXT
-#define CASE_RETURN_TEXT(code) \
-  case code:                   \
-    return #code
-#endif
-
 inline std::string gatt_status_text(const tGATT_STATUS& status) {
   switch (status) {
     CASE_RETURN_TEXT(GATT_SUCCESS);  // Also GATT_ENCRYPED_MITM
@@ -142,8 +141,6 @@ inline std::string gatt_status_text(const tGATT_STATUS& status) {
       return base::StringPrintf("UNKNOWN[%hhu]", status);
   }
 }
-
-#undef CASE_RETURN_TEXT
 
 typedef enum : uint8_t {
   GATT_RSP_ERROR = 0x01,
@@ -286,10 +283,6 @@ typedef enum : uint16_t {
 
 } tGATT_DISCONN_REASON;
 
-#define CASE_RETURN_TEXT(code) \
-  case code:                   \
-    return #code
-
 inline std::string gatt_disconnection_reason_text(
     const tGATT_DISCONN_REASON& reason) {
   switch (reason) {
@@ -306,18 +299,11 @@ inline std::string gatt_disconnection_reason_text(
       return base::StringPrintf("UNKNOWN[%hu]", reason);
   }
 }
-#undef CASE_RETURN_TEXT
 
 /* MAX GATT MTU size
 */
 #ifndef GATT_MAX_MTU_SIZE
 #define GATT_MAX_MTU_SIZE 517
-#endif
-
-/* max legth of an attribute value
-*/
-#ifndef GATT_MAX_ATTR_LEN
-#define GATT_MAX_ATTR_LEN 512
 #endif
 
 /* default GATT MTU size over LE link

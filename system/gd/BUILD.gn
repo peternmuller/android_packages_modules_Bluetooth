@@ -56,6 +56,7 @@ static_library("libbluetooth_gd") {
   sources = [
     "module.cc",
     "module_dumper.cc",
+    "module_dumper_flatbuffer.cc",
     "stack_manager.cc",
   ]
 
@@ -67,7 +68,6 @@ static_library("libbluetooth_gd") {
     "//bt/system/gd/rust/shim:libbluetooth_rust_interop",
     "//bt/system/gd/att:BluetoothAttSources",
     "//bt/system/gd/common:BluetoothCommonSources",
-    "//bt/system/gd/crypto_toolbox:BluetoothCryptoToolboxSources",
     "//bt/system/gd/dumpsys:BluetoothDumpsysSources",
     "//bt/system/gd/hal:BluetoothHalSources",
     "//bt/system/gd/hal:BluetoothHalSources_hci_host",

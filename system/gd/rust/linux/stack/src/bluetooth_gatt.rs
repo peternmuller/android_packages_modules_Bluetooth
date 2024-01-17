@@ -18,7 +18,7 @@ use bt_utils::adv_parser;
 use bt_utils::array_utils;
 
 use crate::async_helper::{AsyncHelper, CallbackSender};
-use crate::bluetooth::{Bluetooth, IBluetooth};
+use crate::bluetooth::{Bluetooth, BluetoothDevice, IBluetooth};
 use crate::bluetooth_adv::{
     AdvertiseData, AdvertiserId, Advertisers, AdvertisingSetInfo, AdvertisingSetParameters,
     IAdvertisingSetCallback, PeriodicAdvertisingParameters, INVALID_REG_ID,
@@ -184,6 +184,14 @@ impl ContextMap {
         }
     }
 
+    fn get_client_ids_from_address(&self, address: &String) -> Vec<i32> {
+        self.connections
+            .iter()
+            .filter(|conn| conn.address == *address)
+            .map(|conn| conn.client_id)
+            .collect()
+    }
+
     fn get_callback_from_callback_id(
         &mut self,
         callback_id: u32,
@@ -326,6 +334,14 @@ impl ServerContextMap {
             .iter()
             .find(|conn| conn.server_id == server_id && conn.address == *address)
             .map(|conn| conn.conn_id);
+    }
+
+    fn get_server_ids_from_address(&self, address: &String) -> Vec<i32> {
+        self.connections
+            .iter()
+            .filter(|conn| conn.address == *address)
+            .map(|conn| conn.server_id)
+            .collect()
     }
 
     fn get_address_from_conn_id(&self, conn_id: i32) -> Option<String> {
@@ -585,6 +601,8 @@ pub trait IBluetoothGatt {
     fn configure_mtu(&self, client_id: i32, addr: String, mtu: i32);
 
     /// Requests a connection parameter update.
+    /// This causes |on_connection_updated| to be called if there is already an existing
+    /// connection to |addr|; Otherwise the method won't generate any callbacks.
     fn connection_parameter_update(
         &self,
         client_id: i32,
@@ -1354,6 +1372,12 @@ impl GattAsyncIntf {
     }
 }
 
+pub enum GattActions {
+    /// This disconnects all server and client connections to the device.
+    /// Params: remote_device
+    Disconnect(BluetoothDevice),
+}
+
 /// Implementation of the GATT API (IBluetoothGatt).
 pub struct BluetoothGatt {
     intf: Arc<Mutex<BluetoothInterface>>,
@@ -1381,6 +1405,7 @@ pub struct BluetoothGatt {
     small_rng: SmallRng,
 
     gatt_async: Arc<tokio::sync::Mutex<GattAsyncIntf>>,
+    enabled: bool,
 }
 
 impl BluetoothGatt {
@@ -1414,6 +1439,7 @@ impl BluetoothGatt {
                 async_helper_msft_adv_monitor_remove,
                 async_helper_msft_adv_monitor_enable,
             })),
+            enabled: false,
         }
     }
 
@@ -1506,6 +1532,10 @@ impl BluetoothGatt {
             time::sleep(time::Duration::from_millis(500)).await;
             let _ = api_tx_clone.send(APIMessage::IsReady(BluetoothAPI::Gatt)).await;
         });
+    }
+
+    pub fn enable(&mut self, enabled: bool) {
+        self.enabled = enabled;
     }
 
     /// Remove a scanner callback and unregisters all scanners associated with that callback.
@@ -1619,6 +1649,10 @@ impl BluetoothGatt {
     /// The resume_scan method is used to resume scanning after system suspension.
     /// It assumes that scanner.filter has already had the filter data.
     fn resume_scan(&mut self, scanner_id: u8) -> BtStatus {
+        if !self.enabled {
+            return BtStatus::Fail;
+        }
+
         let scan_suspend_mode = self.get_scan_suspend_mode();
         if scan_suspend_mode != SuspendMode::Normal && scan_suspend_mode != SuspendMode::Resuming {
             return BtStatus::Busy;
@@ -1810,6 +1844,51 @@ impl BluetoothGatt {
     pub(crate) fn stop_active_scan(&mut self, scanner_id: u8) -> BtStatus {
         self.stop_scan(scanner_id)
     }
+
+    pub fn handle_action(&mut self, action: GattActions) {
+        match action {
+            GattActions::Disconnect(device) => {
+                let address = match RawAddress::from_string(&device.address) {
+                    None => {
+                        warn!(
+                            "GattActions::Disconnect failed: Invalid device address={}",
+                            device.address
+                        );
+                        return;
+                    }
+                    Some(addr) => addr,
+                };
+                for client_id in self.context_map.get_client_ids_from_address(&device.address) {
+                    if let Some(conn_id) =
+                        self.context_map.get_conn_id_from_address(client_id, &device.address)
+                    {
+                        self.gatt
+                            .as_ref()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .client
+                            .disconnect(client_id, &address, conn_id);
+                    }
+                }
+                for server_id in
+                    self.server_context_map.get_server_ids_from_address(&device.address)
+                {
+                    if let Some(conn_id) =
+                        self.server_context_map.get_conn_id_from_address(server_id, &device.address)
+                    {
+                        self.gatt
+                            .as_ref()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .server
+                            .disconnect(server_id, &address, conn_id);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, FromPrimitive, ToPrimitive)]
@@ -1937,6 +2016,10 @@ impl IBluetoothGatt for BluetoothGatt {
         settings: Option<ScanSettings>,
         filter: Option<ScanFilter>,
     ) -> BtStatus {
+        if !self.enabled {
+            return BtStatus::Fail;
+        }
+
         let scan_suspend_mode = self.get_scan_suspend_mode();
         if scan_suspend_mode != SuspendMode::Normal && scan_suspend_mode != SuspendMode::Resuming {
             return BtStatus::Busy;
@@ -1969,6 +2052,10 @@ impl IBluetoothGatt for BluetoothGatt {
     }
 
     fn stop_scan(&mut self, scanner_id: u8) -> BtStatus {
+        if !self.enabled {
+            return BtStatus::Fail;
+        }
+
         let scan_suspend_mode = self.get_scan_suspend_mode();
         if scan_suspend_mode != SuspendMode::Normal && scan_suspend_mode != SuspendMode::Suspending
         {
@@ -2048,7 +2135,7 @@ impl IBluetoothGatt for BluetoothGatt {
 
     fn start_advertising_set(
         &mut self,
-        parameters: AdvertisingSetParameters,
+        mut parameters: AdvertisingSetParameters,
         advertise_data: AdvertiseData,
         scan_response: Option<AdvertiseData>,
         periodic_parameters: Option<PeriodicAdvertisingParameters>,
@@ -2062,9 +2149,19 @@ impl IBluetoothGatt for BluetoothGatt {
         }
 
         let device_name = self.get_adapter_name();
-        let is_legacy = parameters.is_legacy;
-        let params = parameters.into();
         let adv_bytes = advertise_data.make_with(&device_name);
+        let is_le_extended_advertising_supported = match &self.adapter {
+            Some(adapter) => adapter.lock().unwrap().is_le_extended_advertising_supported(),
+            _ => false,
+        };
+        // TODO(b/311417973): Remove this once we have more robust /device/bluetooth APIs to control extended advertising
+        let is_legacy = parameters.is_legacy
+            && !AdvertiseData::can_upgrade(
+                &mut parameters,
+                &adv_bytes,
+                is_le_extended_advertising_supported,
+            );
+        let params = parameters.into();
         if !AdvertiseData::validate_raw_data(is_legacy, &adv_bytes) {
             log::warn!("Failed to start advertising set with invalid advertise data");
             return INVALID_REG_ID;
@@ -2790,7 +2887,7 @@ impl IBluetoothGatt for BluetoothGatt {
             let handle = self.server_context_map.get_request_handle_from_id(request_id)?;
             let len = value.len() as u16;
 
-            let data: [u8; 600] = array_utils::to_sized_array(&value);
+            let data: [u8; 512] = array_utils::to_sized_array(&value);
 
             self.gatt.as_ref().unwrap().lock().unwrap().server.send_response(
                 conn_id,

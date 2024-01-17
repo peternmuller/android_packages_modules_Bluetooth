@@ -26,10 +26,10 @@ import static org.mockito.Mockito.*;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothSinkAudioPolicy;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadset;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothSinkAudioPolicy;
 import android.bluetooth.BluetoothUuid;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -37,6 +37,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.Looper;
 import android.os.ParcelUuid;
 import android.os.PowerManager;
 import android.os.RemoteException;
@@ -46,7 +47,6 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.espresso.intent.matcher.IntentMatchers;
 import androidx.test.filters.MediumTest;
-import androidx.test.rule.ServiceTestRule;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.bluetooth.TestUtils;
@@ -60,14 +60,13 @@ import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
-import org.mockito.InOrder;
 
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -93,7 +92,6 @@ public class HeadsetServiceAndStateMachineTest {
     private static final String TEST_PHONE_NUMBER = "1234567890";
     private static final String TEST_CALLER_ID = "Test Name";
 
-    @Rule public final ServiceTestRule mServiceRule = new ServiceTestRule();
 
     private Context mTargetContext;
     private HeadsetService mHeadsetService;
@@ -173,7 +171,6 @@ public class HeadsetServiceAndStateMachineTest {
         doReturn(new ParcelUuid[]{BluetoothUuid.HFP}).when(mAdapterService)
                 .getRemoteUuids(any(BluetoothDevice.class));
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
-        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         // We cannot mock HeadsetObjectsFactory.getInstance() with Mockito.
         // Hence we need to use reflection to call a private method to
         // initialize properly the HeadsetObjectsFactory.sInstance field.
@@ -222,9 +219,9 @@ public class HeadsetServiceAndStateMachineTest {
         // Modify start VR timeout to a smaller value for testing
         mOriginalVrTimeoutMs = HeadsetService.sStartVrTimeoutMs;
         HeadsetService.sStartVrTimeoutMs = START_VR_TIMEOUT_MILLIS;
-        TestUtils.startService(mServiceRule, HeadsetService.class);
+        mHeadsetService = new HeadsetService(mTargetContext);
+        mHeadsetService.doStart();
         mIsHeadsetServiceStarted = true;
-        mHeadsetService = HeadsetService.getHeadsetService();
         Assert.assertNotNull(mHeadsetService);
         verify(mObjectsFactory).makeSystemInterface(mHeadsetService);
         verify(mObjectsFactory).getNativeInterface();
@@ -250,7 +247,7 @@ public class HeadsetServiceAndStateMachineTest {
 
         if (mIsHeadsetServiceStarted) {
             mTargetContext.unregisterReceiver(mHeadsetIntentReceiver);
-            TestUtils.stopService(mServiceRule, HeadsetService.class);
+            mHeadsetService.doStop();
             mHeadsetService = HeadsetService.getHeadsetService();
             Assert.assertNull(mHeadsetService);
             // Clear classes that is spied on and has static life time
@@ -356,10 +353,9 @@ public class HeadsetServiceAndStateMachineTest {
                 BluetoothProfile.STATE_DISCONNECTED, BluetoothProfile.STATE_CONNECTING);
         // Send unbond intent
         doReturn(BluetoothDevice.BOND_NONE).when(mAdapterService).getBondState(eq(device));
-        Intent unbondIntent = new Intent(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        unbondIntent.putExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
-        unbondIntent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-        InstrumentationRegistry.getTargetContext().sendBroadcast(unbondIntent);
+        mHeadsetService.handleBondStateChanged(
+                device, BluetoothDevice.BOND_BONDED, BluetoothDevice.BOND_NONE);
+        TestUtils.waitForLooperToFinishScheduledTask(Looper.getMainLooper());
         // Check that the state machine is actually destroyed
         ArgumentCaptor<HeadsetStateMachine> stateMachineArgument =
                 ArgumentCaptor.forClass(HeadsetStateMachine.class);

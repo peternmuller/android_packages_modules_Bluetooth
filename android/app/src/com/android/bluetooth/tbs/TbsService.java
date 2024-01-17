@@ -17,18 +17,19 @@
 
 package com.android.bluetooth.tbs;
 
+import static com.android.bluetooth.Utils.enforceBluetoothPrivilegedPermission;
+
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothLeCall;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.IBluetoothLeCallControl;
 import android.bluetooth.IBluetoothLeCallControlCallback;
 import android.content.AttributionSource;
+import android.content.Context;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.sysprop.BluetoothProperties;
 import android.util.Log;
-
-import static com.android.bluetooth.Utils.enforceBluetoothPrivilegedPermission;
 
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.ProfileService;
@@ -50,6 +51,10 @@ public class TbsService extends ProfileService {
 
     private final TbsGeneric mTbsGeneric = new TbsGeneric();
 
+    public TbsService(Context ctx) {
+        super(ctx);
+    }
+
     public static boolean isEnabled() {
         return BluetoothProperties.isProfileCcpServerEnabled().orElse(false);
     }
@@ -57,13 +62,6 @@ public class TbsService extends ProfileService {
     @Override
     protected IProfileServiceBinder initBinder() {
         return new TbsServerBinder(this);
-    }
-
-    @Override
-    protected void create() {
-        if (DBG) {
-            Log.d(TAG, "create()");
-        }
     }
 
     @Override

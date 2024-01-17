@@ -21,23 +21,20 @@
  *  This module contains action functions of the link control state machine.
  *
  ******************************************************************************/
-#ifdef __ANDROID__
-#include <a2dp.sysprop.h>
-#endif
+#include <android_bluetooth_sysprop.h>
 #include <string.h>
 
 #include "avct_api.h"
 #include "avct_int.h"
-#include "bt_target.h"
-#include "bta/include/bta_api.h"
 #include "bta/include/bta_sec_api.h"
-#include "btm_api.h"
 #include "device/include/device_iot_config.h"
+#include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
-#include "stack/btm/btm_sec.h"
+#include "stack/avct/avct_defs.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/bt_types.h"
 
 /* packet header length lookup table */
 const uint8_t avct_lcb_pkt_type_len[] = {AVCT_HDR_LEN_SINGLE,
@@ -227,8 +224,7 @@ void avct_lcb_open_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
   int i;
   bool bind = false;
 
-#ifdef __ANDROID__
-  if (android::sysprop::bluetooth::A2dp::src_sink_coexist().value_or(false)) {
+  if (GET_SYSPROP(A2dp, src_sink_coexist, false)) {
     bool is_originater = false;
 
     for (i = 0; i < AVCT_NUM_CONN; i++, p_ccb++) {
@@ -276,9 +272,7 @@ void avct_lcb_open_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
         }
       }
     }
-  } else
-#endif
-  {
+  } else {
     for (i = 0; i < AVCT_NUM_CONN; i++, p_ccb++) {
       /* if ccb allocated and */
       if (p_ccb->allocated) {
@@ -682,15 +676,12 @@ void avct_lcb_msg_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
     return;
   }
 
-#ifdef __ANDROID__
   bool bind = false;
-  if (android::sysprop::bluetooth::A2dp::src_sink_coexist().value_or(false)) {
+  if (GET_SYSPROP(A2dp, src_sink_coexist, false)) {
     bind = avct_msg_ind_for_src_sink_coexist(p_lcb, p_data, label, cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     if (bind) return;
-  } else
-#endif
-  {
+  } else {
     /* lookup PID */
     p_ccb = avct_lcb_has_pid(p_lcb, pid);
     if (p_ccb) {

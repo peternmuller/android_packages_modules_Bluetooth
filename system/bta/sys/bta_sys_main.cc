@@ -29,15 +29,14 @@
 
 #include <cstring>
 
-#include "bt_target.h"  // Must be first to define build configuration
 #include "bta/sys/bta_sys.h"
 #include "bta/sys/bta_sys_int.h"
 #include "include/hardware/bluetooth.h"
+#include "internal_include/bt_target.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
 #include "osi/include/log.h"
 #include "stack/include/bt_hdr.h"
-#include "stack/include/bt_types.h"
 #include "stack/include/main_thread.h"
 
 void BTIF_dm_on_hw_error();

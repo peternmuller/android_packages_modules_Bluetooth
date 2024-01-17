@@ -37,7 +37,6 @@
 #include <string>
 #include <utility>
 
-#include "bt_types.h"
 #include "btcore/include/module.h"
 #include "btif/include/btif_storage.h"
 #include "check.h"
@@ -393,6 +392,8 @@ static const char* interop_feature_string_(const interop_feature_t feature) {
     CASE_RETURN_STR(INTEROP_HFP_1_7_ALLOWLIST);
     CASE_RETURN_STR(INTEROP_HFP_1_9_ALLOWLIST);
     CASE_RETURN_STR(INTEROP_IGNORE_DISC_BEFORE_SIGNALLING_TIMEOUT);
+    CASE_RETURN_STR(INTEROP_SUSPEND_ATT_TRAFFIC_DURING_PAIRING);
+    CASE_RETURN_STR(INTEROP_INSERT_CALL_WHEN_SCO_START);
   }
   return UNKNOWN_INTEROP_FEATURE;
 }

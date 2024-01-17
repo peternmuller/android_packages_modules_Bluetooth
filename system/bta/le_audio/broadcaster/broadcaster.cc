@@ -21,7 +21,6 @@
 
 #include <mutex>
 
-#include "bta/include/bta_le_audio_api.h"
 #include "bta/include/bta_le_audio_broadcaster_api.h"
 #include "bta/le_audio/broadcaster/state_machine.h"
 #include "bta/le_audio/codec_interface.h"
@@ -29,11 +28,12 @@
 #include "bta/le_audio/le_audio_types.h"
 #include "bta/le_audio/le_audio_utils.h"
 #include "bta/le_audio/metrics_collector.h"
+#include "common/strings.h"
 #include "device/include/controller.h"
-#include "gd/common/strings.h"
 #include "internal_include/stack_config.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/properties.h"
+#include "stack/include/bt_types.h"
 #include "stack/include/btm_api_types.h"
 #include "stack/include/btm_iso_api.h"
 
@@ -48,6 +48,7 @@ using bluetooth::le_audio::BroadcastId;
 using bluetooth::le_audio::PublicBroadcastAnnouncementData;
 using le_audio::CodecManager;
 using le_audio::ContentControlIdKeeper;
+using le_audio::DsaMode;
 using le_audio::LeAudioCodecConfiguration;
 using le_audio::LeAudioSourceAudioHalClient;
 using le_audio::broadcaster::BigConfig;
@@ -156,7 +157,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     BasicAudioAnnouncementData announcement;
 
     /* Prepare the announcement */
-    announcement.presentation_delay = 0x004E20; /* TODO: Use the proper value */
+    announcement.presentation_delay_us = 40000; /* us */
 
     auto const& codec_id = codec_config.GetLeAudioCodecId();
 
@@ -491,7 +492,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
            .sample_rate = offload_config->sampling_rate,
            .bits_per_sample = offload_config->bits_per_sample,
            .data_interval_us = offload_config->frame_duration},
-          offload_config->codec_bitrate, offload_config->octets_per_frame);
+          offload_config->octets_per_frame);
       BroadcastQosConfig qos_config(offload_config->retransmission_number,
                                     offload_config->max_transport_latency);
 
@@ -1040,7 +1041,8 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       for (uint8_t chan = 0; chan < num_channels; ++chan) {
         auto initial_channel_offset = chan * bytes_per_sample;
         sw_enc_[chan]->Encode(data.data() + initial_channel_offset,
-                              num_channels, codec_wrapper_.GetFrameLen());
+                              num_channels,
+                              codec_wrapper_.GetOctetsPerCodecFrame());
       }
 
       /* Currently there is no way to broadcast multiple distinct streams.
@@ -1079,8 +1081,8 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       instance->le_audio_source_hal_client_->ConfirmStreamingRequest();
     }
 
-    virtual void OnAudioMetadataUpdate(
-        source_metadata_v7 source_metadata) override {
+    virtual void OnAudioMetadataUpdate(source_metadata_v7 source_metadata,
+                                       DsaMode dsa_mode) override {
       LOG_INFO();
       if (!instance) return;
 

@@ -41,8 +41,6 @@ import static org.mockito.quality.Strictness.STRICT_STUBS;
 import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
 import android.bluetooth.IBluetoothManagerCallback;
-import android.bluetooth.IBluetoothProfileServiceConnection;
-import android.bluetooth.IBluetoothStateChangeCallback;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.AttributionSource;
 import android.content.Context;
@@ -142,23 +140,7 @@ public class BluetoothServiceBinderTest {
     }
 
     @Test
-    public void registerStateChangeCallback() {
-        assertThrows(NullPointerException.class, () -> mBinder.registerStateChangeCallback(null));
-        mBinder.registerStateChangeCallback(mock(IBluetoothStateChangeCallback.class));
-        verify(mManagerService).registerStateChangeCallback(any());
-        verifyMock();
-    }
-
-    @Test
-    public void unregisterStateChangeCallback() {
-        assertThrows(NullPointerException.class, () -> mBinder.unregisterStateChangeCallback(null));
-        mBinder.unregisterStateChangeCallback(mock(IBluetoothStateChangeCallback.class));
-        verify(mManagerService).unregisterStateChangeCallback(any());
-        verifyMock();
-    }
-
-    @Test
-    @DisableCompatChanges({BluetoothManagerService.RESTRICT_ENABLE_DISABLE})
+    @DisableCompatChanges({ChangeIds.RESTRICT_ENABLE_DISABLE})
     public void enableNoRestrictEnable() {
         assertThrows(NullPointerException.class, () -> mBinder.enable(null));
 
@@ -242,27 +224,6 @@ public class BluetoothServiceBinderTest {
         mBinder.getState();
         verify(mManagerService).getState();
         verify(mUserManager).getProfileParent(any());
-        verifyMock();
-    }
-
-    @Test
-    public void bindBluetoothProfileService() {
-        assertThrows(
-                NullPointerException.class,
-                () -> mBinder.bindBluetoothProfileService(0, "foo", null));
-        // No permission needed for this call
-
-        mBinder.bindBluetoothProfileService(
-                0, "foo", mock(IBluetoothProfileServiceConnection.class));
-        verify(mManagerService).bindBluetoothProfileService(anyInt(), any(), any());
-        verifyMock();
-    }
-
-    @Test
-    public void unbindBluetoothProfileService() {
-        // No permission needed for this call
-        mBinder.unbindBluetoothProfileService(0, null);
-        verify(mManagerService).unbindBluetoothProfileService(anyInt(), any());
         verifyMock();
     }
 

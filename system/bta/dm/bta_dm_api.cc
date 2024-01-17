@@ -26,14 +26,11 @@
 
 #include <vector>
 
-#include "bt_target.h"  // Must be first to define build configuration
+#include "android_bluetooth_flags.h"
 #include "bta/dm/bta_dm_disc.h"
 #include "bta/dm/bta_dm_int.h"
 #include "bta/dm/bta_dm_sec_int.h"
-#include "osi/include/allocator.h"
 #include "osi/include/compat.h"
-#include "stack/btm/btm_sec.h"
-#include "stack/include/bt_octets.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_api.h"
 #include "stack/include/btm_client_interface.h"
@@ -83,18 +80,11 @@ void BTA_DmSetDeviceName(const char* p_name) {
  *                  performs an inquiry and gets the remote name for devices.
  *                  Service discovery is done if services is non zero
  *
- *
  * Returns          void
  *
  ******************************************************************************/
 void BTA_DmSearch(tBTA_DM_SEARCH_CBACK* p_cback) {
-  tBTA_DM_API_SEARCH* p_msg =
-      (tBTA_DM_API_SEARCH*)osi_calloc(sizeof(tBTA_DM_API_SEARCH));
-
-  p_msg->hdr.event = BTA_DM_API_SEARCH_EVT;
-  p_msg->p_cback = p_cback;
-
-  bta_sys_sendmsg(p_msg);
+  bta_dm_disc_start_device_discovery(p_cback);
 }
 
 /*******************************************************************************
@@ -103,18 +93,10 @@ void BTA_DmSearch(tBTA_DM_SEARCH_CBACK* p_cback) {
  *
  * Description      This function  cancels a search initiated by BTA_DmSearch
  *
- *
  * Returns          void
  *
  ******************************************************************************/
-void BTA_DmSearchCancel(void) {
-  tBTA_DM_API_DISCOVERY_CANCEL* p_msg =
-      (tBTA_DM_API_DISCOVERY_CANCEL*)osi_calloc(
-          sizeof(tBTA_DM_API_DISCOVERY_CANCEL));
-
-  p_msg->hdr.event = BTA_DM_API_SEARCH_CANCEL_EVT;
-  bta_sys_sendmsg(p_msg);
-}
+void BTA_DmSearchCancel(void) { bta_dm_disc_stop_device_discovery(); }
 
 /*******************************************************************************
  *
@@ -129,15 +111,7 @@ void BTA_DmSearchCancel(void) {
  ******************************************************************************/
 void BTA_DmDiscover(const RawAddress& bd_addr, tBTA_DM_SEARCH_CBACK* p_cback,
                     tBT_TRANSPORT transport) {
-  tBTA_DM_API_DISCOVER* p_msg =
-      (tBTA_DM_API_DISCOVER*)osi_calloc(sizeof(tBTA_DM_API_DISCOVER));
-
-  p_msg->hdr.event = BTA_DM_API_DISCOVER_EVT;
-  p_msg->bd_addr = bd_addr;
-  p_msg->transport = transport;
-  p_msg->p_cback = p_cback;
-
-  bta_sys_sendmsg(p_msg);
+  bta_dm_disc_start_service_discovery(p_cback, bd_addr, transport);
 }
 
 /*******************************************************************************
@@ -300,8 +274,12 @@ void BTA_DmBleUpdateConnectionParams(const RawAddress& bd_addr,
  *
  ******************************************************************************/
 void BTA_DmBleConfigLocalPrivacy(bool privacy_enable) {
-  do_in_main_thread(FROM_HERE, base::BindOnce(bta_dm_ble_config_local_privacy,
-                                              privacy_enable));
+  if (IS_FLAG_ENABLED(synchronous_bta_sec)) {
+    bta_dm_ble_config_local_privacy(privacy_enable);
+  } else {
+    do_in_main_thread(FROM_HERE, base::BindOnce(bta_dm_ble_config_local_privacy,
+                                                privacy_enable));
+  }
 }
 
 /*******************************************************************************
@@ -566,12 +544,17 @@ void BTA_DmBleSubrateRequest(const RawAddress& bd_addr, uint16_t subrate_min,
 }
 
 bool BTA_DmCheckLeAudioCapable(const RawAddress& address) {
-  for (tBTM_INQ_INFO* inq_ent = BTM_InqDbFirst(); inq_ent != nullptr;
-       inq_ent = BTM_InqDbNext(inq_ent)) {
+  for (tBTM_INQ_INFO* inq_ent = get_btm_client_interface().db.BTM_InqDbFirst();
+       inq_ent != nullptr;
+       inq_ent = get_btm_client_interface().db.BTM_InqDbNext(inq_ent)) {
     if (inq_ent->results.remote_bd_addr != address) continue;
 
-    LOG_INFO("Device is LE Audio capable based on AD content");
-    return inq_ent->results.ble_ad_is_le_audio_capable;
+    if (inq_ent->results.ble_ad_is_le_audio_capable) {
+      LOG_INFO("Device is LE Audio capable based on AD content");
+      return true;
+    }
+
+    return false;
   }
   return false;
 }

@@ -28,19 +28,18 @@
 #include <mutex>
 #include <string>
 
-#include "bt_target.h"  // Must be first to define build configuration
 #include "btif/include/btif_av.h"
 #include "btif/include/btif_av_co.h"
 #include "btif/include/btif_avrcp_audio_track.h"
 #include "btif/include/btif_util.h"  // CASE_RETURN_STR
 #include "common/message_loop_thread.h"
+#include "internal_include/bt_target.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
 #include "osi/include/fixed_queue.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/include/bt_hdr.h"
-#include "stack/include/bt_types.h"
 #include "types/raw_address.h"
 
 using bluetooth::common::MessageLoopThread;

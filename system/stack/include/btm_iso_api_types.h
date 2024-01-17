@@ -21,13 +21,17 @@
 
 #include "hcimsgs.h"
 #include "stack/include/bt_hdr.h"
-#include "stack/include/bt_octets.h"
 
 namespace bluetooth {
 namespace hci {
 constexpr uint8_t kIsoCodingFormatTransparent = 0x03;
 constexpr uint8_t kIsoCodingFormatLc3 = 0x06;
 constexpr uint8_t kIsoCodingFormatVendorSpecific = 0xFF;
+
+namespace qcom {
+constexpr uint16_t kIsoCodingFormatAptxLe = 0x0001;
+constexpr uint16_t kIsoCodingFormatAptxLeX = 0x01AD;
+}  // namespace qcom
 
 constexpr uint8_t kIsoCigPackingSequential = 0x00;
 constexpr uint8_t kIsoCigPackingInterleaved = 0x01;

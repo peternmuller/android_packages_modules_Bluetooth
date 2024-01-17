@@ -28,12 +28,21 @@ namespace le_audio {
  * phone.
  * It can also be passed to the audio source to configure its parameters.
  */
+
+struct LeAudioCodecId {
+    uint8_t coding_format;
+    uint16_t vendor_company_id;
+    uint16_t vendor_codec_id;
+};
+
 struct LeAudioCodecConfiguration {
   static constexpr uint8_t kChannelNumberMono =
       bluetooth::audio::le_audio::kChannelNumberMono;
   static constexpr uint8_t kChannelNumberStereo =
       bluetooth::audio::le_audio::kChannelNumberStereo;
 
+  static constexpr uint32_t kSampleRate96000 =
+      bluetooth::audio::le_audio::kSampleRate96000;
   static constexpr uint32_t kSampleRate48000 =
       bluetooth::audio::le_audio::kSampleRate48000;
   static constexpr uint32_t kSampleRate44100 =
@@ -56,6 +65,15 @@ struct LeAudioCodecConfiguration {
 
   static constexpr uint32_t kInterval7500Us = 7500;
   static constexpr uint32_t kInterval10000Us = 10000;
+  static constexpr uint32_t kInterval15000Us = 15000;
+  static constexpr uint8_t kLeAudioCodingFormatLC3 = 0x06;
+  static constexpr uint8_t kLeAudioVendorSpecificFormat = 0xFF;
+  static constexpr uint16_t kLeAudioCompanyIdQcom = 0x000A;
+  static constexpr uint16_t kLeAudioCodecIdAptxLe = 0x0001;
+  static constexpr uint16_t kLeAudioCodecIdAptxLeX = 0x01AD;
+
+  /** negotiated codec id */
+  LeAudioCodecId codec;
 
   /** number of channels */
   uint8_t num_channels;
@@ -74,6 +92,8 @@ struct LeAudioCodecConfiguration {
    */
   uint32_t data_interval_us;
 
+  uint16_t  octets_per_codec_frame;
+
   bool operator!=(const LeAudioCodecConfiguration& other) {
     return !((num_channels == other.num_channels) &&
              (sample_rate == other.sample_rate) &&
@@ -88,9 +108,17 @@ struct LeAudioCodecConfiguration {
             (data_interval_us == other.data_interval_us));
   }
 
-  bool IsInvalid() {
-    return (num_channels == 0) || (sample_rate == 0) ||
-           (bits_per_sample == 0) || (data_interval_us == 0);
+  bool IsInvalid() const {
+    if (codec.coding_format == kLeAudioCodingFormatLC3)
+      return (num_channels == 0) || (sample_rate == 0) ||
+             (bits_per_sample == 0) || (data_interval_us == 0) ||
+             (octets_per_codec_frame == 0);
+    else if (codec.coding_format == kLeAudioVendorSpecificFormat &&
+             codec.vendor_company_id == kLeAudioCompanyIdQcom &&
+             (codec.vendor_codec_id == kLeAudioCodecIdAptxLe ||
+             codec.vendor_codec_id == kLeAudioCodecIdAptxLeX))
+      return (num_channels == 0) || (sample_rate == 0);
+    else return true;
   }
 };
 
@@ -112,7 +140,8 @@ class LeAudioSinkAudioHalClient {
 
   virtual ~LeAudioSinkAudioHalClient() = default;
   virtual bool Start(const LeAudioCodecConfiguration& codecConfiguration,
-                     Callbacks* audioReceiver) = 0;
+                     Callbacks* audioReceiver,
+                     DsaModes dsa_modes = {DsaMode::DISABLED}) = 0;
   virtual void Stop() = 0;
   virtual size_t SendData(uint8_t* data, uint16_t size) = 0;
 
@@ -144,14 +173,16 @@ class LeAudioSourceAudioHalClient {
     virtual void OnAudioDataReady(const std::vector<uint8_t>& data) = 0;
     virtual void OnAudioSuspend(void) = 0;
     virtual void OnAudioResume(void) = 0;
-    virtual void OnAudioMetadataUpdate(source_metadata_v7 source_metadata) = 0;
+    virtual void OnAudioMetadataUpdate(source_metadata_v7 source_metadata,
+                                       DsaMode dsa_mode) = 0;
 
     base::WeakPtrFactory<Callbacks> weak_factory_{this};
   };
 
   virtual ~LeAudioSourceAudioHalClient() = default;
   virtual bool Start(const LeAudioCodecConfiguration& codecConfiguration,
-                     Callbacks* audioReceiver) = 0;
+                     Callbacks* audioReceiver,
+                     DsaModes dsa_modes = {DsaMode::DISABLED}) = 0;
   virtual void Stop() = 0;
   virtual size_t SendData(uint8_t* data, uint16_t size) { return 0; }
   virtual void ConfirmStreamingRequest() = 0;

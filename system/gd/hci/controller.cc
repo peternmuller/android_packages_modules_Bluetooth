@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "common/init_flags.h"
+#include "dumpsys_data_generated.h"
 #include "hci/event_checkers.h"
 #include "hci/hci_layer.h"
 #include "hci_controller_generated.h"
@@ -94,6 +95,12 @@ struct Controller::impl {
       hci_->EnqueueCommand(
           LeReadBufferSizeV1Builder::Create(),
           handler->BindOnceOn(this, &Controller::impl::le_read_buffer_size_handler));
+    }
+
+    if (is_supported(OpCode::READ_LOCAL_SUPPORTED_CODECS_V1)) {
+      hci_->EnqueueCommand(
+          ReadLocalSupportedCodecsV1Builder::Create(),
+          handler->BindOnceOn(this, &Controller::impl::read_local_supported_codecs_v1_handler));
     }
 
     hci_->EnqueueCommand(
@@ -353,6 +360,16 @@ struct Controller::impl {
       acl_buffers_ -= le_buffer_size_.total_num_le_packets_;
       le_buffer_size_.le_data_packet_length_ = acl_buffer_length_;
     }
+  }
+
+  void read_local_supported_codecs_v1_handler(CommandCompleteView view) {
+    auto complete_view = ReadLocalSupportedCodecsV1CompleteView::Create(view);
+    ASSERT(complete_view.IsValid());
+    ErrorCode status = complete_view.GetStatus();
+    ASSERT_LOG(
+        status == ErrorCode::SUCCESS, "Status 0x%02hhx, %s", status, ErrorCodeText(status).c_str());
+    local_supported_codec_ids_ = complete_view.GetSupportedCodecs();
+    local_supported_vendor_codec_ids_ = complete_view.GetVendorSpecificCodecs();
   }
 
   void set_min_encryption_key_size_handler(CommandCompleteView view) {
@@ -1065,6 +1082,8 @@ struct Controller::impl {
   Address mac_address_{};
   std::string local_name_{};
   LeBufferSize le_buffer_size_{};
+  std::vector<uint8_t> local_supported_codec_ids_{};
+  std::vector<uint32_t> local_supported_vendor_codec_ids_{};
   LeBufferSize iso_buffer_size_{};
   uint64_t le_local_supported_features_{};
   uint64_t le_supported_states_{};
@@ -1104,6 +1123,10 @@ std::string Controller::GetLocalName() const {
 
 LocalVersionInformation Controller::GetLocalVersionInformation() const {
   return impl_->local_version_information_;
+}
+
+std::vector<uint8_t> Controller::GetLocalSupportedBrEdrCodecIds() const {
+  return impl_->local_supported_codec_ids_;
 }
 
 #define BIT(x) (0x1ULL << (x))
