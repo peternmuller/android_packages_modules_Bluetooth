@@ -92,6 +92,8 @@ cc_library_shared {
         "android.hardware.audio.common@5.0",
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.0",
         "android.hardware.bluetooth@1.0",
         "android.hardware.bluetooth@1.1",
         "android.hardware.common-V2-ndk",
