@@ -508,17 +508,6 @@ tBTM_STATUS BTM_RegisterForVSEvents(tBTM_VS_EVT_CB* p_cb, bool is_register) {
   return (retval);
 }
 
-void btm_ble_read_remote_supported_qll_features_status_cback(tBTM_VSC_CMPL* param) {
-  uint8_t status;
-
-  LOG_VERBOSE("%s, op: %x, param_len: %d", __func__, param->opcode,
-                     param->param_len);
-  if (param->param_len == 1) {
-    status = *param->p_param_buf;
-    LOG_VERBOSE("%s, status = %d", __func__, status);
-  }
-}
-
 /*******************************************************************************
  *
  * Function         btm_vendor_specific_evt

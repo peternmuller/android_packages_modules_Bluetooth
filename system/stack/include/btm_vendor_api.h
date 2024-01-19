@@ -23,29 +23,20 @@ extern bool BTM_GetRemoteQLLFeatures(uint16_t handle, uint8_t* features);
 
 /*******************************************************************************
  *
- * Function         BTM_IsQHSPhySupported
+ * Function        BTM_IsQHSPhySupported
  *
- * Description      This function is called to determine if QHS phy can be used
+ * Description     This function is called to determine if QHS is supported or
+ *not.
  *
- * Parameter        connection handle
+ * Parameters      bda : BD address of the remote device
+ *                 transport : Physical transport used for ACL connection
+ *                 (BR/EDR or LE)
  *
- * Returns          bool true if qhs phy can be used
+ * Returns         True if qhs phy can be used, false otherwise.
  *
  ******************************************************************************/
-extern bool BTM_IsQHSPhySupported(uint16_t handle);
+bool BTM_IsQHSPhySupported(const RawAddress& bda, tBT_TRANSPORT transport);
 
-/*******************************************************************************
- *
- * Function         BTM_BleIsQHSPhySupported
- *
- * Description      This function is called to determine if QHS phy can be used
- *
- * Parameter        bda: BD address of the remote device
- *
- * Returns          bool true if qhs phy can be used, false otherwise
- *
- ******************************************************************************/
-extern bool BTM_BleIsQHSPhySupported(const RawAddress& bda);
 /*******************************************************************************
  *
  * Function         BTM_GetHostAddOnFeatures
@@ -82,3 +73,13 @@ bt_device_soc_add_on_features_t* BTM_GetSocAddOnFeatures(
  *
  ******************************************************************************/
 void BTM_ReadVendorAddOnFeatures();
+
+char* BTM_GetA2dpOffloadCapablity();
+
+bool BTM_IsSpiltA2dpSupported();
+
+bool BTM_IsAACFrameCtrlEnabled();
+
+uint8_t* BTM_GetScramblingSupportedFreqs(uint8_t* number_of_freqs);
+void BTM_RegisterForQleCigLatencyChangedEvt(
+    tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);

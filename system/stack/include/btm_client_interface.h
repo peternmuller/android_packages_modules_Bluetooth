@@ -172,6 +172,14 @@ struct btm_client_interface_t {
         uint8_t* host_add_on_features_len);
     bt_device_soc_add_on_features_t* (*BTM_GetSocAddOnFeatures)(
         uint8_t* soc_add_on_features_len);
+    char* (*BTM_GetA2dpOffloadCapablity)();
+    bool (*BTM_IsSpiltA2dpSupported)();
+    bool (*BTM_IsAACFrameCtrlEnabled)();
+    uint8_t* (*BTM_GetScramblingSupportedFreqs)(uint8_t* number_of_freqs);
+    bool (*BTM_IsQHSPhySupported)(const RawAddress& bda,
+                                  tBT_TRANSPORT transport);
+    void (*BTM_RegisterForQleCigLatencyChangedEvt)(
+        tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
   } vendor;
 };
 

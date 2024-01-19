@@ -35,6 +35,8 @@ cc_library_static {
             shared_libs: [
                 "android.hardware.bluetooth.audio-V4-ndk",
                 "vendor.qti.hardware.bluetooth.audio-V1-ndk",
+                "vendor.qti.hardware.bluetooth_audio@2.1",
+                "vendor.qti.hardware.bluetooth_audio@2.0",
                 "libbinder_ndk",
                 "libfmq",
             ],
@@ -56,6 +58,9 @@ cc_library_static {
                 "hidl/codec_status_hidl.cc",
                 "hidl/hearing_aid_software_encoding_hidl.cc",
                 "hidl/le_audio_software_hidl.cc",
+                "qti_hidl/a2dp_encoding.cc",
+                "qti_hidl/client_interface.cc",
+                "qti_hidl/hearing_aid_software_encoding.cc",
                 "le_audio_software.cc",
             ],
         },

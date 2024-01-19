@@ -44,6 +44,22 @@
 
 #define HCI_VS_GET_ADDON_FEATURES_SUPPORT (0x001D | HCI_GRP_VENDOR_SPECIFIC)
 
+#define HCI_VSE_SUBCODE_QBCE 0x51
+#define MSG_QBCE_QLL_CONNECTION_COMPLETE 0x09
+#define MSG_QBCE_REMOTE_SUPPORTED_QLL_FEATURES_COMPLETE 0x06
+#define MSG_QBCE_QCM_PHY_CHANGE 0x01
+#define MSG_QBCE_QLE_CIG_LATENCY_CHANGED 0x03
+#define MSG_QBCE_VS_PARAM_REPORT_EVENT 0x12
+
+#define BTM_QLL_FEATURES_STATE_IDLE 0 /* initial state */
+#define BTM_QLL_FEATURES_STATE_CONN_COMPLETE \
+  1 /* QLL connection complete event received */
+#define BTM_QLL_FEATURES_STATE_FEATURE_COMPLETE \
+  2 /* remote QLL features complete event received */
+#define BTM_QLL_FEATURES_STATE_ERROR 3 /* error status */
+
+#define BTM_QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE_LEN 3
+
 /* Add_on features encoding - page 0 (the only page for now)*/
 #define BTM_WIPOWER_FASTBOOT_ENABLE(x) ((x)[0] & 0x01)
 #define BTM_SPLIT_A2DP_SCRAMBLING_DATA_REQUIRED(x) ((x)[0] & 0x02)
@@ -91,6 +107,10 @@
 #define BTM_BROADCAST_AUDIO_RX_WITH_EC_2_5(x) ((x)[4] & 0x04)
 #define BTM_BROADCAST_AUDIO_RX_WITH_EC_3_9(x) ((x)[4] & 0x08)
 #define BTM_ISO_CIG_PARAMETER_CALCULATOR(x) ((x)[4] & 0x10)
+
+/* QCM PHY state */
+#define QCM_PHY_STATE_BR_EDR 0
+#define QCM_PHY_STATE_QHS 1
 
 typedef struct {
   uint8_t as_array[SOC_ADD_ON_FEATURES_MAX_SIZE];
