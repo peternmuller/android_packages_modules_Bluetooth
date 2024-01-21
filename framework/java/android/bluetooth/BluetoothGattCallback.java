@@ -52,6 +52,7 @@
 package android.bluetooth;
 
 import android.annotation.NonNull;
+import android.annotation.SystemApi;
 
 /** This abstract class is used to implement {@link BluetoothGatt} callbacks. */
 public abstract class BluetoothGattCallback {
@@ -302,6 +303,7 @@ public abstract class BluetoothGattCallback {
      *     successfully.
      * @hide
      */
+    @SystemApi
     public void onSubrateChange(
             BluetoothGatt gatt,
             int subrateFactor,
