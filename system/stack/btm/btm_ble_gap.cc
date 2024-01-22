@@ -22,6 +22,7 @@
  *
  ******************************************************************************/
 
+#include "bt_dev_class.h"
 #define LOG_TAG "bt_btm_ble"
 
 #include <android_bluetooth_sysprop.h>
@@ -2039,8 +2040,8 @@ static uint8_t btm_ble_is_discoverable(const RawAddress& bda,
   return scan_state;
 }
 
-static void btm_ble_appearance_to_cod(uint16_t appearance, uint8_t* dev_class) {
-  dev_class[0] = 0;
+static DEV_CLASS btm_ble_appearance_to_cod(uint16_t appearance) {
+  DEV_CLASS dev_class = kDevClassEmpty;
 
   switch (appearance) {
     case BTM_BLE_APPEARANCE_GENERIC_PHONE:
@@ -2171,6 +2172,7 @@ static void btm_ble_appearance_to_cod(uint16_t appearance, uint8_t* dev_class) {
       dev_class[1] = BTM_COD_MAJOR_UNCLASSIFIED;
       dev_class[2] = BTM_COD_MINOR_UNCLASSIFIED;
   };
+  return dev_class;
 }
 
 bool btm_ble_get_appearance_as_cod(std::vector<uint8_t> const& data,
@@ -2184,8 +2186,8 @@ bool btm_ble_get_appearance_as_cod(std::vector<uint8_t> const& data,
   const uint8_t* p_uuid16 = AdvertiseDataParser::GetFieldByType(
       data, BTM_BLE_AD_TYPE_APPEARANCE, &len);
   if (p_uuid16 && len == 2) {
-    btm_ble_appearance_to_cod((uint16_t)p_uuid16[0] | (p_uuid16[1] << 8),
-                              dev_class);
+    dev_class =
+        btm_ble_appearance_to_cod((uint16_t)p_uuid16[0] | (p_uuid16[1] << 8));
     return true;
   }
 
@@ -3225,24 +3227,6 @@ void btm_ble_update_mode_operation(uint8_t link_role, const RawAddress* bd_addr,
   if (btm_cb.ble_ctr_cb.inq_var.connectable_mode == BTM_BLE_CONNECTABLE) {
     btm_ble_set_connectability(btm_cb.btm_inq_vars.connectable_mode |
                                btm_cb.ble_ctr_cb.inq_var.connectable_mode);
-  }
-
-  /* in case of disconnected, we must cancel bgconn and restart
-     in order to add back device to acceptlist in order to reconnect */
-  if (bd_addr != nullptr) {
-      LOG_DEBUG("gd_acl enabled so skip background connection logic");
-  }
-
-  /* when no connection is attempted, and controller is not rejecting last
-     request
-     due to resource limitation, start next direct connection or background
-     connection
-     now in order */
-  if (btm_cb.ble_ctr_cb.is_connection_state_idle() &&
-      status != HCI_ERR_HOST_REJECT_RESOURCES &&
-      status != HCI_ERR_MAX_NUM_OF_CONNECTIONS) {
-      LOG_DEBUG("Resuming le background connections");
-      btm_ble_resume_bg_conn();
   }
 }
 

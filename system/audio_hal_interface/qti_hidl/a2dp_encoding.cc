@@ -60,10 +60,10 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
 #include "a2dp_aac.h"
 #include "bta/av/bta_av_int.h"
-#include "btif_a2dp_source.h"
-#include "btif_av.h"
-#include "btif_av_co.h"
-#include "btif_hf.h"
+#include "btif/include/btif_a2dp_source.h"
+#include "btif/include/btif_av.h"
+#include "btif/include/btif_av_co.h"
+#include "btif/include/btif_hf.h"
 #include "osi/include/properties.h"
 #include "a2dp_sbc.h"
 #include <a2dp_vendor.h>
