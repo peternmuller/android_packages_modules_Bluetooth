@@ -158,7 +158,6 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
     SetState(State::CONFIGURED);
 
     callbacks_->OnStateMachineCreateStatus(GetBroadcastId(), true);
-    callbacks_->OnStateMachineEvent(GetBroadcastId(), State::CONFIGURED);
 
     advertiser_if_->GetOwnAddress(
         advertising_sid,
@@ -322,6 +321,7 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
     LOG_INFO("own address=%s, type=%d", ADDRESS_TO_LOGGABLE_CSTR(addr), addr_type);
     addr_ = addr;
     addr_type_ = addr_type;
+    callbacks_->OnStateMachineEvent(GetBroadcastId(), GetState());
   }
 
   void CreateBroadcastAnnouncement(
