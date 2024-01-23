@@ -840,8 +840,6 @@ class LeAudioLtvMap {
       STREAM_TO_UINT32(core.audio_channel_allocation, ptr);
       core.allocated_channel_count =
               std::bitset<32>(core.audio_channel_allocation.value()).count();
-    } else {
-      core.allocated_channel_count = 1;
     }
 
     return core;
