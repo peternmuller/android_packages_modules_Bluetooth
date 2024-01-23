@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-#include "gd/rust/topshim/gatt/gatt_ble_advertiser_shim.h"
+#include "rust/topshim/gatt/gatt_ble_advertiser_shim.h"
 
 #include <base/functional/bind.h>
 #include <base/functional/callback.h>
