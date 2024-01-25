@@ -165,6 +165,13 @@ public class A2dpNativeInterface {
                                               codecConfigArray);
     }
 
+    public void setStreamMode(boolean isGamingEnabled, boolean isLowLatencyEnabled) {
+        if (DBG) {
+            Log.d(TAG, "setStreamMode");
+        }
+        setStreamModeNative(isGamingEnabled, isLowLatencyEnabled);
+    }
+
     private BluetoothDevice getDevice(byte[] address) {
         return mAdapterService.getDeviceFromByte(address);
     }
@@ -256,4 +263,5 @@ public class A2dpNativeInterface {
     private native boolean setActiveDeviceNative(byte[] address);
     private native boolean setCodecConfigPreferenceNative(byte[] address,
                 BluetoothCodecConfig[] codecConfigArray);
+    public native void setStreamModeNative(boolean isGamingEnabled, boolean isLowLatencyEnabled);
 }

@@ -407,6 +407,8 @@ typedef struct {
       const RawAddress& bd_addr,
       std::vector<btav_a2dp_codec_config_t> codec_preferences);
 
+  void (*set_stream_mode)(bool isGaming, bool isLowLatency);
+
   /** Closes the interface. */
   void (*cleanup)(void);
 
