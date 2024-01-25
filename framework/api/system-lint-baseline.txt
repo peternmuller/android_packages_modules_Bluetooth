@@ -57,6 +57,10 @@ RequiresPermission: android.bluetooth.BluetoothDevice#setAlias(String):
     Method 'setAlias' documentation mentions permissions already declared by @RequiresPermission
 
 
+UnflaggedApi: android.bluetooth.BluetoothA2dp#getActiveDevice():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothA2dp.getActiveDevice()
+UnflaggedApi: android.bluetooth.BluetoothAdapter#isBroadcastActive():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothAdapter.isBroadcastActive()
 UnflaggedApi: android.bluetooth.BluetoothGatt#SUBRATE_REQUEST_MODE_BALANCED:
     New API must be flagged with @FlaggedApi: field android.bluetooth.BluetoothGatt.SUBRATE_REQUEST_MODE_BALANCED
 UnflaggedApi: android.bluetooth.BluetoothGatt#SUBRATE_REQUEST_MODE_HIGH:
@@ -85,8 +89,29 @@ UnflaggedApi: android.bluetooth.BluetoothHapClient#switchToPreviousPreset(androi
     New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothHapClient.switchToPreviousPreset(android.bluetooth.BluetoothDevice)
 UnflaggedApi: android.bluetooth.BluetoothHapClient#switchToPreviousPresetForGroup(int):
     New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothHapClient.switchToPreviousPresetForGroup(int)
+UnflaggedApi: android.bluetooth.BluetoothLeAudio#getActiveDevices():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudio.getActiveDevices()
 UnflaggedApi: android.bluetooth.BluetoothLeAudio.Callback#onGroupStreamStatusChanged(int, int):
     New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudio.Callback.onGroupStreamStatusChanged(int,int)
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig#SOURCE_CODEC_TYPE_APTX_ADAPTIVE_R4:
+    New API must be flagged with @FlaggedApi: field android.bluetooth.BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE_R4
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig#getCodecSpecific1():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.getCodecSpecific1()
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig#getCodecSpecific2():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.getCodecSpecific2()
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig#getCodecSpecific3():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.getCodecSpecific3()
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig#getCodecSpecific4():
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.getCodecSpecific4()
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig.Builder#setCodecSpecific1(long):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.Builder.setCodecSpecific1(long)
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig.Builder#setCodecSpecific2(long):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.Builder.setCodecSpecific2(long)
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig.Builder#setCodecSpecific3(long):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.Builder.setCodecSpecific3(long)
+UnflaggedApi: android.bluetooth.BluetoothLeAudioCodecConfig.Builder#setCodecSpecific4(long):
+    New API must be flagged with @FlaggedApi: method android.bluetooth.BluetoothLeAudioCodecConfig.Builder.setCodecSpecific4(long)
+
 UnflaggedApi: android.bluetooth.le.ScanSettings#getRssiHighThreshold():
     New API must be flagged with @FlaggedApi: method android.bluetooth.le.ScanSettings.getRssiHighThreshold()
 UnflaggedApi: android.bluetooth.le.ScanSettings#getRssiLowThreshold():
