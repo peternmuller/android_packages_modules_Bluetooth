@@ -502,6 +502,18 @@ static jboolean setCodecConfigPreferenceNative(JNIEnv* env, jobject object,
   return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
 
+static void setStreamModeNative(JNIEnv* env, jobject object,
+                                      jboolean gamingModeEnabled,
+                                      jboolean lowLatencyEnabled) {
+    std::shared_lock<std::shared_timed_mutex> lock(interface_mutex);
+  if (!sBluetoothA2dpInterface) {
+    ALOGE("%s: Failed to get the Bluetooth A2DP Interface", __func__);
+    return;
+  }
+
+  sBluetoothA2dpInterface->set_stream_mode(gamingModeEnabled,lowLatencyEnabled);
+}
+
 int register_com_android_bluetooth_a2dp(JNIEnv* env) {
   const JNINativeMethod methods[] = {
       {"initNative",
@@ -519,6 +531,7 @@ int register_com_android_bluetooth_a2dp(JNIEnv* env) {
       {"setCodecConfigPreferenceNative",
        "([B[Landroid/bluetooth/BluetoothCodecConfig;)Z",
        (void*)setCodecConfigPreferenceNative},
+       {"setStreamModeNative", "(ZZ)V", (void*)setStreamModeNative},
   };
   const int result = REGISTER_NATIVE_METHODS(
       env, "com/android/bluetooth/a2dp/A2dpNativeInterface", methods);
