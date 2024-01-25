@@ -78,6 +78,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import android.annotation.SystemApi;
 
 /**
  * Public API for the Bluetooth GATT Profile.
@@ -196,6 +197,7 @@ public final class BluetoothGatt implements BluetoothProfile {
      *
      * @hide
      */
+    @SystemApi
     public static final int SUBRATE_REQUEST_MODE_BALANCED = 0;
 
     /**
@@ -203,6 +205,7 @@ public final class BluetoothGatt implements BluetoothProfile {
      *
      * @hide
      */
+    @SystemApi
     public static final int SUBRATE_REQUEST_MODE_HIGH = 1;
 
     /**
@@ -210,6 +213,7 @@ public final class BluetoothGatt implements BluetoothProfile {
      *
      * @hide
      */
+    @SystemApi
     public static final int SUBRATE_REQUEST_MODE_LOW_POWER = 2;
 
     /** @hide */
@@ -2258,6 +2262,7 @@ public final class BluetoothGatt implements BluetoothProfile {
      * @return true, if the request is send to the Bluetooth stack.
      * @hide
      */
+    @SystemApi
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean requestSubrateMode(@SubrateRequestMode int subrateMode) {
@@ -2293,6 +2298,7 @@ public final class BluetoothGatt implements BluetoothProfile {
      * @return true, if the request is send to the Bluetooth stack.
      * @hide
      */
+    @SystemApi
     @RequiresBluetoothConnectPermission
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean bleSubrateRequest(
