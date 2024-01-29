@@ -1040,6 +1040,18 @@ class LeAudioClientImpl : public LeAudioClient {
       return;
     }
 
+    if (output_codec_config.codec_type ==
+        bluetooth::le_audio::btle_audio_codec_index_t::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX) {
+      group->DisableLeXCodec(false);
+      LOG_DEBUG("Enabling LeX Codec");
+      group->UpdateAudioSetConfigurationCache(group->GetConfigurationContextType());
+    } else if (output_codec_config.codec_type ==
+        bluetooth::le_audio::btle_audio_codec_index_t::LE_AUDIO_CODEC_INDEX_SOURCE_DEFAULT) {
+      group->DisableLeXCodec(true);
+      LOG_DEBUG("Disabling LeX Codec");
+      group->UpdateAudioSetConfigurationCache(group->GetConfigurationContextType());
+    }
+
     // set configuration and check if streaming
     if (SetConfigurationAndStopStreamWhenNeeded(
             group, group->GetConfigurationContextType())) {
@@ -4002,6 +4014,11 @@ class LeAudioClientImpl : public LeAudioClient {
       }
 
       sink_cfg_available = false;
+    }
+
+    if (group->lex_codec_disabled.second == true) {
+      group->lex_codec_disabled.second = false;
+      reconfiguration_needed = true;
     }
 
     LOG_DEBUG(

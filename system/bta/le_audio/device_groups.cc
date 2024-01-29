@@ -1291,6 +1291,13 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
       return false;
     }
 
+    if (((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) ||
+        (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe)) &&
+        lex_codec_disabled.first) {
+      LOG_INFO("Skipping LeX config as Lex is disabled");
+      return false;
+    }
+
     for (auto* device = GetFirstDevice();
         device != nullptr && required_device_cnt > 0;
         device = GetNextDevice(device)) {
@@ -1554,6 +1561,11 @@ LeAudioDeviceGroup::GetActiveConfiguration(void) const {
 
 bool LeAudioDeviceGroup::IsSeamlessSupported(void) {
   return false;
+}
+
+void LeAudioDeviceGroup::DisableLeXCodec(bool status) {
+   lex_codec_disabled.first = status;
+   lex_codec_disabled.second = true;
 }
 
 const set_configurations::AudioSetConfiguration*
