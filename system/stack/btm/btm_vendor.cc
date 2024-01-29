@@ -883,7 +883,7 @@ void BTM_ReadVendorAddOnFeatures() {
     } else {
       btConfigStore = false;
     }
-    LOG_INFO(":: btConfigStore = %d", spilt_a2dp_supported);
+    LOG_INFO(":: btConfigStore = %d", btConfigStore);
   }
 
   if (btConfigStore) {
