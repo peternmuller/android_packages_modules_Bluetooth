@@ -58,6 +58,11 @@ public final class BluetoothCodecType implements Parcelable {
     /** Opus codec identifier. See {@link BluetoothCodecType#getCodecId}. */
     public static final long CODEC_ID_OPUS = 0x000100e0ff;
 
+    /** Aptx Adaptive codec identifier. See {@link BluetoothCodecType#getCodecId}.
+    * @hide
+    */
+    public static final long CODEC_ID_APTX_AD = 0x00ad00d7ff;
+
     /**
      * Create the bluetooth codec type from the static codec type index.
      *
@@ -170,6 +175,7 @@ public final class BluetoothCodecType implements Parcelable {
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> CODEC_ID_APTX_HD;
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC -> CODEC_ID_LDAC;
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS -> CODEC_ID_OPUS;
+                    case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE -> CODEC_ID_APTX_AD;
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3,
                             BluetoothCodecConfig.SOURCE_CODEC_TYPE_INVALID -> -1;
                     default -> -1;

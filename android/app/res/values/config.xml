@@ -167,7 +167,7 @@
          value should be unique. -->
     <integer name="a2dp_source_codec_priority_sbc">1001</integer>
     <integer name="a2dp_source_codec_priority_aac">2001</integer>
-    <integer name="a2dp_source_codec_priority_aptx_adaptive">3001</integer>
+    <integer name="a2dp_source_codec_priority_aptx_adaptive">9001</integer>
     <integer name="a2dp_source_codec_priority_aptx">4001</integer>
     <integer name="a2dp_source_codec_priority_aptx_hd">5001</integer>
     <integer name="a2dp_source_codec_priority_ldac">6001</integer>
