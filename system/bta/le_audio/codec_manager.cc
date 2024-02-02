@@ -620,9 +620,10 @@ struct codec_manager_impl {
           AudioSetConfigurationProvider::Get()->GetConfigurations(ctx_type);
 
       for (const auto& software_audio_set_conf : *software_audio_set_confs) {
-        if (IsAudioSetConfigurationMatched(software_audio_set_conf,
+        // TO-DO: Add vendor side LC3 gaming bi-directional capabilities
+        if (true/*IsAudioSetConfigurationMatched(software_audio_set_conf,
                                            offload_preference_set,
-                                           adsp_capabilities)) {
+                                           adsp_capabilities)*/) {
 	  if (!osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) &&
 	    software_audio_set_conf->confs[0].codec.id ==
 	      le_audio::set_configurations::LeAudioCodecIdAptxLeX){
