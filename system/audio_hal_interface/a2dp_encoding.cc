@@ -28,16 +28,17 @@ namespace audio {
 namespace a2dp {
 
 bool update_codec_offloading_capabilities(
-    const std::vector<btav_a2dp_codec_config_t>& framework_preference) {
-  LOG(INFO) << __func__;
+    const std::vector<btav_a2dp_codec_config_t>& framework_preference,
+    bool supports_a2dp_hw_offload_v2) {
   if (HalVersionManager::GetHalTransport() ==
       BluetoothAudioHalTransport::HIDL) {
     return hidl::a2dp::update_codec_offloading_capabilities(framework_preference);
   } else if (HalVersionManager::GetHalTransport() ==
       BluetoothAudioHalTransport::AIDL) {
-    return aidl::a2dp::update_codec_offloading_capabilities(framework_preference);
+    return aidl::a2dp::update_codec_offloading_capabilities(framework_preference, false);
   }
-  return false;
+  return aidl::a2dp::update_codec_offloading_capabilities(
+      framework_preference, supports_a2dp_hw_offload_v2);
 }
 
 // Check if new bluetooth_audio is enabled

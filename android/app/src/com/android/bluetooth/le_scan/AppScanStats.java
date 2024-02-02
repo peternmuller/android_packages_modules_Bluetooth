@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.bluetooth.gatt;
+
+package com.android.bluetooth.le_scan;
 
 import android.bluetooth.BluetoothProtoEnums;
 import android.bluetooth.le.ScanFilter;
@@ -27,6 +28,8 @@ import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.BluetoothStatsLog;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.MetricsLogger;
+import com.android.bluetooth.gatt.ContextMap;
+import com.android.bluetooth.gatt.GattService;
 import com.android.bluetooth.util.WorkSourceUtil;
 import com.android.internal.annotations.GuardedBy;
 
@@ -45,7 +48,7 @@ import java.util.Objects;
  * on a per application basis.
  * @hide
  */
-/*package*/ class AppScanStats {
+public class AppScanStats {
     private static final String TAG = AppScanStats.class.getSimpleName();
 
     static final DateFormat DATE_FORMAT = new SimpleDateFormat("MM-dd HH:mm:ss");
@@ -121,8 +124,8 @@ import java.util.Objects;
         }
     }
     public String appName;
-    public WorkSource mWorkSource; // Used for BatteryStatsManager
-    public final WorkSourceUtil mWorkSourceUtil; // Used for BluetoothStatsLog
+    private WorkSource mWorkSource; // Used for BatteryStatsManager
+    private final WorkSourceUtil mWorkSourceUtil; // Used for BluetoothStatsLog
     private int mScansStarted = 0;
     private int mScansStopped = 0;
     public boolean isRegistered = false;
@@ -142,11 +145,11 @@ import java.util.Objects;
     private int mAmbientDiscoveryScan = 0;
     private List<LastScan> mLastScans = new ArrayList<LastScan>();
     private HashMap<Integer, LastScan> mOngoingScans = new HashMap<Integer, LastScan>();
-    public long startTime = 0;
-    public long stopTime = 0;
-    public int results = 0;
+    private long startTime = 0;
+    private long stopTime = 0;
+    private int results = 0;
 
-    AppScanStats(String name, WorkSource source, ContextMap map, GattService service) {
+    public AppScanStats(String name, WorkSource source, ContextMap map, GattService service) {
         appName = name;
         mContextMap = map;
         mGattService = service;
@@ -161,7 +164,7 @@ import java.util.Objects;
         mAdapterService = Objects.requireNonNull(AdapterService.getAdapterService());
     }
 
-    synchronized void addResult(int scannerId) {
+    public synchronized void addResult(int scannerId) {
         LastScan scan = getScanFromScannerId(scannerId);
         if (scan != null) {
             scan.results++;
@@ -210,7 +213,7 @@ import java.util.Objects;
         return scan.isAutoBatchScan;
     }
 
-    synchronized void recordScanStart(ScanSettings settings, List<ScanFilter> filters,
+    public synchronized void recordScanStart(ScanSettings settings, List<ScanFilter> filters,
             boolean isFilterScan, boolean isCallbackScan, int scannerId) {
         LastScan existingScan = getScanFromScannerId(scannerId);
         if (existingScan != null) {
@@ -277,7 +280,7 @@ import java.util.Objects;
         mOngoingScans.put(scannerId, scan);
     }
 
-    synchronized void recordScanStop(int scannerId) {
+    public synchronized void recordScanStop(int scannerId) {
         LastScan scan = getScanFromScannerId(scannerId);
         if (scan == null) {
             return;
@@ -396,6 +399,7 @@ import java.util.Objects;
             sIsRadioStarted = false;
         }
     }
+
     static boolean recordScanRadioStart(int scanMode) {
         synchronized (sLock) {
             if (sIsRadioStarted) {
@@ -473,7 +477,7 @@ import java.util.Objects;
         }
     }
 
-    static void recordScanRadioResultCount() {
+    public static void recordScanRadioResultCount() {
         synchronized (sLock) {
             if (!sIsRadioStarted) {
                 return;
@@ -488,7 +492,7 @@ import java.util.Objects;
         }
     }
 
-    static void recordBatchScanRadioResultCount(int numRecords) {
+    public static void recordBatchScanRadioResultCount(int numRecords) {
         boolean isScreenOn;
         synchronized (sLock) {
             isScreenOn = sIsScreenOn;
@@ -572,7 +576,7 @@ import java.util.Objects;
         }
     }
 
-    synchronized boolean isScanningTooFrequently() {
+    public synchronized boolean isScanningTooFrequently() {
         if (mLastScans.size() < mAdapterService.getScanQuotaCount()) {
             return false;
         }
@@ -695,7 +699,7 @@ import java.util.Objects;
         }
     }
 
-    synchronized void dumpToString(StringBuilder sb) {
+    public synchronized void dumpToString(StringBuilder sb) {
         long currentTime = System.currentTimeMillis();
         long currTime = SystemClock.elapsedRealtime();
         long Score = 0;
