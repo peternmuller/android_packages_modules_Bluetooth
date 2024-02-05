@@ -39,9 +39,7 @@ java_library {
     name: "service-bluetooth-pre-jarjar",
     installable: false,
     //defaults: ["service-bluetooth-common-defaults"],
-    srcs: [
-        ":services.bluetooth-sources",
-    ],
+    srcs: [":services.bluetooth-sources"],
 
     errorprone: {
         javacflags: [

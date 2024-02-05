@@ -113,6 +113,7 @@ cc_library_shared {
         "libbluetooth_core_rs_bridge",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
+        "libbt-audio-asrc",
         "libbt-audio-hal-interface",
         "libbt-bta",
         "libbt-bta-core",
@@ -238,6 +239,7 @@ android_app {
     jni_uses_platform_apis: true,
     libs: [
         "app-compat-annotations",
+        "bluetooth_flags_java_lib",
         "framework-bluetooth-pre-jarjar",
         "framework-statsd.stubs.module_lib",
         "framework-tethering.stubs.module_lib",
@@ -265,7 +267,6 @@ android_app {
         "androidx.annotation_annotation",
         "bluetooth.change-ids",
         "bluetooth.mapsapi",
-        "bluetooth_flags_java_lib",
         "com.android.obex",
         "com.android.vcard",
         "guava",
@@ -300,9 +301,7 @@ android_app {
             "UseSparseArrays",
             "UseValueOf",
         ],
-        strict_updatability_linting: true,
         baseline_filename: "lint-baseline.xml",
-
     },
 
     optimize: {
