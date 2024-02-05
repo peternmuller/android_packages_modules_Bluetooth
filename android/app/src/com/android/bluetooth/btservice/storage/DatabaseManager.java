@@ -994,6 +994,8 @@ public class DatabaseManager {
             Metadata metadata = mMetadataCache.get(address);
             outputOnlyProfile = metadata.preferred_output_only_profile;
             duplexProfile = metadata.preferred_duplex_profile;
+            Log.d(TAG, "getPreferredAudioProfiles: AUDIO_MODE_OUTPUT_ONLY: " + outputOnlyProfile +
+            ", AUDIO_MODE_DUPLEX: " + duplexProfile);
         }
 
         // Checks if the default values are present (aka no explicit preference)

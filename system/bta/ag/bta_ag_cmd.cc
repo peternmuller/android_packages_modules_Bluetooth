@@ -231,6 +231,27 @@ static void bta_ag_send_result(tBTA_AG_SCB* p_scb, size_t code,
     return;
   }
 
+  if ((p_scb->conn_service == BTA_AG_HFP) && (p_scb->svc_conn)) {
+    switch (code) {
+      case BTA_AG_INBAND_RING_RES:
+      case BTA_AG_IND_RES:
+      case BTA_AG_IN_CALL_RES:
+      case BTA_AG_IN_CALL_CONN_RES:
+      case BTA_AG_CALL_WAIT_RES:
+      case BTA_AG_OUT_CALL_ORIG_RES:
+      case BTA_AG_OUT_CALL_ALERT_RES:
+      case BTA_AG_CALL_CANCEL_RES:
+      case BTA_AG_END_CALL_RES:
+      case BTA_AG_IN_CALL_HELD_RES:
+      case BTA_AG_MULTI_CALL_RES:
+        if (!bta_ag_is_sco_open_allowed (p_scb,
+                                         "CALL Indiacator event")) {
+          LOG_ERROR("%s: HFP is not preference, not sending responses", __func__);
+          return;
+        }
+    }
+  }
+
   char buf[BTA_AG_AT_MAX_LEN + 16] = "";
   char* p = buf;
 
@@ -1890,11 +1911,23 @@ void bta_ag_send_bcs(tBTA_AG_SCB* p_scb) {
  ******************************************************************************/
 bool bta_ag_is_sco_open_allowed(tBTA_AG_SCB* p_scb, const std::string event) {
 #ifdef __ANDROID__
-  /* Do not open SCO if 1. the dual mode audio system property is enabled,
-  2. LEA is active, and 3. LEA is preferred for DUPLEX */
+  /* Do not open SCO if
+    1. the dual mode audio system property is enabled,
+    2. LE Audio is active,
+    3. LE Audio is preferred for DUPLEX,
+    4. If it's a CS Call not VoIP one */
+
+  bool is_duplex_pref_leaudio =
+      LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr);
+  bool is_in_call = LeAudioClient::Get()->IsInCall();
+
+  LOG_INFO("Is Duplex preferred profile le audio for device %s is %d ",
+           p_scb->peer_addr.ToStringForLogging().c_str(), is_duplex_pref_leaudio);
+  LOG_INFO("Is call in progress %d", is_in_call);
+
   if (bluetooth::os::GetSystemPropertyBool(
           bluetooth::os::kIsDualModeAudioEnabledProperty, false)) {
-    if (LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr)) {
+    if (is_duplex_pref_leaudio && is_in_call) {
       LOG_INFO("NOT opening SCO for EVT %s on dual mode device %s",
                event.c_str(), p_scb->peer_addr.ToStringForLogging().c_str());
       return false;

@@ -232,6 +232,14 @@ public class LeAudioNativeInterface {
         sendMessageToService(event);
     }
 
+    void OnMetadataUpdate(int context_type) {
+        Log.w(TAG, "Context Type: " + context_type);
+        LeAudioService service = LeAudioService.getLeAudioService();
+        if (service != null) {
+            service.setMetadataContext(context_type);
+        }
+    }
+
     @VisibleForTesting
     void onHealthBasedRecommendationAction(byte[] address, int action) {
         LeAudioStackEvent event =

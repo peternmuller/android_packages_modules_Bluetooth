@@ -71,6 +71,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.bluetooth.Utils;
+import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.bass_client.BassClientService;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.AudioRoutingManager;
@@ -3224,6 +3225,20 @@ public class LeAudioService extends ProfileService {
             return false;
         }
 
+        boolean isCsipSupported = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
+                                                      BluetoothUuid.COORDINATED_SET);
+        CsipSetCoordinatorService csipClient =
+                mServiceFactory.getCsipSetCoordinatorService();
+        int CsipGroupSize = 1;
+        int grpId = -1;
+        if (isCsipSupported && csipClient != null) {
+            grpId = csipClient.getGroupId(device, BluetoothUuid.CAP);
+            CsipGroupSize = csipClient.getDesiredGroupSize(grpId);
+        }
+
+        Log.w(TAG, "Group size of device " + device + " with group id: " + grpId +
+                " has group size = " + CsipGroupSize);
+
         if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
             setEnabledState(device, /* enabled = */ true);
             // Authorizes LEA GATT server services if already assigned to a group
@@ -3231,12 +3246,46 @@ public class LeAudioService extends ProfileService {
             if (groupId != LE_AUDIO_GROUP_ID_INVALID) {
                 setAuthorizationForRelatedProfiles(device, true);
             }
+            if (Utils.isDualModeAudioEnabled()) {
+                if (isCsipSupported && CsipGroupSize > 1) {
+                    A2dpService mA2dp = A2dpService.getA2dpService();
+                    if (mA2dp != null) {
+                        mA2dp.disconnect(device);
+                        Log.e(TAG, "A2DP disconnect when dual mode enable for CSIP device "
+                            + device + " for le audio policy allowed");
+                    }
+
+                    HeadsetService mHfp = HeadsetService.getHeadsetService();
+                    if (mHfp != null) {
+                        mHfp.disconnect(device);
+                        Log.e(TAG, "HFP disconnect when dual mode enable for CSIP device "
+                            + device + " for le audio policy allowed");
+                    }
+                }
+            }
             connect(device);
         } else if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
             setEnabledState(device, /* enabled = */ false);
             // Remove authorization for LEA GATT server services
             setAuthorizationForRelatedProfiles(device, false);
             disconnect(device);
+            if (Utils.isDualModeAudioEnabled()) {
+                if (isCsipSupported && CsipGroupSize > 1) {
+                    A2dpService mA2dp = A2dpService.getA2dpService();
+                    if (mA2dp != null) {
+                        mA2dp.connect(device);
+                        Log.e(TAG, "A2DP connect when dual mode enable for CSIP device "
+                            + device + " for le audio policy forbidden");
+                    }
+
+                    HeadsetService mHfp = HeadsetService.getHeadsetService();
+                    if (mHfp != null) {
+                        mHfp.connect(device);
+                        Log.e(TAG, "HFP connect when dual mode enable for CSIP device "
+                            + device + " for le audio policy forbidden");
+                    }
+                }
+            }
         }
         setLeAudioGattClientProfilesPolicy(device, connectionPolicy);
         return true;
@@ -3919,13 +3968,14 @@ public class LeAudioService extends ProfileService {
                         BluetoothProfileConnectionInfo.createLeAudioInfo(suppressNoisyIntent, true);
             }
 
+            Log.d(TAG, "handleBluetoothActiveDeviceChanged called for LE Out");
             mAudioManager.handleBluetoothActiveDeviceChanged(
                     mActiveAudioOutDevice, mActiveAudioOutDevice, connectionInfo);
             audioFrameworkCalls++;
         }
 
         if (mActiveAudioInDevice != null) {
-            Log.i(TAG, "Sending LE Audio Input active device changed for audio profile change");
+            Log.d(TAG, "handleBluetoothActiveDeviceChanged called for LE In");
             mAudioManager.handleBluetoothActiveDeviceChanged(mActiveAudioInDevice,
                     mActiveAudioInDevice, BluetoothProfileConnectionInfo.createLeAudioInfo(false,
                             false));
@@ -3933,6 +3983,19 @@ public class LeAudioService extends ProfileService {
         }
 
         return audioFrameworkCalls;
+    }
+
+    /**
+     * Gets the context of Update Metadata
+     * @param context_type context type from Update Metadata
+     * @hide
+     */
+    public void setMetadataContext(int context_type) {
+        BluetoothDevice btDevice = mActiveAudioInDevice;
+        Log.w(TAG, "setMetadataContext Type: " + context_type + " for device" + btDevice);
+        mAdapterService
+                .getActiveDeviceManager()
+                .contextBundle(btDevice, context_type);
     }
 
     /**

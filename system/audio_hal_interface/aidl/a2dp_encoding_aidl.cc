@@ -170,9 +170,8 @@ int getPriority(LeAudioContextType context) {
   return 0;
 }
 
-int context_contention_src(source_metadata_t *source_metadata) {
-  auto tracks = source_metadata->tracks;
-  auto track_count = source_metadata->track_count;
+int context_contention_src(const source_metadata_v7_t& source_metadata) {
+  auto track_count = source_metadata.track_count;
   LeAudioContextType current_context = LeAudioContextType::MEDIA;
   auto current_priority = -1;
 
@@ -181,29 +180,28 @@ int context_contention_src(source_metadata_t *source_metadata) {
     return 0;
   }
 
-  while (track_count) {
+  for (size_t i = 0; i < track_count; i++) {
     auto context_priority = 0;
-    if (tracks->content_type == 0 && tracks->usage == 0) {
-      --track_count;
+    auto track = source_metadata.tracks[i].base;
+    if (track.content_type == 0 && track.usage == 0) {
       LOG(INFO) << __func__ << ": tracks count: " << track_count;
-      ++tracks;
       continue;
     }
 
     LOG(INFO) << __func__
-              << ": usage=" << tracks->usage
-              << ", content_type=" << tracks->content_type
-              << ", gain=" << tracks->gain;
-    LeAudioContextType context_type = AudioContentToLeAudioContextInAPM(tracks->content_type,
-                                                    AUDIO_SOURCE_DEFAULT, tracks->usage);
+              << ": usage=" << track.usage
+              << ", content_type=" << track.content_type
+              << ", gain=" << track.gain;
+    LeAudioContextType context_type = AudioContentToLeAudioContextInAPM(track.content_type,
+                                                    AUDIO_SOURCE_DEFAULT, track.usage);
+
     context_priority = getPriority(context_type);
+    LOG(INFO) << __func__ << ": context_priority: " << context_priority;
     if (context_priority > current_priority)
-      {
+    {
         current_priority = context_priority;
         current_context = context_type;
-      }
-    --track_count;
-    ++tracks;
+    }
   }
   uint16_t ctx = LeAudioContextToIntContentInAPM(current_context);;
   return ctx;
@@ -359,7 +357,15 @@ void A2dpTransport::SourceMetadataChanged(
     --track_count;
     ++tracks;
   }
-  uint16_t context = context_contention_src((source_metadata_t *)&source_metadata);
+
+  uint16_t context = context_contention_src(source_metadata);
+
+  if (btif_av_is_dual_mode_enabled() &&
+      (context == CONTENT_TYPE_MEDIA ||
+      context == CONTENT_TYPE_GAME)) {
+    btif_av_metadata_update(context);
+  }
+
   bool is_gaming = (context == CONTENT_TYPE_GAME) ? true : false;
   btif_av_update_source_metadata(is_gaming);
 }

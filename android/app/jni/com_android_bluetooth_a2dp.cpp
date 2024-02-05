@@ -28,6 +28,7 @@ static jmethodID method_onConnectionStateChanged;
 static jmethodID method_onAudioStateChanged;
 static jmethodID method_onCodecConfigChanged;
 static jmethodID method_isMandatoryCodecPreferred;
+static jmethodID method_OnMetadataUpdate;
 
 static struct {
   jclass clazz;
@@ -184,12 +185,24 @@ static bool bta2dp_mandatory_codec_preferred_callback(
       mCallbacksObj, method_isMandatoryCodecPreferred, addr.get());
 }
 
+static void bta2dp_metadata_update_callback(uint16_t context) {
+  ALOGI("%s", __func__);
+
+  std::shared_lock<std::shared_timed_mutex> lock(callbacks_mutex);
+  CallbackEnv sCallbackEnv(__func__);
+  if (!sCallbackEnv.valid() || mCallbacksObj == nullptr) return;
+
+  return sCallbackEnv->CallVoidMethod(mCallbacksObj, method_OnMetadataUpdate,
+                                                      (jint)context);
+}
+
 static btav_source_callbacks_t sBluetoothA2dpCallbacks = {
     sizeof(sBluetoothA2dpCallbacks),
     bta2dp_connection_state_callback,
     bta2dp_audio_state_callback,
     bta2dp_audio_config_callback,
     bta2dp_mandatory_codec_preferred_callback,
+    bta2dp_metadata_update_callback,
 };
 
 static std::vector<btav_a2dp_codec_config_t> prepareCodecPreferences(
@@ -548,6 +561,7 @@ int register_com_android_bluetooth_a2dp(JNIEnv* env) {
        "[Landroid/bluetooth/BluetoothCodecConfig;)V",
        &method_onCodecConfigChanged},
       {"isMandatoryCodecPreferred", "([B)Z", &method_isMandatoryCodecPreferred},
+      {"OnMetadataUpdate", "(I)V", &method_OnMetadataUpdate},
   };
   GET_JAVA_METHODS(env, "com/android/bluetooth/a2dp/A2dpNativeInterface",
                    javaMethods);

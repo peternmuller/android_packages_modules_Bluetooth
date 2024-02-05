@@ -254,6 +254,14 @@ public class A2dpNativeInterface {
         }
     }
 
+    private void OnMetadataUpdate(int context_type) {
+        Log.w(TAG, "Context Type: " + context_type);
+        A2dpService service = A2dpService.getA2dpService();
+        if (service != null) {
+            service.setMetadataContext(context_type);
+        }
+    }
+
     // Native methods that call into the JNI interface
     private native void initNative(int maxConnectedAudioDevices,
                                    BluetoothCodecConfig[] codecConfigPriorities,

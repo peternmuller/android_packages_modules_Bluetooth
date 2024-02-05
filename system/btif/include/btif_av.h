@@ -281,6 +281,16 @@ void btif_av_update_source_metadata(bool is_Gaming_Enabled);
  */
 void btif_av_set_low_latency_spatial_audio(bool is_low_latency);
 
+/*
+ * Dual Mode Enabled check
+ */
+bool btif_av_is_dual_mode_enabled();
+
+/*
+ * Update Metadata Context
+ */
+void btif_av_metadata_update(uint16_t context);
+
 /**
  * Check whether A2DP Source is enabled.
  */
