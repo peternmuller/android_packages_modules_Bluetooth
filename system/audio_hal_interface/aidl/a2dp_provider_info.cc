@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AIDLProviderInfo"
+#define LOG_TAG "AIDLA2dpProviderInfo"
 
-#include "provider_info.h"
+#include "a2dp_provider_info.h"
 
 #include <android/binder_manager.h>
 #include <android_bluetooth_flags.h>
@@ -49,9 +49,16 @@ using ::aidl::android::hardware::bluetooth::audio::SessionType;
  * getProviderInfo, or if the feature flag for codec
  * extensibility is disabled.
  ***/
-std::unique_ptr<ProviderInfo> ProviderInfo::GetProviderInfo() {
+std::unique_ptr<ProviderInfo> ProviderInfo::GetProviderInfo(
+    bool supports_a2dp_hw_offload_v2) {
   if (!IS_FLAG_ENABLED(a2dp_offload_codec_extensibility)) {
     LOG(INFO) << "a2dp offload codec extensibility is disabled;"
+              << " not going to load the ProviderInfo";
+    return nullptr;
+  }
+
+  if (!supports_a2dp_hw_offload_v2) {
+    LOG(INFO) << "a2dp hw offload v2 is not supported by the controller;"
               << " not going to load the ProviderInfo";
     return nullptr;
   }
@@ -79,6 +86,7 @@ std::unique_ptr<ProviderInfo> ProviderInfo::GetProviderInfo() {
     sink_codecs = std::move(sink_provider_info->codecInfos);
   }
 
+  LOG(INFO) << "successfully loaded provider info";
   return std::make_unique<ProviderInfo>(std::move(source_codecs),
                                         std::move(sink_codecs));
 }

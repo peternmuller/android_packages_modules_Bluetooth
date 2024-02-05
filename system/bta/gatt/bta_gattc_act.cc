@@ -727,7 +727,7 @@ static void bta_gattc_set_discover_st(tBTA_GATTC_SERV* p_srcb) {
   if (!interop_match_addr_or_name(INTEROP_DISABLE_LE_CONN_UPDATES,
                                   &p_srcb->server_bda,
                                   &btif_storage_get_remote_device_property)) {
-    L2CA_EnableUpdateBleConnParams(p_srcb->server_bda, false);
+    L2CA_LockBleConnParamsForServiceDiscovery(p_srcb->server_bda, true);
   }
   for (i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
     if (bta_gattc_cb.clcb[i].p_srcb == p_srcb) {
@@ -811,7 +811,7 @@ void bta_gattc_start_discover_internal(tBTA_GATTC_CLCB* p_clcb) {
     if (!interop_match_addr_or_name(INTEROP_DISABLE_LE_CONN_UPDATES,
                                     &p_clcb->p_srcb->server_bda,
                                     &btif_storage_get_remote_device_property)) {
-      L2CA_EnableUpdateBleConnParams(p_clcb->p_srcb->server_bda, false);
+      L2CA_LockBleConnParamsForServiceDiscovery(p_clcb->p_srcb->server_bda, true);
     }
   }
 
@@ -952,7 +952,8 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
         (!interop_match_addr_or_name(
             INTEROP_DISABLE_LE_CONN_UPDATES, &p_clcb->p_srcb->server_bda,
             &btif_storage_get_remote_device_property))) {
-      L2CA_EnableUpdateBleConnParams(p_clcb->p_srcb->server_bda, true);
+      L2CA_LockBleConnParamsForServiceDiscovery(p_clcb->p_srcb->server_bda,
+                                                false);
     }
   }
 

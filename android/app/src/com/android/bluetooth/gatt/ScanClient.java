@@ -21,6 +21,8 @@ import android.bluetooth.le.ScanSettings;
 import android.os.Binder;
 import android.os.UserHandle;
 
+import com.android.bluetooth.le_scan.AppScanStats;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -29,7 +31,7 @@ import java.util.Objects;
  *
  * @hide
  */
-/* package */class ScanClient {
+public class ScanClient {
     public int scannerId;
     public ScanSettings settings;
     public int scanModeApp;
@@ -57,7 +59,7 @@ import java.util.Objects;
         this(scannerId, DEFAULT_SCAN_SETTINGS, null);
     }
 
-    ScanClient(int scannerId, ScanSettings settings, List<ScanFilter> filters) {
+    public ScanClient(int scannerId, ScanSettings settings, List<ScanFilter> filters) {
         this(scannerId, settings, filters, Binder.getCallingUid());
     }
 
