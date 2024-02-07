@@ -236,6 +236,17 @@ static void transmit_command(const BT_HDR* command,
 
   bool is_qbce_sub_opcode_return_command_status = false;
 
+  if (command_op_code == (uint16_t)bluetooth::hci::OpCode::HCI_VS_QBCE_OCF) {
+    uint8_t cmd_len = data[2];
+    uint8_t sub_opcode;
+    if (cmd_len > 0) {
+      sub_opcode = data[3];
+      log::debug("Sending command, qbce sub_opcode {}", sub_opcode);
+      // 0x0c is for QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE
+      if (sub_opcode == 0x0c) is_qbce_sub_opcode_return_command_status = true;
+    }
+  }
+
   // Gd stack API requires opcode specification and calculates length, so
   // no need to provide opcode or length here.
   data += (kCommandOpcodeSize + kCommandLengthSize);

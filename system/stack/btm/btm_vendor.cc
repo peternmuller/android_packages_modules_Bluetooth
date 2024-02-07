@@ -55,6 +55,10 @@
 #define BLE_TECH_VALUE 0x02
 #define BT_DEFAULT_POWER (0x80)
 
+constexpr uint16_t  HCI_VS_QBCE_OCF = 0xFC51;
+constexpr uint16_t  HCI_VS_GET_ADDON_FEATURES_SUPPORT = 0xFC1D;
+constexpr uint16_t  HCI_VS_LINK_POWER_CTRL_REQ_OPCODE = 0xFCDA;
+
 using namespace bluetooth;
 
 typedef struct {

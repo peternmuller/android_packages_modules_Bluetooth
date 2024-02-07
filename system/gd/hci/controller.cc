@@ -1162,6 +1162,8 @@ struct Controller::impl {
         return false;
       case OpCode::MSFT_OPCODE_QUALCOMM:
         return false;
+      case OpCode::HCI_VS_QBCE_OCF:
+        return true;
       // undefined in local_supported_commands_
       case OpCode::READ_LOCAL_SUPPORTED_COMMANDS:
         return true;

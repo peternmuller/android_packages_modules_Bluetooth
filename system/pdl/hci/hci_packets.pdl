@@ -460,6 +460,7 @@ enum OpCode : 16 {
   // MSFT_OPCODE_xxxx below are needed for the tests.
   MSFT_OPCODE_MEDIATEK = 0xFD30,
   MSFT_OPCODE_QUALCOMM = 0xFD70,
+  HCI_VS_QBCE_OCF = 0xFC51,
 }
 
 // For mapping Local Supported Commands command
