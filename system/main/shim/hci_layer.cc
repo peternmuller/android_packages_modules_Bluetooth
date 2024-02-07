@@ -358,6 +358,22 @@ static void transmit_command(const BT_HDR* command,
 
   // little endian command opcode
   uint16_t command_op_code = (data[1] << 8 | data[0]);
+
+  bool is_qbce_sub_opcode_return_command_status = false;
+  if (command_op_code == (uint16_t)bluetooth::hci::OpCode::HCI_VS_QBCE_OCF) {
+    uint8_t cmd_len = data[2];
+    uint8_t sub_opcode;
+    if (cmd_len > 0) {
+      sub_opcode = data[3];
+      LOG_INFO(
+          "Sending command, is_qbce_sub_opcode_return_command qbce "
+          "sub_opcode=%d",
+          sub_opcode);
+      // 0x0c is for QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE
+      if (sub_opcode == 0x0c) is_qbce_sub_opcode_return_command_status = true;
+    }
+  }
+
   // Gd stack API requires opcode specification and calculates length, so
   // no need to provide opcode or length here.
   data += (kCommandOpcodeSize + kCommandLengthSize);
@@ -371,7 +387,8 @@ static void transmit_command(const BT_HDR* command,
 
   LOG_DEBUG("Sending command %s", bluetooth::hci::OpCodeText(op_code).c_str());
 
-  if (bluetooth::hci::Checker::IsCommandStatusOpcode(op_code)) {
+  if (bluetooth::hci::Checker::IsCommandStatusOpcode(op_code) ||
+      is_qbce_sub_opcode_return_command_status) {
     auto command_unique = std::make_unique<OsiObject>(command);
     bluetooth::shim::GetHciLayer()->EnqueueCommand(
         std::move(packet), bluetooth::shim::GetGdShimHandler()->BindOnce(
@@ -412,6 +429,16 @@ static void register_event(bluetooth::hci::EventCode event_code) {
   auto handler = bluetooth::shim::GetGdShimHandler();
   bluetooth::shim::GetHciLayer()->RegisterEventHandler(
       event_code, handler->Bind(event_callback));
+}
+
+static void register_vs_event() {
+  auto handler = bluetooth::shim::GetGdShimHandler();
+  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
+      handler->Bind(cpp::vendor_specific_event_callback));
+  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
+      handler->Bind(cpp::vendor_specific_event_callback));
 }
 
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {
@@ -575,6 +602,7 @@ void bluetooth::shim::hci_on_reset_complete() {
       bluetooth::hci::VseSubeventCode::BQR_EVENT,
       handler->Bind(cpp::vendor_specific_event_callback));
 
+  cpp::register_vs_event();
   cpp::register_for_iso();
 }
 
