@@ -438,8 +438,11 @@ void btm_ble_qll_connection_complete(uint8_t* p) {
   p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
 
   if (p_acl == nullptr) {
-    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
-    return;
+    p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_BR_EDR);
+    if (p_acl == nullptr) {
+      LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+      return;
+    }
   }
 
   if (status != HCI_SUCCESS) {
@@ -558,8 +561,11 @@ void btm_acl_update_qcm_phy_state(uint8_t* p) {
   p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_LE);
 
   if (p_acl == nullptr) {
-    LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
-    return;
+    p_acl = btm_acl_for_bda(remote_bd_addr, BT_TRANSPORT_BR_EDR);
+    if (p_acl == nullptr) {
+      LOG_ERROR(" :: can't find acl for handle: 0x%04x", handle);
+      return;
+    }
   }
 
   if (status != HCI_SUCCESS) {
@@ -628,19 +634,21 @@ bool BTM_IsQHSPhySupported(const RawAddress& bda, tBT_TRANSPORT transport) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_vendor_vse_cback(uint8_t* p, uint8_t evt_len) {
+void btm_vendor_vse_cback(uint8_t evt_len, uint8_t* p) {
   uint8_t i;
   uint8_t* pp = p;
   uint8_t vse_subcode;
+  LOG_INFO(" :: VSE event received, pp = 0x%x, evt_len = 0x%02x", pp, evt_len);
 
   if (evt_len >= 2) {
     STREAM_TO_UINT8(vse_subcode, pp);
+    LOG_INFO(" :: VSE event received, vse_subcode = 0x%02x", vse_subcode);
 
     if (HCI_VSE_SUBCODE_QBCE == vse_subcode) {
       uint8_t vse_msg_type;
 
       STREAM_TO_UINT8(vse_msg_type, pp);
-      LOG_INFO(" :: QBCE VSE event received, msg = %x", vse_msg_type);
+      LOG_INFO(" :: QBCE VSE event received, msg = 0x%02x", vse_msg_type);
       switch (vse_msg_type) {
         case MSG_QBCE_QLL_CONNECTION_COMPLETE:
           btm_ble_qll_connection_complete(pp);
@@ -658,14 +666,14 @@ void btm_vendor_vse_cback(uint8_t* p, uint8_t evt_len) {
             return;
           }
           break;
-        case MSG_QBCE_VS_PARAM_REPORT_EVENT:
-          bluetooth::hci::IsoManager::GetInstance()->HandleVscHciEvent(
-              vse_msg_type, p, evt_len - 1);
         default:
           LOG_INFO(" :: unknown msg type: %d", vse_msg_type);
           break;
       }
       return;
+    } else if (MSG_QBCE_VS_PARAM_REPORT_EVENT == vse_subcode) {
+      bluetooth::hci::IsoManager::GetInstance()->HandleVscHciEvent(
+          vse_subcode, pp, evt_len - 1);
     }
   }
   LOG_DEBUG("BTM Event: Vendor Specific event from controller");
