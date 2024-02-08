@@ -63,6 +63,21 @@ bt_device_host_add_on_features_t* BTM_GetHostAddOnFeatures(
 bt_device_soc_add_on_features_t* BTM_GetSocAddOnFeatures(
     uint8_t* soc_add_on_features_len);
 
+
+/*******************************************************************************
+ *
+ * Function         BTM_GetQllLocalSupportedFeatures
+ *
+ * Description      BTM_GetQllLocalSupportedFeatures
+ *
+ *
+ * Returns          get QLL Local Supported add on features array
+ *
+ ******************************************************************************/
+bt_device_qll_local_supported_features_t* BTM_GetQllLocalSupportedFeatures(
+    uint8_t* qll_local_supported_features_len);
+
+
 /*******************************************************************************
  *
  * Function         BTM_ReadVendorAddOnFeatures

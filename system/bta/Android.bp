@@ -752,6 +752,7 @@ cc_test {
         ":TestMockBtaLeAudioHalVerifier",
         ":TestMockLegacyHciInterface",
         ":TestStubOsi",
+        ":TestMockStackBtm",
         "le_audio/codec_manager.cc",
         "le_audio/codec_manager_test.cc",
         "le_audio/le_audio_set_configuration_provider_json.cc",
@@ -1032,6 +1033,7 @@ cc_test {
     srcs: [
         ":TestCommonMockFunctions",
         ":TestCommonStackConfig",
+        ":TestMockOsi",
         "le_audio/broadcaster/broadcaster_types.cc",
         "le_audio/broadcaster/mock_ble_advertising_manager.cc",
         "le_audio/broadcaster/state_machine.cc",
