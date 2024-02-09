@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "base/functional/callback.h"
 #include "device/include/esco_parameters.h"
 #include "stack/btm/neighbor_inquiry.h"
@@ -518,10 +520,10 @@ tBTM_STATUS BTM_ReadLocalDeviceNameFromController(
  *
  * Description      This function is called to read the local device class
  *
- * Returns          pointer to the device class
+ * Returns          the device class
  *
  ******************************************************************************/
-uint8_t* BTM_ReadDeviceClass(void);
+DEV_CLASS BTM_ReadDeviceClass(void);
 
 /*******************************************************************************
  *

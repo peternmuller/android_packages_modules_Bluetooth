@@ -657,6 +657,14 @@ struct LeAudioCoreCodecConfig {
     return 0;
   }
 
+  /** Returns the frame duration representation in us */
+  uint16_t GetOctetsPerFrame() const {
+    if (octets_per_codec_frame)
+      return *octets_per_codec_frame;
+
+    return 0;
+  }
+
   /** Channel count per CIS or BIS */
   uint8_t GetChannelCountPerIsoStream(void) const {
     return allocated_channel_count;
@@ -832,8 +840,6 @@ class LeAudioLtvMap {
       STREAM_TO_UINT32(core.audio_channel_allocation, ptr);
       core.allocated_channel_count =
               std::bitset<32>(core.audio_channel_allocation.value()).count();
-    } else {
-      core.allocated_channel_count = 1;
     }
 
     return core;
@@ -1145,7 +1151,7 @@ static constexpr uint32_t kChannelAllocationStereo =
     codec_spec_conf::kLeAudioLocationFrontRight;
 
 /* Declarations */
-void get_cis_count(const AudioSetConfigurations& audio_set_configurations,
+void get_cis_count(types::LeAudioContextType context_type,
                    int expected_device_cnt,
                    types::LeAudioConfigurationStrategy strategy,
                    int group_ase_snk_cnt, int group_ase_src_count,
@@ -1175,7 +1181,8 @@ struct stream_parameters {
   /* Total number of channels we request from the audio framework */
   uint8_t num_of_channels;
   int num_of_devices;
-
+  uint8_t mode;
+  uint16_t delay;
   std::vector<uint8_t> codec_spec_metadata;
 
   /* cis_handle, audio location*/

@@ -25,8 +25,8 @@
 #define BTA_SYS_H
 
 #include <base/strings/stringprintf.h>
-#include <base/time/time.h>
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -200,6 +200,9 @@ typedef void(tBTA_SYS_ROLE_SWITCH_CBACK)(tBTA_SYS_CONN_STATUS status,
 typedef void(tBTA_SYS_SSR_CFG_CBACK)(uint8_t id, uint8_t app_id,
                                      uint16_t latency, uint16_t tout);
 
+typedef void(tBTA_SYS_SNIFF_CBACK)(uint8_t id, uint8_t app_id,
+                                   const RawAddress& peer_addr);
+
 typedef struct {
   bluetooth::Uuid custom_uuid;
   uint32_t handle;
@@ -234,14 +237,14 @@ void bta_sys_register(uint8_t id, const tBTA_SYS_REG* p_reg);
 void bta_sys_deregister(uint8_t id);
 bool bta_sys_is_register(uint8_t id);
 void bta_sys_sendmsg(void* p_msg);
-void bta_sys_sendmsg_delayed(void* p_msg, const base::TimeDelta& delay);
+void bta_sys_sendmsg_delayed(void* p_msg, std::chrono::microseconds delay);
 void bta_sys_start_timer(alarm_t* alarm, uint64_t interval_ms, uint16_t event,
                          uint16_t layer_specific);
 void bta_sys_disable();
 
 void bta_sys_rm_register(tBTA_SYS_CONN_CBACK* p_cback);
 void bta_sys_pm_register(tBTA_SYS_CONN_CBACK* p_cback);
-
+void bta_sys_sniff_register(tBTA_SYS_SNIFF_CBACK* p_cback);
 void bta_sys_sco_register(tBTA_SYS_CONN_SCO_CBACK* p_cback);
 
 void bta_sys_conn_open(tBTA_SYS_ID id, uint8_t app_id,
@@ -262,7 +265,8 @@ void bta_sys_sco_unuse(tBTA_SYS_ID id, uint8_t app_id,
                        const RawAddress& peer_addr);
 void bta_sys_idle(tBTA_SYS_ID id, uint8_t app_id, const RawAddress& peer_addr);
 void bta_sys_busy(tBTA_SYS_ID id, uint8_t app_id, const RawAddress& peer_addr);
-
+void bta_sys_reset_sniff(uint8_t id, uint8_t app_id,
+                         const RawAddress& peer_addr);
 void bta_sys_ssr_cfg_register(tBTA_SYS_SSR_CFG_CBACK* p_cback);
 void bta_sys_chg_ssr_config(tBTA_SYS_ID id, uint8_t app_id,
                             uint16_t max_latency, uint16_t min_tout);

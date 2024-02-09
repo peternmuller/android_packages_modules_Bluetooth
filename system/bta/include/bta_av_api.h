@@ -157,7 +157,8 @@ typedef enum {
   BTA_AV_CODEC_TYPE_APTX = 0x04,
   BTA_AV_CODEC_TYPE_APTXHD = 0x08,
   BTA_AV_CODEC_TYPE_LDAC = 0x10,
-  BTA_AV_CODEC_TYPE_OPUS = 0x20
+  BTA_AV_CODEC_TYPE_OPUS = 0x20,
+  BTA_AV_CODEC_TYPE_APTX_ADAPTIVE = 0X40
 } tBTA_AV_CODEC_TYPE;
 
 /* Event associated with BTA_AV_ENABLE_EVT */
@@ -692,6 +693,17 @@ void BTA_AvMetaCmd(uint8_t rc_handle, uint8_t label, tBTA_AV_CMD cmd_code,
  *
  ******************************************************************************/
 void BTA_AvSetLatency(tBTA_AV_HNDL handle, bool is_low_latency);
+
+/*******************************************************************************
+ *
+ * Function         BTA_AvSetCodecMode
+ *
+ * Description      Set Codec Mode based on Metadata update.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode);
 
 /*******************************************************************************
  *

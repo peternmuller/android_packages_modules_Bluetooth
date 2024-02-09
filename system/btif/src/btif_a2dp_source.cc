@@ -36,21 +36,22 @@
 #include "audio_a2dp_hw/include/audio_a2dp_hw.h"
 #include "audio_hal_interface/a2dp_encoding.h"
 #include "bta_av_ci.h"
-#include "btif_a2dp.h"
 #include "btif_a2dp_control.h"
 #include "btif_a2dp_source.h"
 #include "btif_av.h"
 #include "btif_av_co.h"
 #include "btif_metrics_logging.h"
-#include "btif_util.h"
 #include "common/message_loop_thread.h"
 #include "common/metrics.h"
 #include "common/repeating_timer.h"
 #include "common/time_util.h"
+#include "include/check.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/fixed_queue.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
+#include "osi/include/properties.h"
 #include "osi/include/wakelock.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/acl_api_types.h"
@@ -598,9 +599,45 @@ static void btif_a2dp_source_setup_codec_delayed(
   }
 
   A2dpCodecConfig* a2dp_codec_config = bta_av_get_a2dp_current_codec();
-  if (a2dp_codec_config == nullptr) {
+  btav_a2dp_codec_config_t codec_config;
+
+  if (a2dp_codec_config != nullptr) {
+      codec_config = a2dp_codec_config->getCodecConfig();
+  } else {
     LOG_ERROR("%s: Cannot stream audio: current codec is not set", __func__);
     return;
+  }
+
+  uint8_t p_codec_info[AVDT_CODEC_SIZE];
+  memset(p_codec_info, 0, AVDT_CODEC_SIZE);
+
+  //copy peer codec info to p_codec_info
+  if (!a2dp_codec_config->copyOutOtaCodecConfig(p_codec_info)) {
+    LOG_ERROR("%s: Fetching peer codec info returns fail.", __func__);
+    return;
+  }
+
+  tBT_FLOW_SPEC flow_spec;
+  memset(&flow_spec, 0x00, sizeof(flow_spec));
+
+  flow_spec.flow_direction = 0x00;     /* flow direction - out going */
+  flow_spec.service_type = 0x02;       /* Guaranteed */
+  flow_spec.token_rate = 0x00;         /* bytes/second - no token rate is specified*/
+  flow_spec.token_bucket_size = 0x00;  /* bytes - no token bucket is needed*/
+  flow_spec.latency = 0xFFFFFFFF;      /* microseconds - default value */
+
+  if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_AAC) {
+    char prop_value[PROPERTY_VALUE_MAX] = "false";
+    osi_property_get("persist.vendor.qcom.bluetooth.aac_abr_support", prop_value, "false");
+    if (!strcmp(prop_value, "true")) {
+      flow_spec.peak_bandwidth = 0;//ABR enabled
+    } else {
+      flow_spec.peak_bandwidth = (165*1000)/8; /* bytes/second */
+    }
+    tBTM_STATUS status = BTM_FlowSpec(peer_address, &flow_spec, NULL);
+    if (status != BTM_CMD_STARTED) {
+      LOG_WARN("%s: Cannot send FlowSpec: status %d", __func__, status);
+    }
   }
 
   btif_a2dp_source_cb.encoder_interface->encoder_init(
@@ -826,11 +863,7 @@ static void btif_a2dp_source_audio_tx_start_event(void) {
   btif_a2dp_source_cb.media_alarm.SchedulePeriodic(
       btif_a2dp_source_thread.GetWeakPtr(), FROM_HERE,
       base::BindRepeating(&btif_a2dp_source_audio_handle_timer),
-#if BASE_VER < 931007
-      base::TimeDelta::FromMilliseconds(
-#else
-      base::Milliseconds(
-#endif
+      std::chrono::milliseconds(
           btif_a2dp_source_cb.encoder_interface->get_encoder_interval_ms()));
   btif_a2dp_source_cb.sw_audio_is_encoding = true;
 
@@ -1365,6 +1398,16 @@ static void btif_a2dp_source_update_metrics(void) {
     }
   }
   BluetoothMetricsLogger::GetInstance()->LogA2dpSession(metrics);
+
+  if (metrics.audio_duration_ms != -1) {
+    log_a2dp_session_metrics_event(
+        btif_av_source_active_peer(), metrics.audio_duration_ms,
+        metrics.media_timer_min_ms, metrics.media_timer_max_ms,
+        metrics.media_timer_avg_ms, metrics.total_scheduling_count,
+        metrics.buffer_overruns_max_count, metrics.buffer_overruns_total,
+        metrics.buffer_underruns_average, metrics.buffer_underruns_count,
+        metrics.codec_index, metrics.is_a2dp_offload);
+  }
 }
 
 void btif_a2dp_source_set_dynamic_audio_buffer_size(

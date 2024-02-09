@@ -27,11 +27,12 @@
 
 // Original included files, if any
 #include "device/include/controller.h"
+#include "hci/class_of_device.h"
 #include "stack/acl/acl.h"
 #include "stack/btm/security_device_record.h"
 #include "stack/include/acl_client_callbacks.h"
 #include "stack/include/bt_hdr.h"
-#include "types/class_of_device.h"
+#include "stack/include/bt_types.h"
 #include "types/raw_address.h"
 
 // Mocked compile conditionals, if any
@@ -39,17 +40,6 @@ namespace test {
 namespace mock {
 namespace stack_acl {
 
-// Shared state between mocked functions and tests
-// Name: ACL_SupportTransparentSynchronousData
-// Params: const RawAddress& bd_addr
-// Returns: bool
-struct ACL_SupportTransparentSynchronousData {
-  std::function<bool(const RawAddress& bd_addr)> body{
-      [](const RawAddress& /* bd_addr */) { return false; }};
-  bool operator()(const RawAddress& bd_addr) { return body(bd_addr); };
-};
-extern struct ACL_SupportTransparentSynchronousData
-    ACL_SupportTransparentSynchronousData;
 // Name: BTM_BLE_IS_RESOLVE_BDA
 // Params: const RawAddress& x
 // Returns: bool
@@ -790,15 +780,15 @@ struct btm_acl_connected {
 };
 extern struct btm_acl_connected btm_acl_connected;
 // Name: btm_connection_request
-// Params: const RawAddress& bda, const bluetooth::types::ClassOfDevice& cod
+// Params: const RawAddress& bda, const bluetooth::hci::ClassOfDevice& cod
 // Returns: void
 struct btm_connection_request {
   std::function<void(const RawAddress& bda,
-                     const bluetooth::types::ClassOfDevice& cod)>
+                     const bluetooth::hci::ClassOfDevice& cod)>
       body{[](const RawAddress& /* bda */,
-              const bluetooth::types::ClassOfDevice& /* cod */) { ; }};
+              const bluetooth::hci::ClassOfDevice& /* cod */) { ; }};
   void operator()(const RawAddress& bda,
-                  const bluetooth::types::ClassOfDevice& cod) {
+                  const bluetooth::hci::ClassOfDevice& cod) {
     body(bda, cod);
   };
 };
@@ -1191,6 +1181,30 @@ struct BTM_unblock_role_switch_and_sniff_mode_for {
 };
 extern struct BTM_unblock_role_switch_and_sniff_mode_for
     BTM_unblock_role_switch_and_sniff_mode_for;
+
+struct btm_flow_spec_complete {
+  std::function<void(uint8_t status, uint16_t handle, tBT_FLOW_SPEC* p_flow)> body{
+      [](uint8_t /*status*/, uint16_t /*handle*/, tBT_FLOW_SPEC* /*p_flow*/) {}};
+  void operator()(uint8_t status, uint16_t handle, tBT_FLOW_SPEC* p_flow)
+        { body(status, handle, p_flow); };
+};
+extern struct btm_flow_spec_complete btm_flow_spec_complete;
+
+// Name: BTM_FlowSpec
+// Params: const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+// tBTM_CMPL_CB* p_cb Returns: tBTM_STATUS
+struct BTM_FlowSpec {
+  std::function<tBTM_STATUS(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                            tBTM_CMPL_CB* p_cb)> body{
+      [](const RawAddress& /*addr*/, tBT_FLOW_SPEC* /*p_flow*/, tBTM_CMPL_CB* /*p_cb*/) {
+        return 0; 
+      }};
+  tBTM_STATUS operator()(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                         tBTM_CMPL_CB* p_cb) {
+    return body(addr, p_flow, p_cb);
+  };
+};
+extern struct BTM_FlowSpec BTM_FlowSpec;
 
 }  // namespace stack_acl
 }  // namespace mock

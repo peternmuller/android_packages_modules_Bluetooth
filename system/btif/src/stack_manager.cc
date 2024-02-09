@@ -18,8 +18,6 @@
 
 #define LOG_TAG "bt_stack_manager"
 
-#include "btif/include/stack_manager.h"
-
 #include <hardware/bluetooth.h>
 
 #include <cstdlib>
@@ -27,10 +25,12 @@
 
 #include "btcore/include/module.h"
 #include "btcore/include/osi_module.h"
+#include "btif/include/stack_manager_t.h"
 #include "btif_api.h"
 #include "btif_common.h"
 #include "common/message_loop_thread.h"
 #include "core_callbacks.h"
+#include "include/check.h"
 #include "main/shim/shim.h"
 #include "os/log.h"
 #include "osi/include/osi.h"
@@ -106,8 +106,6 @@ static_assert(
     "  Host interface device profile is always enabled in the bluetooth stack"
     "*** Conditional Compilation Directive error");
 
-void main_thread_shut_down();
-void main_thread_start_up();
 void BTA_dm_on_hw_on();
 void BTA_dm_on_hw_off();
 

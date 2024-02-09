@@ -331,6 +331,7 @@ public class AdapterService extends Service {
     private AdapterState mAdapterStateMachine;
     private BondStateMachine mBondStateMachine;
     private RemoteDevices mRemoteDevices;
+    private Vendor mVendor;
 
     /* TODO: Consider to remove the search API from this class, if changed to use call-back */
     private SdpManager mSdpManager = null;
@@ -636,6 +637,7 @@ public class AdapterService extends Service {
         mBatteryStatsManager = getNonNullSystemService(BatteryStatsManager.class);
         mCompanionDeviceManager = getNonNullSystemService(CompanionDeviceManager.class);
 
+        mVendor = new Vendor(this);
         mRemoteDevices = new RemoteDevices(this, mLooper);
         mRemoteDevices.init();
         clearDiscoveringPackages();
@@ -759,6 +761,7 @@ public class AdapterService extends Service {
             // Some platforms, such as wearables do not have a system ui.
             Log.w(TAG, "Unable to resolve SystemUI's UID.", e);
         }
+        mVendor.init();
     }
 
     @Override
@@ -1304,6 +1307,10 @@ public class AdapterService extends Service {
                 }
                 mWakeLock = null;
             }
+        }
+
+        if (mVendor != null) {
+            mVendor.cleanup();
         }
 
         if (mDatabaseManager != null) {
@@ -6941,6 +6948,10 @@ public class AdapterService extends Service {
         return mAdapterProperties.getScanMode();
     }
 
+    public Vendor getVendorIntf() {
+        return mVendor;
+    }
+
     public String[] getAllowlistedMediaPlayers() {
         return mAdapterProperties.getAllowlistedMediaPlayers();
     }
@@ -7044,6 +7055,11 @@ public class AdapterService extends Service {
     IBinder getProfile(int profileId) {
         if (getState() == BluetoothAdapter.STATE_TURNING_ON) {
             return null;
+        }
+
+        // LE_AUDIO_BROADCAST is not associated with a service and use LE_AUDIO's Binder
+        if (profileId == BluetoothProfile.LE_AUDIO_BROADCAST) {
+            profileId = BluetoothProfile.LE_AUDIO;
         }
 
         ProfileService profile = mStartedProfiles.get(profileId);

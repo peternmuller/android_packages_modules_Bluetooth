@@ -359,6 +359,16 @@ struct BTA_AvVendorRsp {
 };
 extern struct BTA_AvVendorRsp BTA_AvVendorRsp;
 
+// Name: BTA_AvSetCodecMode
+// Params: tBTA_AV_HNDL handle, uint16_t enc_mode
+// Return: void
+struct BTA_AvSetCodecMode {
+  std::function<void(tBTA_AV_HNDL handle, uint16_t enc_mode)> body{
+      [](tBTA_AV_HNDL /* handle */, uint16_t /* enc_mode */) {}};
+  void operator()(tBTA_AV_HNDL handle, uint16_t enc_mode) { body(handle, enc_mode); };
+};
+extern struct BTA_AvSetCodecMode BTA_AvSetCodecMode;
+
 }  // namespace bta_av_api
 }  // namespace mock
 }  // namespace test

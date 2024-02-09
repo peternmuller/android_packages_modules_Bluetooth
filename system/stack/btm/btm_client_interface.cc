@@ -22,6 +22,7 @@
 #include "stack/include/btm_api.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_sec_api.h"
+#include "stack/include/btm_vendor_api.h"
 
 struct btm_client_interface_t btm_client_interface = {
     .lifecycle =
@@ -41,12 +42,6 @@ struct btm_client_interface_t btm_client_interface = {
     // Acl peer and lifecycle
     .peer =
         {
-            .features =
-                {
-                    .SupportTransparentSynchronousData =
-                        ACL_SupportTransparentSynchronousData,
-                },
-
             .BTM_IsAclConnectionUp = BTM_IsAclConnectionUp,
             .BTM_ReadConnectedTransportAddress =
                 BTM_ReadConnectedTransportAddress,
@@ -130,6 +125,20 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_InqDbNext = BTM_InqDbNext,
             .BTM_ClearInqDb = BTM_ClearInqDb,
         },
+    .vendor =
+        {
+            .BTM_ReadVendorAddOnFeatures = BTM_ReadVendorAddOnFeatures,
+            .BTM_GetSocAddOnFeatures = BTM_GetSocAddOnFeatures,
+            .BTM_GetHostAddOnFeatures = BTM_GetHostAddOnFeatures,
+            .BTM_GetA2dpOffloadCapablity = BTM_GetA2dpOffloadCapablity,
+            .BTM_IsSpiltA2dpSupported = BTM_IsSpiltA2dpSupported,
+            .BTM_IsAACFrameCtrlEnabled = BTM_IsAACFrameCtrlEnabled,
+            .BTM_GetScramblingSupportedFreqs = BTM_GetScramblingSupportedFreqs,
+            .BTM_IsQHSPhySupported = BTM_IsQHSPhySupported,
+            .BTM_RegisterForQleCigLatencyChangedEvt =
+                BTM_RegisterForQleCigLatencyChangedEvt,
+        }
+
 };
 
 struct btm_client_interface_t& get_btm_client_interface() {

@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
@@ -199,6 +200,12 @@ struct tACL_CONN {
   uint16_t flush_timeout_in_ticks;
   uint16_t hci_handle;
   tLINK_POLICY link_policy;
+
+  uint8_t qll_features_state;
+
+  /* available when qll_features_state is
+   * BTM_QLL_FEATURES_STATE_FEATURE_COMPLETE */
+  BD_FEATURES remote_qll_features;
 
  public:
   uint16_t Handle() const { return hci_handle; }

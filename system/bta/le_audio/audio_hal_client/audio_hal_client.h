@@ -17,11 +17,10 @@
  */
 #pragma once
 
-#include <future>
 #include <memory>
+#include <vector>
 
 #include "audio_hal_interface/le_audio_software.h"
-#include "common/repeating_timer.h"
 
 namespace le_audio {
 /* Represents configuration of audio codec, as exchanged between le audio and
@@ -92,20 +91,23 @@ struct LeAudioCodecConfiguration {
    */
   uint32_t data_interval_us;
 
+  /** octets per frame that codec expects to receive from audio framework */
   uint16_t  octets_per_codec_frame;
 
   bool operator!=(const LeAudioCodecConfiguration& other) {
     return !((num_channels == other.num_channels) &&
              (sample_rate == other.sample_rate) &&
              (bits_per_sample == other.bits_per_sample) &&
-             (data_interval_us == other.data_interval_us));
+             (data_interval_us == other.data_interval_us) &&
+             (octets_per_codec_frame == other.octets_per_codec_frame));
   }
 
   bool operator==(const LeAudioCodecConfiguration& other) const {
     return ((num_channels == other.num_channels) &&
             (sample_rate == other.sample_rate) &&
             (bits_per_sample == other.bits_per_sample) &&
-            (data_interval_us == other.data_interval_us));
+            (data_interval_us == other.data_interval_us) &&
+            (octets_per_codec_frame == other.octets_per_codec_frame));
   }
 
   bool IsInvalid() const {

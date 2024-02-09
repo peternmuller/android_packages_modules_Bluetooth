@@ -20,6 +20,7 @@ package com.android.bluetooth.le_audio;
 import static android.Manifest.permission.BLUETOOTH_CONNECT;
 import static android.bluetooth.IBluetoothLeAudio.LE_AUDIO_GROUP_ID_INVALID;
 
+import static com.android.bluetooth.flags.Flags.leaudioBroadcastFeatureSupport;
 import static com.android.bluetooth.Utils.enforceBluetoothPrivilegedPermission;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastU;
 
@@ -279,7 +280,8 @@ public class LeAudioService extends ProfileService {
     }
 
     public static boolean isBroadcastEnabled() {
-        return BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false);
+        return leaudioBroadcastFeatureSupport()
+                && BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false);
     }
 
     private boolean registerTmap() {
@@ -300,7 +302,7 @@ public class LeAudioService extends ProfileService {
     }
 
     @Override
-    protected boolean start() {
+    protected void start() {
         Log.i(TAG, "start()");
         if (sLeAudioService != null) {
             throw new IllegalStateException("start() called twice");
@@ -369,8 +371,6 @@ public class LeAudioService extends ProfileService {
         // Delay the call to init by posting it. This ensures TBS and MCS are fully initialized
         // before we start accepting connections
         mHandler.post(this::init);
-
-        return true;
     }
 
     private void init() {
@@ -392,11 +392,11 @@ public class LeAudioService extends ProfileService {
     }
 
     @Override
-    protected boolean stop() {
+    protected void stop() {
         Log.i(TAG, "stop()");
         if (sLeAudioService == null) {
             Log.w(TAG, "stop() called before start()");
-            return true;
+            return;
         }
 
         mQueuedInCallValue = Optional.empty();
@@ -495,8 +495,6 @@ public class LeAudioService extends ProfileService {
         mVolumeControlService = null;
         mCsipSetCoordinatorService = null;
         mBassClientService = null;
-
-        return true;
     }
 
     @Override
@@ -1074,6 +1072,7 @@ public class LeAudioService extends ProfileService {
     public List<BluetoothLeBroadcastMetadata> getAllBroadcastMetadata() {
         return mBroadcastDescriptors.values().stream()
                 .map(s -> s.mMetadata)
+                .filter(s -> s != null)
                 .collect(Collectors.toList());
     }
 
@@ -2195,8 +2194,8 @@ public class LeAudioService extends ProfileService {
         if (mAudioServersScanner == null || mScanCallback == null) {
             if (DBG) {
                 Log.d(TAG, "stopAudioServersBackgroundScan: already stopped");
-                return;
             }
+            return;
         }
 
         try {
@@ -2230,8 +2229,8 @@ public class LeAudioService extends ProfileService {
             if (mScanCallback != null) {
                 if (DBG) {
                     Log.d(TAG, "startAudioServersBackgroundScan: Scanning already enabled");
-                    return;
                 }
+                return;
             }
             mScanCallback = new AudioServerScanCallback();
         }
@@ -2538,10 +2537,8 @@ public class LeAudioService extends ProfileService {
             boolean success = stackEvent.valueBool1;
             if (success) {
                 Log.d(TAG, "Broadcast broadcastId: " + broadcastId + " created.");
-                notifyBroadcastStarted(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
-
                 mBroadcastDescriptors.put(broadcastId, new LeAudioBroadcastDescriptor());
-
+                notifyBroadcastStarted(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
                 // Start sending the actual stream
                 startBroadcast(broadcastId);
 
@@ -2560,23 +2557,22 @@ public class LeAudioService extends ProfileService {
 
         } else if (stackEvent.type == LeAudioStackEvent.EVENT_TYPE_BROADCAST_DESTROYED) {
             Integer broadcastId = stackEvent.valueInt1;
+            LeAudioBroadcastDescriptor descriptor = mBroadcastDescriptors.get(broadcastId);
+            if (descriptor == null) {
+                Log.e(
+                        TAG,
+                        "EVENT_TYPE_BROADCAST_DESTROYED: No valid descriptor for broadcastId: "
+                                + broadcastId);
+            } else {
+                mBroadcastDescriptors.remove(broadcastId);
+            }
 
             // TODO: Improve reason reporting or extend the native stack event with reason code
             notifyOnBroadcastStopped(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
-
             BassClientService bassClientService = getBassClientService();
             if (bassClientService != null) {
                 bassClientService.stopReceiversSourceSynchronization(broadcastId);
             }
-
-            LeAudioBroadcastDescriptor descriptor = mBroadcastDescriptors.get(broadcastId);
-            if (descriptor == null) {
-                Log.e(TAG, "EVENT_TYPE_BROADCAST_DESTROYED: No valid descriptor for broadcastId: "
-                        + broadcastId);
-                return;
-            }
-            mBroadcastDescriptors.remove(broadcastId);
-
         } else if (stackEvent.type == LeAudioStackEvent.EVENT_TYPE_BROADCAST_STATE) {
             int broadcastId = stackEvent.valueInt1;
             int state = stackEvent.valueInt2;

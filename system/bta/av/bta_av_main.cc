@@ -37,8 +37,8 @@
 #include "btif/include/btif_av.h"
 #include "btif/include/btif_av_co.h"
 #include "btif/include/btif_config.h"
-#include "gd/os/log.h"
 #include "internal_include/bt_target.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "osi/include/properties.h"
@@ -159,12 +159,8 @@ static void bta_av_api_enable(tBTA_AV_DATA* p_data) {
       tBTA_AV_API_ENABLE* p_buf =
           (tBTA_AV_API_ENABLE*)osi_malloc(sizeof(tBTA_AV_API_ENABLE));
       memcpy(p_buf, &p_data->api_enable, sizeof(tBTA_AV_API_ENABLE));
-#if BASE_VER < 931007
-      bta_sys_sendmsg_delayed(p_buf, base::TimeDelta::FromMilliseconds(
-#else
-      bta_sys_sendmsg_delayed(p_buf, base::Milliseconds(
-#endif
-                                         kEnablingAttemptsIntervalMs));
+      bta_sys_sendmsg_delayed(
+          p_buf, std::chrono::milliseconds(kEnablingAttemptsIntervalMs));
       return;
     }
     if (bta_av_cb.sdp_a2dp_handle) {
@@ -465,11 +461,7 @@ static void bta_av_api_register(tBTA_AV_DATA* p_data) {
         (tBTA_AV_API_REG*)osi_malloc(sizeof(tBTA_AV_API_REG));
     memcpy(p_buf, &p_data->api_reg, sizeof(tBTA_AV_API_REG));
     bta_sys_sendmsg_delayed(
-#if BASE_VER < 931007
-        p_buf, base::TimeDelta::FromMilliseconds(kEnablingAttemptsIntervalMs));
-#else
-        p_buf, base::Milliseconds(kEnablingAttemptsIntervalMs));
-#endif
+        p_buf, std::chrono::milliseconds(kEnablingAttemptsIntervalMs));
     return;
   }
 
@@ -619,7 +611,7 @@ static void bta_av_api_register(tBTA_AV_DATA* p_data) {
     avdtp_stream_config.media_type = AVDT_MEDIA_TYPE_AUDIO;
     avdtp_stream_config.mtu = MAX_3MBPS_AVDTP_MTU;
     btav_a2dp_codec_index_t codec_index_min = BTAV_A2DP_CODEC_INDEX_SOURCE_MIN;
-    btav_a2dp_codec_index_t codec_index_max = BTAV_A2DP_CODEC_INDEX_SOURCE_MAX;
+    btav_a2dp_codec_index_t codec_index_max = BTAV_A2DP_CODEC_INDEX_SOURCE_EXT_MIN;
 
     if (bta_av_cb.features & BTA_AV_FEAT_REPORT) {
       avdtp_stream_config.cfg.psc_mask |= AVDT_PSC_REPORT;
@@ -631,7 +623,7 @@ static void bta_av_api_register(tBTA_AV_DATA* p_data) {
     if (profile_initialized == UUID_SERVCLASS_AUDIO_SOURCE) {
       avdtp_stream_config.tsep = AVDT_TSEP_SRC;
       codec_index_min = BTAV_A2DP_CODEC_INDEX_SOURCE_MIN;
-      codec_index_max = BTAV_A2DP_CODEC_INDEX_SOURCE_MAX;
+      codec_index_max = BTAV_A2DP_CODEC_INDEX_SOURCE_EXT_MIN;
     } else if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK) {
       avdtp_stream_config.tsep = AVDT_TSEP_SNK;
       avdtp_stream_config.p_sink_data_cback = bta_av_sink_data_cback;
@@ -1225,6 +1217,9 @@ static void bta_av_non_state_machine_event(uint16_t event,
     case BTA_AV_API_SET_LATENCY_EVT:
       bta_av_api_set_latency(p_data);
       break;
+    case BTA_AV_SET_CODEC_MODE_EVT:
+      bta_av_set_codec_mode(p_data);
+      break;
     case BTA_AV_CI_SRC_DATA_READY_EVT:
       bta_av_ci_data(p_data);
       break;
@@ -1518,6 +1513,10 @@ const char* bta_av_evt_code(uint16_t evt_code) {
       return "API_START";
     case BTA_AV_API_STOP_EVT:
       return "API_STOP";
+    case BTA_AV_API_SET_LATENCY_EVT:
+      return "API_SET_LATENCY";
+    case BTA_AV_SET_CODEC_MODE_EVT:
+      return "SET_CODEC_MODE";
     default:
       return "unknown";
   }

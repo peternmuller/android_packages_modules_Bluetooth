@@ -33,6 +33,8 @@ struct MockIsoManager {
 
   MOCK_METHOD((void), RegisterCigCallbacks,
               (bluetooth::hci::iso_manager::CigCallbacks * callbacks), (const));
+  MOCK_METHOD((void), RegisterVscCallbacks,
+              (bluetooth::hci::iso_manager::VscCallback * callbacks), (const));
   MOCK_METHOD((void), RegisterBigCallbacks,
               (bluetooth::hci::iso_manager::BigCallbacks * callbacks), (const));
   MOCK_METHOD((void), RegisterOnIsoTrafficActiveCallbacks,
@@ -69,6 +71,8 @@ struct MockIsoManager {
   MOCK_METHOD((void), HandleNumComplDataPkts, (uint8_t * p, uint8_t evt_len));
   MOCK_METHOD((void), HandleGdNumComplDataPkts, (uint8_t * p, uint8_t evt_len));
   MOCK_METHOD((void), HandleHciEvent,
+              (uint8_t sub_code, uint8_t* params, uint16_t length));
+  MOCK_METHOD((void), HandleVscHciEvent,
               (uint8_t sub_code, uint8_t* params, uint16_t length));
 
   MOCK_METHOD((void), Start, ());

@@ -23,10 +23,10 @@
 #include "stack/btm/power_mode.h"
 #include "stack/include/acl_client_callbacks.h"
 #include "stack/include/bt_hdr.h"
-#include "stack/include/bt_octets.h"
 #include "stack/include/btm_api_types.h"
 #include "stack/include/btm_ble_api_types.h"
 #include "stack/include/btm_status.h"
+#include "stack/include/btm_vendor_types.h"
 #include "stack/include/security_client_callbacks.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -51,10 +51,6 @@ struct btm_client_interface_t {
 
   // Acl peer and lifecycle
   struct {
-    struct {
-      bool (*SupportTransparentSynchronousData)(const RawAddress& bd_addr);
-    } features;
-
     bool (*BTM_IsAclConnectionUp)(const RawAddress& bd_addr,
                                   tBT_TRANSPORT transport);
     bool (*BTM_ReadConnectedTransportAddress)(RawAddress* bd_addr,
@@ -143,7 +139,7 @@ struct btm_client_interface_t {
     tBTM_STATUS (*BTM_SetLocalDeviceName)(const char* p_name);
     tBTM_STATUS (*BTM_SetDeviceClass)(DEV_CLASS dev_class);
     bool (*BTM_IsDeviceUp)();
-    uint8_t* (*BTM_ReadDeviceClass)();
+    DEV_CLASS (*BTM_ReadDeviceClass)();
   } local;
 
   struct {
@@ -164,6 +160,22 @@ struct btm_client_interface_t {
     tBTM_INQ_INFO* (*BTM_InqDbNext)(tBTM_INQ_INFO* p_cur);
     tBTM_STATUS (*BTM_ClearInqDb)(const RawAddress* p_bda);
   } db;
+
+  struct {
+    void (*BTM_ReadVendorAddOnFeatures)();
+    bt_device_host_add_on_features_t* (*BTM_GetHostAddOnFeatures)(
+        uint8_t* host_add_on_features_len);
+    bt_device_soc_add_on_features_t* (*BTM_GetSocAddOnFeatures)(
+        uint8_t* soc_add_on_features_len);
+    char* (*BTM_GetA2dpOffloadCapablity)();
+    bool (*BTM_IsSpiltA2dpSupported)();
+    bool (*BTM_IsAACFrameCtrlEnabled)();
+    uint8_t* (*BTM_GetScramblingSupportedFreqs)(uint8_t* number_of_freqs);
+    bool (*BTM_IsQHSPhySupported)(const RawAddress& bda,
+                                  tBT_TRANSPORT transport);
+    void (*BTM_RegisterForQleCigLatencyChangedEvt)(
+        tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
+  } vendor;
 };
 
 struct btm_client_interface_t& get_btm_client_interface();

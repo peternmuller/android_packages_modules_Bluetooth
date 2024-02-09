@@ -21,7 +21,6 @@ cc_defaults {
         "packages/modules/Bluetooth/system",
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/btif/avrcp",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/stack/btm",
         "packages/modules/Bluetooth/system/stack/include",
@@ -136,6 +135,7 @@ cc_library_static {
     ],
     static_libs: [
         "avrcp-target-service",
+        "bluetooth_flags_c_lib",
         "lib-bt-packets",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -268,12 +268,17 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "android.hardware.bluetooth.audio-V4-ndk",
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
         "libbase",
+        "libbinder_ndk",
         "libcrypto",
         "libcutils",
+        "libfmq",
+        "libhidlbase",
         "liblog",
+        "libutils",
         "server_configurable_flags",
     ],
     static_libs: [
@@ -305,7 +310,10 @@ cc_test {
         ":audio_set_scenarios_bfbs",
         ":audio_set_scenarios_json",
     ],
-    cflags: ["-Wno-unused-parameter"],
+    cflags: [
+        "-Wno-macro-redefined",
+        "-Wno-unused-parameter",
+    ],
 }
 
 // bta GATT unit tests
@@ -336,8 +344,10 @@ cc_test {
     shared_libs: [
         "libcrypto",
         "liblog",
+        "server_configurable_flags",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -380,8 +390,10 @@ cc_test {
         "liblog",
         "libprotobuf-cpp-lite",
         "libstatssocket",
+        "server_configurable_flags",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -434,8 +446,10 @@ cc_test {
         "libcrypto",
         "libcutils",
         "liblog",
+        "server_configurable_flags",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbt-common",
         "libbt-platform-protos-lite",
@@ -477,7 +491,6 @@ cc_test {
         "packages/modules/Bluetooth/system/bta/groups",
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/bta/test/common",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/osi/include",
     ],
     srcs: [
@@ -723,7 +736,6 @@ cc_test {
         "packages/modules/Bluetooth/system",
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/bta/test/common",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/stack/include",
     ],
@@ -800,7 +812,6 @@ cc_test {
         "packages/modules/Bluetooth/system",
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/bta/test/common",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/gd",
         "packages/modules/Bluetooth/system/stack/include",
     ],
@@ -902,6 +913,7 @@ cc_test {
         ":TestMockBtaLeAudioHalVerifier",
         ":TestMockMainShim",
         ":TestStubOsi",
+        ":TestMockStackHcic",
         "gatt/database.cc",
         "gatt/database_builder.cc",
         "le_audio/client.cc",
@@ -1002,7 +1014,6 @@ cc_test {
         "packages/modules/Bluetooth/system",
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/bta/le_audio",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/stack/btm",
         "packages/modules/Bluetooth/system/stack/include",
     ],
@@ -1059,7 +1070,6 @@ cc_test {
         "packages/modules/Bluetooth/system/bta/include",
         "packages/modules/Bluetooth/system/bta/le_audio",
         "packages/modules/Bluetooth/system/bta/test/common",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/stack/btm",
         "packages/modules/Bluetooth/system/stack/include",
     ],

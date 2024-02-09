@@ -25,8 +25,9 @@
 #include "audio_hal_interface/le_audio_software.h"
 #include "audio_source_hal_asrc.h"
 #include "bta/le_audio/codec_manager.h"
+#include "common/repeating_timer.h"
 #include "common/time_util.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/wakelock.h"
 #include "stack/include/main_thread.h"
 
@@ -254,11 +255,7 @@ void SourceImpl::StartAudioTicks() {
   audio_timer_.SchedulePeriodic(
       worker_thread_->GetWeakPtr(), FROM_HERE,
       base::BindRepeating(&SourceImpl::SendAudioData, base::Unretained(this)),
-#if BASE_VER < 931007
-      base::TimeDelta::FromMicroseconds(source_codec_config_.data_interval_us));
-#else
-      base::Microseconds(source_codec_config_.data_interval_us));
-#endif
+      std::chrono::microseconds(source_codec_config_.data_interval_us));
 }
 
 void SourceImpl::StopAudioTicks() {

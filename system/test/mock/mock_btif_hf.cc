@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Android Open Source Project
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,41 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /*
  * Generated mock file from original source file
- *   Functions generated:6
+ *   Functions generated:0
  *
- *  mockcify.pl ver 0.2
+ *  mockcify.pl ver 0.7.0
  */
+
 // Mock include file to share data between tests and mock
-#include "test/mock/mock_stack_acl_btm_ble_connection_establishment.h"
+#include "test/mock/mock_btif_hf.h"
 
 #include <cstdint>
 
-// Original included files, if any
-
 #include "test/common/mock_functions.h"
-#include "types/raw_address.h"
 
-// Mocked compile conditionals, if any
+// Original usings
+
 // Mocked internal structures, if any
 
 namespace test {
 namespace mock {
-namespace stack_acl_btm_ble_connection_establishment {
+namespace btif_hf {
 
 // Function state capture and return values, if needed
-struct btm_ble_create_ll_conn_complete btm_ble_create_ll_conn_complete;
-
-}  // namespace stack_acl_btm_ble_connection_establishment
+struct GetInterface GetInterface;
+}  // namespace btif_hf
 }  // namespace mock
 }  // namespace test
 
-void btm_ble_create_ll_conn_complete(tHCI_STATUS status) {
+// Mocked functions, if any
+namespace bluetooth {
+namespace headset {
+Interface* GetInterface() {
   inc_func_call_count(__func__);
-  test::mock::stack_acl_btm_ble_connection_establishment::
-      btm_ble_create_ll_conn_complete(status);
+  return test::mock::btif_hf::GetInterface();
 }
+}  // namespace headset
+}  // namespace bluetooth
 
+// Mocked functions complete
 // END mockcify generation

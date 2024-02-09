@@ -757,6 +757,26 @@ struct btsnd_hcic_write_voice_settings {
 };
 extern struct btsnd_hcic_write_voice_settings btsnd_hcic_write_voice_settings;
 
+// Name: btsnd_hcic_flow_spec
+// Params: uint16_t handle, uint8_t unused, uint8_t direction,
+//         uint8_t service_type, uint32_t token_rate,
+//         uint32_t token_size, uint32_t peak, uint32_t latency
+// Return: void
+struct btsnd_hcic_flow_spec {
+  std::function<void(uint16_t handle, uint8_t unused, uint8_t direction,
+                    uint8_t service_type, uint32_t token_rate,
+                    uint32_t token_size, uint32_t peak, uint32_t latency)
+               > body{[](uint16_t handle, uint8_t unused, uint8_t direction,
+                         uint8_t service_type, uint32_t token_rate,
+                         uint32_t token_size, uint32_t peak, uint32_t latency) {}};
+  void operator()(uint16_t handle, uint8_t unused, uint8_t direction,
+                  uint8_t service_type, uint32_t token_rate,
+                  uint32_t token_size, uint32_t peak, uint32_t latency)
+                  { body(handle, unused, direction, service_type,
+                         token_rate, token_size, peak, latency); };
+};
+extern struct btsnd_hcic_flow_spec btsnd_hcic_flow_spec;
+
 }  // namespace stack_hcic_hcicmds
 }  // namespace mock
 }  // namespace test

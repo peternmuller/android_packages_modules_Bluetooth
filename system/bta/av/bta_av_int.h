@@ -118,6 +118,7 @@ enum {
                            the *AP_*EVT */
   BTA_AV_API_STOP_EVT,
   BTA_AV_API_SET_LATENCY_EVT,
+  BTA_AV_SET_CODEC_MODE_EVT,
 };
 
 /* events for AV control block state machine */
@@ -129,13 +130,16 @@ enum {
 
 /* events that do not go through state machine */
 #define BTA_AV_FIRST_NSM_EVT BTA_AV_API_ENABLE_EVT
-#define BTA_AV_LAST_NSM_EVT BTA_AV_API_SET_LATENCY_EVT
+#define BTA_AV_LAST_NSM_EVT BTA_AV_SET_CODEC_MODE_EVT
 
 /* API events passed to both SSMs (by bta_av_api_to_ssm) */
 #define BTA_AV_FIRST_A2S_API_EVT BTA_AV_API_START_EVT
 #define BTA_AV_FIRST_A2S_SSM_EVT BTA_AV_AP_START_EVT
 
-#define BTA_AV_LAST_EVT BTA_AV_API_SET_LATENCY_EVT
+#define BTA_AV_LAST_EVT BTA_AV_SET_CODEC_MODE_EVT
+
+/* Info ID from updating aptX Adaptive Encoder mode */
+#define BTA_AV_ENCODER_MODE_CHANGE_ID 5
 
 /* maximum number of SEPS in stream discovery results */
 #define BTA_AV_NUM_SEPS 32
@@ -273,6 +277,12 @@ typedef struct {
   BT_HDR_RIGID hdr;
   bool is_low_latency;
 } tBTA_AV_API_SET_LATENCY;
+
+/* data type for BTA_AV_SET_CODEC_MODE_EVT */
+typedef struct {
+  BT_HDR_RIGID hdr;
+  uint16_t enc_mode;
+} tBTA_AV_SET_CODEC_MODE;
 
 /* data type for BTA_AV_API_START_EVT and bta_av_do_start */
 typedef struct {
@@ -452,6 +462,7 @@ union tBTA_AV_DATA {
   tBTA_AV_API_REG api_reg;
   tBTA_AV_API_OPEN api_open;
   tBTA_AV_API_SET_LATENCY api_set_latency;
+  tBTA_AV_SET_CODEC_MODE set_codec_mode;
   tBTA_AV_DO_START do_start;
   tBTA_AV_API_STOP api_stop;
   tBTA_AV_API_DISCNT api_discnt;
@@ -691,17 +702,43 @@ class tBT_A2DP_OFFLOAD {
   uint16_t acl_hdl;               /* connection handle */
   uint16_t l2c_rcid;              /* l2cap channel id */
   uint16_t mtu;                   /* MTU size */
-  uint8_t codec_info[32];         /* Codec specific information */
+  uint8_t codec_info[AVDT_CODEC_SIZE];         /* Codec specific information */
 };
 
+typedef struct {
+  uint8_t codec_type;
+  uint8_t transport_type;
+  uint8_t stream_type;
+  uint8_t dev_index;
+  uint8_t max_latency;
+  uint8_t delay_reporting;
+  uint8_t cp_active;
+  uint8_t cp_flag;
+  uint16_t sample_rate;
+  uint16_t acl_hdl;
+  uint16_t l2c_rcid;
+  uint16_t mtu;
+//#ifdef TWS_ENABLED
+  uint8_t stream_start;// Start Stream:1
+  uint8_t split_acl; // BR-EDR Device:0 TWS Device:1
+  uint8_t ch_mode; //None:0 Left:1 Right:2
+  uint16_t ttp; //time to play
+//#endif
+  uint8_t codec_info[AVDT_CODEC_SIZE];
+  tBTA_AV_SCB* p_scb;
+}tBT_QTI_A2DP_OFFLOAD;
+
+
 /* Vendor OFFLOAD VSC */
-#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
+#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x0A
+#define HCI_VSQC_CONTROLLER_A2DP_STOP_OPCODE 0x05
 
 #define VS_HCI_A2DP_OFFLOAD_START 0x01
 #define VS_HCI_A2DP_OFFLOAD_STOP 0x02
 #define VS_HCI_A2DP_OFFLOAD_START_V2 0x03
 #define VS_HCI_A2DP_OFFLOAD_STOP_V2 0x04
 
+#define VS_QHCI_ENCODER_MODE_CHANGE 0X13
 /*****************************************************************************
  *  Global data
  ****************************************************************************/
@@ -760,6 +797,7 @@ bool bta_av_link_role_ok(tBTA_AV_SCB* p_scb, uint8_t bits);
 void bta_av_api_disconnect(tBTA_AV_DATA* p_data);
 void bta_av_set_use_latency_mode(tBTA_AV_SCB* p_scb, bool use_latency_mode);
 void bta_av_api_set_latency(tBTA_AV_DATA* p_data);
+void bta_av_set_codec_mode(tBTA_AV_DATA* p_data);
 void bta_av_sig_chg(tBTA_AV_DATA* p_data);
 void bta_av_signalling_timer(tBTA_AV_DATA* p_data);
 void bta_av_rc_disc_done(tBTA_AV_DATA* p_data);

@@ -25,11 +25,13 @@
 
 #define LOG_TAG "bt_bta_dm"
 
+#include <android_bluetooth_flags.h>
 #include <android_bluetooth_sysprop.h>
 #include <base/location.h>
 #include <base/logging.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "bta/dm/bta_dm_disc.h"
 #include "bta/dm/bta_dm_gatt_client.h"
@@ -40,9 +42,10 @@
 #include "bta/include/bta_sec_api.h"
 #include "bta/sys/bta_sys.h"
 #include "btif/include/btif_dm.h"
-#include "btif/include/stack_manager.h"
+#include "btif/include/stack_manager_t.h"
 #include "device/include/controller.h"
 #include "include/bind_helpers.h"
+#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/acl_api.h"
 #include "main/shim/btm_api.h"
@@ -83,6 +86,9 @@ static void bta_dm_rm_cback(tBTA_SYS_CONN_STATUS status, tBTA_SYS_ID id,
 static void bta_dm_adjust_roles(bool delay_role_switch);
 tBTM_CONTRL_STATE bta_dm_pm_obtain_controller_state(void);
 static void bta_dm_ctrl_features_rd_cmpl_cback(tHCI_STATUS result);
+
+static const char kPropertySniffOffloadEnabled[] =
+    "bluetooth.sniff_offload.enabled";
 
 #ifndef BTA_DM_BLE_ADV_CHNL_MAP
 #define BTA_DM_BLE_ADV_CHNL_MAP \
@@ -259,6 +265,7 @@ void BTA_dm_on_hw_on() {
       osi_property_get_int32(PROPERTY_PAGE_TIMEOUT,
                              p_bta_dm_cfg->page_timeout));
 
+  get_btm_client_interface().vendor.BTM_ReadVendorAddOnFeatures();
   if (ble_vnd_is_included()) {
     get_btm_client_interface().ble.BTM_BleReadControllerFeatures(
         bta_dm_ctrl_features_rd_cmpl_cback);
@@ -285,8 +292,13 @@ void BTA_dm_on_hw_on() {
 
   bta_sys_rm_register(bta_dm_rm_cback);
 
-  /* initialize bluetooth low power manager */
-  bta_dm_init_pm();
+  /* if sniff is offload, no need to handle it in the stack */
+  if (IS_FLAG_ENABLED(enable_sniff_offload) &&
+      osi_property_get_bool(kPropertySniffOffloadEnabled, false)) {
+  } else {
+    /* initialize bluetooth low power manager */
+    bta_dm_init_pm();
+  }
 
   bta_dm_disc_gattc_register();
 }
@@ -652,7 +664,7 @@ void handle_remote_features_complete(const RawAddress& bd_addr) {
     return;
   }
 
-  if (controller_get_interface()->supports_sniff_subrating() &&
+  if (controller_get_interface()->SupportsSniffSubrating() &&
       acl_peer_supports_sniff_subrating(bd_addr)) {
     LOG_DEBUG("Device supports sniff subrating peer:%s",
               ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
@@ -705,7 +717,7 @@ void bta_dm_acl_up(const RawAddress& bd_addr, tBT_TRANSPORT transport,
   device->reset_device_info();
   device->transport = transport;
 
-  if (controller_get_interface()->supports_sniff_subrating() &&
+  if (controller_get_interface()->SupportsSniffSubrating() &&
       acl_peer_supports_sniff_subrating(bd_addr)) {
     // NOTE: This callback assumes upon ACL connection that
     // the read remote features has completed and is valid.
@@ -1708,6 +1720,7 @@ tBTA_DM_PEER_DEVICE* allocate_device_for(const RawAddress& bd_addr,
 
 void bta_dm_init_cb() { ::bta_dm_init_cb(); }
 void bta_dm_deinit_cb() { ::bta_dm_deinit_cb(); }
+void BTA_dm_on_hw_on() { ::BTA_dm_on_hw_on(); }
 
 }  // namespace testing
 }  // namespace legacy

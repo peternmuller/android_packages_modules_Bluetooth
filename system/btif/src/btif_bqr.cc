@@ -24,7 +24,7 @@
 
 #include <cerrno>
 
-#include "btif/include/stack_manager.h"
+#include "btif/include/stack_manager_t.h"
 #include "btif_bqr.h"
 #include "btif_common.h"
 #include "btif_storage.h"
@@ -33,6 +33,7 @@
 #include "common/leaky_bonded_queue.h"
 #include "common/time_util.h"
 #include "core_callbacks.h"
+#include "internal_include/bt_trace.h"
 #include "osi/include/properties.h"
 #include "raw_address.h"
 #include "stack/btm/btm_dev.h"

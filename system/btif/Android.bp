@@ -29,22 +29,16 @@ cc_library {
         "com.android.btservices",
     ],
     min_sdk_version: "30",
+    shared_libs: [
+        "libstatssocket",
+    ],
+    export_shared_lib_headers: [
+        "libstatssocket",
+    ],
     target: {
-        android: {
-            shared_libs: [
-                "libstatssocket",
-            ],
-            export_shared_lib_headers: [
-                "libstatssocket",
-            ],
-        },
         host: {
             static_libs: [
                 "libbase",
-                "libstatssocket",
-            ],
-            export_static_lib_headers: [
-                "libstatssocket",
             ],
         },
         darwin: {
@@ -218,6 +212,7 @@ cc_library_static {
         "src/btif_storage.cc",
         "src/btif_uid.cc",
         "src/btif_util.cc",
+        "src/btif_vendor.cc",
         "src/stack_manager.cc",
     ],
     generated_headers: [
@@ -278,6 +273,7 @@ cc_test {
         "latest_android_hardware_bluetooth_audio_ndk_static",
         "latest_android_media_audio_common_types_ndk_static",
         "mts_defaults",
+        "libbtconfigstore_qti_defaults",
     ],
     test_suites: ["general-tests"],
     host_supported: true,

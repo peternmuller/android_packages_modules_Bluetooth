@@ -27,6 +27,8 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
+#include <vector>
+
 #include "avrcp/avrcp.h"
 #include "base/functional/callback.h"
 #include "bluetooth/uuid.h"
@@ -604,6 +606,8 @@ typedef void (*energy_info_callback)(bt_activity_energy_info* energy_info,
 typedef void (*generate_local_oob_data_callback)(tBT_TRANSPORT transport,
                                                  bt_oob_data_t oob_data);
 
+typedef void (*key_missing_callback)(RawAddress bd_addr);
+
 /** TODO: Add callbacks for Link Up/Down and other generic
  *  notifications/callbacks */
 
@@ -631,6 +635,7 @@ typedef struct {
   switch_buffer_size_callback switch_buffer_size_cb;
   switch_codec_callback switch_codec_cb;
   le_rand_callback le_rand_cb;
+  key_missing_callback key_missing_cb;
 } bt_callbacks_t;
 
 typedef int (*acquire_wake_lock_callout)(const char* lock_name);
@@ -749,6 +754,8 @@ typedef struct {
 
   /** Cancel Bond */
   int (*cancel_bond)(const RawAddress* bd_addr);
+
+  bool (*pairing_is_busy)();
 
   /**
    * Get the connection status for a given remote device.

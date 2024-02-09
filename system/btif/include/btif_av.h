@@ -24,6 +24,7 @@
 #define BTIF_AV_H
 
 #include <cstdint>
+#include <vector>
 
 #include "include/hardware/bt_av.h"
 #include "types/raw_address.h"
@@ -31,6 +32,12 @@
 // #include "bta/include/bta_av_api.h"
 // #include "btif/include/btif_common.h"
 
+#define APTX_HQ 0X1000
+#define APTX_LL 0X2000
+#define APTX_MODE_MASK 0X7000
+
+#define APTX_HQ_LATENCY 2000
+#define APTX_LL_LATENCY 700
 /**
  * When the local device is A2DP source, get the address of the active peer.
  */
@@ -254,6 +261,27 @@ void btif_av_set_dynamic_audio_buffer_size(uint8_t dynamic_audio_buffer_size);
 void btif_av_set_low_latency(bool is_low_latency);
 
 /**
+ * Update Codec Mode
+ *
+ * @param is_Gaming_Latency to set
+ */
+void btif_av_update_codec_mode(bool is_Gaming_Latency);
+
+/**
+ * Update Source Metadata
+ *
+ * @param source_metadata to set
+ */
+void btif_av_update_source_metadata(bool is_Gaming_Enabled);
+
+/**
+ * Set Low Latency for Spatial Audio
+ *
+ * @param low_latency to set
+ */
+void btif_av_set_low_latency_spatial_audio(bool is_low_latency);
+
+/**
  * Check whether A2DP Source is enabled.
  */
 extern bool btif_av_is_source_enabled(void);
@@ -265,4 +293,5 @@ extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);
 extern bool btif_av_peer_is_connected_source(const RawAddress& peer_address);
 extern bool btif_av_peer_is_sink(const RawAddress& peer_address);
 extern bool btif_av_peer_is_source(const RawAddress& peer_address);
+
 #endif /* BTIF_AV_H */

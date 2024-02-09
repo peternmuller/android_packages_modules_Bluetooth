@@ -24,7 +24,8 @@
 #include <memory>
 
 #include "aidl/audio_aidl_interfaces.h"
-#include "osi/include/log.h"
+#include "include/check.h"
+#include "os/log.h"
 
 namespace bluetooth {
 namespace audio {
@@ -101,6 +102,7 @@ BluetoothAudioHalVersion GetAidlInterfaceVersion() {
               aidl_retval.getDescription().c_str());
     return BluetoothAudioHalVersion::VERSION_UNAVAILABLE;
   }
+  LOG(INFO) << __func__ << ": aidl_version: " << aidl_version;
 
   switch (aidl_version) {
     case 1:
@@ -123,6 +125,7 @@ HalVersionManager::HalVersionManager() {
   hal_transport_ = BluetoothAudioHalTransport::UNKNOWN;
   if (AServiceManager_checkService(
           kDefaultAudioProviderFactoryInterface.c_str()) != nullptr) {
+    LOG(INFO) << __func__ << ": Going with AIDL: ";
     hal_version_ = GetAidlInterfaceVersion();
     hal_transport_ = BluetoothAudioHalTransport::AIDL;
     return;
@@ -145,6 +148,7 @@ HalVersionManager::HalVersionManager() {
   }
 
   if (instance_count > 0) {
+    LOG(INFO) << __func__ << ": Going with AOSP HIDL 2.1 ";
     hal_version_ = BluetoothAudioHalVersion::VERSION_2_1;
     hal_transport_ = BluetoothAudioHalTransport::HIDL;
     return;
@@ -159,8 +163,39 @@ HalVersionManager::HalVersionManager() {
   }
 
   if (instance_count > 0) {
+    LOG(INFO) << __func__ << ": Going with AOSP HIDL 2.0 ";
     hal_version_ = BluetoothAudioHalVersion::VERSION_2_0;
     hal_transport_ = BluetoothAudioHalTransport::HIDL;
+    return;
+  }
+
+  hidl_retval = service_manager->listManifestByInterface(
+      kFullyQualifiedQTIInterfaceName_2_1, listManifestByInterface_cb);
+  if (!hidl_retval.isOk()) {
+    LOG(FATAL) << __func__ << ": IServiceManager::listByInterface failure: "
+               << hidl_retval.description();
+    return;
+  }
+
+  if (instance_count > 0) {
+    LOG(INFO) << __func__ << " QTI HIDL 2.1 version";
+    hal_version_ = BluetoothAudioHalVersion::VERSION_QTI_HIDL_2_1;
+    hal_transport_ = BluetoothAudioHalTransport::QTI_HIDL;
+    return;
+  }
+
+  hidl_retval = service_manager->listManifestByInterface(
+      kFullyQualifiedQTIInterfaceName_2_0, listManifestByInterface_cb);
+  if (!hidl_retval.isOk()) {
+    LOG(FATAL) << __func__ << ": IServiceManager::listByInterface failure: "
+               << hidl_retval.description();
+    return;
+  }
+
+  if (instance_count > 0) {
+    LOG(INFO) << __func__ << " QTI HIDL 2.0 version";
+    hal_version_ = BluetoothAudioHalVersion::VERSION_QTI_HIDL_2_0;
+    hal_transport_ = BluetoothAudioHalTransport::QTI_HIDL;
     return;
   }
 

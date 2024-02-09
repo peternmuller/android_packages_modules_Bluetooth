@@ -21,9 +21,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "gd/common/init_flags.h"
+#include "common/init_flags.h"
 #include "hci/hci_layer_mock.h"
-#include "hci/include/hci_layer.h"
 #include "internal_include/bt_target.h"
 #include "stack/btm/btm_dev.h"
 #include "stack/btm/btm_int_types.h"
@@ -45,8 +44,6 @@ using testing::Eq;
 extern tBTM_CB btm_cb;
 
 tL2C_CB l2cb;
-
-const hci_t* hci_layer_get_interface() { return nullptr; }
 
 const std::string kSmpOptions("mock smp options");
 const std::string kBroadcastAudioConfigOptions(
@@ -235,7 +232,7 @@ TEST_F(StackBtmWithInitFreeTest, btm_sec_rmt_name_request_complete) {
   ASSERT_TRUE(BTM_SecAddRmtNameNotifyCallback(
       [](const RawAddress& bd_addr, DEV_CLASS dc, tBTM_BD_NAME bd_name) {
         btm_test.bd_addr = bd_addr;
-        memcpy(btm_test.dc, dc, DEV_CLASS_LEN);
+        btm_test.dc = dc;
         memcpy(btm_test.bd_name, bd_name, BTM_MAX_REM_BD_NAME_LEN);
       }));
 

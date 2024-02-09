@@ -37,6 +37,9 @@ java_library {
     ],
     min_sdk_version: "Tiramisu",
     sdk_version: "module_current",
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 java_library {
@@ -49,6 +52,9 @@ java_library {
     ],
     min_sdk_version: "Tiramisu",
     sdk_version: "module_current",
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 // Bluetooth JNI
@@ -60,6 +66,7 @@ cc_library_shared {
         "latest_android_hardware_audio_common_ndk_static",
         "latest_android_hardware_bluetooth_audio_ndk_static",
         "latest_android_media_audio_common_types_ndk_static",
+        "libbtconfigstore_qti_defaults",
     ],
     srcs: ["jni/**/*.cpp"],
     version_script: "libbluetooth_jni.map",
@@ -85,6 +92,8 @@ cc_library_shared {
         "android.hardware.audio.common@5.0",
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.0",
         "android.hardware.bluetooth@1.0",
         "android.hardware.bluetooth@1.1",
         "android.hardware.common-V2-ndk",
@@ -281,17 +290,19 @@ android_app {
     javacflags: ["-Aroom.schemaLocation=packages/modules/Bluetooth/android/app/tests/unit/src/com/android/bluetooth/btservice/storage/schemas"],
 
     lint: {
+        // TODO(b/318814235): Add back ObsoleteSdkInt to this list.
         error_checks: [
             "ExtraText",
             "MissingClass",
             "NewApi",
-            "ObsoleteSdkInt",
             "Recycle",
             "RtlHardcoded",
             "UseSparseArrays",
             "UseValueOf",
         ],
         strict_updatability_linting: true,
+        baseline_filename: "lint-baseline.xml",
+
     },
 
     optimize: {
@@ -333,7 +344,6 @@ java_library {
     ],
     min_sdk_version: "Tiramisu",
     sdk_version: "module_current",
-
 }
 
 genrule {

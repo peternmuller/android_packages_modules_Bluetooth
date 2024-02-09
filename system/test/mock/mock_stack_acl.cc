@@ -26,10 +26,11 @@
 #include <cstdint>
 #include <string>
 
+#include "hci/class_of_device.h"
 #include "stack/include/acl_client_callbacks.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/bt_types.h"
 #include "test/common/mock_functions.h"
-#include "types/class_of_device.h"
 #include "types/raw_address.h"
 
 // Mocked compile conditionals, if any
@@ -40,8 +41,6 @@ namespace mock {
 namespace stack_acl {
 
 // Function state capture and return values, if needed
-struct ACL_SupportTransparentSynchronousData
-    ACL_SupportTransparentSynchronousData;
 struct BTM_BLE_IS_RESOLVE_BDA BTM_BLE_IS_RESOLVE_BDA;
 struct BTM_IsAclConnectionUp BTM_IsAclConnectionUp;
 struct BTM_IsAclConnectionUpAndHandleValid BTM_IsAclConnectionUpAndHandleValid;
@@ -159,16 +158,14 @@ struct on_acl_br_edr_connected on_acl_br_edr_connected;
 struct on_acl_br_edr_failed on_acl_br_edr_failed;
 struct BTM_unblock_role_switch_and_sniff_mode_for
     BTM_unblock_role_switch_and_sniff_mode_for;
+struct btm_flow_spec_complete btm_flow_spec_complete;
+struct BTM_FlowSpec BTM_FlowSpec;
 
 }  // namespace stack_acl
 }  // namespace mock
 }  // namespace test
 
 // Mocked functions, if any
-bool ACL_SupportTransparentSynchronousData(const RawAddress& bd_addr) {
-  inc_func_call_count(__func__);
-  return test::mock::stack_acl::ACL_SupportTransparentSynchronousData(bd_addr);
-}
 bool BTM_BLE_IS_RESOLVE_BDA(const RawAddress& x) {
   inc_func_call_count(__func__);
   return test::mock::stack_acl::BTM_BLE_IS_RESOLVE_BDA(x);
@@ -639,7 +636,7 @@ void hci_btm_set_link_supervision_timeout(tACL_CONN& link, uint16_t timeout) {
   test::mock::stack_acl::hci_btm_set_link_supervision_timeout(link, timeout);
 }
 void btm_connection_request(const RawAddress& bda,
-                            const bluetooth::types::ClassOfDevice& cod) {
+                            const bluetooth::hci::ClassOfDevice& cod) {
   test::mock::stack_acl::btm_connection_request(bda, cod);
 }
 void on_acl_br_edr_connected(const RawAddress& bda, uint16_t handle,
@@ -657,6 +654,15 @@ void on_acl_br_edr_failed(const RawAddress& bda, tHCI_STATUS status,
 void BTM_unblock_role_switch_and_sniff_mode_for(const RawAddress& peer_addr) {
   inc_func_call_count(__func__);
   test::mock::stack_acl::BTM_unblock_role_switch_and_sniff_mode_for(peer_addr);
+}
+
+void btm_flow_spec_complete(uint8_t status, uint16_t handle, tBT_FLOW_SPEC* p_flow) {
+  inc_func_call_count(__func__);
+}
+
+tBTM_STATUS BTM_FlowSpec(const RawAddress& addr, tBT_FLOW_SPEC* p_flow, tBTM_CMPL_CB* p_cb) {
+  inc_func_call_count(__func__);
+  return test::mock::stack_acl::BTM_FlowSpec(addr, p_flow, p_cb);
 }
 
 // END mockcify generation

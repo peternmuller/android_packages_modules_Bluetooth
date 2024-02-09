@@ -31,19 +31,21 @@
 
 #include <base/functional/bind.h>
 #include <base/location.h>
-#include <base/logging.h>
 
 #include <cstdint>
 
 #include "common/init_flags.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
+#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "main/shim/hci_layer.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "stack/btm/neighbor_inquiry.h"
+#include "osi/include/log.h"
+#include "stack/btm/btm_int.h"
 #include "stack/include/acl_hci_link_interface.h"
 #include "stack/include/ble_acl_interface.h"
 #include "stack/include/ble_hci_link_interface.h"
@@ -92,6 +94,7 @@ static void btu_hcif_hardware_error_evt(uint8_t* p);
 static void btu_hcif_mode_change_evt(uint8_t* p);
 static void btu_hcif_link_key_notification_evt(const uint8_t* p);
 static void btu_hcif_read_clock_off_comp_evt(uint8_t* p);
+static void btu_hcif_flow_spec_comp_evt(uint8_t* p);
 static void btu_hcif_esco_connection_comp_evt(const uint8_t* p);
 static void btu_hcif_esco_connection_chg_evt(uint8_t* p);
 
@@ -294,6 +297,9 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id,
       break;
     case HCI_READ_CLOCK_OFF_COMP_EVT:
       btu_hcif_read_clock_off_comp_evt(p);
+      break;
+    case HCI_FLOW_SPECIFICATION_COMP_EVT:
+      btu_hcif_flow_spec_comp_evt(p);
       break;
     case HCI_ESCO_CONNECTION_COMP_EVT:
       btu_hcif_esco_connection_comp_evt(p);
@@ -1127,7 +1133,7 @@ static void btu_hcif_hdl_command_complete(uint16_t opcode, uint8_t* p,
     case HCI_BLE_CREATE_LL_CONN:
     case HCI_LE_EXTENDED_CREATE_CONNECTION:
       // No command complete event for those commands according to spec
-      LOG(ERROR) << "No command complete expected, but received!";
+      LOG_ERROR("No command complete expected, but received!");
       break;
 
     case HCI_BLE_TRANSMITTER_TEST:
@@ -1286,13 +1292,6 @@ static void btu_hcif_hdl_command_status(uint16_t opcode, uint8_t status,
       }
       break;
 
-    // BLE Commands
-    case HCI_BLE_CREATE_LL_CONN:
-    case HCI_LE_EXTENDED_CREATE_CONNECTION:
-      if (status != HCI_SUCCESS) {
-        btm_ble_create_ll_conn_complete(hci_status);
-      }
-      break;
     case HCI_BLE_START_ENC:
       // Race condition: disconnection happened right before we send
       // "LE Encrypt", controller responds with no connection, we should
@@ -1458,6 +1457,9 @@ void btu_hcif_proc_sp_req_evt(tBTM_SP_EVT event, const uint8_t* p) {
     case BTM_SP_KEY_REQ_EVT:
       // No value needed.
       break;
+    default:
+      LOG_WARN("unexpected event:%s", sp_evt_to_text(event).c_str());
+      break;
   }
   btm_proc_sp_req_evt(event, bda, value);
 }
@@ -1465,7 +1467,7 @@ void btu_hcif_create_conn_cancel_complete(const uint8_t* p, uint16_t evt_len) {
   uint8_t status;
 
   if (evt_len < 1 + BD_ADDR_LEN) {
-    LOG_ERROR("%s malformatted event packet, too short", __func__);
+    LOG_ERROR("malformatted event packet, too short");
     return;
   }
 
@@ -1495,7 +1497,7 @@ void btu_hcif_read_local_oob_complete(const uint8_t* p, uint16_t evt_len) {
   return;
 
 err_out:
-  LOG_ERROR("%s: bogus event packet, too short", __func__);
+  LOG_ERROR("bogus event packet, too short");
 }
 
 /*******************************************************************************
@@ -1660,8 +1662,8 @@ static void btu_ble_data_length_change_evt(uint8_t* p, uint16_t evt_len) {
   uint16_t tx_data_len;
   uint16_t rx_data_len;
 
-  if (!controller_get_interface()->supports_ble_packet_extension()) {
-    LOG_WARN("%s, request not supported", __func__);
+  if (!controller_get_interface()->SupportsBleDataPacketLengthExtension()) {
+    LOG_WARN("request not supported");
     return;
   }
 
@@ -1687,7 +1689,7 @@ static void btu_ble_rc_param_req_evt(uint8_t* p, uint8_t len) {
   uint16_t int_min, int_max, latency, timeout;
 
   if (len < 10) {
-    LOG(ERROR) << __func__ << "bogus event packet, too short";
+    LOG_ERROR("bogus event packet, too short");
     return;
   }
 
@@ -1699,4 +1701,30 @@ static void btu_ble_rc_param_req_evt(uint8_t* p, uint8_t len) {
 
   l2cble_process_rc_param_request_evt(handle, int_min, int_max, latency,
                                       timeout);
+}
+
+/*******************************************************************************
+ *
+ * Function         btu_hcif_flow_spec_comp_evt
+ *
+ * Description      Process event HCI_FLOW_SPECIFICATION_COMP_EVT
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static void btu_hcif_flow_spec_comp_evt(uint8_t* p) {
+  uint8_t status;
+  uint16_t handle;
+  tBT_FLOW_SPEC flow;
+
+  STREAM_TO_UINT8(status, p);
+  STREAM_TO_UINT16(handle, p);
+  STREAM_TO_UINT8(flow.qos_unused, p);
+  STREAM_TO_UINT8(flow.flow_direction, p);
+  STREAM_TO_UINT8(flow.service_type, p);
+  STREAM_TO_UINT32(flow.token_rate, p);
+  STREAM_TO_UINT32(flow.peak_bandwidth, p);
+  STREAM_TO_UINT32(flow.latency, p);
+
+  btm_flow_spec_complete(status, handle, &flow);
 }

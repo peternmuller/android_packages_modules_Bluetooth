@@ -31,16 +31,18 @@
 #include "bta_gatt_queue.h"
 #include "bta_groups.h"
 #include "bta_le_audio_api.h"
-#include "btif_profile_storage.h"
+#include "btif/include/btif_profile_storage.h"
 #include "btm_iso_api.h"
 #include "client_parser.h"
 #include "codec_interface.h"
 #include "codec_manager.h"
+#include "common/strings.h"
 #include "common/time_util.h"
 #include "content_control_id_keeper.h"
 #include "device/include/controller.h"
 #include "devices.h"
-#include "gd/common/strings.h"
+#include "include/check.h"
+#include "internal_include/bt_trace.h"
 #include "internal_include/stack_config.h"
 #include "le_audio_health_status.h"
 #include "le_audio_set_configuration_provider.h"
@@ -56,6 +58,9 @@
 #include "state_machine.h"
 #include "storage_helper.h"
 
+#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
+#define VS_QHCI_USECASE_UPDATE 0x15
+
 using base::Closure;
 using bluetooth::Uuid;
 using bluetooth::common::ToString;
@@ -65,6 +70,7 @@ using bluetooth::hci::IsoManager;
 using bluetooth::hci::iso_manager::cig_create_cmpl_evt;
 using bluetooth::hci::iso_manager::cig_remove_cmpl_evt;
 using bluetooth::hci::iso_manager::CigCallbacks;
+using bluetooth::hci::iso_manager::VscCallback;
 using bluetooth::le_audio::ConnectionState;
 using bluetooth::le_audio::GroupNodeStatus;
 using bluetooth::le_audio::GroupStatus;
@@ -179,6 +185,7 @@ std::mutex instance_mutex;
 LeAudioSourceAudioHalClient::Callbacks* audioSinkReceiver;
 LeAudioSinkAudioHalClient::Callbacks* audioSourceReceiver;
 CigCallbacks* stateMachineHciCallbacks;
+VscCallback* stateMachineVscHciCallback;
 LeAudioGroupStateMachine::Callbacks* stateMachineCallbacks;
 DeviceGroupsCallbacks* device_group_callbacks;
 
@@ -2064,7 +2071,7 @@ class LeAudioClientImpl : public LeAudioClient {
     BTA_GATTC_CancelOpen(gatt_if_, address, false);
     BTA_GATTC_Open(gatt_if_, address, reconnection_mode_, false);
 
-    if (controller_get_interface()->supports_ble_2m_phy()) {
+    if (controller_get_interface()->SupportsBle2mPhy()) {
       LOG(INFO) << ADDRESS_TO_LOGGABLE_STR(address)
                 << " set preferred PHY to 2M";
       BTM_BleSetPhy(address, PHY_LE_2M, PHY_LE_2M, 0);
@@ -2282,12 +2289,7 @@ class LeAudioClientImpl : public LeAudioClient {
         base::BindOnce(
             &LeAudioClientImpl::checkGroupConnectionStateAfterMemberDisconnect,
             weak_factory_.GetWeakPtr(), group_id),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kGroupConnectedWatchDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kGroupConnectedWatchDelayMs));
   }
 
   void autoConnect(RawAddress address) {
@@ -2307,12 +2309,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::autoConnect,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kAutoConnectAfterOwnDisconnectDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kAutoConnectAfterOwnDisconnectDelayMs));
   }
 
   void recoveryReconnect(RawAddress address) {
@@ -2346,12 +2343,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::recoveryReconnect,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kRecoveryReconnectDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kRecoveryReconnectDelayMs));
   }
 
   void checkIfGroupMember(RawAddress address) {
@@ -2387,12 +2379,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::checkIfGroupMember,
                        weak_factory_.GetWeakPtr(), address),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kCsisGroupMemberDelayMs)
-#else
-        base::Milliseconds(kCsisGroupMemberDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kCsisGroupMemberDelayMs));
   }
 
   void OnGattDisconnected(uint16_t conn_id, tGATT_IF client_if,
@@ -3198,12 +3185,7 @@ class LeAudioClientImpl : public LeAudioClient {
         FROM_HERE,
         base::BindOnce(&LeAudioClientImpl::restartAttachToTheStream,
                        weak_factory_.GetWeakPtr(), addr),
-#if BASE_VER < 931007
-        base::TimeDelta::FromMilliseconds(kDeviceAttachDelayMs)
-#else
-        base::Milliseconds(kDeviceAttachDelayMs)
-#endif
-    );
+        std::chrono::milliseconds(kDeviceAttachDelayMs));
   }
 
   void SendAudioGroupSelectableCodecConfigChanged(LeAudioDeviceGroup* group) {
@@ -4357,7 +4339,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
   void notifyAudioLocalSink(UnicastMonitorModeStatus status) {
     if (sink_monitor_notified_status_ != status) {
-      LOG_INFO("Stram monitoring status changed to: %d",
+      LOG_INFO("Stream monitoring status changed to: %d",
                static_cast<int>(status));
       sink_monitor_notified_status_ = status;
       callbacks_->OnUnicastMonitorModeStatus(
@@ -4379,7 +4361,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
     if (sink_monitor_mode_ &&
         active_group_id_ == bluetooth::groups::kGroupUnknown) {
-      if (!sink_monitor_notified_status_) {
+      if (sink_monitor_notified_status_ !=
+          UnicastMonitorModeStatus::STREAMING_REQUESTED) {
         notifyAudioLocalSink(UnicastMonitorModeStatus::STREAMING_REQUESTED);
       }
       CancelLocalAudioSinkStreamingRequest();
@@ -5017,6 +5000,16 @@ class LeAudioClientImpl : public LeAudioClient {
     return remote_metadata;
   }
 
+  void btif_acm_send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type) {
+    uint8_t param[4] = {0};
+    param[0] = VS_QHCI_USECASE_UPDATE;
+    param[1] = (BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0x00FF;
+    param[2] = ((BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0xFF00) >> 8;
+    param[3] = (uint8_t)content_type;
+    //BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+    btsnd_hcic_vendor_spec_cmd(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+  }
+
   /* Return true if stream is started */
   bool ReconfigureOrUpdateRemote(LeAudioDeviceGroup* group,
                                  int remote_direction) {
@@ -5109,6 +5102,9 @@ class LeAudioClientImpl : public LeAudioClient {
         new_config_context = configuration_context_type_;
       }
     }
+
+    btif_acm_send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+        static_cast<uint16_t>(new_config_context));
 
     /* Note that the remote device metadata was so far unfiltered when it comes
      * to group context availability, or multiple contexts support flag, so that
@@ -5382,6 +5378,19 @@ class LeAudioClientImpl : public LeAudioClient {
         group, leAudioDevice, status, conn_handle);
   }
 
+  void QhciVscEvt(uint16_t delay, uint8_t mode) {
+    auto group = aseGroups_.FindById(active_group_id_);
+    if (!group) {
+      LOG_ERROR("Invalid group: %d", active_group_id_);
+      return;
+    }
+    LOG_WARN("QhciVscEvt: %d delay %d mode.", delay, mode);
+    if (delay != 0xFFFF)
+      group->stream_conf.stream_params.sink.delay = delay;
+    if (mode != 0xFF)
+      group->stream_conf.stream_params.sink.mode = mode;
+  }
+
   void IsoLinkQualityReadCb(
       uint8_t conn_handle, uint8_t cig_id, uint32_t txUnackedPackets,
       uint32_t txFlushedPackets, uint32_t txLastSubeventPackets,
@@ -5604,6 +5613,14 @@ class LeAudioClientImpl : public LeAudioClient {
                 kLeAudioContextAllRemoteSource.test(configuration_context_type_)
                     ? le_audio::types::kLeAudioDirectionSource
                     : le_audio::types::kLeAudioDirectionSink;
+
+            /* Reconfiguration to non requiring source scenario */
+            if (sink_monitor_mode_ &&
+                (remote_direction == le_audio::types::kLeAudioDirectionSink)) {
+              notifyAudioLocalSink(
+                  UnicastMonitorModeStatus::STREAMING_SUSPENDED);
+            }
+
             auto remote_contexts =
                 DirectionalRealignMetadataAudioContexts(group, remote_direction);
             ApplyRemoteMetadataAudioContextPolicy(group, remote_contexts,
@@ -5618,8 +5635,7 @@ class LeAudioClientImpl : public LeAudioClient {
             group->ClearPendingConfiguration();
           } else {
             if (sink_monitor_mode_) {
-              callbacks_->OnUnicastMonitorModeStatus(
-                  le_audio::types::kLeAudioDirectionSink,
+              notifyAudioLocalSink(
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
             }
           }
@@ -5894,6 +5910,15 @@ class LeAudioStateMachineHciCallbacksImpl : public CigCallbacks {
 
 LeAudioStateMachineHciCallbacksImpl stateMachineHciCallbacksImpl;
 
+class LeAudioStateMachineVscHciCallbackImpl : public VscCallback {
+  public:
+    void OnVscEvent(uint16_t delay, uint8_t mode) override {
+      if (instance) instance->QhciVscEvt(delay, mode);
+    }
+};
+
+LeAudioStateMachineVscHciCallbackImpl stateMachineVscHciCallbackImpl;
+
 class CallbacksImpl : public LeAudioGroupStateMachine::Callbacks {
  public:
   void StatusReportCb(int group_id, GroupStreamStatus status) override {
@@ -6059,9 +6084,9 @@ void LeAudioClient::Initialize(
   }
 
   if (!controller_get_interface()
-           ->supports_ble_connected_isochronous_stream_central() &&
+           ->SupportsBleConnectedIsochronousStreamCentral() &&
       !controller_get_interface()
-           ->supports_ble_connected_isochronous_stream_peripheral()) {
+           ->SupportsBleConnectedIsochronousStreamPeripheral()) {
     LOG(ERROR) << "Controller reports no ISO support."
                   " LeAudioClient Init aborted.";
     return;
@@ -6078,10 +6103,12 @@ void LeAudioClient::Initialize(
   audioSourceReceiver = &audioSourceReceiverImpl;
   stateMachineHciCallbacks = &stateMachineHciCallbacksImpl;
   stateMachineCallbacks = &stateMachineCallbacksImpl;
+  stateMachineVscHciCallback = &stateMachineVscHciCallbackImpl;
   device_group_callbacks = &deviceGroupsCallbacksImpl;
   instance = new LeAudioClientImpl(callbacks_, stateMachineCallbacks, initCb);
 
   IsoManager::GetInstance()->RegisterCigCallbacks(stateMachineHciCallbacks);
+  IsoManager::GetInstance()->RegisterVscCallback(stateMachineVscHciCallback);
   CodecManager::GetInstance()->Start(offloading_preference);
   ContentControlIdKeeper::GetInstance()->Start();
 

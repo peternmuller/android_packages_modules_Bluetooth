@@ -45,6 +45,7 @@
 #include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
+#include "include/check.h"
 #include "include/l2cap_hci_link_interface.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/acl_api.h"
@@ -61,6 +62,7 @@
 #include "stack/acl/acl.h"
 #include "stack/acl/peer_packet_types.h"
 #include "stack/btm/btm_dev.h"
+#include "stack/btm/btm_int.h"
 #include "stack/btm/btm_int_types.h"
 #include "stack/btm/btm_sco.h"
 #include "stack/btm/btm_sec.h"
@@ -101,6 +103,9 @@ void BTM_db_reset(void);
 extern tBTM_CB btm_cb;
 void btm_iot_save_remote_properties(tACL_CONN* p_acl_cb);
 void btm_iot_save_remote_versions(tACL_CONN* p_acl_cb);
+
+extern void btm_flow_spec_complete(uint8_t status, uint16_t handle,
+                            tBT_FLOW_SPEC* p_flow);
 
 struct StackAclBtmAcl {
   tACL_CONN* acl_allocate_connection();
@@ -154,7 +159,7 @@ static bool IsEprAvailable(const tACL_CONN& p_acl) {
     return false;
   }
   return HCI_ATOMIC_ENCRYPT_SUPPORTED(p_acl.peer_lmp_feature_pages[0]) &&
-         controller_get_interface()->supports_encryption_pause();
+         controller_get_interface()->SupportsEncryptionPause();
 }
 
 static void btm_process_remote_ext_features(tACL_CONN* p_acl_cb,
@@ -251,35 +256,35 @@ void BTM_acl_after_controller_started(const controller_t* controller) {
   uint16_t btm_acl_pkt_types_supported =
       (HCI_PKT_TYPES_MASK_DH1 + HCI_PKT_TYPES_MASK_DM1);
 
-  if (controller->supports_3_slot_packets())
+  if (controller->Supports3SlotPackets())
     btm_acl_pkt_types_supported |=
         (HCI_PKT_TYPES_MASK_DH3 + HCI_PKT_TYPES_MASK_DM3);
 
-  if (controller->supports_5_slot_packets())
+  if (controller->Supports5SlotPackets())
     btm_acl_pkt_types_supported |=
         (HCI_PKT_TYPES_MASK_DH5 + HCI_PKT_TYPES_MASK_DM5);
 
   /* Add in EDR related ACL types */
-  if (!controller->supports_classic_2m_phy()) {
+  if (!controller->SupportsClassic2mPhy()) {
     btm_acl_pkt_types_supported |=
         (HCI_PKT_TYPES_MASK_NO_2_DH1 + HCI_PKT_TYPES_MASK_NO_2_DH3 +
          HCI_PKT_TYPES_MASK_NO_2_DH5);
   }
 
-  if (!controller->supports_classic_3m_phy()) {
+  if (!controller->SupportsClassic3mPhy()) {
     btm_acl_pkt_types_supported |=
         (HCI_PKT_TYPES_MASK_NO_3_DH1 + HCI_PKT_TYPES_MASK_NO_3_DH3 +
          HCI_PKT_TYPES_MASK_NO_3_DH5);
   }
 
   /* Check to see if 3 and 5 slot packets are available */
-  if (controller->supports_classic_2m_phy() ||
-      controller->supports_classic_3m_phy()) {
-    if (!controller->supports_3_slot_edr_packets())
+  if (controller->SupportsClassic2mPhy() ||
+      controller->SupportsClassic3mPhy()) {
+    if (!controller->Supports3SlotEdrPackets())
       btm_acl_pkt_types_supported |=
           (HCI_PKT_TYPES_MASK_NO_2_DH3 + HCI_PKT_TYPES_MASK_NO_3_DH3);
 
-    if (!controller->supports_5_slot_edr_packets())
+    if (!controller->Supports5SlotEdrPackets())
       btm_acl_pkt_types_supported |=
           (HCI_PKT_TYPES_MASK_NO_2_DH5 + HCI_PKT_TYPES_MASK_NO_3_DH5);
   }
@@ -467,7 +472,7 @@ void btm_acl_created(const RawAddress& bda, uint16_t hci_handle,
                                 &p_acl->active_remote_addr_type);
 
     if (controller_get_interface()
-            ->supports_ble_peripheral_initiated_feature_exchange() ||
+            ->SupportsBlePeripheralInitiatedFeaturesExchange() ||
         link_role == HCI_ROLE_CENTRAL) {
       btsnd_hcic_ble_read_remote_feat(p_acl->hci_handle);
     } else {
@@ -566,7 +571,7 @@ tBTM_STATUS BTM_GetRole(const RawAddress& remote_bd_addr, tHCI_ROLE* p_role) {
  *
  ******************************************************************************/
 tBTM_STATUS BTM_SwitchRoleToCentral(const RawAddress& remote_bd_addr) {
-  if (!controller_get_interface()->supports_central_peripheral_role_switch()) {
+  if (!controller_get_interface()->SupportsRoleSwitch()) {
     LOG_INFO("Local controller does not support role switching");
     return BTM_MODE_UNSUPPORTED;
   }
@@ -706,22 +711,20 @@ static void check_link_policy(tLINK_POLICY* settings) {
   const controller_t* controller = controller_get_interface();
 
   if ((*settings & HCI_ENABLE_CENTRAL_PERIPHERAL_SWITCH) &&
-      (!controller->supports_role_switch())) {
+      (!controller->SupportsRoleSwitch())) {
     *settings &= (~HCI_ENABLE_CENTRAL_PERIPHERAL_SWITCH);
     LOG_INFO("Role switch not supported (settings: 0x%04x)", *settings);
   }
-  if ((*settings & HCI_ENABLE_HOLD_MODE) &&
-      (!controller->supports_hold_mode())) {
+  if ((*settings & HCI_ENABLE_HOLD_MODE) && (!controller->SupportsHoldMode())) {
     *settings &= (~HCI_ENABLE_HOLD_MODE);
     LOG_INFO("hold not supported (settings: 0x%04x)", *settings);
   }
   if ((*settings & HCI_ENABLE_SNIFF_MODE) &&
-      (!controller->supports_sniff_mode())) {
+      (!controller->SupportsSniffMode())) {
     *settings &= (~HCI_ENABLE_SNIFF_MODE);
     LOG_INFO("sniff not supported (settings: 0x%04x)", *settings);
   }
-  if ((*settings & HCI_ENABLE_PARK_MODE) &&
-      (!controller->supports_park_mode())) {
+  if ((*settings & HCI_ENABLE_PARK_MODE) && (!controller->SupportsParkMode())) {
     *settings &= (~HCI_ENABLE_PARK_MODE);
     LOG_INFO("park not supported (settings: 0x%04x)", *settings);
   }
@@ -1331,8 +1334,8 @@ void btm_rejectlist_role_change_device(const RawAddress& bd_addr,
   /* check for carkits */
   const uint32_t cod_audio_device =
       (BTM_COD_SERVICE_AUDIO | BTM_COD_MAJOR_AUDIO) << 8;
-  const uint8_t* dev_class = btm_get_dev_class(bd_addr);
-  if (dev_class == nullptr) return;
+  DEV_CLASS dev_class = btm_get_dev_class(bd_addr);
+  if (dev_class == kDevClassEmpty) return;
   const uint32_t cod =
       ((dev_class[0] << 16) | (dev_class[1] << 8) | dev_class[2]) & 0xffffff;
   if ((hci_status != HCI_SUCCESS) &&
@@ -2541,7 +2544,7 @@ void acl_create_classic_connection(const RawAddress& bd_addr,
 }
 
 void btm_connection_request(const RawAddress& bda,
-                            const bluetooth::types::ClassOfDevice& cod) {
+                            const bluetooth::hci::ClassOfDevice& cod) {
   // Copy Cod information
   DEV_CLASS dc;
 
@@ -2791,17 +2794,6 @@ void ACL_UnregisterClient(struct acl_client_callback_s* callbacks) {
   LOG_DEBUG("UNIMPLEMENTED");
 }
 
-bool ACL_SupportTransparentSynchronousData(const RawAddress& bd_addr) {
-  const tACL_CONN* p_acl =
-      internal_.btm_bda_to_acl(bd_addr, BT_TRANSPORT_BR_EDR);
-  if (p_acl == nullptr) {
-    LOG_WARN("Unable to find active acl");
-    return false;
-  }
-
-  return HCI_LMP_TRANSPNT_SUPPORTED(p_acl->peer_lmp_feature_pages[0]);
-}
-
 tACL_CONN* btm_acl_for_bda(const RawAddress& bd_addr, tBT_TRANSPORT transport) {
   tACL_CONN* p_acl = internal_.btm_bda_to_acl(bd_addr, transport);
   if (p_acl == nullptr) {
@@ -2829,4 +2821,64 @@ void find_in_device_record(const RawAddress& bd_addr,
   }
   *address_with_type = {.type = BLE_ADDR_PUBLIC, .bda = bd_addr};
   return;
+}
+
+tBTM_STATUS BTM_FlowSpec(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
+                    tBTM_CMPL_CB* p_cb) {
+  tACL_CONN* p = nullptr;
+
+  VLOG(2) << __func__ << " BdAddr: " << addr;
+
+  /* If someone already waiting on the version, do not allow another */
+  if (btm_cb.devcb.p_flow_spec_cmpl_cb) return (BTM_BUSY);
+
+  p = internal_.btm_bda_to_acl(addr, BT_TRANSPORT_BR_EDR);
+  if (p != NULL) {
+    btm_cb.devcb.p_flow_spec_cmpl_cb = p_cb;
+
+    btsnd_hcic_flow_spec(p->hci_handle, p_flow->qos_unused, p_flow->flow_direction,
+                         p_flow->service_type,
+                         p_flow->token_rate, p_flow->token_bucket_size ,
+                         p_flow->peak_bandwidth, p_flow->latency);
+    return (BTM_CMD_STARTED);
+  }
+
+  /* If here, no BD Addr found */
+  return (BTM_UNKNOWN_ADDR);
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_flow_spec_complete
+ *
+ * Description      This function is called when the command complete message
+ *                  is received from the HCI for the flow spec request.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_flow_spec_complete(uint8_t status, uint16_t handle,
+                            tBT_FLOW_SPEC* p_flow) {
+  tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_flow_spec_cmpl_cb;
+  tBTM_FLOW_SPEC_CMPL flow_su;
+
+  LOG_DEBUG("%s", __func__);
+  btm_cb.devcb.p_flow_spec_cmpl_cb = NULL;
+
+  /* If there was a registered callback, call it */
+  if (p_cb) {
+    memset(&flow_su, 0, sizeof(tBTM_FLOW_SPEC_CMPL));
+    flow_su.status = status;
+    flow_su.handle = handle;
+    if (p_flow != NULL) {
+      flow_su.flow.qos_unused = p_flow->qos_unused;
+      flow_su.flow.service_type = p_flow->service_type;
+      flow_su.flow.flow_direction = p_flow->flow_direction;
+      flow_su.flow.token_rate = p_flow->token_rate;
+      flow_su.flow.token_bucket_size = p_flow->token_bucket_size;
+      flow_su.flow.peak_bandwidth = p_flow->peak_bandwidth;
+      flow_su.flow.latency = p_flow->latency;
+    }
+    (*p_cb)(&flow_su);
+  }
 }

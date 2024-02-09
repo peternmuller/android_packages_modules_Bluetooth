@@ -17,6 +17,8 @@
 
 #include "a2dp_encoding_aidl.h"
 
+#include <vector>
+
 #include "a2dp_transport.h"
 #include "audio_aidl_interfaces.h"
 #include "bta/av/bta_av_int.h"
@@ -24,6 +26,188 @@
 #include "codec_status_aidl.h"
 #include "provider_info.h"
 #include "transport_instance.h"
+#include "hardware/audio.h"
+
+/*****************************************************************************
+ *  Local type definitions
+ *****************************************************************************/
+/* Context Types */
+enum class LeAudioContextType : uint16_t {
+  UNINITIALIZED = 0x0000,
+  UNSPECIFIED = 0x0001,
+  CONVERSATIONAL = 0x0002,
+  MEDIA = 0x0004,
+  GAME = 0x0008,
+  INSTRUCTIONAL = 0x0010,
+  VOICEASSISTANTS = 0x0020,
+  LIVE = 0x0040,
+  SOUNDEFFECTS = 0x0080,
+  NOTIFICATIONS = 0x0100,
+  RINGTONE = 0x0200,
+  ALERTS = 0x0400,
+  EMERGENCYALARM = 0x0800,
+  RFU = 0x1000,
+};
+
+enum Content {
+  CONTENT_TYPE_UNINITIALIZED = 0x0000,
+  CONTENT_TYPE_UNSPECIFIED = 0x0001,
+  CONTENT_TYPE_CONVERSATIONAL = 0x0002,
+  CONTENT_TYPE_MEDIA = 0x0004,
+  CONTENT_TYPE_GAME = 0x0008,
+  CONTENT_TYPE_INSTRUCTIONAL = 0x0010,
+  CONTENT_TYPE_VOICEASSISTANTS = 0x0020,
+  CONTENT_TYPE_LIVE = 0x0040,
+  CONTENT_TYPE_SOUNDEFFECTS = 0x0080,
+  CONTENT_TYPE_NOTIFICATIONS = 0x0100,
+  CONTENT_TYPE_RINGTONE = 0x0200,
+  CONTENT_TYPE_ALERTS = 0x0400,
+  CONTENT_TYPE_EMERGENCYALARM = 0x0800,
+  CONTENT_TYPE_RFU = 0x1000,
+};
+
+uint16_t LeAudioContextToIntContentInAPM(LeAudioContextType context_type);
+//LeAudioContextType priority_context = LeAudioContextType::SOUNDEFFECTS;
+
+enum CONTEXT_PRIORITY {
+  SONIFICATION = 0,
+  MEDIA,
+  GAME,
+  CONVERSATIONAL
+};
+
+enum METADATA_TYPE {
+  SOURCE = 0,
+  SINK
+};
+
+LeAudioContextType AudioContentToLeAudioContextInAPM(
+    audio_content_type_t content_type,
+    audio_source_t source_type, audio_usage_t usage) {
+  LOG(INFO) << __func__ << ": usage: " << usage;
+  switch (usage) {
+    case AUDIO_USAGE_MEDIA:
+      return LeAudioContextType::MEDIA;
+    case AUDIO_USAGE_VOICE_COMMUNICATION:
+      return LeAudioContextType::CONVERSATIONAL;
+    case AUDIO_USAGE_CALL_ASSISTANT:
+      return LeAudioContextType::CONVERSATIONAL;
+    case AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING:
+      return LeAudioContextType::VOICEASSISTANTS;
+    case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
+      return LeAudioContextType::SOUNDEFFECTS;
+    case AUDIO_USAGE_GAME:
+      return LeAudioContextType::GAME;
+    case AUDIO_USAGE_NOTIFICATION:
+      return LeAudioContextType::NOTIFICATIONS;
+    case AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE:
+      return LeAudioContextType::CONVERSATIONAL;
+    case AUDIO_USAGE_ALARM:
+      return LeAudioContextType::ALERTS;
+    case AUDIO_USAGE_EMERGENCY:
+      return LeAudioContextType::EMERGENCYALARM;
+    case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
+      return LeAudioContextType::INSTRUCTIONAL;
+    default:
+      break;
+  }
+
+  switch (source_type) {
+    case AUDIO_SOURCE_MIC:
+    case AUDIO_SOURCE_HOTWORD:
+    case AUDIO_SOURCE_VOICE_CALL:
+    case AUDIO_SOURCE_VOICE_COMMUNICATION:
+      return LeAudioContextType::CONVERSATIONAL;
+    default:
+      break;
+  }
+
+  LOG(INFO) << __func__ << ": Return Media when not in call by default.";
+  return LeAudioContextType::MEDIA;
+}
+
+uint16_t LeAudioContextToIntContentInAPM(LeAudioContextType context_type) {
+  switch (context_type) {
+    case LeAudioContextType::MEDIA:
+      return CONTENT_TYPE_MEDIA;
+    case LeAudioContextType::GAME:
+      return CONTENT_TYPE_GAME;
+    case LeAudioContextType::CONVERSATIONAL: //Fall through
+      return CONTENT_TYPE_CONVERSATIONAL;
+    case LeAudioContextType::LIVE:
+      return CONTENT_TYPE_LIVE;
+    case LeAudioContextType::RINGTONE:
+      return CONTENT_TYPE_RINGTONE;
+    case LeAudioContextType::VOICEASSISTANTS:
+      return CONTENT_TYPE_CONVERSATIONAL;
+    case LeAudioContextType::SOUNDEFFECTS:
+      return CONTENT_TYPE_SOUNDEFFECTS;
+    case LeAudioContextType::ALERTS:
+      return CONTENT_TYPE_ALERTS;
+    case LeAudioContextType::EMERGENCYALARM:
+      return CONTENT_TYPE_EMERGENCYALARM;
+    default:
+      return CONTENT_TYPE_MEDIA;
+      break;
+  }
+  return 0;
+}
+
+int getPriority(LeAudioContextType context) {
+  LOG(INFO) << __func__ << ": context type = "<<(uint16_t)context;
+  switch (context) {
+    case LeAudioContextType::MEDIA:
+      return CONTEXT_PRIORITY::MEDIA;
+    case LeAudioContextType::GAME:
+      return CONTEXT_PRIORITY::GAME;
+    case LeAudioContextType::CONVERSATIONAL:
+      return CONTEXT_PRIORITY::CONVERSATIONAL;
+    case LeAudioContextType::SOUNDEFFECTS:
+      return CONTEXT_PRIORITY::SONIFICATION ;
+    default:
+      break;
+  }
+  return 0;
+}
+
+int context_contention_src(source_metadata_t *source_metadata) {
+  auto tracks = source_metadata->tracks;
+  auto track_count = source_metadata->track_count;
+  LeAudioContextType current_context = LeAudioContextType::MEDIA;
+  auto current_priority = -1;
+
+  LOG(INFO) << __func__ << ": tracks count: " << track_count;
+  if(!track_count) {
+    return 0;
+  }
+
+  while (track_count) {
+    auto context_priority = 0;
+    if (tracks->content_type == 0 && tracks->usage == 0) {
+      --track_count;
+      LOG(INFO) << __func__ << ": tracks count: " << track_count;
+      ++tracks;
+      continue;
+    }
+
+    LOG(INFO) << __func__
+              << ": usage=" << tracks->usage
+              << ", content_type=" << tracks->content_type
+              << ", gain=" << tracks->gain;
+    LeAudioContextType context_type = AudioContentToLeAudioContextInAPM(tracks->content_type,
+                                                    AUDIO_SOURCE_DEFAULT, tracks->usage);
+    context_priority = getPriority(context_type);
+    if (context_priority > current_priority)
+      {
+        current_priority = context_priority;
+        current_context = context_type;
+      }
+    --track_count;
+    ++tracks;
+  }
+  uint16_t ctx = LeAudioContextToIntContentInAPM(current_context);;
+  return ctx;
+}
 
 namespace bluetooth {
 namespace audio {
@@ -43,6 +227,7 @@ using ::bluetooth::audio::aidl::BluetoothAudioCtrlAck;
 using ::bluetooth::audio::aidl::BluetoothAudioSinkClientInterface;
 using ::bluetooth::audio::aidl::codec::A2dpAacToHalConfig;
 using ::bluetooth::audio::aidl::codec::A2dpAptxToHalConfig;
+using ::bluetooth::audio::aidl::codec::A2dpAptxAdaptiveToHalConfig;
 using ::bluetooth::audio::aidl::codec::A2dpCodecToHalBitsPerSample;
 using ::bluetooth::audio::aidl::codec::A2dpCodecToHalChannelMode;
 using ::bluetooth::audio::aidl::codec::A2dpCodecToHalSampleRate;
@@ -146,6 +331,7 @@ void A2dpTransport::StopRequest() {
 void A2dpTransport::SetLatencyMode(LatencyMode latency_mode) {
   bool is_low_latency = latency_mode == LatencyMode::LOW_LATENCY ? true : false;
   btif_av_set_low_latency(is_low_latency);
+  btif_av_set_low_latency_spatial_audio(is_low_latency);
 }
 
 bool A2dpTransport::GetPresentationPosition(uint64_t* remote_delay_report_ns,
@@ -173,6 +359,9 @@ void A2dpTransport::SourceMetadataChanged(
     --track_count;
     ++tracks;
   }
+  uint16_t context = context_contention_src((source_metadata_t *)&source_metadata);
+  bool is_gaming = (context == CONTENT_TYPE_GAME) ? true : false;
+  btif_av_update_source_metadata(is_gaming);
 }
 
 void A2dpTransport::SinkMetadataChanged(const sink_metadata_v7_t&) {}
@@ -217,7 +406,7 @@ BluetoothAudioSinkClientInterface* active_hal_interface = nullptr;
 // ProviderInfo for A2DP hardware offload encoding and decoding data paths,
 // if supported by the HAL and enabled. nullptr if not supported
 // or disabled.
-::bluetooth::audio::aidl::a2dp::ProviderInfo* provider_info;
+std::unique_ptr<::bluetooth::audio::aidl::a2dp::ProviderInfo> provider_info;
 
 // Save the value if the remote reports its delay before this interface is
 // initialized
@@ -311,6 +500,11 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
       }
       break;
     }
+    case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+      if (!A2dpAptxAdaptiveToHalConfig(codec_config, a2dp_config)) {
+        return false;
+      }
+      break;
     case BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC: {
       if (!A2dpLdacToHalConfig(codec_config, a2dp_config)) {
         return false;
@@ -402,8 +596,37 @@ bool is_hal_offloading() {
          SessionType::A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH;
 }
 
+// Opens the HAL client interface of the specified session type and check
+// that is is valid. Returns nullptr if the client interface did not open
+// properly.
+static BluetoothAudioSinkClientInterface* new_hal_interface(
+    SessionType session_type) {
+  auto a2dp_transport = new A2dpTransport(session_type);
+  auto hal_interface = new BluetoothAudioSinkClientInterface(a2dp_transport);
+  if (hal_interface->IsValid()) {
+    return hal_interface;
+  } else {
+    LOG(ERROR) << __func__ << "BluetoothAudio HAL for a2dp is invalid";
+    delete a2dp_transport;
+    delete hal_interface;
+    return nullptr;
+  }
+}
+
+/// Delete the selected HAL client interface.
+static void delete_hal_interface(
+    BluetoothAudioSinkClientInterface* hal_interface) {
+  if (hal_interface == nullptr) {
+    return;
+  }
+  auto a2dp_transport =
+      static_cast<A2dpTransport*>(hal_interface->GetTransportInstance());
+  delete a2dp_transport;
+  delete hal_interface;
+}
+
 // Initialize BluetoothAudio HAL: openProvider
-bool init(bluetooth::common::MessageLoopThread* message_loop) {
+bool init(bluetooth::common::MessageLoopThread* /*message_loop*/) {
   LOG(INFO) << __func__;
 
   if (software_hal_interface != nullptr) {
@@ -421,34 +644,19 @@ bool init(bluetooth::common::MessageLoopThread* message_loop) {
     return false;
   }
 
-  auto a2dp_sink =
-      new A2dpTransport(SessionType::A2DP_SOFTWARE_ENCODING_DATAPATH);
   software_hal_interface =
-      new BluetoothAudioSinkClientInterface(a2dp_sink, message_loop);
-  if (!software_hal_interface->IsValid()) {
-    LOG(WARNING) << __func__ << ": BluetoothAudio HAL for A2DP is invalid?!";
-    delete software_hal_interface;
-    software_hal_interface = nullptr;
-    delete a2dp_sink;
+      new_hal_interface(SessionType::A2DP_SOFTWARE_ENCODING_DATAPATH);
+  if (software_hal_interface == nullptr) {
     return false;
   }
 
-  if (btif_av_is_a2dp_offload_enabled()) {
-    a2dp_sink =
-        new A2dpTransport(SessionType::A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH);
+  if (btif_av_is_a2dp_offload_enabled() &&
+      offloading_hal_interface == nullptr) {
     offloading_hal_interface =
-        new BluetoothAudioSinkClientInterface(a2dp_sink, message_loop);
-    if (!offloading_hal_interface->IsValid()) {
-      LOG(FATAL) << __func__
-                 << ": BluetoothAudio HAL for A2DP offloading is invalid?!";
-      delete offloading_hal_interface;
-      offloading_hal_interface = nullptr;
-      delete a2dp_sink;
-      a2dp_sink = static_cast<A2dpTransport*>(
-          software_hal_interface->GetTransportInstance());
-      delete software_hal_interface;
+        new_hal_interface(SessionType::A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH);
+    if (offloading_hal_interface == nullptr) {
+      delete_hal_interface(software_hal_interface);
       software_hal_interface = nullptr;
-      delete a2dp_sink;
       return false;
     }
   }
@@ -918,8 +1126,10 @@ provider::get_a2dp_configuration(
   }
   LOG(INFO) << "hint: " << hint.toString();
 
-  if (offloading_hal_interface == nullptr) {
-    LOG(ERROR) << __func__ << "the offloading HAL interface was never opened!";
+  if (offloading_hal_interface == nullptr &&
+      (offloading_hal_interface = new_hal_interface(
+           SessionType::A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH)) == nullptr) {
+    LOG(ERROR) << __func__ << "the offloading HAL interface cannot be opened";
     return std::nullopt;
   }
 

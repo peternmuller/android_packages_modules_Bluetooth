@@ -44,6 +44,7 @@
 #include <hardware/bt_sdp.h>
 #include <hardware/bt_sock.h>
 #include <hardware/bt_vc.h>
+#include <hardware/bt_vendor.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,7 +64,7 @@
 #include "btif/avrcp/avrcp_service.h"
 #include "btif/include/btif_sock.h"
 #include "btif/include/core_callbacks.h"
-#include "btif/include/stack_manager.h"
+#include "btif/include/stack_manager_t.h"
 #include "btif_a2dp.h"
 #include "btif_api.h"
 #include "btif_av.h"
@@ -82,16 +83,17 @@
 #include "btif_sock.h"
 #include "btif_storage.h"
 #include "common/address_obfuscator.h"
+#include "common/init_flags.h"
 #include "common/metrics.h"
 #include "common/os_utils.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
 #include "device/include/interop_config.h"
-#include "gd/common/init_flags.h"
-#include "gd/os/parameter_provider.h"
+#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/dumpsys.h"
 #include "os/log.h"
+#include "os/parameter_provider.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
 #include "osi/include/stack_power_telemetry.h"
@@ -167,6 +169,8 @@ extern LeAudioBroadcasterInterface* btif_le_audio_broadcaster_get_interface();
 extern CsisClientInterface* btif_csis_client_get_interface();
 /* Volume Control client */
 extern VolumeControlInterface* btif_volume_control_get_interface();
+/* vendor  */
+extern btvendor_interface_t* btif_vendor_get_interface();
 
 bt_status_t btif_av_sink_execute_service(bool b_enable);
 bt_status_t btif_hh_execute_service(bool b_enable);
@@ -342,6 +346,7 @@ static bluetooth::core::CoreInterface* CreateInterfaceToProfiles() {
       .invoke_le_test_mode_cb = invoke_le_test_mode_cb,
       .invoke_energy_info_cb = invoke_energy_info_cb,
       .invoke_link_quality_report_cb = invoke_link_quality_report_cb,
+      .invoke_key_missing_cb = invoke_key_missing_cb,
   };
   static bluetooth::core::HACK_ProfileInterface profileInterface{
       // HID
@@ -641,6 +646,12 @@ static int remove_bond(const RawAddress* bd_addr) {
   return BT_STATUS_SUCCESS;
 }
 
+static bool pairing_is_busy() {
+  if (btif_dm_pairing_is_busy()) return true;
+
+  return false;
+}
+
 static int get_connection_state(const RawAddress* bd_addr) {
   if (!interface_ready()) return 0;
 
@@ -796,7 +807,7 @@ static void dump(int fd, const char** arguments) {
   wakelock_debug_dump(fd);
   alarm_debug_dump(fd);
   bluetooth::csis::CsisClient::DebugDump(fd);
-  le_audio::has::HasClient::DebugDump(fd);
+  ::le_audio::has::HasClient::DebugDump(fd);
   HearingAid::DebugDump(fd);
   LeAudioClient::DebugDump(fd);
   LeAudioBroadcaster::DebugDump(fd);
@@ -898,6 +909,9 @@ static const void* get_profile_interface(const char* profile_id) {
 
   if (is_profile(profile_id, BT_PROFILE_CSIS_CLIENT_ID))
     return btif_csis_client_get_interface();
+
+  if (is_profile(profile_id, BT_PROFILE_VENDOR_ID))
+    return btif_vendor_get_interface();
 
   bool isBqrEnabled =
       bluetooth::common::InitFlags::IsBluetoothQualityReportCallbackEnabled();
@@ -1146,6 +1160,7 @@ EXPORT_SYMBOL bt_interface_t bluetoothInterface = {
     .create_bond_out_of_band = create_bond_out_of_band,
     .remove_bond = remove_bond,
     .cancel_bond = cancel_bond,
+    .pairing_is_busy = pairing_is_busy,
     .get_connection_state = get_connection_state,
     .pin_reply = pin_reply,
     .ssp_reply = ssp_reply,
@@ -1483,4 +1498,13 @@ void invoke_switch_codec_cb(bool is_low_latency_buffer_size) {
                                               is_low_latency_buffer_size);
                                   },
                                   is_low_latency_buffer_size));
+}
+
+void invoke_key_missing_cb(RawAddress bd_addr) {
+  do_in_jni_thread(FROM_HERE, base::BindOnce(
+                                  [](RawAddress bd_addr) {
+                                    HAL_CBACK(bt_hal_cbacks, key_missing_cb,
+                                              bd_addr);
+                                  },
+                                  bd_addr));
 }

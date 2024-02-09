@@ -30,6 +30,8 @@
 
 #include "a2dp_aac_decoder.h"
 #include "a2dp_aac_encoder.h"
+#include "include/check.h"
+#include "internal_include/bt_trace.h"
 #include "os/log.h"
 #include "osi/include/osi.h"
 #include "osi/include/properties.h"
@@ -719,7 +721,8 @@ void aac_source_caps_initialize() {
     return;
   }
   a2dp_aac_source_caps =
-      osi_property_get_bool("persist.bluetooth.a2dp_aac.vbr_supported", false)
+      (osi_property_get_bool("persist.bluetooth.a2dp_aac.vbr_supported", false) ||
+      osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled", false))
           ? a2dp_aac_vbr_source_caps
           : a2dp_aac_cbr_source_caps;
   aac_source_caps_configured = true;

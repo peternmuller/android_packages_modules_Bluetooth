@@ -33,6 +33,10 @@ constexpr char kFullyQualifiedInterfaceName_2_0[] =
     "android.hardware.bluetooth.audio@2.0::IBluetoothAudioProvidersFactory";
 constexpr char kFullyQualifiedInterfaceName_2_1[] =
     "android.hardware.bluetooth.audio@2.1::IBluetoothAudioProvidersFactory";
+constexpr char kFullyQualifiedQTIInterfaceName_2_0[] =
+    "vendor.qti.hardware.bluetooth_audio@2.0::IBluetoothAudioProvidersFactory";
+constexpr char kFullyQualifiedQTIInterfaceName_2_1[] =
+    "vendor.qti.hardware.bluetooth_audio@2.1::IBluetoothAudioProvidersFactory";
 
 enum class BluetoothAudioHalVersion : uint8_t {
   VERSION_UNAVAILABLE = 0,
@@ -42,6 +46,8 @@ enum class BluetoothAudioHalVersion : uint8_t {
   VERSION_AIDL_V2,
   VERSION_AIDL_V3,
   VERSION_AIDL_V4,
+  VERSION_QTI_HIDL_2_0,
+  VERSION_QTI_HIDL_2_1,
 };
 
 enum class BluetoothAudioHalTransport : uint8_t {
@@ -49,6 +55,7 @@ enum class BluetoothAudioHalTransport : uint8_t {
   UNKNOWN,
   AIDL,
   HIDL,
+  QTI_HIDL,
 };
 
 class HalVersionManager {

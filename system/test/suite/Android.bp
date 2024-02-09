@@ -10,7 +10,10 @@ package {
 
 cc_defaults {
     name: "net_test_defaults",
-    defaults: ["fluoride_defaults"],
+    defaults: [
+        "fluoride_defaults",
+        "libbtconfigstore_qti_defaults",
+    ],
     include_dirs: [
         "frameworks/av/media/libaaudio/include",
         "packages/modules/Bluetooth/system",
@@ -19,7 +22,6 @@ cc_defaults {
         "packages/modules/Bluetooth/system/bta/sys",
         "packages/modules/Bluetooth/system/btif/avrcp",
         "packages/modules/Bluetooth/system/btif/co",
-        "packages/modules/Bluetooth/system/btif/include",
         "packages/modules/Bluetooth/system/device/include",
         "packages/modules/Bluetooth/system/embdrv/sbc/decoder/include",
         "packages/modules/Bluetooth/system/embdrv/sbc/encoder/include",
@@ -44,6 +46,8 @@ cc_defaults {
     shared_libs: [
         "android.hardware.bluetooth.audio@2.0",
         "android.hardware.bluetooth.audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.1",
+        "vendor.qti.hardware.bluetooth_audio@2.0",
         "android.system.suspend-V1-ndk",
         "libPlatformProperties",
         "libaaudio",

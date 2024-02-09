@@ -33,8 +33,8 @@
 #include "audio_hal_client/audio_hal_client.h"
 #include "bta_groups.h"
 #include "btm_iso_api_types.h"
+#include "common/strings.h"
 #include "gatt_api.h"
-#include "gd/common/strings.h"
 #include "le_audio_log_history.h"
 #include "le_audio_types.h"
 #include "osi/include/alarm.h"
@@ -240,7 +240,7 @@ class LeAudioDevice {
   void PrintDebugState(void);
   void DumpPacsDebugState(std::stringstream& stream);
   void Dump(int fd);
-
+  RawAddress GetBdAddress(void);
   void DisconnectAcl(void);
   std::vector<uint8_t> GetMetadata(types::AudioContexts context_type,
                                    const std::vector<uint8_t>& ccid_list);
