@@ -449,7 +449,11 @@ cc_fuzz {
         "fuzzers/gatt_fuzzer.cc",
         "gatt/*.cc",
     ],
+    shared_libs: [
+        "server_configurable_flags",
+    ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_hci_pdl",
@@ -635,7 +639,6 @@ cc_fuzz {
         "libbt_shim_bridge",
         "libbt_shim_ffi",
         "libgmock",
-        "libosi",
     ],
     target: {
         android: {
@@ -1824,6 +1827,7 @@ cc_test {
         "test/gatt/stack_gatt_test.cc",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -1834,6 +1838,7 @@ cc_test {
         "libbtdevice",
         "libchrome",
         "libevent",
+        "libflagtest",
         "libgmock",
         "liblog",
         "libosi",
@@ -1841,9 +1846,11 @@ cc_test {
         "libstatslog_bt",
     ],
     shared_libs: [
+        "libbase",
         "libbinder_ndk",
         "libcrypto",
         "libcutils",
+        "server_configurable_flags",
     ],
     target: {
         android: {

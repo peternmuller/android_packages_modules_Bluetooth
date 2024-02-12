@@ -76,7 +76,6 @@
 #include "os/log.h"
 #include "os/logging/log_adapter.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"
 #include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "stack/btm/btm_dev.h"
@@ -848,7 +847,8 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
                        static_cast<tBT_DEVICE_TYPE>(device_type));
   }
 
-  if (is_hid && (device_type & BT_DEVICE_TYPE_BLE) == 0) {
+  if (!IS_FLAG_ENABLED(connect_hid_after_service_discovery) &&
+      is_hid && (device_type & BT_DEVICE_TYPE_BLE) == 0) {
     const bt_status_t status =
         GetInterfaceToProfiles()->profileSpecific_HACK->btif_hh_connect(
             &bd_addr);
@@ -2150,25 +2150,17 @@ static void btif_dm_update_allowlisted_media_players() {
   list_free(wl_players);
 }
 
-void BTIF_dm_report_inquiry_status_change(tBTM_STATUS status) {
-  if (status == BTM_INQUIRY_STARTED) {
+void BTIF_dm_report_inquiry_status_change(tBTM_INQUIRY_STATE status) {
+  btif_dm_inquiry_in_progress =
+      (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
+
+  if (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED) {
     GetInterfaceToProfiles()->events->invoke_discovery_state_changed_cb(
         BT_DISCOVERY_STARTED);
-    btif_dm_inquiry_in_progress = true;
-  } else if (status == BTM_INQUIRY_CANCELLED) {
+  } else if (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_CANCELLED) {
     GetInterfaceToProfiles()->events->invoke_discovery_state_changed_cb(
         BT_DISCOVERY_STOPPED);
-    btif_dm_inquiry_in_progress = false;
-  } else if (status == BTM_INQUIRY_COMPLETE) {
-    btif_dm_inquiry_in_progress = false;
   }
-}
-
-void BTIF_dm_on_hw_error() {
-  LOG_ERROR("Received H/W Error");
-  usleep(100000); /* 100milliseconds */
-  /* Killing the process to force a restart as part of fault tolerance */
-  kill(getpid(), SIGKILL);
 }
 
 void BTIF_dm_enable() {
@@ -3169,9 +3161,8 @@ void btif_dm_proc_io_req(tBTM_AUTH_REQ* p_auth_req, bool is_orig) {
   LOG_VERBOSE("updated p_auth_req=%d", *p_auth_req);
 }
 
-void btif_dm_proc_io_rsp(UNUSED_ATTR const RawAddress& bd_addr,
-                         tBTM_IO_CAP io_cap, UNUSED_ATTR tBTM_OOB_DATA oob_data,
-                         tBTM_AUTH_REQ auth_req) {
+void btif_dm_proc_io_rsp(const RawAddress& /* bd_addr */, tBTM_IO_CAP io_cap,
+                         tBTM_OOB_DATA /* oob_data */, tBTM_AUTH_REQ auth_req) {
   if (auth_req & BTA_AUTH_BONDS) {
     LOG_DEBUG("auth_req:%d", auth_req);
     pairing_cb.auth_req = auth_req;
