@@ -20,6 +20,7 @@
 #define SMP_API_TYPES_H
 
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include <cstdint>
 #include <string>
