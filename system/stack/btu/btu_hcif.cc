@@ -88,7 +88,6 @@ static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p,
 static void btu_hcif_command_complete_evt(BT_HDR* response, void* context);
 static void btu_hcif_command_status_evt(uint8_t status, BT_HDR* command,
                                         void* context);
-static void btu_hcif_hardware_error_evt(uint8_t* p);
 static void btu_hcif_mode_change_evt(uint8_t* p);
 static void btu_hcif_link_key_notification_evt(const uint8_t* p);
 static void btu_hcif_read_clock_off_comp_evt(uint8_t* p);
@@ -278,9 +277,6 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id,
           "Someone didn't go through the hci transmit_command function.",
           __func__);
       break;
-    case HCI_HARDWARE_ERROR_EVT:
-      btu_hcif_hardware_error_evt(p);
-      break;
     case HCI_MODE_CHANGE_EVT:
       btu_hcif_mode_change_evt(p);
       break;
@@ -405,6 +401,7 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id,
       break;
 
       // Events now captured by gd::hci_layer module
+    case HCI_HARDWARE_ERROR_EVT:
     case HCI_NUM_COMPL_DATA_PKTS_EVT:  // EventCode::NUMBER_OF_COMPLETED_PACKETS
     case HCI_CONNECTION_COMP_EVT:  // EventCode::CONNECTION_COMPLETE
     case HCI_CONNECTION_REQUEST_EVT:      // EventCode::CONNECTION_REQUEST
@@ -890,44 +887,6 @@ static void btu_hcif_rmt_name_request_comp_evt(const uint8_t* p,
   btm_sec_rmt_name_request_complete(&bd_addr, p, to_hci_status_code(status));
 }
 
-constexpr uint8_t MIN_KEY_SIZE = 7;
-
-static void read_encryption_key_size_complete_after_encryption_change(uint8_t status, uint16_t handle,
-                                                                      uint8_t key_size) {
-  if (status == HCI_ERR_INSUFFCIENT_SECURITY) {
-    /* If remote device stop the encryption before we call "Read Encryption Key
-     * Size", we might receive Insufficient Security, which means that link is
-     * no longer encrypted. */
-    LOG_INFO("encryption stopped on link:0x%x", handle);
-    return;
-  }
-
-  if (status != HCI_SUCCESS) {
-    LOG_ERROR("disconnecting, status:0x%x", status);
-    acl_disconnect_from_handle(handle, HCI_ERR_PEER_USER,
-                               "stack::btu::btu_hcif::read_encryption_key_size_"
-                               "complete_after_encryption_change Bad key size");
-    return;
-  }
-
-  if (key_size < MIN_KEY_SIZE) {
-    LOG_ERROR(
-        "encryption key too short, disconnecting. handle:0x%x,key_size:%d",
-        handle, key_size);
-
-    acl_disconnect_from_handle(
-        handle, HCI_ERR_HOST_REJECT_SECURITY,
-        "stack::btu::btu_hcif::read_encryption_key_size_complete_after_"
-        "encryption_change Key Too Short");
-    return;
-  }
-
-  // good key size - succeed
-  btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
-                         1 /* enable */);
-  btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
-                         1 /* enable */);
-}
 /*******************************************************************************
  *
  * Function         btu_hcif_encryption_change_evt
@@ -946,26 +905,8 @@ static void btu_hcif_encryption_change_evt(uint8_t* p) {
   STREAM_TO_UINT16(handle, p);
   STREAM_TO_UINT8(encr_enable, p);
 
-  if (status != HCI_SUCCESS || encr_enable == 0 ||
-      BTM_IsBleConnection(handle) ||
-      !controller_get_interface()->supports_read_encryption_key_size() ||
-      // Skip encryption key size check when using set_min_encryption_key_size
-      (bluetooth::common::init_flags::set_min_encryption_is_enabled() &&
-       controller_get_interface()->supports_set_min_encryption_key_size())) {
-    if (status == HCI_ERR_CONNECTION_TOUT) {
-      smp_cancel_start_encryption_attempt();
-      return;
-    }
-
-    btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
-                           encr_enable);
-    btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
-                           encr_enable);
-  } else {
-    btsnd_hcic_read_encryption_key_size(
-        handle,
-        base::Bind(&read_encryption_key_size_complete_after_encryption_change));
-  }
+  btm_sec_encryption_change_evt(handle, static_cast<tHCI_STATUS>(status),
+                                encr_enable);
 }
 
 /*******************************************************************************
@@ -1357,20 +1298,6 @@ static void btu_hcif_command_status_evt(uint8_t status, BT_HDR* command,
   do_in_main_thread(
       FROM_HERE,
       base::BindOnce(btu_hcif_command_status_evt_on_task, status, command));
-}
-
-/*******************************************************************************
- *
- * Function         btu_hcif_hardware_error_evt
- *
- * Description      Process event HCI_HARDWARE_ERROR_EVT
- *
- * Returns          void
- *
- ******************************************************************************/
-static void btu_hcif_hardware_error_evt(uint8_t* p) {
-  LOG_ERROR("UNHANDLED Ctlr H/w error event - code:0x%x", *p);
-  BTA_sys_signal_hw_error();
 }
 
 /*******************************************************************************

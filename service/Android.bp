@@ -107,7 +107,6 @@ java_library {
 
     libs: [
         "app-compat-annotations",
-        "framework-bluetooth.impl",
     ],
     sdk_version: "system_server_current",
 

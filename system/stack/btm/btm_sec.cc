@@ -40,8 +40,10 @@
 #include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
+#include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
+#include "main/shim/entry.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
 #include "stack/btm/btm_ble_int.h"
@@ -668,7 +670,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
         BTM_SEC_ROLE_SWITCHED | BTM_SEC_LINK_KEY_AUTHED);
 
   LOG_VERBOSE("after update sec_flags=0x%x", p_dev_rec->sec_rec.sec_flags);
-  if (!controller_get_interface()->SupportsSimplePairing()) {
+  if (!bluetooth::shim::GetController()->SupportsSimplePairing()) {
     /* The special case when we authenticate keyboard.  Set pin type to fixed */
     /* It would be probably better to do it from the application, but it is */
     /* complicated */
@@ -700,7 +702,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
   }
 
   LOG_VERBOSE("sec mode: %d sm4:x%x", btm_sec_cb.security_mode, p_dev_rec->sm4);
-  if (!controller_get_interface()->SupportsSimplePairing() ||
+  if (!bluetooth::shim::GetController()->SupportsSimplePairing() ||
       (p_dev_rec->sm4 == BTM_SM4_KNOWN)) {
     if (btm_sec_check_prefetch_pin(p_dev_rec)) return (BTM_CMD_STARTED);
   }
@@ -1302,7 +1304,7 @@ void BTM_RemoteOobDataReply(tBTM_STATUS res, const RawAddress& bd_addr,
  *
  ******************************************************************************/
 bool BTM_BothEndsSupportSecureConnections(const RawAddress& bd_addr) {
-  return ((controller_get_interface()->SupportsSecureConnections()) &&
+  return ((bluetooth::shim::GetController()->SupportsSecureConnections()) &&
           (BTM_PeerSupportsSecureConnections(bd_addr)));
 }
 
@@ -1475,7 +1477,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
 
   if ((!is_originator) && (security_required & BTM_SEC_MODE4_LEVEL4)) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* acceptor receives L2CAP Channel Connect Request for Secure Connections
      * Only service */
     if (!local_supports_sc || !p_dev_rec->SupportsSecureConnections()) {
@@ -1821,7 +1823,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
   if ((!is_originator) && ((security_required & BTM_SEC_MODE4_LEVEL4) ||
                            (btm_sec_cb.security_mode == BTM_SEC_MODE_SC))) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* acceptor receives service connection establishment Request for */
     /* Secure Connections Only service */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
@@ -2054,7 +2056,7 @@ void btm_sec_check_pending_reqs(void) {
  *
  ******************************************************************************/
 void btm_sec_dev_reset(void) {
-  ASSERT_LOG(controller_get_interface()->SupportsSimplePairing(),
+  ASSERT_LOG(bluetooth::shim::GetController()->SupportsSimplePairing(),
              "only controllers with SSP is supported");
 
   /* set the default IO capabilities */
@@ -2511,7 +2513,7 @@ void btm_io_capabilities_req(RawAddress p) {
     err_code = HCI_ERR_PAIRING_NOT_ALLOWED;
   } else if (btm_sec_cb.security_mode == BTM_SEC_MODE_SC) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* device in Secure Connections Only mode */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
       LOG_DEBUG(
@@ -3344,6 +3346,80 @@ void btm_sec_encrypt_change(uint16_t handle, tHCI_STATUS status,
     btm_sec_dev_rec_cback_event(p_dev_rec, btm_status, false);
 }
 
+constexpr uint8_t MIN_KEY_SIZE = 7;
+
+static void read_encryption_key_size_complete_after_encryption_change(
+    uint8_t status, uint16_t handle, uint8_t key_size) {
+  if (status == HCI_ERR_INSUFFCIENT_SECURITY) {
+    /* If remote device stop the encryption before we call "Read Encryption Key
+     * Size", we might receive Insufficient Security, which means that link is
+     * no longer encrypted. */
+    LOG_INFO("encryption stopped on link:0x%x", handle);
+    return;
+  }
+
+  if (status != HCI_SUCCESS) {
+    LOG_ERROR("disconnecting, status:0x%x", status);
+    acl_disconnect_from_handle(handle, HCI_ERR_PEER_USER,
+                               "stack::btu::btu_hcif::read_encryption_key_size_"
+                               "complete_after_encryption_change Bad key size");
+    return;
+  }
+
+  if (key_size < MIN_KEY_SIZE) {
+    LOG_ERROR(
+        "encryption key too short, disconnecting. handle:0x%x,key_size:%d",
+        handle, key_size);
+
+    acl_disconnect_from_handle(
+        handle, HCI_ERR_HOST_REJECT_SECURITY,
+        "stack::btu::btu_hcif::read_encryption_key_size_complete_after_"
+        "encryption_change Key Too Short");
+    return;
+  }
+
+  // good key size - succeed
+  btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                         1 /* enable */);
+  btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                         1 /* enable */);
+}
+
+// TODO: Remove
+void smp_cancel_start_encryption_attempt();
+
+/*******************************************************************************
+ *
+ * Function         btm_encryption_change_evt
+ *
+ * Description      Process event HCI_ENCRYPTION_CHANGE_EVT
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_sec_encryption_change_evt(uint16_t handle, tHCI_STATUS status,
+                                   uint8_t encr_enable) {
+  if (status != HCI_SUCCESS || encr_enable == 0 ||
+      BTM_IsBleConnection(handle) ||
+      !controller_get_interface()->supports_read_encryption_key_size() ||
+      // Skip encryption key size check when using set_min_encryption_key_size
+      (bluetooth::common::init_flags::set_min_encryption_is_enabled() &&
+       controller_get_interface()->supports_set_min_encryption_key_size())) {
+    if (status == HCI_ERR_CONNECTION_TOUT) {
+      smp_cancel_start_encryption_attempt();
+      return;
+    }
+
+    btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                           encr_enable);
+    btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                           encr_enable);
+  } else {
+    btsnd_hcic_read_encryption_key_size(
+        handle,
+        base::Bind(&read_encryption_key_size_complete_after_encryption_change));
+  }
+}
 /*******************************************************************************
  *
  * Function         btm_sec_connect_after_reject_timeout
@@ -3826,8 +3902,6 @@ void btm_sec_role_changed(tHCI_STATUS hci_status, const RawAddress& bd_addr,
                       BTM_BLE_SEC_NONE);
   }
 }
-
-constexpr uint8_t MIN_KEY_SIZE = 7;
 
 static void read_encryption_key_size_complete_after_key_refresh(
     uint8_t status, uint16_t handle, uint8_t key_size) {

@@ -40,6 +40,7 @@
 #include "btif/include/btif_config.h"
 #include "common/time_util.h"
 #include "device/include/controller.h"
+#include "hci/controller_interface.h"
 #include "hci/hci_layer.h"
 #include "include/check.h"
 #include "internal_include/bt_target.h"
@@ -357,7 +358,7 @@ void BTM_EnableInterlacedInquiryScan() {
   uint16_t inq_scan_type =
       osi_property_get_int32(PROPERTY_INQ_SCAN_TYPE, BTM_SCAN_TYPE_INTERLACED);
 
-  if (!controller_get_interface()->SupportsInterlacedInquiryScan() ||
+  if (!bluetooth::shim::GetController()->SupportsInterlacedInquiryScan() ||
       inq_scan_type != BTM_SCAN_TYPE_INTERLACED ||
       btm_cb.btm_inq_vars.inq_scan_type == BTM_SCAN_TYPE_INTERLACED) {
     return;
@@ -373,7 +374,7 @@ void BTM_EnableInterlacedPageScan() {
   uint16_t page_scan_type =
       osi_property_get_int32(PROPERTY_PAGE_SCAN_TYPE, BTM_SCAN_TYPE_INTERLACED);
 
-  if (!controller_get_interface()->SupportsInterlacedInquiryScan() ||
+  if (!bluetooth::shim::GetController()->SupportsInterlacedInquiryScan() ||
       page_scan_type != BTM_SCAN_TYPE_INTERLACED ||
       btm_cb.btm_inq_vars.page_scan_type == BTM_SCAN_TYPE_INTERLACED) {
     return;
@@ -399,15 +400,14 @@ void BTM_EnableInterlacedPageScan() {
  *
  ******************************************************************************/
 tBTM_STATUS BTM_SetInquiryMode(uint8_t mode) {
-  const controller_t* controller = controller_get_interface();
   LOG_VERBOSE("");
   if (mode == BTM_INQ_RESULT_STANDARD) {
     /* mandatory mode */
   } else if (mode == BTM_INQ_RESULT_WITH_RSSI) {
-    if (!controller->SupportsRssiWithInquiryResults())
+    if (!bluetooth::shim::GetController()->SupportsRssiWithInquiryResults())
       return (BTM_MODE_UNSUPPORTED);
   } else if (mode == BTM_INQ_RESULT_EXTENDED) {
-    if (!controller->SupportsExtendedInquiryResponse())
+    if (!bluetooth::shim::GetController()->SupportsExtendedInquiryResponse())
       return (BTM_MODE_UNSUPPORTED);
   } else
     return (BTM_ILLEGAL_VALUE);
@@ -679,7 +679,8 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
   if (btm_cb.btm_inq_vars.inq_active & BTM_SSP_INQUIRY_ACTIVE) {
     LOG_INFO("Not starting inquiry as SSP is in progress");
     // Report the status here because inq_complete will cancel it below
-    BTIF_dm_report_inquiry_status_change(BTM_INQUIRY_STARTED);
+    BTIF_dm_report_inquiry_status_change(
+        tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
 
     btm_process_inq_complete(HCI_ERR_MAX_NUM_OF_CONNECTIONS,
                              BTM_GENERAL_INQUIRY);
@@ -702,7 +703,8 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
             ASSERT(status_view.IsValid());
             auto status = status_view.GetStatus();
             if (status == bluetooth::hci::ErrorCode::SUCCESS) {
-              BTIF_dm_report_inquiry_status_change(BTM_INQUIRY_STARTED);
+              BTIF_dm_report_inquiry_status_change(
+                  tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
             } else {
               LOG_INFO("Inquiry failed to start status: %s",
                        bluetooth::hci::ErrorCodeText(status).c_str());
@@ -1495,7 +1497,8 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
   btm_cb.btm_inq_vars.inqparms.mode &= ~(mode);
   const auto inq_active = btm_cb.btm_inq_vars.inq_active;
 
-  BTIF_dm_report_inquiry_status_change(BTM_INQUIRY_COMPLETE);
+  BTIF_dm_report_inquiry_status_change(
+      tBTM_INQUIRY_STATE::BTM_INQUIRY_COMPLETE);
 
   if (status != HCI_SUCCESS) {
     LOG_WARN("Received unexpected hci status:%s",
@@ -1518,7 +1521,7 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
       btm_clr_inq_result_flt();
 
       if ((status == HCI_SUCCESS) &&
-          controller_get_interface()->SupportsRssiWithInquiryResults()) {
+          bluetooth::shim::GetController()->SupportsRssiWithInquiryResults()) {
         btm_sort_inq_result();
       }
 
@@ -1589,7 +1592,8 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
  *
  ******************************************************************************/
 void btm_process_cancel_complete(tHCI_STATUS status, uint8_t mode) {
-  BTIF_dm_report_inquiry_status_change(BTM_INQUIRY_CANCELLED);
+  BTIF_dm_report_inquiry_status_change(
+      tBTM_INQUIRY_STATE::BTM_INQUIRY_CANCELLED);
   btm_process_inq_complete(status, mode);
 }
 /*******************************************************************************
@@ -1781,7 +1785,7 @@ void btm_inq_rmt_name_failed_cancelled(void) {
  *
  ******************************************************************************/
 tBTM_STATUS BTM_WriteEIR(BT_HDR* p_buff) {
-  if (controller_get_interface()->SupportsExtendedInquiryResponse()) {
+  if (bluetooth::shim::GetController()->SupportsExtendedInquiryResponse()) {
     LOG_VERBOSE("Write Extended Inquiry Response to controller");
     btsnd_hcic_write_ext_inquiry_response(p_buff, BTM_EIR_DEFAULT_FEC_REQUIRED);
     return BTM_SUCCESS;
