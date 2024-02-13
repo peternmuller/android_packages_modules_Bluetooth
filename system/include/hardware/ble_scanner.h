@@ -183,7 +183,8 @@ class BleScannerInterface {
                                     MsftAdvMonitorEnableCallback cb) = 0;
 
   /** Sets the LE scan interval and window in units of N*0.625 msec */
-  virtual void SetScanParameters(int scanner_id, std::vector<uint32_t> scan_interval,
+  virtual void SetScanParameters(int scanner_id, uint8_t scan_type,
+                                 std::vector<uint32_t> scan_interval,
                                  std::vector<uint32_t> scan_window,
                                  Callback cb) = 0;
 

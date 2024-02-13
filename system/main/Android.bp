@@ -54,6 +54,7 @@ cc_library_static {
     min_sdk_version: "Tiramisu",
     static_libs: [
         "libbluetooth_gd",
+        "libbluetooth_log",
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
     ],
@@ -143,6 +144,7 @@ cc_library_static {
     ],
     header_libs: ["libbluetooth_headers"],
     static_libs: [
+        "libbluetooth_log",
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
     ],
@@ -172,6 +174,7 @@ cc_test {
         ":TestMockBta",
         ":TestMockBtif",
         ":TestMockBtu",
+        ":TestMockJni",
         ":TestMockLegacyHciCommands",
         ":TestMockLegacyHciInterface",
         ":TestMockMainShimEntry",
@@ -204,6 +207,7 @@ cc_test {
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
         "libbluetooth_hci_pdl",
+        "libbluetooth_log",
         "libbt-common",
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",

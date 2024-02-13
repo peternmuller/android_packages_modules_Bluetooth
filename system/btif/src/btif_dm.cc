@@ -94,6 +94,7 @@
 #include "stack/include/btm_sec_api_types.h"
 #include "stack/include/smp_api.h"
 #include "stack/sdp/sdpint.h"
+#include "storage/config_keys.h"
 #include "types/raw_address.h"
 
 #ifdef __ANDROID__
@@ -823,8 +824,8 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
   std::string addrstr = bd_addr.ToString();
   const char* bdstr = addrstr.c_str();
   if (transport == BT_TRANSPORT_LE) {
-    if (!btif_config_get_int(bdstr, "DevType", &device_type)) {
-      btif_config_set_int(bdstr, "DevType", BT_DEVICE_TYPE_BLE);
+    if (!btif_config_get_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, &device_type)) {
+      btif_config_set_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, BT_DEVICE_TYPE_BLE);
     }
     if (btif_storage_get_remote_addr_type(&bd_addr, &addr_type) !=
         BT_STATUS_SUCCESS) {
@@ -838,7 +839,7 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
       btif_storage_set_remote_addr_type(&bd_addr, addr_type);
     }
   }
-  if ((btif_config_get_int(bdstr, "DevType", &device_type) &&
+  if ((btif_config_get_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, &device_type) &&
        (btif_storage_get_remote_addr_type(&bd_addr, &addr_type) ==
         BT_STATUS_SUCCESS) &&
        (device_type & BT_DEVICE_TYPE_BLE) == BT_DEVICE_TYPE_BLE) ||
@@ -4145,7 +4146,9 @@ bool btif_get_device_type(const RawAddress& bda, int* p_device_type) {
   std::string addrstr = bda.ToString();
   const char* bd_addr_str = addrstr.c_str();
 
-  if (!btif_config_get_int(bd_addr_str, "DevType", p_device_type)) return false;
+  if (!btif_config_get_int(bd_addr_str, BTIF_STORAGE_KEY_DEV_TYPE,
+                           p_device_type))
+    return false;
   tBT_DEVICE_TYPE device_type = static_cast<tBT_DEVICE_TYPE>(*p_device_type);
   LOG_DEBUG("bd_addr:%s device_type:%s", ADDRESS_TO_LOGGABLE_CSTR(bda),
             DeviceTypeText(device_type).c_str());
@@ -4160,7 +4163,8 @@ bool btif_get_address_type(const RawAddress& bda, tBLE_ADDR_TYPE* p_addr_type) {
   const char* bd_addr_str = addrstr.c_str();
 
   int val = 0;
-  if (!btif_config_get_int(bd_addr_str, "AddrType", &val)) return false;
+  if (!btif_config_get_int(bd_addr_str, BTIF_STORAGE_KEY_ADDR_TYPE, &val))
+    return false;
   *p_addr_type = static_cast<tBLE_ADDR_TYPE>(val);
   LOG_DEBUG("bd_addr:%s[%s]", ADDRESS_TO_LOGGABLE_CSTR(bda),
             AddressTypeText(*p_addr_type).c_str());
