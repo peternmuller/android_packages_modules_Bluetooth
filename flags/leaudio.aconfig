@@ -1,4 +1,5 @@
 package: "com.android.bluetooth.flags"
+container: "com.android.btservices"
 
 flag {
     name: "leaudio_broadcast_monitor_source_sync_status"
@@ -127,4 +128,14 @@ flag {
     namespace: "bluetooth"
     description: "Support multiple audio outputs for volume offset"
     bug: "323156655"
+}
+
+flag {
+    name: "leaudio_volume_change_on_ringtone_fix"
+    namespace: "bluetooth"
+    description: "Apply the volume update to call volume during ringtone"
+    bug: "324041939"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
