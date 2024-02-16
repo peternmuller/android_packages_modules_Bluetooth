@@ -1369,38 +1369,13 @@ class BluetoothManagerService {
                 ("disable(" + packageName + ", " + persist + "):")
                         + (" mAdapter=" + mAdapter)
                         + (" isBinding=" + isBinding())
-                        + (" mState=" + mState));
+                        + (" mState=" + mState)
+                        + ("mUseNewAirplaneMode" + mUseNewAirplaneMode));
 
         synchronized (mReceiver) {
             if (!mUseNewAirplaneMode) {
                 mBluetoothAirplaneModeListener.notifyUserToggledBluetooth(false);
-                if (persist) {
-                    sendDisableMsg(BluetoothProtoEnums.ENABLE_DISABLE_REASON_APPLICATION_REQUEST,
-                            packageName);
-                } else {
-                    /* It means disable is called by shutdown thread */
-                    synchronized (this) {
-                        clearBleApps();
-                    }
 
-                    try {
-                        mAdapterLock.readLock().lock();
-                        mEnableExternal = false;
-                        if (mAdapter != null) {
-                            if(getState() == STATE_BLE_ON) {
-                                mEnable = false;
-                                mAdapter.stopBle(mContext.getAttributionSource());
-                            } else {
-                                sendDisableMsg(BluetoothProtoEnums.ENABLE_DISABLE_REASON_SYSTEM_BOOT,
-                                        packageName);
-                            }
-                        }
-                    } catch (RemoteException | TimeoutException e) {
-                        Log.e(TAG, "Unable to initiate disable", e);
-                    } finally {
-                        mAdapterLock.readLock().unlock();
-                    }
-                }
             } else {
                 // TODO(b/288450479): Remove clearCallingIdentity when threading is fixed
                 final long callingIdentity = Binder.clearCallingIdentity();
@@ -1412,6 +1387,34 @@ class BluetoothManagerService {
                 }
             }
 
+            if (persist) {
+                sendDisableMsg(BluetoothProtoEnums.ENABLE_DISABLE_REASON_APPLICATION_REQUEST,
+                            packageName);
+
+            } else {
+                /* It means disable is called by shutdown thread */
+                synchronized (this) {
+                clearBleApps();
+                }
+
+                try {
+                    mAdapterLock.readLock().lock();
+                    mEnableExternal = false;
+                    if (mAdapter != null) {
+                        if (getState() == STATE_BLE_ON) {
+                           mEnable = false;
+                           mAdapter.stopBle(mContext.getAttributionSource());
+                        } else {
+                            sendDisableMsg(BluetoothProtoEnums.ENABLE_DISABLE_REASON_SYSTEM_BOOT,
+                                   packageName);
+                        }
+                    }
+                } catch (RemoteException | TimeoutException e) {
+                    Log.e(TAG, "Unable to initiate disable", e);
+                } finally {
+                    mAdapterLock.readLock().unlock();
+                }
+            }
             if (persist) {
                 persistBluetoothSetting(BLUETOOTH_OFF);
             }
@@ -2051,7 +2054,7 @@ class BluetoothManagerService {
                     try {
                         // Remove timeout
                         mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
-                        
+
                         mAdapter = BluetoothServerProxy.getInstance().createAdapterBinder(service);
 
                         int foregroundUserId = ActivityManager.getCurrentUser();
