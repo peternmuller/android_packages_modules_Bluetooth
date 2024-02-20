@@ -64,6 +64,7 @@
 #include "btif_storage.h"
 #include "btif_util.h"
 #include "btif_vendor.h"
+#include "common/init_flags.h"
 #include "common/lru_cache.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"

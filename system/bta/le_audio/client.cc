@@ -21,6 +21,7 @@
 #include <lc3.h>
 
 #include <deque>
+#include <map>
 #include <mutex>
 #include <optional>
 
@@ -748,6 +749,7 @@ class LeAudioClientImpl : public LeAudioClient {
               ToString(group->cig.GetState()).c_str());
     if (group->IsEmpty() &&
         (group->cig.GetState() == le_audio::types::CigState::NONE)) {
+      lastNotifiedGroupStreamStatusMap_.erase(group->group_id_);
       aseGroups_.Remove(group->group_id_);
     }
   }
@@ -1391,8 +1393,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Reset sink listener notified status */
     sink_monitor_notified_status_ = std::nullopt;
-    callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
     SendAudioGroupSelectableCodecConfigChanged(group);
+    callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
   }
 
   void SetEnableState(const RawAddress& address, bool enabled) override {
@@ -3916,6 +3918,7 @@ class LeAudioClientImpl : public LeAudioClient {
     }
     groupStateMachine_->Cleanup();
     aseGroups_.Cleanup();
+    lastNotifiedGroupStreamStatusMap_.clear();
     leAudioDevices_.Cleanup(gatt_if_);
     if (gatt_if_) BTA_GATTC_AppDeregister(gatt_if_);
 
@@ -5539,6 +5542,30 @@ class LeAudioClientImpl : public LeAudioClient {
     stream_setup_start_timestamp_ = 0;
   }
 
+  void notifyGroupStreamStatus(int group_id,
+                               GroupStreamStatus groupStreamStatus) {
+    if (!IS_FLAG_ENABLED(leaudio_callback_on_group_stream_status)) {
+      return;
+    }
+
+    GroupStreamStatus newGroupStreamStatus = GroupStreamStatus::IDLE;
+    if (groupStreamStatus == GroupStreamStatus::STREAMING) {
+      newGroupStreamStatus = GroupStreamStatus::STREAMING;
+    }
+
+    auto it = lastNotifiedGroupStreamStatusMap_.find(group_id);
+
+    if (it != lastNotifiedGroupStreamStatusMap_.end()) {
+      if (it->second != newGroupStreamStatus) {
+        callbacks_->OnGroupStreamStatus(group_id, newGroupStreamStatus);
+        it->second = newGroupStreamStatus;
+      }
+    } else {
+      callbacks_->OnGroupStreamStatus(group_id, newGroupStreamStatus);
+      lastNotifiedGroupStreamStatusMap_.emplace(group_id, newGroupStreamStatus);
+    }
+  }
+
   void OnStateMachineStatusReportCb(int group_id, GroupStreamStatus status) {
     LOG_INFO(
         "status: %d ,  group_id: %d, audio_sender_state %s, "
@@ -5547,6 +5574,9 @@ class LeAudioClientImpl : public LeAudioClient {
         bluetooth::common::ToString(audio_sender_state_).c_str(),
         bluetooth::common::ToString(audio_receiver_state_).c_str());
     LeAudioDeviceGroup* group = aseGroups_.FindById(group_id);
+
+    notifyGroupStreamStatus(group_id, status);
+
     switch (status) {
       case GroupStreamStatus::STREAMING: {
         ASSERT_LOG(group_id == active_group_id_, "invalid group id %d!=%d",
@@ -5832,6 +5862,8 @@ class LeAudioClientImpl : public LeAudioClient {
   le_audio::CodecInterface* cached_channel_ = nullptr;
 
   base::WeakPtrFactory<LeAudioClientImpl> weak_factory_{this};
+
+  std::map<int, GroupStreamStatus> lastNotifiedGroupStreamStatusMap_;
 
   void ClientAudioInterfaceRelease() {
     if (le_audio_source_hal_client_) {

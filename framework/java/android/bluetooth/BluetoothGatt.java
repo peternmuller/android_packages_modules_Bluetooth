@@ -82,6 +82,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import android.annotation.SystemApi;
 
+
 /**
  * Public API for the Bluetooth GATT Profile.
  *
@@ -1762,6 +1763,13 @@ public final class BluetoothGatt implements BluetoothProfile {
             }
             throw e.rethrowAsRuntimeException();
         }
+        if (Flags.gattFixDeviceBusy()) {
+            if (requestStatus != BluetoothStatusCodes.SUCCESS) {
+                synchronized (mDeviceBusyLock) {
+                    mDeviceBusy = false;
+                }
+            }
+        }
 
         return requestStatus;
     }
@@ -1912,6 +1920,11 @@ public final class BluetoothGatt implements BluetoothProfile {
                 mDeviceBusy = false;
             }
             throw e.rethrowAsRuntimeException();
+        }
+        if (Flags.gattFixDeviceBusy()) {
+            synchronized (mDeviceBusyLock) {
+                mDeviceBusy = false;
+            }
         }
         return BluetoothStatusCodes.ERROR_UNKNOWN;
     }

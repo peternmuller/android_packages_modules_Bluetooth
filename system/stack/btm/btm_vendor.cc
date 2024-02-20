@@ -23,7 +23,7 @@
 #include "btif/include/btif_config.h"
 #include "btm_api.h"
 #include "btm_int_types.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "stack/acl/acl.h"
 #include "stack/acl/peer_packet_types.h"
 #include "stack/include/bt_types.h"
