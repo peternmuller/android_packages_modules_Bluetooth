@@ -185,6 +185,7 @@ class MockAudioHalClientEndpoint : public LeAudioSourceAudioHalClient {
                ::le_audio::DsaModes dsa_modes),
               (override));
   MOCK_METHOD((void), Stop, (), (override));
+  MOCK_METHOD((void), ConfirmSuspendRequest, (), (override));
   MOCK_METHOD((void), ConfirmStreamingRequest, (), (override));
   MOCK_METHOD((void), CancelStreamingRequest, (), (override));
   MOCK_METHOD((void), UpdateRemoteDelay, (uint16_t delay), (override));

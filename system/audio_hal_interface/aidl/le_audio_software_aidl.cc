@@ -158,7 +158,9 @@ BluetoothAudioCtrlAck LeAudioTransport::SuspendRequest() {
   LOG(INFO) << __func__;
   if (stream_cb_.on_suspend_()) {
     flush_();
-    return BluetoothAudioCtrlAck::SUCCESS_FINISHED;
+    LOG_INFO("Suspend pending.");
+    return BluetoothAudioCtrlAck::PENDING;
+    //return BluetoothAudioCtrlAck::SUCCESS_FINISHED;
   } else {
     return BluetoothAudioCtrlAck::FAILURE;
   }

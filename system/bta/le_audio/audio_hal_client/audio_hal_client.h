@@ -147,6 +147,7 @@ class LeAudioSinkAudioHalClient {
   virtual void Stop() = 0;
   virtual size_t SendData(uint8_t* data, uint16_t size) = 0;
 
+  virtual void ConfirmSuspendRequest() = 0;
   virtual void ConfirmStreamingRequest() = 0;
   virtual void CancelStreamingRequest() = 0;
 
@@ -187,6 +188,7 @@ class LeAudioSourceAudioHalClient {
                      DsaModes dsa_modes = {DsaMode::DISABLED}) = 0;
   virtual void Stop() = 0;
   virtual size_t SendData(uint8_t* data, uint16_t size) { return 0; }
+  virtual void ConfirmSuspendRequest() = 0;
   virtual void ConfirmStreamingRequest() = 0;
   virtual void CancelStreamingRequest() = 0;
   virtual void UpdateRemoteDelay(uint16_t remote_delay_ms) = 0;

@@ -88,6 +88,7 @@ class LeAudioClientInterface {
     virtual void SetRemoteDelay(uint16_t delay_report_ms) = 0;
     virtual void StartSession() = 0;
     virtual void StopSession() = 0;
+    virtual void ConfirmSuspendRequest() = 0;
     virtual void ConfirmStreamingRequest() = 0;
     virtual void CancelStreamingRequest() = 0;
     virtual void ConfirmStreamingRequestV2() = 0;
@@ -109,6 +110,7 @@ class LeAudioClientInterface {
     void SetRemoteDelay(uint16_t delay_report_ms) override;
     void StartSession() override;
     void StopSession() override;
+    void ConfirmSuspendRequest() override;
     void ConfirmStreamingRequest() override;
     void CancelStreamingRequest() override;
     void ConfirmStreamingRequestV2() override;
@@ -135,6 +137,7 @@ class LeAudioClientInterface {
     void SetRemoteDelay(uint16_t delay_report_ms) override;
     void StartSession() override;
     void StopSession() override;
+    void ConfirmSuspendRequest() override;
     void ConfirmStreamingRequest() override;
     void CancelStreamingRequest() override;
     void ConfirmStreamingRequestV2() override;
