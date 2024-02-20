@@ -163,6 +163,8 @@ struct btm_client_interface_t {
         uint8_t* host_add_on_features_len);
     bt_device_soc_add_on_features_t* (*BTM_GetSocAddOnFeatures)(
         uint8_t* soc_add_on_features_len);
+    bt_device_qll_local_supported_features_t* (*BTM_GetQllLocalSupportedFeatures)(
+        uint8_t* qll_local_supported_features_len);
     char* (*BTM_GetA2dpOffloadCapablity)();
     bool (*BTM_IsSpiltA2dpSupported)();
     bool (*BTM_IsAACFrameCtrlEnabled)();

@@ -42,9 +42,6 @@
 #define SEAMLESS_LEA_CONFIG_MASK    0x4
 #define SEAMLESS_XPAN_CONFIG_MASK   0x8
 
-#define CODEC_VERSION_1           0x01
-#define CODEC_VERSION_2           0x02
-
 /* Vendor specific config LTV */
 // TO-DO: Find a better place to define it
 constexpr uint8_t  LTV_TYPE_VER_NUM        = 0X00;

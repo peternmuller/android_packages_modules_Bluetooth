@@ -203,16 +203,17 @@ uint8_t ConvertLeToLeXContext(const LeAudioContextType& context_type) {
 }
 
 static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
-		                       const types::LeAudioLtvMap& pacs,
+                                       const types::LeAudioLtvMap& pacs,
                                        const std::vector<uint8_t>& pacs_metadata_,
                                        const types::LeAudioLtvMap& reqs,
-				       std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
+            std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
   auto caps = pacs.GetAsCoreCodecCapabilities();
   auto config = reqs.GetAsCoreCodecConfig();
   uint16_t u16_pac_val;
 
   bool parsed_ok = false;
-  types::LeAudioLtvMap pacs_metadata = types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
+  types::LeAudioLtvMap pacs_metadata =
+      types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
 
   /* Sampling frequency */
   if (!caps.HasSupportedSamplingFrequencies() || !config.sampling_frequency) {
@@ -344,8 +345,8 @@ static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
     uint8_t pac_decoder_version = pac_vendor_metadata.value()[5];
     uint8_t req_encoder_version = req_metadata[0];
     if (pac_decoder_version < req_encoder_version) {
-      LOG_DEBUG(" Encoder version cfg couldn't be negotiated as corresponding peer decoder couldn't be"
-          " matched as pac_decoder_version %d < req_encoder_version %d ",
+      LOG_DEBUG(" Encoder version cfg couldn't be negotiated as corresponding peer decoder couldn't"
+          " be matched as pac_decoder_version %d < req_encoder_version %d ",
           pac_decoder_version, req_encoder_version);
       return false;
     }
@@ -353,8 +354,8 @@ static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
     uint8_t pac_encoder_version = pac_vendor_metadata.value()[4];
     uint8_t req_decoder_version = req_metadata[1];
     if (pac_encoder_version < req_decoder_version) {
-      LOG_DEBUG(" Decoder version cfg couldn't be negotiated as corresponding peer encoder couldn't be"
-          " matched as pac_encoder_version %d < req_decoder_version %d ",
+      LOG_DEBUG(" Decoder version cfg couldn't be negotiated as corresponding peer encoder couldn't"
+          " be matched as pac_encoder_version %d < req_decoder_version %d ",
           pac_encoder_version, req_encoder_version);
       return false;
     }
@@ -367,10 +368,11 @@ static bool IsCodecConfigurationSupportedVendorAptxLe(types::LeAudioContextType 
                                           const types::LeAudioLtvMap& pacs,
                                           const std::vector<uint8_t>& pacs_metadata_,
                                           const types::LeAudioLtvMap& reqs,
-                                          std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
+            std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
 
   bool parsed_ok = false;
-  types::LeAudioLtvMap pacs_metadata = types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
+  types::LeAudioLtvMap pacs_metadata =
+      types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
   uint8_t u8_req_val, u8_pac_val;
   uint16_t u16_pac_val;
 
@@ -533,9 +535,10 @@ static bool IsCodecConfigurationSupportedVendorAptxLeX(types::LeAudioContextType
                                           const types::LeAudioLtvMap& pacs,
                                           const std::vector<uint8_t>& pacs_metadata_,
                                           const types::LeAudioLtvMap& reqs,
-                                          std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
+            std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
   bool parsed_ok = false;
-  types::LeAudioLtvMap pacs_metadata = types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
+  types::LeAudioLtvMap pacs_metadata =
+      types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
   uint8_t u8_req_val, u8_pac_val;
   uint16_t u16_pac_val;
 
@@ -733,9 +736,7 @@ bool IsCodecConfigSettingSupported(types::LeAudioContextType context_type,
     const acs_ac_record& pac, const CodecConfigSetting& codec_config_setting,
     std::optional<CodecMetadataSetting> vendor_metadata) {
   const auto& codec_id = codec_config_setting.id;
-
-  bool IsAptxLeSupported = /*(IsAptxLeSuppoerted(check sysprop, BN Variation controller)*/ true;
-  bool IsAptxLeXSupported = /*(IsAptxLeXSuppoerted(check sysprop, Controller QLL feat)*/ true;
+  auto cm = CodecManager::GetInstance();
 
   if (codec_id != pac.codec_id) return false;
 
@@ -758,15 +759,13 @@ bool IsCodecConfigSettingSupported(types::LeAudioContextType context_type,
         case types::kLeAudioVendorCompanyIdQualcomm:
           switch (codec_id.vendor_codec_id) {
             case types::kLeAudioCodingFormatAptxLe:
-              return IsAptxLeSupported && IsCodecConfigurationSupportedVendorAptxLe(context_type,
-                  pac.codec_spec_caps, pac.metadata,
-                  codec_config_setting.params,
-                  vendor_metadata);
+              return cm->IsAptxAdaptiveLeSupported() && IsCodecConfigurationSupportedVendorAptxLe(
+                  context_type, pac.codec_spec_caps, pac.metadata,
+                  codec_config_setting.params, vendor_metadata);
              case types::kLeAudioCodingFormatAptxLeX:
-              return IsAptxLeXSupported && IsCodecConfigurationSupportedVendorAptxLeX(context_type,
-                  pac.codec_spec_caps, pac.metadata,
-                  codec_config_setting.params,
-                  vendor_metadata);
+              return cm->IsAptxAdaptiveLeXSupported() && IsCodecConfigurationSupportedVendorAptxLeX(
+                  context_type, pac.codec_spec_caps, pac.metadata,
+                  codec_config_setting.params, vendor_metadata);
             default:
               return false;
           }

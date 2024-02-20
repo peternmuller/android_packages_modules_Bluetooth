@@ -1002,21 +1002,6 @@ void LeAudioDevice::DeactivateAllAses(void) {
   }
 }
 
-std::vector<uint8_t> LeAudioDevice::GetVsMetadata() {
-  const auto* ase = GetFirstActiveAse();
-  for (const auto& pac_tuple : snk_pacs_) {
-    /* Get PAC records from tuple as second element from tuple */
-    auto& pac_recs = std::get<1>(pac_tuple);
-
-    for (const auto& pac : pac_recs) {
-      if (pac.codec_id == ase->codec_id) {
-        return std::vector<uint8_t>(pac.metadata.data()+4, (pac.metadata.data()+4)+(pac.metadata.size()-4));
-      }
-    }
-  }
-  return std::vector<uint8_t>();
-}
-
 std::vector<uint8_t> LeAudioDevice::GetMetadata(
     AudioContexts context_type, const std::vector<uint8_t>& ccid_list) {
   std::vector<uint8_t> metadata;
