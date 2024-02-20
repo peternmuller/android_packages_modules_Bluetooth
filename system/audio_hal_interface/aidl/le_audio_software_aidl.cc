@@ -26,7 +26,7 @@
 
 #include "codec_status_aidl.h"
 #include "hal_version_manager.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include <aidl/vendor/qti/hardware/bluetooth/audio/LeAudioVendorConfiguration.h>
 #include <aidl/vendor/qti/hardware/bluetooth/audio/VendorCodecType.h>
 
