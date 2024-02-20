@@ -74,6 +74,7 @@
 #include <string.h>
 #include <vector>
 
+#undef LOG_TAG
 #define LOG_TAG "bt_btif_vendor"
 
 #include <base/bind.h>
@@ -84,8 +85,8 @@
 #include "btif_common.h"
 #include "btif_vendor.h"
 #include "btm_api.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "stack/include/btm_client_interface.h"
 

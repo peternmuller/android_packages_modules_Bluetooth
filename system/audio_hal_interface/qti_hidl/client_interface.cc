@@ -26,7 +26,7 @@
 #include <hidl/MQDescriptor.h>
 #include <future>
 
-#include "osi/include/log.h"
+#include "os/log.h"
 
 namespace bluetooth {
 namespace audio {
