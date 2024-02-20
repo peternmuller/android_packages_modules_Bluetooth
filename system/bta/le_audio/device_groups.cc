@@ -948,12 +948,12 @@ void LeAudioDeviceGroup::CigConfiguration::GenerateCisIds(
   /* If this is CSIS group, the csis_group_size will be > 0, otherwise -1.
    * If the last happen it means, group size is 1 */
   int group_size = csis_group_size > 0 ? csis_group_size : 1;
-
   set_configurations::get_cis_count(
       context_type, group_size, group_->GetGroupStrategy(group_size),
       group_->GetAseCount(types::kLeAudioDirectionSink),
       group_->GetAseCount(types::kLeAudioDirectionSource), cis_count_bidir,
-      cis_count_unidir_sink, cis_count_unidir_source);
+      cis_count_unidir_sink, cis_count_unidir_source,
+      group_->GetLatestAvailableContexts());
 
   uint8_t idx = 0;
   while (cis_count_bidir > 0) {
