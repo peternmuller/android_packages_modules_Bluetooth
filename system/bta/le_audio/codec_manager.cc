@@ -108,7 +108,8 @@ struct codec_manager_impl {
     }
 
     uint8_t qll_supported_feat_len = 0;
-    bool is_apx_lossless_le_supported = true;
+    bool is_apx_lossless_le_supported = false;
+    bool is_apx_lossless_le_supported_local = false;
 
     bt_device_qll_local_supported_features_t *qll_feature_list =
         get_btm_client_interface().vendor.BTM_GetQllLocalSupportedFeatures(&qll_supported_feat_len);
@@ -116,14 +117,22 @@ struct codec_manager_impl {
     bool is_dynamic_bn_over_qhs = BTM_QBCE_QLL_BN_VARIATION_BY_QHS_RATE(qll_feature_list->as_array);
     bool is_dynamic_ft_change_supported = BTM_QBCE_QLL_FT_CHNAGE(qll_feature_list->as_array);
 
-    if (!osi_property_get_bool("persist.vendor.qcom.bluetooth.lossless_aptx_adaptive_le.enabled", true)) {
-      LOG_DEBUG("APTX LEX codec enabled at target level");
+    if (osi_property_get_bool("persist.vendor.qcom.bluetooth.lossless_aptx_adaptive_le.enabled",
+        false)) {
+      LOG_DEBUG("Aptx LE codec enabled at target level");
       is_apx_lossless_le_supported = true;
     }
 
+    // To-Do remove below property once FW change merges
+    if (osi_property_get_bool("bluetooth.aptx_adaptive_le.enabled", false)) {
+      LOG_DEBUG("Aptx LE codec enabled at local level");
+      is_apx_lossless_le_supported_local = true;
+    }
+
     is_aptx_adaptive_le_supported_ = is_dynamic_bn_over_qhs &&
-                             is_dynamic_ft_change_supported &&
-                             is_apx_lossless_le_supported;
+                                     is_dynamic_ft_change_supported &&
+                                     is_apx_lossless_le_supported &&
+                                     is_apx_lossless_le_supported_local;
     is_aptx_adaptive_lex_supported_ = /*(IsAptxLeXSuppoerted(check sysprop, QLL feat)*/ true;
 
     LOG_DEBUG("FT Changes allowed %d, BN Variation allowed %d, Aptx LE Lossless enabled %d",
