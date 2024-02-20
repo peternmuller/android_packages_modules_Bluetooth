@@ -72,6 +72,7 @@ static uint8_t host_add_on_features_length = 0;
 char qhs_value[PROPERTY_VALUE_MAX] = "0";
 uint8_t qhs_support_mask = 0;
 static bt_device_qll_local_supported_features_t qll_features;
+static uint8_t qll_local_supported_features_length = 0;
 static bt_configstore_interface_t* bt_configstore_intf = NULL;
 tBTM_VS_EVT_CB* p_vnd_qle_cig_latency_changed_cb = nullptr;
 
@@ -173,6 +174,23 @@ bt_device_soc_add_on_features_t* BTM_GetSocAddOnFeatures(
   *soc_add_on_features_len = soc_add_on_features_length;
   return &soc_add_on_features;
 }
+
+/*******************************************************************************
+ *
+ * Function         BTM_GetQllLocalSupportedFeatures
+ *
+ * Description      BTM_GetQllLocalSupportedFeatures
+ *
+ *
+ * Returns          get QLL Local Supported add on features array
+ *
+ ******************************************************************************/
+bt_device_qll_local_supported_features_t* BTM_GetQllLocalSupportedFeatures(
+    uint8_t* qll_local_supported_features_len) {
+  *qll_local_supported_features_len = qll_local_supported_features_length;
+  return &qll_features;
+}
+
 /*******************************************************************************
  *
  * Function         BTM_BleIsCisParamUpdateLocalHostSupported
@@ -334,6 +352,7 @@ static void parse_qll_read_local_supported_features_response(
     STREAM_TO_UINT8(subcmd, stream);
     STREAM_TO_ARRAY(qll_features.as_array, stream,
                     (int)sizeof(bt_device_qll_local_supported_features_t));
+    qll_local_supported_features_length = length - 2;
     LOG_INFO(": opcode = 0x%04X, length = %d, status = %d, subcmd = %d", opcode,
              length, status, subcmd);
     if (status == HCI_SUCCESS) {

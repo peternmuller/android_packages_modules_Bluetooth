@@ -127,6 +127,7 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_ReadVendorAddOnFeatures = BTM_ReadVendorAddOnFeatures,
             .BTM_GetSocAddOnFeatures = BTM_GetSocAddOnFeatures,
             .BTM_GetHostAddOnFeatures = BTM_GetHostAddOnFeatures,
+            .BTM_GetQllLocalSupportedFeatures = BTM_GetQllLocalSupportedFeatures,
             .BTM_GetA2dpOffloadCapablity = BTM_GetA2dpOffloadCapablity,
             .BTM_IsSpiltA2dpSupported = BTM_IsSpiltA2dpSupported,
             .BTM_IsAACFrameCtrlEnabled = BTM_IsAACFrameCtrlEnabled,
