@@ -2499,6 +2499,13 @@ public class LeAudioService extends ProfileService {
 
             descriptor.mInputSelectableConfig = stackEvent.valueCodecList1;
             descriptor.mOutputSelectableConfig = stackEvent.valueCodecList2;
+            descriptor.mCodecStatus = new BluetoothLeAudioCodecStatus(
+                            null,
+                            null,
+                            mInputLocalCodecCapabilities,
+                            mOutputLocalCodecCapabilities,
+                            descriptor.mInputSelectableConfig,
+                            descriptor.mOutputSelectableConfig);
 
         } else if (stackEvent.type
                 == LeAudioStackEvent.EVENT_TYPE_AUDIO_GROUP_CURRENT_CODEC_CONFIG_CHANGED) {
