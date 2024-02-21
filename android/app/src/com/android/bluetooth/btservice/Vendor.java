@@ -68,11 +68,19 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothStatusCodes;
-import com.android.bluetooth.Utils;
-import android.os.SystemProperties;
 
+import com.android.bluetooth.Utils;
+
+import android.os.SystemProperties;
+import android.content.BroadcastReceiver;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.SoftApConfiguration;
+import android.net.wifi.SupplicantState;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.Context;
+
 import java.util.UUID;
 
 final class Vendor {
@@ -80,13 +88,16 @@ final class Vendor {
     private AdapterService mService;
     private String socName;
     private String a2dpOffloadCap;
+    private boolean isPowerBackoffEnabled = false;
+    private boolean isPowerBackoffSupported = false;
     // Split A2dp will be enabled by default
     private boolean splitA2dpEnabled = true;
-    private static boolean PowerbackoffStatus = false;
     // SWB will be enabled by default
     private boolean isSwbEnabled = true;
     // SWB-PM will be enabled by default
     private boolean isSwbPmEnabled = true;
+
+    public static final int SOFT_AP_BAND_DUAL = 1 << 3;
 
     static final int BT_VENDOR_PROPERTY_HOST_ADD_ON_FEATURES = 0x01;
     static final int BT_VENDOR_PROPERTY_SOC_ADD_ON_FEATURES = 0x02;
@@ -141,45 +152,98 @@ final class Vendor {
         mService = service;
     }
 
-    public void init(){
+    private final BroadcastReceiver mWifiStateBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = (intent != null) ? intent.getAction() : null;
+
+            if (action == null) return;
+            if ((action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION) ||
+                (action.equals(WifiManager.WIFI_AP_STATE_CHANGED_ACTION)))) {
+                if (isPowerBackOffRequired()) {
+                    setPowerBackoff(true);
+                } else {
+                    setPowerBackoff(false);
+                }
+            }
+        }
+    };
+
+    public void init() {
         initNative();
-        socName =  SystemProperties.get("persist.vendor.qcom.bluetooth.soc");
-        Log.d(TAG,"socName: " + socName);
+        socName = SystemProperties.get("persist.vendor.qcom.bluetooth.soc");
+        Log.d(TAG, "socName: " + socName);
         a2dpOffloadCap = SystemProperties.get("persist.vendor.qcom.bluetooth.a2dp_offload_cap");
-        Log.d(TAG,"a2dpOffloadCap: " + a2dpOffloadCap);
-        splitA2dpEnabled = SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.splita2dp", true);
-        Log.d(TAG,"splitA2dpEnabled: " + splitA2dpEnabled);
-        isSwbEnabled = SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.swb", true);
-        Log.d(TAG,"isSwbEnabled: " + isSwbEnabled);
-        isSwbPmEnabled = SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.swbpm", true);
-        Log.d(TAG,"isSwbPmEnabled: " + isSwbPmEnabled);
+        Log.d(TAG, "a2dpOffloadCap: " + a2dpOffloadCap);
+        splitA2dpEnabled =
+                SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.splita2dp", true);
+        Log.d(TAG, "splitA2dpEnabled: " + splitA2dpEnabled);
+        isSwbEnabled =
+                SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.swb", true);
+        Log.d(TAG, "isSwbEnabled: " + isSwbEnabled);
+        isSwbPmEnabled =
+                SystemProperties.getBoolean("persist.vendor.qcom.bluetooth.enable.swbpm", true);
+        Log.d(TAG, "isSwbPmEnabled: " + isSwbPmEnabled);
+
+        String max_power_support =
+                SystemProperties.get("persist.vendor.qcom.bluetooth.max_power_support");
+        Log.d(TAG, "max_power_support: " + max_power_support);
+        if (!max_power_support.isEmpty()) {
+            isPowerBackoffSupported = true;
+            isPowerBackoffEnabled = false;
+        }
+
+    }
+
+    private boolean isPowerBackOffRequired() {
+        try {
+
+            WifiManager mWifiManager = (WifiManager) (
+                    mService.getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+            final SoftApConfiguration config = mWifiManager.getSoftApConfiguration();
+
+            if (config != null)
+                Log.d(TAG, "Soft AP is on band: " + config.getBand());
+            if ((mWifiManager != null) && ((mWifiManager.isWifiEnabled() ||
+                ((mWifiManager.getWifiApState() == WifiManager.WIFI_AP_STATE_ENABLED) &&
+                    (config != null) &&
+                    (((config.getBand() & SoftApConfiguration.BAND_5GHZ) != 0) ||
+                        ((config.getBand() & SoftApConfiguration.BAND_6GHZ) != 0) ||
+                        ((config.getBand() & SOFT_AP_BAND_DUAL) != 0)))))) {
+                return true;
+            }
+            return false;
+        } catch (SecurityException e) {
+            Log.e(TAG, e.toString());
+        }
+        return false;
     }
 
     public void setWifiState(boolean status) {
-        Log.d(TAG,"setWifiState to: " + status);
+        Log.d(TAG, "setWifiState to: " + status);
         setWifiStateNative(status);
     }
 
-   public void setPowerBackoff(boolean status) {
-
-        if (getPowerBackoff() == status)
-            return;
-        Log.d(TAG,"setPowerBackoff to: " + status);
-        PowerbackoffStatus = status;
-        setPowerBackoffNative(status);
-    }
-
-   public boolean getPowerBackoff() {
-        Log.d(TAG,"getPowerBackoff " );
-        return PowerbackoffStatus;
+    public void setPowerBackoff(boolean status) {
+        Log.d(TAG, "setPowerBackoff status: " + status
+            + " isPowerBackoffEnabled: " + isPowerBackoffEnabled);
+        if (isPowerBackoffEnabled != status) {
+            isPowerBackoffEnabled = status;
+            setPowerBackoffNative(status);
+        }
     }
 
     public void cleanup() {
+        if (isPowerBackoffSupported) {
+            mService.getApplicationContext().unregisterReceiver(mWifiStateBroadcastReceiver);
+            isPowerBackoffSupported = false;
+            isPowerBackoffEnabled = false;
+        }
         cleanupNative();
     }
 
     void ssr_cleanup_callback() {
-        Log.e(TAG,"ssr_cleanup_callback");
+        Log.e(TAG, "ssr_cleanup_callback");
         android.os.Process.killProcess(android.os.Process.myPid());
     }
 
@@ -202,6 +266,17 @@ final class Vendor {
                     break;
                 case BT_VENDOR_PROPERTY_SOC_ADD_ON_FEATURES:
                     updateSocFeatureSupport(val);
+                    if (isPowerBackoffSupported) {
+                        IntentFilter wifiFilter = new IntentFilter();
+
+                        wifiFilter.addAction(WifiManager.WIFI_AP_STATE_CHANGED_ACTION);
+                        wifiFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+                        mService.getApplicationContext()
+                                .registerReceiver(mWifiStateBroadcastReceiver, wifiFilter);
+                        if (isPowerBackOffRequired()) {
+                            setPowerBackoff(true);
+                        }
+                    }
                     break;
             }
         }
@@ -218,9 +293,11 @@ final class Vendor {
     public boolean isSplitA2dpEnabled() {
         return splitA2dpEnabled;
     }
+
     public boolean isSwbEnabled() {
         return isSwbEnabled;
     }
+
     public boolean isSwbPmEnabled() {
         return isSwbPmEnabled;
     }
@@ -256,6 +333,7 @@ final class Vendor {
     public boolean isSplitA2DP48KhzSampleFreq() {
         return mSplitA2DP48KhzSampleFreq;
     }
+
     /**
      * @return Split A2DP Single VS Command Support status
      */
@@ -538,7 +616,7 @@ final class Vendor {
             mVoiceDualSCO = ((0x01 & ((int) val[3])) != 0);
             mVoiceTWSPLUSeSCOAG = ((0x02 & ((int) val[3])) != 0);
             mSWBVoicewithAptxAdaptiveAG = ((0x04 & ((int) val[3])) != 0);
-            mSplitA2DPSourceAACABR =  ((0x40 & ((int) val[3])) != 0);
+            mSplitA2DPSourceAACABR = ((0x40 & ((int) val[3])) != 0);
             mSplitA2DPSourceTxSplitAPTXADAPTIVE = ((0x80 & ((int) val[3])) != 0);
             mBroadcastAudioTxwithEC_2_5 = ((0x01 & ((int) val[4])) != 0);
             mBroadcastAudioTxwithEC_3_9 = ((0x02 & ((int) val[4])) != 0);
@@ -547,73 +625,78 @@ final class Vendor {
             mISOCIGParameterCalculator = ((0x10 & ((int) val[4])) != 0);
 
             Log.d(TAG, "BT_PROPERTY_ADD_ON_FEATURES: update from BT controller"
-                    + "\n mWiPowerFastbootEnabled = "
-                    + mWiPowerFastbootEnabled + "\n SplitA2DPScrambleDataRequired = "
-                    + mSplitA2DPScrambleDataRequired + "\n mSplitA2DP44p1KhzSampleFreq = "
-                    + mSplitA2DP44p1KhzSampleFreq + "\n mSplitA2DP48KhzSampleFreq = "
-                    + mSplitA2DP48KhzSampleFreq + "\n mSplitA2DPSingleVSCommandSupport = "
-                    + mSplitA2DPSingleVSCommandSupport + "\n mSplitA2DPSourceSBCEncoding = "
-                    + mSplitA2DPSourceSBCEncoding + "\n mSplitA2DPSourceSBC = "
-                    + mSplitA2DPSourceSBC + "\n mSplitA2DPSourceMP3 = "
-                    + mSplitA2DPSourceMP3 + "\n mSplitA2DPSourceAAC = "
-                    + mSplitA2DPSourceAAC + "\n mSplitA2DPSourceLDAC = " + mSplitA2DPSourceLDAC
-                    + "\n mSplitA2DPSourceAPTX = " + mSplitA2DPSourceAPTX
-                    + "\n mSplitA2DPSourceAPTXHD = " + mSplitA2DPSourceAPTXHD
-                    + "\n mSplitA2DPSourceAPTXADAPTIVE = " + mSplitA2DPSourceAPTXADAPTIVE
-                    + "\n mSplitA2DPSourceAPTXTWSPLUS = " + mSplitA2DPSourceAPTXTWSPLUS
-                    + "\n mSplitA2DPSinkSBC = " + mSplitA2DPSinkSBC + "\n mSplitA2DPSinkMP3 = "
-                    + mSplitA2DPSinkMP3 + "\n mSplitA2DPSinkAAC = "
-                    + mSplitA2DPSinkAAC + "\n mSplitA2DPSinkLDAC = " + mSplitA2DPSinkLDAC
-                    + "\n mSplitA2DPSinkAPTX = " + mSplitA2DPSinkAPTX
-                    + "\n mSplitA2DPSinkAPTXHD = " + mSplitA2DPSinkAPTXHD
-                    + "\n mSplitA2DPSinkAPTXADAPTIVE = " + mSplitA2DPSinkAPTXADAPTIVE
-                    + "\n mSplitA2DPSinkAPTXTWSPLUS = " + mSplitA2DPSinkAPTXTWSPLUS
-                    + "\n mVoiceDualSCO = " + mVoiceDualSCO + "\n mVoiceTWSPLUSeSCOAG = "
-                    + mVoiceTWSPLUSeSCOAG + "\n mSWBVoicewithAptxAdaptiveAG = "
-                    + mSWBVoicewithAptxAdaptiveAG + "\n SplitA2DPSourceAACABR = "
-                    + mSplitA2DPSourceAACABR + "\n SplitA2DPSourceTxSplitAPTXADAPTIVE = "
-                    + mSplitA2DPSourceTxSplitAPTXADAPTIVE + "\n BroadcastAudioTxwithEC_2_5 = "
-                    + mBroadcastAudioTxwithEC_2_5 + "\n mBroadcastAudioTxwithEC_3_9 = "
-                    + mBroadcastAudioTxwithEC_3_9 + "\n mBroadcastAudioRxwithEC_2_5 = "
-                    + mBroadcastAudioRxwithEC_2_5 + "\n mBroadcastAudioRxwithEC_3_9= "
-                    + mBroadcastAudioRxwithEC_3_9 + "\n mISOCIGParameterCalculator= "
-                    + mISOCIGParameterCalculator);
-         }
+                + "\n mWiPowerFastbootEnabled = "
+                + mWiPowerFastbootEnabled + "\n SplitA2DPScrambleDataRequired = "
+                + mSplitA2DPScrambleDataRequired + "\n mSplitA2DP44p1KhzSampleFreq = "
+                + mSplitA2DP44p1KhzSampleFreq + "\n mSplitA2DP48KhzSampleFreq = "
+                + mSplitA2DP48KhzSampleFreq + "\n mSplitA2DPSingleVSCommandSupport = "
+                + mSplitA2DPSingleVSCommandSupport + "\n mSplitA2DPSourceSBCEncoding = "
+                + mSplitA2DPSourceSBCEncoding + "\n mSplitA2DPSourceSBC = "
+                + mSplitA2DPSourceSBC + "\n mSplitA2DPSourceMP3 = "
+                + mSplitA2DPSourceMP3 + "\n mSplitA2DPSourceAAC = "
+                + mSplitA2DPSourceAAC + "\n mSplitA2DPSourceLDAC = " + mSplitA2DPSourceLDAC
+                + "\n mSplitA2DPSourceAPTX = " + mSplitA2DPSourceAPTX
+                + "\n mSplitA2DPSourceAPTXHD = " + mSplitA2DPSourceAPTXHD
+                + "\n mSplitA2DPSourceAPTXADAPTIVE = " + mSplitA2DPSourceAPTXADAPTIVE
+                + "\n mSplitA2DPSourceAPTXTWSPLUS = " + mSplitA2DPSourceAPTXTWSPLUS
+                + "\n mSplitA2DPSinkSBC = " + mSplitA2DPSinkSBC + "\n mSplitA2DPSinkMP3 = "
+                + mSplitA2DPSinkMP3 + "\n mSplitA2DPSinkAAC = "
+                + mSplitA2DPSinkAAC + "\n mSplitA2DPSinkLDAC = " + mSplitA2DPSinkLDAC
+                + "\n mSplitA2DPSinkAPTX = " + mSplitA2DPSinkAPTX
+                + "\n mSplitA2DPSinkAPTXHD = " + mSplitA2DPSinkAPTXHD
+                + "\n mSplitA2DPSinkAPTXADAPTIVE = " + mSplitA2DPSinkAPTXADAPTIVE
+                + "\n mSplitA2DPSinkAPTXTWSPLUS = " + mSplitA2DPSinkAPTXTWSPLUS
+                + "\n mVoiceDualSCO = " + mVoiceDualSCO + "\n mVoiceTWSPLUSeSCOAG = "
+                + mVoiceTWSPLUSeSCOAG + "\n mSWBVoicewithAptxAdaptiveAG = "
+                + mSWBVoicewithAptxAdaptiveAG + "\n SplitA2DPSourceAACABR = "
+                + mSplitA2DPSourceAACABR + "\n SplitA2DPSourceTxSplitAPTXADAPTIVE = "
+                + mSplitA2DPSourceTxSplitAPTXADAPTIVE + "\n BroadcastAudioTxwithEC_2_5 = "
+                + mBroadcastAudioTxwithEC_2_5 + "\n mBroadcastAudioTxwithEC_3_9 = "
+                + mBroadcastAudioTxwithEC_3_9 + "\n mBroadcastAudioRxwithEC_2_5 = "
+                + mBroadcastAudioRxwithEC_2_5 + "\n mBroadcastAudioRxwithEC_3_9= "
+                + mBroadcastAudioRxwithEC_3_9 + "\n mISOCIGParameterCalculator= "
+                + mISOCIGParameterCalculator);
+        }
     }
 
     void updateHostFeatureSupport(byte[] val) {
-         mHostAddonFeaturesSupported = (val.length != 0);
-         if (!mHostAddonFeaturesSupported) {
-                 Log.d(TAG, "BT_PROPERTY_HOST_ADD_ON_FEATURES: host add-on features not supported");
-         } else {
-             mHostAdvAudioUnicastFeatureSupported = ((0x01 & ((int) val[0])) != 0);
-             mHostAdvAudioBCAFeatureSupported = ((0x02 & ((int) val[0])) != 0);
-             mHostAdvAudioBCSFeatureSupported = ((0x04 & ((int) val[0])) != 0);
-             mHostAdvAudioStereoRecordingFeatureSupported = ((0x08 & ((int) val[0])) != 0);
-             mHostAdvAudioLC3QFeatureSupported = ((0x10 & ((int) val[0])) != 0);
-             mHostQHSFeatureSupported = ((0x20 & ((int) val[0])) != 0);
-             /* bit 7 and 8 of first byte reserved for future use
+        mHostAddonFeaturesSupported = (val.length != 0);
+        if (!mHostAddonFeaturesSupported) {
+            Log.d(TAG, "BT_PROPERTY_HOST_ADD_ON_FEATURES: host add-on features not supported");
+        } else {
+            mHostAdvAudioUnicastFeatureSupported = ((0x01 & ((int) val[0])) != 0);
+            mHostAdvAudioBCAFeatureSupported = ((0x02 & ((int) val[0])) != 0);
+            mHostAdvAudioBCSFeatureSupported = ((0x04 & ((int) val[0])) != 0);
+            mHostAdvAudioStereoRecordingFeatureSupported = ((0x08 & ((int) val[0])) != 0);
+            mHostAdvAudioLC3QFeatureSupported = ((0x10 & ((int) val[0])) != 0);
+            mHostQHSFeatureSupported = ((0x20 & ((int) val[0])) != 0);
+            /* bit 7 and 8 of first byte reserved for future use
              */
-             Log.d(TAG, "BT_PROPERTY_HOST_ADD_ON_FEATURES: update from BT HAL"
-                     + "\n mHostAdvAudioUnicastFeatureSupported = "
-                     + mHostAdvAudioUnicastFeatureSupported
-                     + "\n mHostAdvAudioBCAFeatureSupported = "
-                     + mHostAdvAudioBCAFeatureSupported
-                     + "\n mHostAdvAudioBCSFeatureSupported = "
-                     + mHostAdvAudioBCSFeatureSupported
-                     + "\n mHostAdvAudioStereoRecordingFeatureSupported = "
-                     + mHostAdvAudioStereoRecordingFeatureSupported
-                     + "\n mHostAdvAudioLC3QFeatureSupported = "
-                     + mHostAdvAudioLC3QFeatureSupported
-                     + "\n mHostQHSFeatureSupported = "
-                     + mHostQHSFeatureSupported);
-         }
+            Log.d(TAG, "BT_PROPERTY_HOST_ADD_ON_FEATURES: update from BT HAL"
+                + "\n mHostAdvAudioUnicastFeatureSupported = "
+                + mHostAdvAudioUnicastFeatureSupported
+                + "\n mHostAdvAudioBCAFeatureSupported = "
+                + mHostAdvAudioBCAFeatureSupported
+                + "\n mHostAdvAudioBCSFeatureSupported = "
+                + mHostAdvAudioBCSFeatureSupported
+                + "\n mHostAdvAudioStereoRecordingFeatureSupported = "
+                + mHostAdvAudioStereoRecordingFeatureSupported
+                + "\n mHostAdvAudioLC3QFeatureSupported = "
+                + mHostAdvAudioLC3QFeatureSupported
+                + "\n mHostQHSFeatureSupported = "
+                + mHostQHSFeatureSupported);
+        }
     }
 
     private native void initNative();
+
     private native static void classInitNative();
+
     private native void cleanupNative();
+
     private native void setWifiStateNative(boolean status);
+
     private native void setPowerBackoffNative(boolean status);
+
     private native void informTimeoutToHidlNative();
 }

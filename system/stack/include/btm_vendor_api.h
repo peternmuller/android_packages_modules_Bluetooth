@@ -98,3 +98,14 @@ bool BTM_IsAACFrameCtrlEnabled();
 uint8_t* BTM_GetScramblingSupportedFreqs(uint8_t* number_of_freqs);
 void BTM_RegisterForQleCigLatencyChangedEvt(
     tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
+
+/*******************************************************************************
+ *
+ * Function         BTM_SetPowerBackOffState
+ *
+ * Description      This function sets PowerBackOff state.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+extern void BTM_SetPowerBackOffState(bool status);

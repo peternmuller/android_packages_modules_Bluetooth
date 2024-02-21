@@ -287,6 +287,9 @@ static void register_vs_event() {
   bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
       bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
       handler->Bind(cpp::vendor_specific_event_callback));
+  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_LINK_POWER_CTRL_EVENT,
+      handler->Bind(cpp::vendor_specific_event_callback));
 }
 
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {

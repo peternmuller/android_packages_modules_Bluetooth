@@ -915,6 +915,7 @@ enum VseSubeventCode : 8 {
   BLE_TRACKING = 0x56,
   DEBUG_INFO = 0x57,
   BQR_EVENT = 0x58,
+  QBCE_VS_LINK_POWER_CTRL_EVENT = 0xb4,
 }
 
 // Common definitions for commands and events
