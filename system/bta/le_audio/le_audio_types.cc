@@ -75,7 +75,8 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
                    int avail_group_ase_snk_cnt, int avail_group_ase_src_count,
                    uint8_t& out_cis_count_bidir,
                    uint8_t& out_cis_count_unidir_sink,
-                   uint8_t& out_cis_count_unidir_source) {
+                   uint8_t& out_cis_count_unidir_source,
+                   types::BidirectionalPair<types::AudioContexts> group_contexts) {
   LOG_INFO(
       " %s strategy %d, group avail sink ases: %d, group avail source ases %d "
       "expected_device_count %d",
@@ -84,6 +85,12 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
       avail_group_ase_src_count, expected_device_cnt);
 
   bool is_bidirectional = types::kLeAudioContextAllBidir.test(context_type);
+
+  if(!(group_contexts.sink.test(context_type) && group_contexts.source.test(context_type))) {
+    LOG_WARN(" Remote does not support (context:%s) for both directions",
+                      bluetooth::common::ToString(context_type).c_str());
+    is_bidirectional = false;
+  }
 
   switch (strategy) {
     case types::LeAudioConfigurationStrategy::MONO_ONE_CIS_PER_DEVICE:
@@ -104,7 +111,11 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
           }
         }
       } else {
-        out_cis_count_unidir_sink = expected_device_cnt;
+        if(context_type == LeAudioContextType::LIVE) {
+          out_cis_count_unidir_source = expected_device_cnt;
+        } else {
+          out_cis_count_unidir_sink = expected_device_cnt;
+        }
       }
 
       break;
@@ -125,7 +136,11 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
           }
         }
       } else {
-        out_cis_count_unidir_sink = 2 * expected_device_cnt;
+        if(context_type == LeAudioContextType::LIVE) {
+          out_cis_count_unidir_source = 2*expected_device_cnt;
+        } else {
+          out_cis_count_unidir_sink = 2*expected_device_cnt;
+        }
       }
       break;
     case types::LeAudioConfigurationStrategy::RFU:
