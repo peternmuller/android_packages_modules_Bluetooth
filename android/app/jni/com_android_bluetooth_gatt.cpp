@@ -2280,8 +2280,7 @@ static PeriodicAdvertisingParameters parsePeriodicParams(JNIEnv* env,
   uint16_t interval = env->CallIntMethod(i, methodId);
 
   p.enable = true;
-  p.include_adi =
-      bluetooth::common::init_flags::periodic_advertising_adi_is_enabled();
+  p.include_adi = true;
   p.min_interval = interval;
   p.max_interval = interval + 16; /* 20ms difference betwen min and max */
   uint16_t props = 0;
@@ -2497,10 +2496,8 @@ static void setPeriodicAdvertisingEnableNative(JNIEnv* /* env */,
                                                jboolean enable) {
   if (!sGattIf) return;
 
-  bool include_adi =
-      bluetooth::common::init_flags::periodic_advertising_adi_is_enabled();
   sGattIf->advertiser->SetPeriodicAdvertisingEnable(
-      advertiser_id, enable, include_adi,
+      advertiser_id, enable, true /*include_adi*/,
       base::Bind(&enablePeriodicSetCb, advertiser_id, enable));
 }
 
@@ -2600,11 +2597,11 @@ static void distanceMeasurementCleanupNative(JNIEnv* env,
 }
 
 static void startDistanceMeasurementNative(JNIEnv* env, jobject /* object */,
-                                           jstring address, jint frequency,
+                                           jstring address, jint interval,
                                            jint method) {
   if (!sGattIf) return;
   sGattIf->distance_measurement_manager->StartDistanceMeasurement(
-      str2addr(env, address), frequency, method);
+      str2addr(env, address), interval, method);
 }
 
 static void stopDistanceMeasurementNative(JNIEnv* env, jobject /* object */,
