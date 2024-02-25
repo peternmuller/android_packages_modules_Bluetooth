@@ -35,7 +35,6 @@ mod ffi {
         fn leaudio_multicodec_support_is_enabled() -> bool;
         fn leaudio_targeted_announcement_reconnection_mode_is_enabled() -> bool;
         fn pbap_pse_dynamic_version_upgrade_is_enabled() -> bool;
-        fn periodic_advertising_adi_is_enabled() -> bool;
         fn private_gatt_is_enabled() -> bool;
         fn redact_log_is_enabled() -> bool;
         fn rust_event_loop_is_enabled() -> bool;

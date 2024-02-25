@@ -145,3 +145,16 @@ struct hash<bluetooth::Uuid> {
 };
 
 }  // namespace std
+
+// This file is used outside bluetooth in components
+// that do not have access to bluetooth/log.h
+#if __has_include(<bluetooth/log.h>)
+
+#include <bluetooth/log.h>
+
+namespace fmt {
+template <>
+struct formatter<bluetooth::Uuid> : ostream_formatter {};
+}  // namespace fmt
+
+#endif  // __has_include(<bluetooth/log.h>)
