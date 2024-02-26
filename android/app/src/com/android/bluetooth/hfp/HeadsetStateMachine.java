@@ -169,8 +169,7 @@ public class HeadsetStateMachine extends StateMachine {
     private BluetoothSinkAudioPolicy mHsClientAudioPolicy;
 
     static final boolean IS_APTX_SUPPORT_ENABLED =
-            Flags.hfpCodecAptxVoice()
-                    && SystemProperties.getBoolean("bluetooth.hfp.codec_aptx_voice.enabled", false);
+                    SystemProperties.getBoolean("bluetooth.hfp.codec_aptx_voice.enabled", false);
 
     // Keys are AT commands, and values are the company IDs.
     private static final Map<String, Integer> VENDOR_SPECIFIC_AT_COMMAND_COMPANY_ID;
