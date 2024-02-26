@@ -173,6 +173,7 @@ struct btm_client_interface_t {
                                   tBT_TRANSPORT transport);
     void (*BTM_RegisterForQleCigLatencyChangedEvt)(
         tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
+    void (*BTM_SetPowerBackOffState)(bool status);
   } vendor;
 };
 

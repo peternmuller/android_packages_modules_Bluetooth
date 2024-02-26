@@ -156,8 +156,8 @@ static void set_wifi_state(bool status) {
 
 static void set_Power_back_off_state(bool status) {
   LOG_INFO("setPowerBackOffState :%d ", status);
-  // todo
-  // BTA_DmPowerBackOff(status);
+  // do_in_main_thread(base::BindOnce(get_btm_client_interface().vendor.BTM_GetHostAddOnFeatures)
+  get_btm_client_interface().vendor.BTM_SetPowerBackOffState(status);
 }
 
 static void cleanup(void) {

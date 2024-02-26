@@ -938,6 +938,10 @@ class LeAudioClientImpl : public LeAudioClient {
           UnicastMonitorModeStatus::STREAMING_REQUESTED);
     }
 
+    send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+        static_cast<uint16_t>(configuration_context_type),
+        group->GetFirstDevice()->snk_pacs_);
+
     bool result = groupStateMachine_->StartStream(
         group, configuration_context_type, remote_contexts, ccids);
 
@@ -3250,9 +3254,9 @@ class LeAudioClientImpl : public LeAudioClient {
     callbacks_->OnAudioGroupSelectableCodecConf(
         group->group_id_,
         le_audio::utils::GetRemoteBtLeAudioCodecConfigFromPac(
-            leAudioDevice->snk_pacs_),
+            leAudioDevice->src_pacs_),
         le_audio::utils::GetRemoteBtLeAudioCodecConfigFromPac(
-            leAudioDevice->src_pacs_));
+            leAudioDevice->snk_pacs_));
   }
 
   void SendAudioGroupCurrentCodecConfigChanged(LeAudioDeviceGroup* group) {
@@ -5057,14 +5061,26 @@ class LeAudioClientImpl : public LeAudioClient {
     return remote_metadata;
   }
 
-  void btif_acm_send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type) {
-    uint8_t param[4] = {0};
-    param[0] = VS_QHCI_USECASE_UPDATE;
-    param[1] = (BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0x00FF;
-    param[2] = ((BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0xFF00) >> 8;
-    param[3] = (uint8_t)content_type;
-    //BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
-    btsnd_hcic_vendor_spec_cmd(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+  void send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type,
+    const le_audio::types::PublishedAudioCapabilities& group_pacs) {
+    bool remote_support = false;
+    for (auto& [handles, pacs_record] : group_pacs) {
+      for (auto& pac : pacs_record) {
+        if (pac.codec_id.vendor_codec_id == le_audio::types::kLeAudioCodingFormatAptxLeX) {
+          remote_support = true;
+          break;
+        }
+      }
+    }
+    if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
+      uint8_t param[4] = {0};
+      param[0] = VS_QHCI_USECASE_UPDATE;
+      param[1] = (BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0x00FF;
+      param[2] = ((BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0xFF00) >> 8;
+      param[3] = (uint8_t)content_type;
+      //BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+      btsnd_hcic_vendor_spec_cmd(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
+    }
   }
 
   /* Return true if stream is started */
@@ -5160,8 +5176,9 @@ class LeAudioClientImpl : public LeAudioClient {
       }
     }
 
-    btif_acm_send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
-        static_cast<uint16_t>(new_config_context));
+    send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+        static_cast<uint16_t>(new_config_context),
+        group->GetFirstDevice()->snk_pacs_);
 
     /* Note that the remote device metadata was so far unfiltered when it comes
      * to group context availability, or multiple contexts support flag, so that

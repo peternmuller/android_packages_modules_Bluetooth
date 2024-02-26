@@ -249,6 +249,7 @@ android_app {
         "framework-location.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
         "framework-mediaprovider",
+        "framework-wifi",
         "unsupportedappusage",
 
         // Need to link the class at runtime

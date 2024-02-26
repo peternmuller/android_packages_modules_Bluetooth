@@ -135,6 +135,7 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_IsQHSPhySupported = BTM_IsQHSPhySupported,
             .BTM_RegisterForQleCigLatencyChangedEvt =
                 BTM_RegisterForQleCigLatencyChangedEvt,
+            .BTM_SetPowerBackOffState = BTM_SetPowerBackOffState,
         }
 
 };
