@@ -183,6 +183,7 @@
                 "VND_SingleDev_OneChanStereoSnk_48khz_75octs_OneChanStereoSrc_16khz_30octs_Balanced_Reliability_1",
                 "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R5_L12_1",
                 "VND_SingleDev_OneChanStereoSnk_48khz_75octs_High_Reliability_1",
+                "SingleDev_OneChanStereoSnk_48_1_1_OneChanMonoSrc_16_1_1",
                 "SingleDev_OneChanStereoSnk_48_1_1_OneChanStereoSrc_16_1_1",
                 "SingleDev_OneChanStereoSnk_OneChanMonoSrc_32_2_1",
                 "SingleDev_OneChanStereoSnk_OneChanMonoSrc_32_2_Low_Latency",
