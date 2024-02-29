@@ -84,6 +84,7 @@ class LeAudioDeviceGroup {
   /* Whether LE Audio is preferred for OUTPUT_ONLY and DUPLEX cases */
   bool is_output_preference_le_audio;
   bool is_duplex_preference_le_audio;
+  std::pair<bool, bool> lex_codec_disabled;
   DsaMode dsa_mode_;
   bool asymmetric_phy_for_unidirectional_cis_supported;
 
@@ -124,6 +125,7 @@ class LeAudioDeviceGroup {
     is_output_preference_le_audio = true;
     is_duplex_preference_le_audio = true;
 #endif
+    lex_codec_disabled = std::make_pair(false, false);
     asymmetric_phy_for_unidirectional_cis_supported =
         IS_FLAG_ENABLED(asymmetric_phy_for_unidirectional_cis);
   }
@@ -168,6 +170,7 @@ class LeAudioDeviceGroup {
   bool IsGroupReadyToCreateStream(void) const;
   bool IsGroupReadyToSuspendStream(void) const;
   bool IsSeamlessSupported(void);
+  void DisableLeXCodec(bool status);
   bool HaveAllCisesDisconnected(void) const;
   void ClearAllCises(void);
   void UpdateCisConfiguration(uint8_t direction);
