@@ -1103,6 +1103,11 @@
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
+            "name": "SingleDev_OneChanStereoSnk_48_1_1_OneChanMonoSrc_16_1_1",
+            "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanMonoSrc_16_1",
+            "qos_config_name": ["QoS_Config_48_1_1", "VND_QoS_Config_R3_L15"]
+        },
+        {
             "name": "SingleDev_OneChanStereoSnk_48_1_1_OneChanStereoSrc_16_1_1",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanStereoSrc_16_1",
             "qos_config_name": ["QoS_Config_48_1_1", "VND_QoS_Config_R3_L15"]

@@ -1723,7 +1723,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       case LeAudioContextType::RINGTONE:
         return VOICE_USE_CASE;
       case LeAudioContextType::GAME:
-        return GAMING_NO_VBC_USE_CASE;
+        return GAMING_VBC_USE_CASE;
       case LeAudioContextType::LIVE:
         return STEREO_REC_USE_CASE;
       default:

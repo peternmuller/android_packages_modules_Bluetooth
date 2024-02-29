@@ -637,6 +637,16 @@ static void btif_a2dp_source_setup_codec_delayed(
     if (status != BTM_CMD_STARTED) {
       LOG_WARN("%s: Cannot send FlowSpec: status %d", __func__, status);
     }
+  } else if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC) {
+    /* For ABR mode default peak bandwidth is 0, for static it will be fetched */
+    uint32_t bitrate = 0;
+    bitrate = a2dp_codec_config->getTrackBitRate();
+    LOG_INFO(LOG_TAG, "LDAC bitrate = %d", bitrate);
+    flow_spec.peak_bandwidth = bitrate/8;  /* bytes/second */
+    tBTM_STATUS status = BTM_FlowSpec(peer_address, &flow_spec, NULL);
+    if (status != BTM_CMD_STARTED) {
+      LOG_WARN("%s: Cannot send FlowSpec: status %d", __func__, status);
+    }
   }
 
   btif_a2dp_source_cb.encoder_interface->encoder_init(

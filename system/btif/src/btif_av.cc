@@ -4381,31 +4381,31 @@ bool btif_av_peer_is_source(const RawAddress& peer_address) {
   return true;
 }
 
-void btif_av_update_codec_mode(bool is_Gaming_Latency) {
+void btif_av_update_codec_mode(bool is_gaming_latency) {
   btif_av_codec_mode_change_t codec_mode_change;
   A2dpCodecConfig* current_codec = bta_av_get_a2dp_current_codec();
   if (current_codec != nullptr) {
     btav_a2dp_codec_config_t codec_config;
     codec_config = current_codec->getCodecConfig();
-    if(codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
-      if (is_Gaming_Latency) {
+    if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+      if (is_gaming_latency) {
         LOG_INFO(" Is game/low latency, going for Low Latency Mode");
         codec_mode_change.enc_mode = APTX_LL;
       } else {
         LOG_INFO(" Isn't game/low latency, going for High Quality Mode");
         codec_mode_change.enc_mode = APTX_HQ;
       }
+      BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
+                                sizeof(codec_mode_change));
+      LOG_INFO("peer_address=%s event=%s",
+                ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
+                btif_av_event.ToString().c_str());
+      do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
+                                              AVDT_TSEP_SNK,  // peer_sep
+                                              btif_av_source_active_peer(),
+                                              kBtaHandleUnknown, btif_av_event));
     }
   }
-  BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
-                            sizeof(codec_mode_change));
-  LOG_INFO("peer_address=%s event=%s",
-            ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
-            btif_av_event.ToString().c_str());
-  do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
-                                          AVDT_TSEP_SNK,  // peer_sep
-                                          btif_av_source_active_peer(),
-                                          kBtaHandleUnknown, btif_av_event));
 }
 
 void btif_av_update_source_metadata(bool is_Gaming_Enabled) {
