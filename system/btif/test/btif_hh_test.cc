@@ -39,6 +39,8 @@ namespace bluetooth::testing {
 void set_hal_cbacks(bt_callbacks_t* callbacks);
 }  // namespace bluetooth::testing
 
+bool bta_ag_is_call_present(const RawAddress* peer_addr) { return true; }
+
 // Used the legacy stack manager
 module_t bt_utils_module;
 module_t gd_controller_module;

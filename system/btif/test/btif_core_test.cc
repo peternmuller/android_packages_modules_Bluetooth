@@ -50,6 +50,8 @@ module_t gd_shim_module;
 module_t osi_module;
 module_t rust_module;
 
+bool bta_ag_is_call_present(const RawAddress* peer_addr) { return true; }
+
 namespace {
 
 const RawAddress kRawAddress({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});

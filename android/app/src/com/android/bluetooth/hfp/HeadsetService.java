@@ -177,6 +177,7 @@ public class HeadsetService extends ProfileService {
     public static boolean isEnabled() {
         return BluetoothProperties.isProfileHfpAgEnabled().orElse(false);
     }
+    private static final int AUDIO_CONNECTION_DELAY_DEFAULT = 100;
 
     @Override
     public IProfileServiceBinder initBinder() {
@@ -1501,6 +1502,8 @@ public class HeadsetService extends ProfileService {
     }
 
     int connectAudio(BluetoothDevice device) {
+        int connDelay = SystemProperties.getInt("persist.vendor.bluetooth.audioconnect.delay",
+                AUDIO_CONNECTION_DELAY_DEFAULT);
         Log.i(TAG, "connectAudio: device=" + device + ", " + Utils.getUidPidString());
         synchronized (mStateMachines) {
             final HeadsetStateMachine stateMachine = mStateMachines.get(device);
@@ -1519,6 +1522,23 @@ public class HeadsetService extends ProfileService {
             }
             if (stateMachine.getAudioState() != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                 logD("connectAudio: audio is not idle for device " + device);
+                /**
+                 * add for case that device disconnecting audio has been set active again,
+                 * then send CONNECT_AUDIO if not contained in queue and should persist audio
+                 */
+                if (mActiveDevice != null && mActiveDevice.equals(device) &&
+                        stateMachine.getAudioState() == BluetoothHeadset.STATE_AUDIO_DISCONNECTING
+                        && !stateMachine.hasMessagesInQueue(HeadsetStateMachine.CONNECT_AUDIO) &&
+                        !stateMachine.hasDeferredMessagesInQueue(HeadsetStateMachine.CONNECT_AUDIO)
+                        && shouldPersistAudio()) {
+                    if (stateMachine.getIfDeviceBlacklistedForSCOAfterSLC() == true)
+                        connDelay = 0;
+
+                    Log.i(TAG, "connectAudio: active again and connect audio after "
+                            + connDelay + " ms");
+                    stateMachine.sendMessageDelayed(HeadsetStateMachine.CONNECT_AUDIO,
+                            device, connDelay);
+                }
                 return BluetoothStatusCodes.SUCCESS;
             }
             if (isAudioOn()) {
@@ -1526,7 +1546,12 @@ public class HeadsetService extends ProfileService {
                         + Arrays.toString(getNonIdleAudioDevices().toArray()));
                 return BluetoothStatusCodes.ERROR_AUDIO_DEVICE_ALREADY_CONNECTED;
             }
-            stateMachine.sendMessage(HeadsetStateMachine.CONNECT_AUDIO, device);
+
+            if (stateMachine.getIfDeviceBlacklistedForSCOAfterSLC() == true)
+                connDelay = 0;
+
+            Log.i(TAG, "connectAudio: connect audio after " + connDelay + " ms");
+            stateMachine.sendMessageDelayed(HeadsetStateMachine.CONNECT_AUDIO, device, connDelay);
         }
         return BluetoothStatusCodes.SUCCESS;
     }
@@ -1713,6 +1738,13 @@ public class HeadsetService extends ProfileService {
                     Log.e(TAG, "dialOutgoingCall failed to stop current virtual call");
                     return false;
                 }
+                HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
+                if (stateMachine != null &&
+                    stateMachine.isDeviceBlacklistedForDelayingCLCCRespAfterVOIPCall()) {
+                    // send delayed message for active device if Blacklisted
+                    stateMachine.sendMessageDelayed(
+                    HeadsetStateMachine.SEND_CLCC_RESP_AFTER_VOIP_CALL, 1000);
+                }
             }
             if (!setActiveDevice(fromDevice)) {
                 Log.e(TAG, "dialOutgoingCall failed to set active device to " + fromDevice);
@@ -1890,6 +1922,13 @@ public class HeadsetService extends ProfileService {
                 if (!isVirtualCall && mVirtualCallStarted) {
                     // stop virtual voice call if there is an incoming Telecom call update
                     stopScoUsingVirtualVoiceCall();
+                    HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
+                    if (stateMachine != null &&
+                        stateMachine.isDeviceBlacklistedForDelayingCLCCRespAfterVOIPCall()) {
+                        // send delayed message for active device if Blacklisted
+                        stateMachine.sendMessageDelayed(
+                        HeadsetStateMachine.SEND_CLCC_RESP_AFTER_VOIP_CALL, 300);
+                    }
                 }
                 if (mVoiceRecognitionStarted) {
                     // stop voice recognition if there is any incoming call

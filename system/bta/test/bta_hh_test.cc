@@ -33,6 +33,7 @@ std::array<uint8_t, 32> data32 = {
     0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
 };
 }
+bool bta_ag_is_call_present(const RawAddress* peer_addr) { return true; }
 
 class BtaHhTest : public ::testing::Test {
  protected:
