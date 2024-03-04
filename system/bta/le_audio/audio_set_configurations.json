@@ -712,19 +712,19 @@
         {
             "name": "VND_SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_32khz_AptxLeX_V1",
             "codec_config_name": "VND_SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_AptxLeX_V1",
-            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "qos_config_name": ["VND_QoS_Config_R4_L10"],
             "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
         },
         {
             "name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLeX_V1_High_Reliability",
             "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_AptxLeX_V1",
-            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "qos_config_name": ["VND_QoS_Config_R4_L10"],
             "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
         },
         {
             "name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLeX_V1_High_Reliability",
             "codec_config_name": "VND_SingleDev_OneChanStereoSnk_96khz_AptxLeX_V1",
-            "qos_config_name": ["VND_QoS_Config_R5_L70"],
+            "qos_config_name": ["VND_QoS_Config_R4_L10"],
             "codec_metadata_name": ["VND_AptxLeX_V1_VS_Metadata"]
         },
         {
@@ -12137,6 +12137,11 @@
             "name": "VND_QoS_Config_R10_L74",
             "retransmission_number": 10,
             "max_transport_latency": 74
+        },
+        {
+            "name": "VND_QoS_Config_R4_L10",
+            "retransmission_number": 4,
+            "max_transport_latency": 10
         },
         {
             "name": "VND_QoS_Config_R3_L15",
