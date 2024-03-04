@@ -1102,7 +1102,8 @@ void LeAudioDeviceGroup::CigConfiguration::GenerateCisIds(
   int group_size = group_->DesiredSize();
 
   set_configurations::get_cis_count(
-      context_type, group_size, group_->GetGroupSinkStrategy(),
+      context_type, group_->GetConfiguration(context_type), group_size,
+      group_->GetGroupSinkStrategy(),
       group_->GetAseCount(types::kLeAudioDirectionSink),
       group_->GetAseCount(types::kLeAudioDirectionSource), cis_count_bidir,
       cis_count_unidir_sink, cis_count_unidir_source,

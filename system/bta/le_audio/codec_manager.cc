@@ -1150,7 +1150,16 @@ struct codec_manager_impl {
                 continue;
             }
           }
-
+          if (!osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", false)){
+            if ((software_audio_set_conf->confs.sink.size() > 0) &&
+                (software_audio_set_conf->confs.source.size() > 0)) {
+                if (software_audio_set_conf->confs.sink[0].codec.id ==
+                    le_audio::set_configurations::LeAudioCodecIdAptxLeX &&
+                    software_audio_set_conf->confs.source[0].codec.id ==
+                    le_audio::set_configurations::LeAudioCodecIdAptxLeX)
+                  continue;
+            }
+          }
           log::info("Offload supported conf, context type: {}, settings -> {}",
                     (int)ctx_type, software_audio_set_conf->name);
           if (dual_bidirection_swb_supported_ &&

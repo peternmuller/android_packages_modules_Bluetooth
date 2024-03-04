@@ -44,7 +44,9 @@ using types::kLeAudioDirectionSink;
 using types::kLeAudioDirectionSource;
 using types::LeAudioCoreCodecConfig;
 
-void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
+void get_cis_count(LeAudioContextType context_type,
+                   std::shared_ptr<const set_configurations::AudioSetConfiguration> conf,
+                   int expected_device_cnt,
                    types::LeAudioConfigurationStrategy strategy,
                    int avail_group_ase_snk_cnt, int avail_group_ase_src_count,
                    uint8_t& out_cis_count_bidir,
@@ -58,6 +60,13 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
       avail_group_ase_snk_cnt, avail_group_ase_src_count, expected_device_cnt);
 
   bool is_bidirectional = types::kLeAudioContextAllBidir.test(context_type);
+
+  bool is_leX_codec = false;
+
+  if (conf->confs.sink.size() > 0) {
+    if (conf->confs.sink[0].codec.id == set_configurations::LeAudioCodecIdAptxLeX)
+      is_leX_codec = true;
+  }
 
   if((strategy == types::LeAudioConfigurationStrategy::STEREO_TWO_CISES_PER_DEVICE) &&
     !(group_contexts.sink.test(context_type) && group_contexts.source.test(context_type))) {
@@ -101,7 +110,12 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
         if ((avail_group_ase_snk_cnt > 0) && (avail_group_ase_src_count) > 0) {
           /* Prepare CIG to enable all microphones per device */
           if(context_type == LeAudioContextType::CONVERSATIONAL) {
-            out_cis_count_bidir = 2*expected_device_cnt;
+            if (is_leX_codec) {
+              out_cis_count_bidir = expected_device_cnt;
+              out_cis_count_unidir_sink = expected_device_cnt;
+            } else {
+              out_cis_count_bidir = 2*expected_device_cnt;
+            }
           } else if (context_type == LeAudioContextType::LIVE) {
             out_cis_count_bidir = 2*expected_device_cnt;
           } else {
@@ -576,7 +590,7 @@ uint32_t CodecConfigSetting::GetDataIntervalUs() const {
           switch (id.vendor_codec_id) {
             case types::kLeAudioCodingFormatAptxLe:
             case types::kLeAudioCodingFormatAptxLeX:
-              return 15000;
+              return params.GetAsCoreCodecConfig().frame_duration.value_or(0);
             default:
               return 0;
           }
