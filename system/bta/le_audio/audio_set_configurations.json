@@ -752,9 +752,9 @@
             "codec_metadata_name": ["VND_AptxLe_V1_VS_Metadata"]
         },
         {
-            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R3_L5_OneChanMonoSrc_32khz_45octs_R3_L5_LC3V2_1",
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R3_L8_OneChanMonoSrc_32khz_45octs_R3_L8_LC3V2_1",
             "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_OneChanMonoSrc_32khz_45octs_1",
-            "qos_config_name": ["VND_QoS_Config_R3_L5", "VND_QoS_Config_R3_L5"],
+            "qos_config_name": ["VND_QoS_Config_R3_L8", "VND_QoS_Config_R3_L8"],
             "codec_metadata_name": ["VND_LC3Q_V2_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
         },
         {
@@ -12159,9 +12159,9 @@
             "max_transport_latency": 200
         },
         {
-            "name": "VND_QoS_Config_R3_L5",
+            "name": "VND_QoS_Config_R3_L8",
             "retransmission_number": 3,
-            "max_transport_latency": 5
+            "max_transport_latency": 8
         },
         {
             "name": "VND_QoS_Config_R31_L100",
