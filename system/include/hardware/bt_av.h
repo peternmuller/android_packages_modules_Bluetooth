@@ -445,5 +445,4 @@ typedef struct {
 } btav_sink_interface_t;
 
 __END_DECLS
-
 #endif /* ANDROID_INCLUDE_BT_AV_H */
