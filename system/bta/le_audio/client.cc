@@ -5583,10 +5583,6 @@ class LeAudioClientImpl : public LeAudioClient {
 
   void notifyGroupStreamStatus(int group_id,
                                GroupStreamStatus groupStreamStatus) {
-    if (!IS_FLAG_ENABLED(leaudio_callback_on_group_stream_status)) {
-      return;
-    }
-
     GroupStreamStatus newGroupStreamStatus = GroupStreamStatus::IDLE;
     if (groupStreamStatus == GroupStreamStatus::STREAMING) {
       newGroupStreamStatus = GroupStreamStatus::STREAMING;
