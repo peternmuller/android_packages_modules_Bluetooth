@@ -702,6 +702,7 @@ cc_test {
         "vendor.qti.hardware.bluetooth.audio-V1-ndk",
 	    "vendor.qti.hardware.bluetooth_audio@2.1",
         "vendor.qti.hardware.bluetooth_audio@2.0",
+        "libbase",
         "libbinder_ndk",
         "libcrypto",
         "libcutils",
@@ -1114,6 +1115,7 @@ cc_test {
         "libcutils",
     ],
     static_libs: [
+        "libbase",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -1233,6 +1235,7 @@ cc_test {
     ],
     static_libs: [
         "libFraunhoferAAC",
+        "libbase",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -1289,6 +1292,7 @@ cc_test {
         "libcutils",
     ],
     static_libs: [
+        "libbase",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_log",
         "libbt-common",
