@@ -1620,8 +1620,7 @@ public class LeAudioService extends ProfileService {
                     continue;
                 }
 
-                byte[] addressBytes = Utils.getBytesFromAddress(address);
-                BluetoothDevice device = mAdapterService.getDeviceFromByte(addressBytes);
+                mExposedActiveDevice = null;
 
                 if (DBG) {
                     Log.d(TAG, " onAudioDevicesRemoved: " + address + ", device type: "
@@ -1630,14 +1629,6 @@ public class LeAudioService extends ProfileService {
                             + ", mActiveAudioInDevice: " + mActiveAudioInDevice
                             + ", mActiveAudioOutDevice: " +  mActiveAudioOutDevice);
                 }
-
-                if (device != mExposedActiveDevice) {
-                    continue;
-                }
-
-                Log.i(TAG, "Audio manager disactivate LeAudio device " + mExposedActiveDevice);
-                mExposedActiveDevice = null;
-                setActiveDevice(null);
             }
         }
     }
