@@ -26,17 +26,22 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHearingAid;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothSinkAudioPolicy;
+import android.content.res.Resources;
+import android.content.res.Resources.NotFoundException;
 import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.SystemProperties;
 import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.bluetooth.BluetoothMethodProxy;
 import com.android.bluetooth.Utils;
+import com.android.bluetooth.R;
 import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.btservice.storage.DatabaseManager;
 import com.android.bluetooth.flags.Flags;
@@ -50,6 +55,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * The active device manager is responsible for keeping track of the
@@ -104,7 +111,9 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
     private static final boolean DBG = true;
     @VisibleForTesting
     static final int A2DP_HFP_SYNC_CONNECTION_TIMEOUT_MS = 5_000;
-
+    private static final String DUAL_MODE_BREDR_LE_MODES_ENABLED_PROPERTY =
+        "bluetooth.dual_mode_bredr_le_modes_enabled";
+    Bundle contextBundleUpdate = new Bundle();
     private final AdapterService mAdapterService;
     private DatabaseManager mDbManager;
     private final ServiceFactory mFactory;
@@ -142,9 +151,43 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
     private BluetoothDevice mClassicDeviceToBeActivated = null;
     private BluetoothDevice mClassicDeviceNotToBeActivated = null;
 
+    private static final int METADATA_UNINITIALIZED  = 0x0000;
+    private static final int METADATA_UNSPECIFIED    = 0x0001;
+    private static final int METADATA_CONVERSATIONAL = 0x0002;
+    private static final int METADATA_MEDIA          = 0x0004;
+    private static final int METADATA_GAME           = 0x0008;
+    private static final int METADATA_INSTRUCTIONAL  = 0x0010;
+    private static final int METADATA_LIVE           = 0x0040;
+    private static final int METADATA_SOUNDEFFECTS   = 0x0080;
+    private static final int METADATA_NOTIFICATIONS  = 0x0100;
+    private static final int METADATA_RINGTONE       = 0x0200;
+    private static final int METADATA_ALERTS         = 0x0400;
+    private static final int METADATA_EMERGENCYALARM = 0x0800;
+
+    // Dual mode map for context_type : <Audio_Mode_Output_Only, Audio_Mode_Duplex>
+    private static HashMap<Integer, Integer[]> contextToModeBundle =
+        new HashMap<Integer, Integer[]>();
+
     @Override
     public void onBluetoothStateChange(int prevState, int newState) {
         mHandler.post(() -> handleAdapterStateChanged(newState));
+    }
+
+    public void contextBundle(BluetoothDevice device, int context) {
+        Log.d(TAG, "contextBundle: context:" + context + ", device: " + device);
+        Integer[] profile_values = new Integer[2];
+        if (contextToModeBundle.containsKey(context)) {
+            profile_values = contextToModeBundle.get(context);
+            contextBundleUpdate.putInt(BluetoothAdapter.AUDIO_MODE_OUTPUT_ONLY, profile_values[0]);
+            contextBundleUpdate.putInt(BluetoothAdapter.AUDIO_MODE_DUPLEX, profile_values[1]);
+        } else {
+            profile_values = contextToModeBundle.get(METADATA_UNSPECIFIED);
+            contextBundleUpdate.putInt(BluetoothAdapter.AUDIO_MODE_OUTPUT_ONLY, profile_values[0]);
+            contextBundleUpdate.putInt(BluetoothAdapter.AUDIO_MODE_DUPLEX, profile_values[1]);
+        }
+        Log.d(TAG, "contextBundle: Setting up values for context: " + context +
+            ", OUTPUT_ONLY mode: " + profile_values[0] + ", DUPLEX mode: " + profile_values[1]);
+        mAdapterService.setPreferredAudioProfiles(device, contextBundleUpdate);
     }
 
     /**
@@ -444,6 +487,17 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
                                 + device);
                 return;
             }
+
+            Integer[] profile_values = new Integer[2];
+            profile_values = contextToModeBundle.get(METADATA_UNSPECIFIED);
+
+            Log.d(TAG, "Sending native profile Values for Default context type: OUTPUT_ONLY mode: "
+                + profile_values[0] + ", DUPLEX mode: " + profile_values[1] + " for device " + device);
+
+            int groupId = leAudioService.getGroupId(device);
+            leAudioService.sendAudioProfilePreferencesToNative(groupId,
+                    profile_values[0] == BluetoothProfile.LE_AUDIO,
+                    profile_values[1] == BluetoothProfile.LE_AUDIO);
 
             if (mHearingAidActiveDevices.isEmpty()
                     && mLeHearingAidActiveDevice == null
@@ -830,6 +884,7 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
 
         mAudioManager.registerAudioDeviceCallback(mAudioManagerAudioDeviceCallback, mHandler);
         mAdapterService.registerBluetoothStateCallback((command) -> mHandler.post(command), this);
+        LoadDualModePoliciesfromLocalStorage();
     }
 
     void cleanup() {
@@ -858,6 +913,67 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
             return null;
         }
         return mHandler.getLooper();
+    }
+
+    private void LoadDualModePoliciesfromLocalStorage() {
+        Log.d(TAG, "LoadDualModePoliciesfromLocalStorage: ");
+        Resources res = mAdapterService.getResources();
+
+        final boolean is_dual_mode_bredr_le_enabled =
+            SystemProperties.getBoolean(DUAL_MODE_BREDR_LE_MODES_ENABLED_PROPERTY, false);
+        int[] profile_values = new int[2];
+
+        if (is_dual_mode_bredr_le_enabled == false) {
+          Integer[] profile_val_le_audio = new Integer[2];
+          profile_val_le_audio[0] = BluetoothProfile.LE_AUDIO;
+          profile_val_le_audio[1] = BluetoothProfile.LE_AUDIO;
+          contextToModeBundle.put(METADATA_CONVERSATIONAL, profile_val_le_audio);
+          contextToModeBundle.put(METADATA_MEDIA, profile_val_le_audio);
+          contextToModeBundle.put(METADATA_GAME, profile_val_le_audio);
+          contextToModeBundle.put(METADATA_LIVE, profile_val_le_audio);
+          contextToModeBundle.put(METADATA_UNSPECIFIED, profile_val_le_audio);
+          return;
+        }
+
+        Integer[] profile_val_conv = new Integer[2];
+        profile_values = res.getIntArray(R.array.conversational_use_case_policy);
+        profile_val_conv[0] = profile_values[0];
+        profile_val_conv[1] = profile_values[1];
+        contextToModeBundle.put(METADATA_CONVERSATIONAL, profile_val_conv);
+        Log.d(TAG, "Policy for context CONVERSATIONAL: Output Only Mode = " + profile_val_conv[0] +
+            ", Duplex Mode = " + profile_val_conv[1]);
+
+        Integer[] profile_val_media = new Integer[2];
+        profile_values = res.getIntArray(R.array.media_use_case_policy);
+        profile_val_media[0] = profile_values[0];
+        profile_val_media[1] = profile_values[1];
+        contextToModeBundle.put(METADATA_MEDIA, profile_val_media);
+        Log.d(TAG, "Policy for context MEDIA: Output Only Mode = " + profile_val_media[0] +
+            ", Duplex Mode = " + profile_val_media[1]);
+
+        Integer[] profile_val_game = new Integer[2];
+        profile_values = res.getIntArray(R.array.game_use_case_policy);
+        profile_val_game[0] = profile_values[0];
+        profile_val_game[1] = profile_values[1];
+        contextToModeBundle.put(METADATA_GAME, profile_val_game);
+        Log.d(TAG, "Policy for context GAME: Output Only Mode = " + profile_val_game[0] +
+            ", Duplex Mode = " + profile_val_game[1]);
+
+        Integer[] profile_val_live = new Integer[2];
+        profile_values = res.getIntArray(R.array.live_use_case_policy);
+        profile_val_live[0] = profile_values[0];
+        profile_val_live[1] = profile_values[1];
+        contextToModeBundle.put(METADATA_LIVE, profile_val_live);
+        Log.d(TAG, "Policy for context LIVE: Output Only Mode = " + profile_val_live[0] +
+            ", Duplex Mode = " + profile_val_live[1]);
+
+        Integer[] profile_val_unspec = new Integer[2];
+        profile_values = res.getIntArray(R.array.default_use_case_policy);
+        profile_val_unspec[0] = profile_values[0];
+        profile_val_unspec[1] = profile_values[1];
+        contextToModeBundle.put(METADATA_UNSPECIFIED, profile_val_unspec);
+        Log.d(TAG,"Policy for context UNSEPCIFIED(default) Output Only Mode = "
+            + profile_val_unspec[0] + ", Duplex Mode = " + profile_val_unspec[1]);
     }
 
     private boolean setA2dpActiveDevice(@NonNull BluetoothDevice device) {

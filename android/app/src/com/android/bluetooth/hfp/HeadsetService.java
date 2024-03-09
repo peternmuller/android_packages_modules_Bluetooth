@@ -56,6 +56,7 @@ import com.android.bluetooth.Utils;
 import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.AudioRoutingManager;
+import com.android.bluetooth.csip.CsipSetCoordinatorService;
 import com.android.bluetooth.btservice.MetricsLogger;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.bluetooth.btservice.ServiceFactory;
@@ -936,6 +937,34 @@ public class HeadsetService extends ProfileService {
                     + Utils.getUidPidString());
             return false;
         }
+
+        boolean isCsipSupported = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
+                                                      BluetoothUuid.COORDINATED_SET);
+        CsipSetCoordinatorService csipClient = mFactory.getCsipSetCoordinatorService();
+        int CsipGroupSize = 1;
+        int groupId = -1;
+        if (isCsipSupported && csipClient != null) {
+            groupId = csipClient.getGroupId(device, BluetoothUuid.CAP);
+            CsipGroupSize = csipClient.getDesiredGroupSize(groupId);
+        }
+
+        Log.w(TAG, "Group size of device " + device + " with group id: " + groupId +
+                " has group size = " + CsipGroupSize);
+
+        if (Utils.isDualModeAudioEnabled()) {
+            if (isCsipSupported && CsipGroupSize > 1) {
+                LeAudioService mLeAudio = LeAudioService.getLeAudioService();
+                if (mLeAudio != null) {
+                    int connPolicy = mLeAudio.getConnectionPolicy(device);
+                    if (connPolicy != BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
+                        Log.e(TAG, "Disallow HFP connect when dual mode enable for CSIP device "
+                             + device);
+                        return false;
+                    }
+                }
+            }
+        }
+
         synchronized (mStateMachines) {
             Log.i(TAG, "connect: device=" + device + ", " + Utils.getUidPidString());
             HeadsetStateMachine stateMachine = mStateMachines.get(device);

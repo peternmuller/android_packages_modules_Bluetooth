@@ -820,7 +820,7 @@ class LeAudioClientImpl : public LeAudioClient {
      * Ideally, we should send all the bits we have, but not all headsets like
      * it.
      */
-    if (osi_property_get_bool(kAllowMultipleContextsInMetadata, true)) {
+    if (osi_property_get_bool(kAllowMultipleContextsInMetadata, false)) {
       return metadata_context_type;
     }
 
@@ -3341,6 +3341,54 @@ class LeAudioClientImpl : public LeAudioClient {
     return true;
   }
 
+  enum ContentType {
+    CONTENT_TYPE_UNINITIALIZED = 0x0000,
+    CONTENT_TYPE_UNSPECIFIED = 0x0001,
+    CONTENT_TYPE_CONVERSATIONAL = 0x0002,
+    CONTENT_TYPE_MEDIA = 0x0004,
+    CONTENT_TYPE_GAME = 0x0008,
+    CONTENT_TYPE_INSTRUCTIONAL = 0x0010,
+    CONTENT_TYPE_VOICEASSISTANTS = 0x0020,
+    CONTENT_TYPE_LIVE = 0x0040,
+    CONTENT_TYPE_SOUNDEFFECTS = 0x0080,
+    CONTENT_TYPE_NOTIFICATIONS = 0x0100,
+    CONTENT_TYPE_RINGTONE = 0x0200,
+    CONTENT_TYPE_ALERTS = 0x0400,
+    CONTENT_TYPE_EMERGENCYALARM = 0x0800,
+    CONTENT_TYPE_RFU = 0x1000,
+  };
+
+  uint16_t LeAudioContextToIntContent(LeAudioContextType context_type) {
+    switch (context_type) {
+      case LeAudioContextType::MEDIA:
+        return CONTENT_TYPE_MEDIA;
+      case LeAudioContextType::GAME:
+        return CONTENT_TYPE_GAME;
+      case LeAudioContextType::CONVERSATIONAL:
+        return CONTENT_TYPE_CONVERSATIONAL;
+      case LeAudioContextType::LIVE:
+        return CONTENT_TYPE_LIVE;
+      case LeAudioContextType::RINGTONE:
+        return CONTENT_TYPE_RINGTONE;
+      case LeAudioContextType::VOICEASSISTANTS:
+        return CONTENT_TYPE_VOICEASSISTANTS;
+      case LeAudioContextType::INSTRUCTIONAL:
+        return CONTENT_TYPE_INSTRUCTIONAL;
+      case LeAudioContextType::SOUNDEFFECTS:
+        return CONTENT_TYPE_SOUNDEFFECTS;
+      case LeAudioContextType::NOTIFICATIONS:
+        return CONTENT_TYPE_NOTIFICATIONS;
+      case LeAudioContextType::ALERTS:
+        return CONTENT_TYPE_ALERTS;
+      case LeAudioContextType::EMERGENCYALARM:
+        return CONTENT_TYPE_EMERGENCYALARM;
+      default:
+        return CONTENT_TYPE_UNSPECIFIED;
+        break;
+    }
+    return 0;
+  }
+
   // mix stero signal into mono
   std::vector<uint8_t> mono_blend(const std::vector<uint8_t>& buf,
                                   int bytes_per_sample, size_t frames) {
@@ -4046,7 +4094,13 @@ class LeAudioClientImpl : public LeAudioClient {
              group->group_id_, ToHexString(context_type).c_str());
 
     configuration_context_type_ = context_type;
- 
+
+    uint16_t context_update_ =
+        LeAudioContextToIntContent(configuration_context_type_);
+    LOG_INFO(" OnMetadataUpdate for context type: %s",
+             ToHexString(context_type).c_str());
+    callbacks_->OnMetadataUpdate(context_update_);
+
     if (is_frame_duration_changed) {
       return AudioReconfigurationResult::RECONFIGURATION_BY_HAL;
     }

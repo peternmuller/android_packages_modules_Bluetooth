@@ -5568,6 +5568,8 @@ public class AdapterService extends Service {
                         && outputOnlyDefault != BluetoothProfile.LE_AUDIO) {
                     outputOnlyDefault = BluetoothProfile.LE_AUDIO;
                 }
+                Log.d(TAG, "getPreferredAudioProfiles: AUDIO_MODE_OUTPUT_ONLY:" +
+                                                                outputOnlyDefault);
                 defaultPreferencesBundle.putInt(
                         BluetoothAdapter.AUDIO_MODE_OUTPUT_ONLY, outputOnlyDefault);
                 useDefaultPreferences = true;
@@ -5581,6 +5583,7 @@ public class AdapterService extends Service {
                         && duplexDefault != BluetoothProfile.LE_AUDIO) {
                     duplexDefault = BluetoothProfile.LE_AUDIO;
                 }
+                Log.d(TAG, "getPreferredAudioProfiles: AUDIO_MODE_DUPLEX:" + duplexDefault);
                 defaultPreferencesBundle.putInt(BluetoothAdapter.AUDIO_MODE_DUPLEX, duplexDefault);
                 useDefaultPreferences = true;
             }
@@ -5600,7 +5603,7 @@ public class AdapterService extends Service {
      * @param modeToProfileBundle is the preferences we want to set for the device
      * @return whether the preferences were successfully requested
      */
-    private int setPreferredAudioProfiles(BluetoothDevice device, Bundle modeToProfileBundle) {
+    public int setPreferredAudioProfiles(BluetoothDevice device, Bundle modeToProfileBundle) {
         Log.i(TAG, "setPreferredAudioProfiles for device=" + device.getAddressForLogging());
         if (!isDualModeAudioEnabled()) {
             Log.e(TAG, "setPreferredAudioProfiles called while sysprop is disabled");
@@ -5627,6 +5630,8 @@ public class AdapterService extends Service {
                 && isOutputOnlyAudioSupported(groupDevices)) {
             int outputOnlyProfile =
                     modeToProfileBundle.getInt(BluetoothAdapter.AUDIO_MODE_OUTPUT_ONLY);
+            Log.d(TAG, "setPreferredAudioProfiles: AUDIO_MODE_OUTPUT_ONLY: " +
+                                                                outputOnlyProfile);
             if (outputOnlyProfile != BluetoothProfile.A2DP
                     && outputOnlyProfile != BluetoothProfile.LE_AUDIO) {
                 throw new IllegalArgumentException(
@@ -5637,6 +5642,8 @@ public class AdapterService extends Service {
         if (modeToProfileBundle.containsKey(BluetoothAdapter.AUDIO_MODE_DUPLEX)
                 && isDuplexAudioSupported(groupDevices)) {
             int duplexProfile = modeToProfileBundle.getInt(BluetoothAdapter.AUDIO_MODE_DUPLEX);
+            Log.d(TAG, "setPreferredAudioProfiles: AUDIO_MODE_DUPLEX: " +
+                                                                duplexProfile);
             if (duplexProfile != BluetoothProfile.HEADSET
                     && duplexProfile != BluetoothProfile.LE_AUDIO) {
                 throw new IllegalArgumentException(
@@ -5645,16 +5652,18 @@ public class AdapterService extends Service {
             strippedPreferences.putInt(BluetoothAdapter.AUDIO_MODE_DUPLEX, duplexProfile);
         }
 
+        Log.d(TAG, "setPreferredAudioProfiles: Going for synchronized mCsipGroupsPendingAudioProfileChanges");
         synchronized (mCsipGroupsPendingAudioProfileChanges) {
-            if (mCsipGroupsPendingAudioProfileChanges.containsKey(groupId)) {
-                return BluetoothStatusCodes.ERROR_ANOTHER_ACTIVE_REQUEST;
-            }
-
+            // if (mCsipGroupsPendingAudioProfileChanges.containsKey(groupId)) {
+            //     return BluetoothStatusCodes.ERROR_ANOTHER_ACTIVE_REQUEST;
+            // }
+            Log.d(TAG, "setPreferredAudioProfiles: Fetching prev pref from DB");
             Bundle previousPreferences = getPreferredAudioProfiles(device);
 
             int dbResult =
                     mDatabaseManager.setPreferredAudioProfiles(groupDevices, strippedPreferences);
             if (dbResult != BluetoothStatusCodes.SUCCESS) {
+                Log.d(TAG, "setPreferredAudioProfiles: dbResult wasn't set ");
                 return dbResult;
             }
 
@@ -6377,16 +6386,6 @@ public class AdapterService extends Service {
             if (device == null) {
                 mA2dpService.removeActiveDevice(false);
             } else {
-                /* Workaround for the controller issue which is not able to handle correctly
-                 * A2DP offloader vendor specific command while ISO Data path is set.
-                 * Proper solutions should be delivered in b/312396770
-                 */
-                if (mLeAudioService != null) {
-                    List<BluetoothDevice> activeLeAudioDevices = mLeAudioService.getActiveDevices();
-                    if (activeLeAudioDevices.get(0) != null) {
-                        mLeAudioService.removeActiveDevice(true);
-                    }
-                }
                 mA2dpService.setActiveDevice(device);
             }
         }

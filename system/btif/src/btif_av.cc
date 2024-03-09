@@ -53,6 +53,7 @@
 #include "include/check.h"
 #include "include/hardware/bt_rc.h"
 #include "internal_include/bt_trace.h"
+#include "os/system_properties.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
 #include "stack/include/avrc_api.h"
@@ -4284,6 +4285,23 @@ bool btif_av_is_a2dp_offload_running() {
     return false;
   }
   return bluetooth::audio::a2dp::is_hal_offloading();
+}
+
+bool btif_av_is_dual_mode_enabled() {
+  return bluetooth::os::GetSystemPropertyBool(
+          bluetooth::os::kIsDualModeAudioEnabledProperty, false);
+}
+
+void btif_av_metadata_update(uint16_t context) {
+  LOG_INFO("context: %d", context);
+  bool is_src = true;
+
+  if (btif_av_source.Enabled()) {
+    do_in_jni_thread(
+        FROM_HERE,
+        base::BindOnce(btif_av_source.Callbacks()->update_metadata_cb,
+                                                  context));
+  }
 }
 
 bool btif_av_is_peer_silenced(const RawAddress& peer_address) {

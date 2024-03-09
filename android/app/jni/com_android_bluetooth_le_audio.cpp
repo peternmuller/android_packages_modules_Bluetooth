@@ -53,6 +53,7 @@ static jmethodID method_onSinkAudioLocationAvailable;
 static jmethodID method_onAudioLocalCodecCapabilities;
 static jmethodID method_onAudioGroupCurrentCodecConf;
 static jmethodID method_onAudioGroupSelectableCodecConf;
+static jmethodID method_OnMetadataUpdate;
 static jmethodID method_onHealthBasedRecommendationAction;
 static jmethodID method_onHealthBasedGroupRecommendationAction;
 static jmethodID method_onUnicastMonitorModeStatus;
@@ -311,6 +312,16 @@ class LeAudioClientCallbacksImpl : public LeAudioClientCallbacks {
     sCallbackEnv->CallVoidMethod(
         mCallbacksObj, method_onAudioGroupSelectableCodecConf, (jint)group_id,
         inputSelectableCodecConfigArray, outputSelectableCodecConfigArray);
+  }
+
+  void OnMetadataUpdate(uint16_t context) override {
+    LOG(INFO) << __func__;
+    std::shared_lock<std::shared_timed_mutex> lock(callbacks_mutex);
+    CallbackEnv sCallbackEnv(__func__);
+    if (!sCallbackEnv.valid() || mCallbacksObj == nullptr) return;
+
+    return sCallbackEnv->CallVoidMethod(mCallbacksObj, method_OnMetadataUpdate,
+                                                        (jint)context);
   }
 
   void OnHealthBasedRecommendationAction(
@@ -721,8 +732,8 @@ static void setUnicastMonitorModeNative(JNIEnv* /* env */, jobject /* object */,
   sLeAudioClientInterface->SetUnicastMonitorMode(direction, enable);
 }
 
-static void sendAudioProfilePreferencesNative(
-    JNIEnv* /* env */, jint groupId, jboolean isOutputPreferenceLeAudio,
+static void sendAudioProfilePreferencesNative(JNIEnv* /* env */,
+    jobject /* object */, jint groupId, jboolean isOutputPreferenceLeAudio,
     jboolean isDuplexPreferenceLeAudio) {
   std::shared_lock<std::shared_timed_mutex> lock(interface_mutex);
   if (!sLeAudioClientInterface) {
@@ -1617,6 +1628,8 @@ int register_com_android_bluetooth_le_audio(JNIEnv* env) {
        "(I[Landroid/bluetooth/BluetoothLeAudioCodecConfig;"
        "[Landroid/bluetooth/BluetoothLeAudioCodecConfig;)V",
        &method_onAudioGroupSelectableCodecConf},
+      {"OnMetadataUpdate", "(I)V",
+       &method_OnMetadataUpdate},
       {"onHealthBasedRecommendationAction", "([BI)V",
        &method_onHealthBasedRecommendationAction},
       {"onHealthBasedGroupRecommendationAction", "(II)V",

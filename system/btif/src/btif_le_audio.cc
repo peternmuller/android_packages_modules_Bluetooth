@@ -116,6 +116,12 @@ class LeAudioClientInterfaceImpl : public LeAudioClientInterface,
              output_selectable_codec_conf));
   }
 
+  void OnMetadataUpdate(uint16_t context) override {
+    do_in_jni_thread(FROM_HERE,
+                     Bind(&LeAudioClientCallbacks::OnMetadataUpdate,
+                          Unretained(callbacks), context));
+  }
+
   void OnHealthBasedRecommendationAction(
       const RawAddress& address,
       bluetooth::le_audio::LeAudioHealthBasedAction action) override {

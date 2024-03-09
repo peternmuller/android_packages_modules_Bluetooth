@@ -334,6 +334,8 @@ class LeAudioClientCallbacks {
       int group_id,
       std::vector<btle_audio_codec_config_t> input_selectable_codec_conf,
       std::vector<btle_audio_codec_config_t> output_selectable_codec_conf) = 0;
+  /* Callback for sending the Context to application*/
+  virtual void OnMetadataUpdate(uint16_t context) = 0;
   virtual void OnHealthBasedRecommendationAction(
       const RawAddress& address, LeAudioHealthBasedAction action) = 0;
   virtual void OnHealthBasedGroupRecommendationAction(
