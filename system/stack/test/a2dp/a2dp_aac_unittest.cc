@@ -32,6 +32,12 @@
 #include "stack/include/bt_hdr.h"
 #include "test_util.h"
 #include "wav_reader.h"
+#include "device/include/interop.h"
+
+//To pass net_test_stack_a2dp_codecs_native
+bool interop_match_addr(const interop_feature_t feature, const RawAddress* addr) {
+   return false;
+}
 
 namespace {
 constexpr uint32_t kAacReadSize = 1024 * 2 * 2;

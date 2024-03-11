@@ -34,6 +34,12 @@
 #include "osi/include/osi.h"
 #include "stack/include/bt_hdr.h"
 #include "types/raw_address.h"
+#include "device/include/interop.h"
+#include "osi/include/properties.h"
+#include "btif/include/btif_storage.h"
+#include "bta/include/bta_av_api.h"
+#include "btif/include/btif_av_co.h"
+#include "a2dp_aac_constants.h"
 
 using namespace bluetooth;
 
@@ -129,6 +135,19 @@ void avdt_ccb_chk_close(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   }
 }
 
+static bool avdt_ccb_check_peer_eligible_for_aac_codec(const AvdtpCcb* p_peer){
+  char remote_name[248] = "";
+  bool aac_support = false;
+  log::verbose(" ");
+  if (interop_match_addr(INTEROP_ENABLE_AAC_CODEC, &p_peer->peer_addr)) {
+    log::verbose("AAC is supported for this WL remote device");
+    aac_support = true;
+  } else {
+      log::verbose("RD is not present in name & address based check for AAC WL.");
+  }
+  return aac_support;
+}
+
 /*******************************************************************************
  *
  * Function         avdt_ccb_hdl_discover_cmd
@@ -155,6 +174,49 @@ void avdt_ccb_hdl_discover_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
   for (int i = 0; i < AVDT_NUM_SEPS; i++, p_scb++) {
     if (p_scb->allocated) {
       /* copy sep info */
+
+    const char *codec_name;
+    codec_name = A2DP_CodecName(p_scb->stream_config.cfg.codec_info);
+
+    log::verbose("codec name %s", codec_name);
+    if (p_scb->stream_config.cfg.codec_info[AVDT_CODEC_TYPE_INDEX] == A2DP_MEDIA_CT_AAC) {
+        bool vbr_bl = false;
+        bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
+                     true);
+        log::verbose("AAC VBR prop value is {}", vbr_supp);
+        int vbr_remote = 0;
+        vbr_remote = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
+        log::verbose("original vbr {}", vbr_remote);
+        if (vbr_supp) {
+          if(vbr_remote) {
+            if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
+              log::verbose("AAC VBR is not supported for this BL remote device");
+              vbr_bl = true;
+            }
+          }
+        }
+
+        if(vbr_remote) {
+          log::verbose("Device has VBR support");
+          if (!vbr_bl) {
+            log::verbose("AAC VBR is enabled, show AAC SEP for this peer device");
+          } else if (avdt_ccb_check_peer_eligible_for_aac_codec(p_ccb)) {
+              log::verbose("Show AAC SEP for this peer device");
+          } else {
+              log::verbose("Do not show AAC SEP for this peer device");
+              continue;
+          }
+        } else {
+            log::verbose("Device does not have VBR support, check in AAC WL");
+            if (avdt_ccb_check_peer_eligible_for_aac_codec(p_ccb)) {
+              log::verbose("Show AAC SEP for this peer device");
+            } else {
+                log::verbose("Do not show AAC SEP for this peer device");
+                continue;
+            }
+        }
+    }
+
       sep_info[p_data->msg.discover_rsp.num_seps].in_use = p_scb->in_use;
       sep_info[p_data->msg.discover_rsp.num_seps].seid = p_scb->ScbHandle();
       sep_info[p_data->msg.discover_rsp.num_seps].media_type =
@@ -217,6 +279,27 @@ void avdt_ccb_hdl_getcap_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
     return;
   }
 
+  if (p_scb->stream_config.cfg.codec_info[AVDT_CODEC_TYPE_INDEX] == A2DP_MEDIA_CT_AAC) {
+    bool vbr_bl = false;
+    bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
+                    true);
+    log::verbose("AAC VBR prop value is {}", vbr_supp);
+    if (vbr_supp) {
+       if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
+         log::verbose("AAC VBR is not supported for this BL remote device");
+         vbr_bl = true;
+       }
+    }
+    int vbr_remote = 0;
+    vbr_remote = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
+    log::verbose("%s, original vbr {}", vbr_remote);
+    if (vbr_bl) {
+      if (vbr_remote == A2DP_AAC_VARIABLE_BIT_RATE_ENABLED) {
+          log::verbose("reset vbr to disabled ");
+          p_scb->stream_config.cfg.codec_info[6] &= ~A2DP_AAC_VARIABLE_BIT_RATE_ENABLED;
+      }
+    }
+  }
   p_data->msg.svccap.p_cfg = &p_scb->stream_config.cfg;
 
   avdt_ccb_event(p_ccb, AVDT_CCB_API_GETCAP_RSP_EVT, p_data);

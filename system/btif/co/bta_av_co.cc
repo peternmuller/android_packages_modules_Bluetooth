@@ -50,6 +50,8 @@
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
 #include "types/raw_address.h"
+#include "device/include/interop.h"
+#include "osi/include/properties.h"
 
 using namespace bluetooth;
 
@@ -1168,6 +1170,23 @@ BtaAvCoSep* BtaAvCo::SelectProviderCodecConfiguration(
   return p_sink;
 }
 
+void DisableVBRCapability(BtaAvCoPeer* p_peer, uint8_t (&sink_codec_cap)[AVDT_CODEC_SIZE]) {
+    bool vbr_bl = false;
+    bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
+                   true);
+    log::verbose("AAC VBR prop value is {}", vbr_supp);
+    if (vbr_supp) {
+      if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_peer->addr)) {
+        log::verbose("AAC VBR is not supported for this BL remote device");
+        vbr_bl = true;
+     }
+    }
+    if(vbr_bl) {
+      log::verbose("AAC VBR is disabled, remove VBR from selectable capability");
+      sink_codec_cap[6] = 0;
+    }
+}
+
 const BtaAvCoSep* BtaAvCo::SelectSourceCodec(BtaAvCoPeer* p_peer) {
   // Update all selectable codecs.
   // This is needed to update the selectable parameters for each codec.
@@ -1195,8 +1214,15 @@ const BtaAvCoSep* BtaAvCo::SelectSourceCodec(BtaAvCoPeer* p_peer) {
       continue;
     }
 
+    uint8_t sink_codec_cap[AVDT_CODEC_SIZE] = {0};
+    memcpy(sink_codec_cap, p_sink->codec_caps,AVDT_CODEC_SIZE);
+    if(iter->codecIndex() == BTAV_A2DP_CODEC_INDEX_SOURCE_AAC) {
+      log::verbose("Disable VBR if in BL");
+      DisableVBRCapability(p_peer, sink_codec_cap);
+    }
+
     if (!p_peer->GetCodecs()->setCodecConfig(
-            p_sink->codec_caps, true /* is_capability */, new_codec_config,
+            sink_codec_cap, true /* is_capability */, new_codec_config,
             false /* select_current_codec */)) {
       log::verbose("cannot set source codec {}", iter->name());
     } else {
@@ -1262,8 +1288,16 @@ const BtaAvCoSep* BtaAvCo::AttemptSourceCodecSelection(
     log::verbose("peer Sink for codec {} not found", codec_config.name());
     return nullptr;
   }
+
+    uint8_t sink_codec_cap[AVDT_CODEC_SIZE] = {0};
+    memcpy(sink_codec_cap, p_sink->codec_caps,AVDT_CODEC_SIZE);
+    if(codec_config.codecIndex() == BTAV_A2DP_CODEC_INDEX_SOURCE_AAC) {
+      log::verbose("Disable VBR if in BL");
+      DisableVBRCapability(p_peer, sink_codec_cap);
+    }
+
   if (!p_peer->GetCodecs()->setCodecConfig(
-          p_sink->codec_caps, true /* is_capability */, new_codec_config,
+          sink_codec_cap, true /* is_capability */, new_codec_config,
           true /* select_current_codec */)) {
     log::verbose("cannot set source codec {}", codec_config.name());
     return nullptr;
@@ -1319,6 +1353,9 @@ size_t BtaAvCo::UpdateAllSelectableSourceCodecs(BtaAvCoPeer* p_peer) {
 bool BtaAvCo::UpdateSelectableSourceCodec(const A2dpCodecConfig& codec_config,
                                           BtaAvCoPeer* p_peer) {
   log::verbose("peer {}", p_peer->addr);
+
+  log::verbose("peer {} checking for codec {}",ADDRESS_TO_LOGGABLE_CSTR(p_peer->addr),
+                 codec_config.name().c_str());
 
   // Find the peer Sink for the codec
   const BtaAvCoSep* p_sink = peer_cache_->FindPeerSink(
