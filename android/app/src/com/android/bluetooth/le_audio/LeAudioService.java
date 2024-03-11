@@ -162,6 +162,8 @@ public class LeAudioService extends ProfileService {
     int mUnicastGroupIdDeactivatedForBroadcastTransition = LE_AUDIO_GROUP_ID_INVALID;
     Optional<Integer> mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
     Optional<Boolean> mQueuedInCallValue = Optional.empty();
+    Optional<Integer> mBroadcastIdPendingStart = Optional.empty();
+    BluetoothDevice mAudioManagerAddedOutDevice = null;
     boolean mTmapStarted = false;
     private boolean mAwaitingBroadcastCreateResponse = false;
     private final LinkedList<BluetoothLeBroadcastSettings> mCreateBroadcastQueue =
@@ -475,6 +477,9 @@ public class LeAudioService extends ProfileService {
         mActiveAudioInDevice = null;
         mExposedActiveDevice = null;
         mLeAudioCodecConfig = null;
+
+        mBroadcastIdPendingStart = Optional.empty();
+        mAudioManagerAddedOutDevice = null;
 
         // Set the service and BLE devices as inactive
         setLeAudioService(null);
@@ -1581,6 +1586,10 @@ public class LeAudioService extends ProfileService {
                             + " isSource: " + deviceInfo.isSource());
                 }
 
+                if (deviceInfo.isSink()) {
+                    mAudioManagerAddedOutDevice = device;
+                }
+
                 /* Don't expose already exposed active device */
                 if (device.equals(mExposedActiveDevice)) {
                     if (DBG) {
@@ -1629,6 +1638,15 @@ public class LeAudioService extends ProfileService {
                             + " isSource: " + deviceInfo.isSource()
                             + ", mActiveAudioInDevice: " + mActiveAudioInDevice
                             + ", mActiveAudioOutDevice: " +  mActiveAudioOutDevice);
+                }
+
+                if (deviceInfo.isSink()) {
+                    mAudioManagerAddedOutDevice = null;
+                    if (mBroadcastIdPendingStart.isPresent()) {
+                        Log.d(TAG, "mBroadcastIdPendingStart exist, Start pending broadcast");
+                        startBroadcast(mBroadcastIdPendingStart.get());
+                        mBroadcastIdPendingStart = Optional.empty();
+                    }
                 }
             }
         }
@@ -2693,7 +2711,12 @@ public class LeAudioService extends ProfileService {
                     if (mBroadcastIdDeactivatedForUnicastTransition.isPresent()) {
                         updateFallbackUnicastGroupIdForBroadcast(groupId);
                         mQueuedInCallValue = Optional.empty();
-                        startBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
+                        if (mAudioManagerAddedOutDevice == null) {
+                            startBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
+                        } else {
+                             Log.d(TAG, "Audio out device is still not removed, pending start broadcast");
+                             mBroadcastIdPendingStart = mBroadcastIdDeactivatedForUnicastTransition;
+                        }
                         mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
                     }
 
@@ -2724,8 +2747,13 @@ public class LeAudioService extends ProfileService {
                 Log.d(TAG, "Broadcast broadcastId: " + broadcastId + " created.");
                 mBroadcastDescriptors.put(broadcastId, new LeAudioBroadcastDescriptor());
                 notifyBroadcastStarted(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
-                // Start sending the actual stream
-                startBroadcast(broadcastId);
+                if (mAudioManagerAddedOutDevice == null) {
+                    // Start sending the actual stream
+                    startBroadcast(broadcastId);
+                } else {
+                    Log.d(TAG, "Audio out device is still not removed, pending start broadcast");
+                    mBroadcastIdPendingStart = Optional.of(broadcastId);
+                }
 
             } else {
                 // TODO: Improve reason reporting or extend the native stack event with reason code
