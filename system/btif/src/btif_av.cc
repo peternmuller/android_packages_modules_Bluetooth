@@ -510,10 +510,22 @@ class BtifAvSource {
                      std::promise<void> peer_ready_promise) {
     log::info("peer: {}", ADDRESS_TO_LOGGABLE_STR(peer_address));
 
+    BtifAvPeer* peer = FindPeer(peer_address);
+
     if (active_peer_ == peer_address) {
       peer_ready_promise.set_value();
       return true;  // Nothing has changed
     }
+
+    if(!peer_address.IsEmpty() &&
+      (peer->IsSink() && AllowedToConnect(peer_address)) &&
+      peer->CheckFlags(BtifAvPeer::kFlagPendingStart)) {
+      LOG(ERROR) << __func__ << ": Pending Start Response on  "
+                 << ADDRESS_TO_LOGGABLE_STR(peer_address)
+                 << ", Return Fail";
+      return false;
+    }
+
     if (peer_address.IsEmpty()) {
       log::verbose("peer address is empty, shutdown the Audio source");
       if (IS_FLAG_ENABLED(a2dp_concurrent_source_sink)) {
@@ -549,7 +561,6 @@ class BtifAvSource {
         btif_av_src_sink_coexist_enabled()) {
       btif_av_sink_delete_active_peer();
     }
-    BtifAvPeer* peer = FindPeer(peer_address);
     if (peer == nullptr || !peer->IsConnected()) {
       log::error("Error setting {} as active Source peer",
                  ADDRESS_TO_LOGGABLE_STR(peer_address));
