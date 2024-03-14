@@ -861,7 +861,7 @@ TEST_F(AclManagerWithConnectionTest, send_read_clock_offset) {
   auto command_view = ReadClockOffsetView::Create(packet);
   ASSERT_TRUE(command_view.IsValid());
 
-  EXPECT_CALL(mock_connection_management_callbacks_, OnReadClockOffsetComplete(0x0123));
+  EXPECT_CALL(mock_connection_management_callbacks_, OnReadClockOffsetComplete(0x0123, 0x0123));
   test_hci_layer_->IncomingEvent(
       ReadClockOffsetCompleteBuilder::Create(ErrorCode::SUCCESS, handle_, 0x0123));
   sync_client_handler();

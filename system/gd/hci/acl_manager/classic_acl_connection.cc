@@ -68,8 +68,8 @@ class AclConnectionTracker : public ConnectionManagementCallbacks {
   void OnChangeConnectionLinkKeyComplete() override {
     SAVE_OR_CALL(OnChangeConnectionLinkKeyComplete)
   }
-  void OnReadClockOffsetComplete(uint16_t clock_offset) override {
-    SAVE_OR_CALL(OnReadClockOffsetComplete, clock_offset)
+  void OnReadClockOffsetComplete(uint16_t handle, uint16_t clock_offset) override {
+    SAVE_OR_CALL(OnReadClockOffsetComplete, handle, clock_offset)
   }
   void OnModeChange(ErrorCode status, Mode current_mode, uint16_t interval) override {
     SAVE_OR_CALL(OnModeChange, status, current_mode, interval)
