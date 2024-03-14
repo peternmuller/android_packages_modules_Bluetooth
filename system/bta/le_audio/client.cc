@@ -249,9 +249,9 @@ class LeAudioClientImpl : public LeAudioClient {
         source_monitor_mode_(false),
         current_source_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
         current_sink_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
-        set_active_inprogress_(false),
-        hal_sink_suspend_inprogress_(false),
-        hal_source_suspend_inprogress_(false),
+        defer_notify_inactive_until_stop_(false),
+        defer_sink_suspend_ack_until_stop_(false),
+        defer_source_suspend_ack_until_stop_(false),
         le_audio_source_hal_client_(nullptr),
         le_audio_sink_hal_client_(nullptr),
         close_vbc_timeout_(alarm_new("LeAudioCloseVbcTimeout")),
@@ -343,30 +343,6 @@ class LeAudioClientImpl : public LeAudioClient {
     ReconfigureOrUpdateMetadata(group, new_configuration_context,
                                 {.sink = local_metadata_context_types_.source,
                                  .source = local_metadata_context_types_.sink});
-  }
-
-  void StartVbcCloseTimeout() {
-    if (alarm_is_scheduled(close_vbc_timeout_)) {
-      StopVbcCloseTimeout();
-    }
-
-    static const uint64_t timeoutMs = 2000;
-    LOG_DEBUG("Start VBC close timeout with %lu ms",
-              static_cast<unsigned long>(timeoutMs));
-
-    alarm_set_on_mloop(
-        close_vbc_timeout_, timeoutMs,
-        [](void*) {
-          if (instance) instance->ReconfigureAfterVbcClose();
-        },
-        nullptr);
-  }
-
-  void StopVbcCloseTimeout() {
-    if (alarm_is_scheduled(close_vbc_timeout_)) {
-      LOG_DEBUG("Cancel VBC close timeout");
-      alarm_cancel(close_vbc_timeout_);
-    }
   }
 
   void AseInitialStateReadRequest(LeAudioDevice* leAudioDevice) {
@@ -986,6 +962,17 @@ class LeAudioClientImpl : public LeAudioClient {
     groupStateMachine_->SuspendStream(group);
   }
 
+  void ProcessPendingGroupNotifyInactive(const int group_id) {
+    LOG_INFO("defer_notify_inactive_until_stop_: %d, group_id: %d",
+                    defer_notify_inactive_until_stop_, group_id);
+    if (defer_notify_inactive_until_stop_) {
+      defer_notify_inactive_until_stop_ = false;
+      active_group_id_ = bluetooth::groups::kGroupUnknown;
+      ClientAudioInterfaceRelease();
+      callbacks_->OnGroupStatus(group_id, GroupStatus::INACTIVE);
+    }
+  }
+
   void GroupStop(const int group_id) override {
     LeAudioDeviceGroup* group = aseGroups_.FindById(group_id);
 
@@ -1308,7 +1295,6 @@ class LeAudioClientImpl : public LeAudioClient {
       return;
     }
     auto group_id_to_close = active_group_id_;
-    //active_group_id_ = bluetooth::groups::kGroupUnknown;
     sink_monitor_notified_status_ = std::nullopt;
 
     LOG_INFO("Group id: %d", group_id_to_close);
@@ -1316,8 +1302,11 @@ class LeAudioClientImpl : public LeAudioClient {
 
     StopAudio();
 
-    LOG_INFO("set_active_inprogress_: %d", set_active_inprogress_);
-    if (!set_active_inprogress_) {
+    LOG_INFO("defer_notify_inactive_until_stop_: %d",
+                                    defer_notify_inactive_until_stop_);
+
+    if (!defer_notify_inactive_until_stop_) {
+      active_group_id_ = bluetooth::groups::kGroupUnknown;
       ClientAudioInterfaceRelease();
       callbacks_->OnGroupStatus(group_id_to_close, GroupStatus::INACTIVE);
     }
@@ -1334,7 +1323,26 @@ class LeAudioClientImpl : public LeAudioClient {
 
       LOG_INFO("Active group_id changed %d -> %d", active_group_id_, group_id);
       auto group_id_to_close = active_group_id_;
-      set_active_inprogress_ = true;
+
+      LeAudioDeviceGroup* group = aseGroups_.FindById(active_group_id_);
+
+      if (!group) {
+        LOG(ERROR) << __func__ << ", unknown group id: " << active_group_id_;
+        return;
+      }
+
+      if (group->IsEmpty()) {
+        LOG(ERROR) << __func__ << ", group is empty";
+        return;
+      }
+
+      LOG_INFO(" current state %s", ToString(group->GetState()).c_str());
+
+      //Below to ensure CIS termination before updating to app about inactive.
+      if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
+        defer_notify_inactive_until_stop_ = true;
+      }
+
       groupSetAndNotifyInactive();
       GroupStop(group_id_to_close);
 
@@ -3979,7 +3987,6 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void Cleanup() {
-    StopVbcCloseTimeout();
     if (alarm_is_scheduled(suspend_timeout_)) alarm_cancel(suspend_timeout_);
 
     if (active_group_id_ != bluetooth::groups::kGroupUnknown) {
@@ -4194,8 +4201,6 @@ class LeAudioClientImpl : public LeAudioClient {
         "r_state: " + ToString(audio_receiver_state_) +
             ", s_state: " + ToString(audio_sender_state_));
 
-    hal_source_suspend_inprogress_ = true;
-
     /* Note: This callback is from audio hal driver.
      * Bluetooth peer is a Sink for Audio Framework.
      * e.g. Peer is a speaker
@@ -4209,6 +4214,7 @@ class LeAudioClientImpl : public LeAudioClient {
         return;
       case AudioState::IDLE:
         if (audio_receiver_state_ == AudioState::READY_TO_RELEASE) {
+          defer_source_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
         }
         return;
@@ -4219,18 +4225,15 @@ class LeAudioClientImpl : public LeAudioClient {
     /* Last suspends group - triggers group stop */
     if ((audio_receiver_state_ == AudioState::IDLE) ||
         (audio_receiver_state_ == AudioState::READY_TO_RELEASE)) {
+      defer_source_suspend_ack_until_stop_ = true;
       OnAudioSuspend();
       le_audio::MetricsCollector::Get()->OnStreamEnded(active_group_id_);
     } else {
-      //For VBC and Call cases
-      LOG_INFO(" hal_source_suspend_inprogress_: %d",
-                              hal_source_suspend_inprogress_);
-      if (hal_source_suspend_inprogress_) {
-        if (le_audio_source_hal_client_) {
-          hal_source_suspend_inprogress_ = false;
-          LOG_INFO("calling source ConfirmSuspendRequest");
-          le_audio_source_hal_client_->ConfirmSuspendRequest();
-        }
+      //In VBC and Call streaming cases, send immediate ack
+      //for the first initiate suspsend.
+      if (le_audio_source_hal_client_) {
+        LOG_INFO("calling source ConfirmSuspendRequest");
+        le_audio_source_hal_client_->ConfirmSuspendRequest();
       }
     }
 
@@ -4444,8 +4447,9 @@ class LeAudioClientImpl : public LeAudioClient {
         "r_state: " + ToString(audio_receiver_state_) +
             ", s_state: " + ToString(audio_sender_state_));
 
-    //StartVbcCloseTimeout();
-    hal_sink_suspend_inprogress_ = true;
+    if (IsInVoipCall()) {
+      SetInVoipCall(false);
+    }
 
     /* Note: This callback is from audio hal driver.
      * Bluetooth peer is a Source for Audio Framework.
@@ -4460,6 +4464,7 @@ class LeAudioClientImpl : public LeAudioClient {
         return;
       case AudioState::IDLE:
         if (audio_sender_state_ == AudioState::READY_TO_RELEASE) {
+          defer_sink_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
         }
         return;
@@ -4470,16 +4475,14 @@ class LeAudioClientImpl : public LeAudioClient {
     /* Last suspends group - triggers group stop */
     if ((audio_sender_state_ == AudioState::IDLE) ||
         (audio_sender_state_ == AudioState::READY_TO_RELEASE)) {
+      defer_sink_suspend_ack_until_stop_ = true;
       OnAudioSuspend();
     } else {
-      LOG_INFO(" hal_sink_suspend_inprogress_: %d",
-                                   hal_sink_suspend_inprogress_);
-      if (hal_sink_suspend_inprogress_) {
-        if (le_audio_sink_hal_client_) {
-          hal_sink_suspend_inprogress_ = false;
-          LOG_INFO("calling sink ConfirmSuspendRequest");
-          le_audio_sink_hal_client_->ConfirmSuspendRequest();
-        }
+      //In VBC and Call streaming cases, send immediate ack
+      //for the first initiate suspsend.
+      if (le_audio_sink_hal_client_) {
+        LOG_INFO("calling sink ConfirmSuspendRequest");
+        le_audio_sink_hal_client_->ConfirmSuspendRequest();
       }
     }
 
@@ -4533,9 +4536,6 @@ class LeAudioClientImpl : public LeAudioClient {
       CancelLocalAudioSinkStreamingRequest();
       return;
     }
-
-    /* Stop the VBC close watchdog if needed */
-    StopVbcCloseTimeout();
 
     /* Note: This callback is from audio hal driver.
      * Bluetooth peer is a Source for Audio Framework.
@@ -4824,11 +4824,6 @@ class LeAudioClientImpl : public LeAudioClient {
                  << ", Invalid group: " << static_cast<int>(active_group_id_);
       return;
     }
-
-    /* Stop the VBC close timeout timer, since we will reconfigure anyway if the
-     * VBC was suspended.
-     */
-    StopVbcCloseTimeout();
 
     LOG_INFO(
         "group_id %d state=%s, target_state=%s, audio_receiver_state_: %s, "
@@ -5835,11 +5830,13 @@ class LeAudioClientImpl : public LeAudioClient {
                     group->group_id_);
             group->ClearPendingConfiguration();
           } else {
-            LOG_INFO("sink_monitor_mode_: %d, set_active_inprogress_: %d,"
-                     " hal_source_suspend_inprogress_: %d,"
-                     " hal_sink_suspend_inprogress_: %d", sink_monitor_mode_,
-                     set_active_inprogress_, hal_source_suspend_inprogress_,
-                     hal_sink_suspend_inprogress_);
+            LOG_INFO("sink_monitor_mode_: %d,"
+                     " defer_notify_inactive_until_stop_: %d,"
+                     " defer_source_suspend_ack_until_stop_: %d,"
+                     " defer_sink_suspend_ack_until_stop_: %d", sink_monitor_mode_,
+                     defer_notify_inactive_until_stop_,
+                     defer_source_suspend_ack_until_stop_,
+                     defer_sink_suspend_ack_until_stop_);
             if (sink_monitor_mode_) {
               notifyAudioLocalSink(
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
@@ -5851,29 +5848,24 @@ class LeAudioClientImpl : public LeAudioClient {
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
             }
 
-            if (hal_source_suspend_inprogress_) {
+            if (defer_source_suspend_ack_until_stop_) {
               if (le_audio_source_hal_client_) {
-                hal_source_suspend_inprogress_ = false;
+                defer_source_suspend_ack_until_stop_ = false;
                 LOG_INFO("calling source ConfirmSuspendRequest");
                 le_audio_source_hal_client_->ConfirmSuspendRequest();
               }
             }
 
-            if (hal_sink_suspend_inprogress_) {
+            if (defer_sink_suspend_ack_until_stop_) {
               if (le_audio_sink_hal_client_) {
-                hal_sink_suspend_inprogress_ = false;
+                defer_sink_suspend_ack_until_stop_ = false;
                 LOG_INFO("calling sink ConfirmSuspendRequest");
                 le_audio_sink_hal_client_->ConfirmSuspendRequest();
               }
             }
 
             LOG_INFO("active_group_id_: %d", active_group_id_);
-            if (set_active_inprogress_) {
-              set_active_inprogress_ = false;
-              ClientAudioInterfaceRelease();
-              callbacks_->OnGroupStatus(active_group_id_, GroupStatus::INACTIVE);
-              active_group_id_ = bluetooth::groups::kGroupUnknown;
-            }
+            ProcessPendingGroupNotifyInactive(active_group_id_);
           }
         }
 
@@ -5955,6 +5947,12 @@ class LeAudioClientImpl : public LeAudioClient {
   /* Listen for streaming status on Source stream */
   bool source_monitor_mode_;
 
+  /*To track set inactive progress */
+  bool defer_notify_inactive_until_stop_;
+  /*To track MM issued suspend progress */
+  bool defer_sink_suspend_ack_until_stop_;
+  bool defer_source_suspend_ack_until_stop_;
+
   /* Reconnection mode */
   tBTM_BLE_CONN_TYPE reconnection_mode_;
   static constexpr uint64_t kGroupConnectedWatchDelayMs = 3000;
@@ -5973,12 +5971,6 @@ class LeAudioClientImpl : public LeAudioClient {
   /* Current stream configuration */
   LeAudioCodecConfiguration current_source_codec_config;
   LeAudioCodecConfiguration current_sink_codec_config;
-
-  /*To track setactive in progress */
-  bool set_active_inprogress_;
-  /*To track MM issued suspend in progress */
-  bool hal_sink_suspend_inprogress_;
-  bool hal_source_suspend_inprogress_;
 
   /* Static Audio Framework session configuration.
    *  Resampling will be done inside the bt stack
