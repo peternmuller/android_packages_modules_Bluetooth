@@ -1171,6 +1171,12 @@
             "codec_metadata_name": ["VND_LC3Q_V1_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
         },
         {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R5_L12_OneChanMonoSrc_16khz_30octs_R3_L12_LC3V1_1",
+            "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanMonoSrc_16_1",
+            "qos_config_name": ["VND_QoS_Config_R5_L12", "VND_QoS_Config_R3_L12"],
+            "codec_metadata_name": ["VND_LC3Q_V1_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
+        },
+        {
             "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R5_L12_OneChanMonoSrc_16khz_30octs_R3_L12_LC3V2_1",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanMonoSrc_16_1",
             "qos_config_name": ["VND_QoS_Config_R5_L12", "VND_QoS_Config_R3_L12"],
