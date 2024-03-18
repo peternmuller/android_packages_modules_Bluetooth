@@ -1783,7 +1783,11 @@ static void btif_dm_search_services_evt(tBTA_DM_SEARCH_EVT event,
           LOG_WARN("SDP failed after bonding re-attempting for %s",
                    ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
           pairing_cb.sdp_attempts++;
-          btif_dm_get_remote_services(bd_addr, BT_TRANSPORT_AUTO);
+          if (IS_FLAG_ENABLED(force_bredr_for_sdp_retry)) {
+            btif_dm_get_remote_services(bd_addr, BT_TRANSPORT_BR_EDR);
+          } else {
+            btif_dm_get_remote_services(bd_addr, BT_TRANSPORT_AUTO);
+          }
         } else {
           LOG_WARN("SDP triggered by someone failed when bonding");
         }
@@ -3300,7 +3304,6 @@ void btif_dm_set_oob_for_le_io_req(const RawAddress& bd_addr,
   LOG_VERBOSE("*p_has_oob_data=%d", *p_has_oob_data);
 }
 
-#ifdef BTIF_DM_OOB_TEST
 void btif_dm_load_local_oob(void) {
   char prop_oob[PROPERTY_VALUE_MAX];
   osi_property_get("service.brcm.bt.oob", prop_oob, "3");
@@ -3559,7 +3562,6 @@ bool btif_dm_proc_rmt_oob(const RawAddress& bd_addr, Octet16* p_c,
   bond_state_changed(BT_STATUS_SUCCESS, bd_addr, BT_BOND_STATE_BONDING);
   return true;
 }
-#endif /*  BTIF_DM_OOB_TEST */
 
 static void btif_dm_ble_key_notif_evt(tBTA_DM_SP_KEY_NOTIF* p_ssp_key_notif) {
   RawAddress bd_addr;

@@ -325,7 +325,6 @@ cc_defaults {
     name: "btstack_fuzzer_default",
     host_supported: true,
     cflags: [
-        "-DHAS_NO_BDROID_BUILDCFG",
         "-Wall",
         "-Werror",
         "-Wextra",
@@ -676,7 +675,7 @@ cc_test {
     defaults: [
         "fluoride_defaults",
         "latest_android_hardware_audio_common_ndk_static",
-        "latest_android_hardware_bluetooth_audio_ndk_shared",
+        "latest_android_hardware_bluetooth_audio_ndk_static",
         "latest_android_media_audio_common_types_ndk_static",
         "mts_defaults",
         "libbtconfigstore_qti_defaults",
@@ -695,20 +694,15 @@ cc_test {
         "test/stack_avrcp_test.cc",
     ],
     shared_libs: [
-        "android.hardware.bluetooth.audio@2.0",
-        "android.hardware.bluetooth.audio@2.1",
         "libPlatformProperties",
         "libaaudio",
         "vendor.qti.hardware.bluetooth.audio-V1-ndk",
 	    "vendor.qti.hardware.bluetooth_audio@2.1",
         "vendor.qti.hardware.bluetooth_audio@2.0",
-        "libbase",
-        "libbinder_ndk",
         "libcrypto",
         "libcutils",
         "libdl",
         "libevent",
-        "libfmq",
         "libhidlbase",
         "liblog",
         "libstatssocket",
@@ -717,16 +711,20 @@ cc_test {
         "server_configurable_flags",
     ],
     static_libs: [
+        "android.hardware.audio.common@5.0",
         "android.hardware.bluetooth.a2dp@1.0",
-        "android.hardware.bluetooth@1.0",
-        "android.hardware.bluetooth@1.1",
+        "android.hardware.bluetooth.audio@2.0",
+        "android.hardware.bluetooth.audio@2.1",
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "android.system.suspend-V1-ndk",
         "android.system.suspend.control-V1-ndk",
         "libFraunhoferAAC",
         "libaudio-a2dp-hw-utils",
+        "libbase",
         "libbluetooth-dumpsys",
+        "libbluetooth-for-tests",
+        "libbluetooth-gdx",
         "libbluetooth-types",
         "libbluetooth_core_rs",
         "libbluetooth_crypto_toolbox",
@@ -748,6 +746,7 @@ cc_test {
         "libbtif",
         "libbtif-core",
         "libchrome",
+        "libfmq",
         "libg722codec",
         "liblc3",
         "libopus",
@@ -756,9 +755,22 @@ cc_test {
         "libstatslog_bt",
         "libudrv-uipc",
     ],
-    whole_static_libs: [
-        "libbluetooth-for-tests",
-    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libbinder_ndk",
+            ],
+            static_libs: [
+                "android.hardware.bluetooth@1.0",
+                "android.hardware.bluetooth@1.1",
+            ],
+        },
+        host: {
+            static_libs: [
+                "libbinder_ndk",
+            ],
+        },
+    },
     header_libs: ["libbluetooth_headers"],
 }
 
@@ -1676,7 +1688,6 @@ cc_test {
         "libosi",
     ],
     shared_libs: [
-        "libPlatformProperties",
         "libcrypto",
     ],
     sanitize: {
@@ -1740,7 +1751,6 @@ cc_test {
         "libprotobuf-cpp-lite",
     ],
     shared_libs: [
-        "libPlatformProperties",
         "libcrypto",
     ],
     target: {

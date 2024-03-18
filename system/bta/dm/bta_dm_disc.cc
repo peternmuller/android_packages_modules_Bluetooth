@@ -16,6 +16,8 @@
 
 #define LOG_TAG "bt_bta_dm"
 
+#include <bluetooth/log.h>
+
 #include "bta/dm/bta_dm_disc.h"
 
 #include <android_bluetooth_flags.h>
@@ -63,6 +65,8 @@
 #ifdef TARGET_FLOSS
 #include "stack/include/srvc_api.h"
 #endif
+
+using namespace bluetooth;
 
 using bluetooth::Uuid;
 using namespace bluetooth::legacy::stack::sdp;
@@ -2453,9 +2457,9 @@ void bta_dm_disc_start_service_discovery(tBTA_DM_SEARCH_CBACK* p_cback,
   bta_sys_sendmsg(p_msg);
 }
 
-void bta_dm_disc_stop_service_discovery(const RawAddress& bd_addr,
-                                        tBT_TRANSPORT transport) {
-  LOG_WARN("Stop service discovery not yet implemented for legacy module");
+void bta_dm_disc_stop_service_discovery(const RawAddress& /* bd_addr */,
+                                        tBT_TRANSPORT /* transport */) {
+  log::warn("Stop service discovery not yet implemented for legacy module");
 }
 
 #define DUMPSYS_TAG "shim::legacy::bta::dm"

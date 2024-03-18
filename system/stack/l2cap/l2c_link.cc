@@ -25,6 +25,8 @@
  ******************************************************************************/
 #define LOG_TAG "l2c_link"
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "device/include/device_iot_config.h"
@@ -43,6 +45,8 @@
 #include "stack/l2cap/l2c_int.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
+
+using namespace bluetooth;
 
 extern tBTM_CB btm_cb;
 
@@ -826,7 +830,7 @@ void l2c_link_check_send_pkts(tL2C_LCB* p_lcb, uint16_t local_cid,
    ** This LCB will be served when receiving number of completed packet event.
    */
   if (l2cb.is_cong_cback_context) {
-    LOG_INFO("skipping, is_cong_cback_context=true");
+    log::warn("skipping, is_cong_cback_context=true");
     return;
   }
 
@@ -898,10 +902,11 @@ void l2c_link_check_send_pkts(tL2C_LCB* p_lcb, uint16_t local_cid,
       l2cb.ble_check_round_robin = false;
   } else /* if this is not round-robin service */
   {
-    /* If a partial segment is being sent, can't send anything else */
+    /* link_state or power mode not ready, can't send anything else */
     if ((p_lcb->link_state != LST_CONNECTED) ||
         (l2c_link_check_power_mode(p_lcb))) {
-      LOG_INFO("A partial segment is being sent, cannot send anything else");
+      log::warn("Can't send, link state: {} not LST_CONNECTED or power mode BTM_PM_STS_PENDING",
+                p_lcb->link_state);
       return;
     }
     LOG_VERBOSE(

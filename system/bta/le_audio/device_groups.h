@@ -85,7 +85,11 @@ class LeAudioDeviceGroup {
   bool is_output_preference_le_audio;
   bool is_duplex_preference_le_audio;
   std::pair<bool, bool> lex_codec_disabled;
-  DsaMode dsa_mode_;
+
+  struct {
+    DsaMode mode;
+    bool active;
+  } dsa_;
   bool asymmetric_phy_for_unidirectional_cis_supported;
 
   explicit LeAudioDeviceGroup(const int group_id)
@@ -94,7 +98,7 @@ class LeAudioDeviceGroup {
         stream_conf({}),
         notify_streaming_when_cises_are_ready_(false),
         audio_directions_(0),
-        dsa_mode_(DsaMode::DISABLED),
+        dsa_({DsaMode::DISABLED, false}),
         is_enabled_(true),
         transport_latency_mtos_us_(0),
         transport_latency_stom_us_(0),

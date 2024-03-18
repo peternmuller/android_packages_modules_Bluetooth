@@ -23,12 +23,15 @@
  ******************************************************************************/
 #define LOG_TAG "l2c_utils"
 
+#include <bluetooth/log.h>
+
 #include <base/logging.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "device/include/controller.h"
 #include "hal/snoop_logger.h"
+#include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
@@ -46,6 +49,8 @@
 #include "stack/include/l2cdefs.h"
 #include "stack/l2cap/l2c_int.h"
 #include "types/raw_address.h"
+
+using namespace bluetooth;
 
 tL2C_CCB* l2cu_get_next_channel_in_rr(tL2C_LCB* p_lcb); // TODO Move
 
@@ -773,10 +778,8 @@ void l2cu_send_peer_config_rej(tL2C_CCB* p_ccb, uint8_t* p_data,
   p_buf->offset = L2CAP_SEND_CMD_OFFSET;
   p = (uint8_t*)(p_buf + 1) + L2CAP_SEND_CMD_OFFSET;
 
-  const controller_t* controller = controller_get_interface();
-
 /* Put in HCI header - handle + pkt boundary */
-  if (controller->SupportsNonFlushablePb()) {
+  if (bluetooth::shim::GetController()->SupportsNonFlushablePb()) {
     UINT16_TO_STREAM(p, (p_ccb->p_lcb->Handle() | (L2CAP_PKT_START_NON_FLUSHABLE
                                                    << L2CAP_PKT_TYPE_SHIFT)));
   } else {
@@ -2072,7 +2075,7 @@ bool l2cu_create_conn_le(tL2C_LCB* p_lcb) {
 /* This function initiates an acl connection to a Classic device via HCI. */
 void l2cu_create_conn_br_edr(tL2C_LCB* p_lcb) {
   const bool controller_supports_role_switch =
-      controller_get_interface()->SupportsRoleSwitch();
+      bluetooth::shim::GetController()->SupportsRoleSwitch();
 
   /* While creating a new classic connection, check check all the other
    * active connections where we are not SCO nor central.
@@ -2339,34 +2342,6 @@ static void l2cu_set_acl_priority_unisoc(tL2C_LCB* p_lcb,
 
 /*******************************************************************************
  *
- * Function         l2cu_set_acl_priority_latency_mtk
- *
- * Description      Sends a VSC to set the ACL priority and recorded latency on
- *                  Mediatek chip.
- *
- * Returns          void
- *
- ******************************************************************************/
-
-static void l2cu_set_acl_priority_latency_mtk(tL2C_LCB* p_lcb,
-                                               tL2CAP_PRIORITY priority) {
-  uint8_t vs_param;
-  if (priority == L2CAP_PRIORITY_HIGH) {
-    // priority to high, if using latency mode check preset latency
-    LOG_INFO("Set ACL priority: High Priority Mode");
-    vs_param = HCI_MTK_ACL_HIGH_PRIORITY;
-  } else {
-    // priority to normal
-    LOG_INFO("Set ACL priority: Normal Mode");
-    vs_param = HCI_MTK_ACL_NORMAL_PRIORITY;
-  }
-
-  BTM_VendorSpecificCommand(HCI_MTK_SET_ACL_PRIORITY,
-                            HCI_MTK_ACL_PRIORITY_PARAM_SIZE, &vs_param, NULL);
-}
-
-/*******************************************************************************
- *
  * Function         l2cu_set_acl_priority
  *
  * Description      Sets the transmission priority for a channel.
@@ -2408,10 +2383,6 @@ bool l2cu_set_acl_priority(const RawAddress& bd_addr, tL2CAP_PRIORITY priority,
 
       case LMP_COMPID_UNISOC:
         l2cu_set_acl_priority_unisoc(p_lcb, priority);
-        break;
-
-      case LMP_COMPID_MEDIATEK:
-        l2cu_set_acl_priority_latency_mtk(p_lcb, priority);
         break;
 
       default:
@@ -2483,6 +2454,34 @@ static void l2cu_set_acl_latency_syna(tL2C_LCB* p_lcb, tL2CAP_LATENCY latency) {
 
 /*******************************************************************************
  *
+ * Function         l2cu_set_acl_latency_mtk
+ *
+ * Description      Sends a VSC to set the ACL latency on Mediatek chip.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+
+static void l2cu_set_acl_latency_mtk(tL2CAP_LATENCY latency) {
+  log::info("Set ACL latency: {}",
+            latency == L2CAP_LATENCY_LOW ? "Low Latancy" : "Normal Latency");
+
+  uint8_t command[HCI_MTK_ACL_PRIORITY_PARAM_SIZE];
+  uint8_t* pp = command;
+  uint8_t vs_param = latency == L2CAP_LATENCY_LOW
+                         ? HCI_MTK_ACL_HIGH_PRIORITY
+                         : HCI_MTK_ACL_NORMAL_PRIORITY;
+  UINT8_TO_STREAM(pp, vs_param);
+  UINT8_TO_STREAM(pp, 0);
+  UINT16_TO_STREAM(pp, 0);  //reserved bytes
+
+  BTM_VendorSpecificCommand(HCI_MTK_SET_ACL_PRIORITY,
+                            HCI_MTK_ACL_PRIORITY_PARAM_SIZE, command, NULL);
+}
+
+
+/*******************************************************************************
+ *
  * Function         l2cu_set_acl_latency
  *
  * Description      Sets the transmission latency for a channel.
@@ -2511,6 +2510,10 @@ bool l2cu_set_acl_latency(const RawAddress& bd_addr, tL2CAP_LATENCY latency) {
 
       case LMP_COMPID_SYNAPTICS:
         l2cu_set_acl_latency_syna(p_lcb, latency);
+        break;
+
+      case LMP_COMPID_MEDIATEK:
+        l2cu_set_acl_latency_mtk(latency);
         break;
 
       default:

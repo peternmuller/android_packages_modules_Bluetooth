@@ -2952,8 +2952,7 @@ public class GattService extends ProfileService {
     // Check and deliver scan results for different scan clients.
     private void deliverBatchScan(ScanClient client, Set<ScanResult> allResults)
             throws RemoteException {
-        TransitionalScanHelper.ScannerMap.App app =
-                mTransitionalScanHelper.getScannerMap().getById(client.scannerId);
+        ContextMap.App app = mTransitionalScanHelper.getScannerMap().getById(client.scannerId);
         if (app == null) {
             return;
         }
@@ -3161,8 +3160,7 @@ public class GattService extends ProfileService {
     }
 
     void onScanParamSetupCompleted(int status, int scannerId) throws RemoteException {
-        TransitionalScanHelper.ScannerMap.App app =
-                mTransitionalScanHelper.getScannerMap().getById(scannerId);
+        ContextMap.App app = mTransitionalScanHelper.getScannerMap().getById(scannerId);
         if (app == null || app.callback == null) {
             Log.e(TAG, "Advertise app or callback is null");
             return;
@@ -3389,8 +3387,7 @@ public class GattService extends ProfileService {
         scanClient.associatedDevices = getAssociatedDevices(callingPackage);
 
         AppScanStats app = mTransitionalScanHelper.getScannerMap().getAppScanStatsById(scannerId);
-        TransitionalScanHelper.ScannerMap.App cbApp =
-                mTransitionalScanHelper.getScannerMap().getById(scannerId);
+        ContextMap.App cbApp = mTransitionalScanHelper.getScannerMap().getById(scannerId);
         if (app != null) {
             scanClient.stats = app;
             boolean isFilteredScan = (filters != null) && !filters.isEmpty();
@@ -3442,7 +3439,7 @@ public class GattService extends ProfileService {
             return;
         }
 
-        TransitionalScanHelper.ScannerMap.App app =
+        ContextMap.App app =
                 mTransitionalScanHelper.getScannerMap().add(uuid, null, null, piInfo, this);
 
         app.mUserHandle = UserHandle.getUserHandleForUid(Binder.getCallingUid());
@@ -3551,8 +3548,7 @@ public class GattService extends ProfileService {
         }
         PendingIntentInfo pii = new PendingIntentInfo();
         pii.intent = intent;
-        TransitionalScanHelper.ScannerMap.App app =
-                mTransitionalScanHelper.getScannerMap().getByContextInfo(pii);
+        ContextMap.App app = mTransitionalScanHelper.getScannerMap().getByContextInfo(pii);
         if (VDBG) {
             Log.d(TAG, "stopScan(PendingIntent): app found = " + app);
         }
