@@ -1204,6 +1204,7 @@ public class LeAudioService extends ProfileService {
                 settingsList.stream()
                         .map(s -> s.getContentMetadata().getRawMetadata())
                         .toArray(byte[][]::new));
+        notifyBroadcastUpdated(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
     }
 
     /**
@@ -4320,6 +4321,20 @@ public class LeAudioService extends ProfileService {
             for (int i = 0; i < n; i++) {
                 try {
                     mBroadcastCallbacks.getBroadcastItem(i).onPlaybackStopped(reason, broadcastId);
+                } catch (RemoteException e) {
+                    continue;
+                }
+            }
+            mBroadcastCallbacks.finishBroadcast();
+        }
+    }
+
+    private void notifyBroadcastUpdated(int broadcastId, int reason) {
+        if (mBroadcastCallbacks != null) {
+            int n = mBroadcastCallbacks.beginBroadcast();
+            for (int i = 0; i < n; i++) {
+                try {
+                    mBroadcastCallbacks.getBroadcastItem(i).onBroadcastUpdated(reason, broadcastId);
                 } catch (RemoteException e) {
                     continue;
                 }
