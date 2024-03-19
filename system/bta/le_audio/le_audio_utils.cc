@@ -57,17 +57,17 @@ LeAudioContextType AudioContentToLeAudioContext(
     case AUDIO_USAGE_GAME:
       return LeAudioContextType::GAME;
     case AUDIO_USAGE_NOTIFICATION:
-      return LeAudioContextType::NOTIFICATIONS;
+      return LeAudioContextType::MEDIA;
     case AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE:
       return LeAudioContextType::RINGTONE;
     case AUDIO_USAGE_ALARM:
-      return LeAudioContextType::ALERTS;
+      return LeAudioContextType::MEDIA;
     case AUDIO_USAGE_EMERGENCY:
       return LeAudioContextType::EMERGENCYALARM;
     case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
       return LeAudioContextType::INSTRUCTIONAL;
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
-      return LeAudioContextType::SOUNDEFFECTS;
+      return LeAudioContextType::MEDIA;
     default:
       break;
   }
