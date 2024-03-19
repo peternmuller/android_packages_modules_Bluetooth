@@ -34,16 +34,15 @@ namespace bluetooth::hci {
 
 std::optional<LeScanningReassembler::CompleteAdvertisingData>
 LeScanningReassembler::ProcessAdvertisingReport(
-    ExtendedAdvertisingEventType event_type,
+    uint16_t event_type,
     uint8_t address_type,
     Address address,
     uint8_t advertising_sid,
     const std::vector<uint8_t>& advertising_data) {
-  bool is_scannable = static_cast<uint16_t>(event_type & ExtendedAdvertisingEventType::SCANNABLE);
-  bool is_scan_response =
-      static_cast<uint16_t>(event_type & ExtendedAdvertisingEventType::SCAN_RESPONSE);
-  bool is_legacy = static_cast<uint16_t>(event_type & ExtendedAdvertisingEventType::LEGACY);
-  DataStatus data_status = DataStatusFromAdvertisingEventType(event_type);
+  bool is_scannable = event_type & (1 << kScannableBit);
+  bool is_scan_response = event_type & (1 << kScanResponseBit);
+  bool is_legacy = event_type & (1 << kLegacyBit);
+  DataStatus data_status = DataStatus((event_type >> kDataStatusBits) & 0x3);
 
   if (address_type != (uint8_t)DirectAdvertisingAddressType::NO_ADDRESS_PROVIDED &&
       address == Address::kEmpty) {
@@ -98,6 +97,25 @@ LeScanningReassembler::ProcessAdvertisingReport(
   return result;
 }
 
+std::optional<std::vector<uint8_t>> LeScanningReassembler::ProcessPeriodicAdvertisingReport(
+    uint16_t sync_handle, DataStatus data_status, const std::vector<uint8_t>& advertising_data) {
+  // Concatenate the data with existing fragments.
+  std::list<PeriodicAdvertisingFragment>::iterator advertising_fragment =
+      AppendPeriodicFragment(sync_handle, advertising_data);
+
+  // Return and wait for additional fragments if the data is marked as
+  // incomplete.
+  if (data_status == DataStatus::CONTINUING) {
+    return {};
+  }
+
+  // The complete payload has been received; trim the advertising data,
+  // remove the cache entry and return the complete advertising data.
+  std::vector<uint8_t> result = TrimAdvertisingData(advertising_fragment->data);
+  periodic_cache_.erase(advertising_fragment);
+  return result;
+}
+
 /// Trim the advertising data by removing empty or overflowing
 /// GAP Data entries.
 std::vector<uint8_t> LeScanningReassembler::TrimAdvertisingData(
@@ -145,17 +163,15 @@ bool LeScanningReassembler::AdvertisingKey::operator==(const AdvertisingKey& oth
 /// dropping the oldest advertiser.
 std::list<LeScanningReassembler::AdvertisingFragment>::iterator
 LeScanningReassembler::AppendFragment(
-    const AdvertisingKey& key,
-    ExtendedAdvertisingEventType extended_event_type,
-    const std::vector<uint8_t>& data) {
+    const AdvertisingKey& key, uint16_t extended_event_type, const std::vector<uint8_t>& data) {
   auto it = FindFragment(key);
   if (it != cache_.end()) {
     // Legacy scan responses don't contain a 'connectable' bit, so this adds the
     // 'connectable' bit from the initial report.
-    if (static_cast<uint16_t>(extended_event_type & ExtendedAdvertisingEventType::LEGACY) &&
-        static_cast<uint16_t>(extended_event_type & ExtendedAdvertisingEventType::SCAN_RESPONSE)) {
-      it->extended_event_type = extended_event_type | (it->extended_event_type &
-                                                       ExtendedAdvertisingEventType::CONNECTABLE);
+    if ((extended_event_type & (1 << kLegacyBit)) &&
+        (extended_event_type & (1 << kScanResponseBit))) {
+      it->extended_event_type =
+          extended_event_type | (it->extended_event_type & (1 << kConnectableBit));
     } else {
       it->extended_event_type = extended_event_type;
     }
@@ -190,6 +206,36 @@ std::list<LeScanningReassembler::AdvertisingFragment>::iterator LeScanningReasse
     }
   }
   return cache_.end();
+}
+
+/// Append to the current advertising data of the selected periodic advertiser.
+/// If the advertiser is unknown a new entry is added, optionally by
+/// dropping the oldest advertiser.
+std::list<LeScanningReassembler::PeriodicAdvertisingFragment>::iterator
+LeScanningReassembler::AppendPeriodicFragment(
+    uint16_t sync_handle, const std::vector<uint8_t>& data) {
+  auto it = FindPeriodicFragment(sync_handle);
+  if (it != periodic_cache_.end()) {
+    it->data.insert(it->data.end(), data.cbegin(), data.cend());
+    return it;
+  }
+
+  if (periodic_cache_.size() > kMaximumPeriodicCacheSize) {
+    periodic_cache_.pop_back();
+  }
+
+  periodic_cache_.emplace_front(sync_handle, data);
+  return periodic_cache_.begin();
+}
+
+std::list<LeScanningReassembler::PeriodicAdvertisingFragment>::iterator
+LeScanningReassembler::FindPeriodicFragment(uint16_t sync_handle) {
+  for (auto it = periodic_cache_.begin(); it != periodic_cache_.end(); it++) {
+    if (it->sync_handle == sync_handle) {
+      return it;
+    }
+  }
+  return periodic_cache_.end();
 }
 
 }  // namespace bluetooth::hci

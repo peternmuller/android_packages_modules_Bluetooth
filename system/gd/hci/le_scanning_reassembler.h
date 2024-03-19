@@ -36,7 +36,7 @@ namespace bluetooth::hci {
 class LeScanningReassembler {
  public:
   struct CompleteAdvertisingData {
-    ExtendedAdvertisingEventType extended_event_type;
+    uint16_t extended_event_type;
     std::vector<uint8_t> data;
   };
 
@@ -52,11 +52,18 @@ class LeScanningReassembler {
   /// Returns the completed advertising data if the event was complete, or the
   /// completion of a fragmented advertising event.
   std::optional<CompleteAdvertisingData> ProcessAdvertisingReport(
-      ExtendedAdvertisingEventType event_type,
+      uint16_t event_type,
       uint8_t address_type,
       Address address,
       uint8_t advertising_sid,
       const std::vector<uint8_t>& advertising_data);
+
+  /// Process an incoming periodic advertising report, extracted from the
+  /// HCI LE Periodic Advertising Report events.
+  /// Returns the completed advertising data if the event was complete,
+  /// or the completion of a fragmented advertising event.
+  std::optional<std::vector<uint8_t>> ProcessPeriodicAdvertisingReport(
+      uint16_t sync_handle, DataStatus status, const std::vector<uint8_t>& advertising_data);
 
   /// Configure the scan response filter.
   /// If true all scan responses are ignored.
@@ -67,6 +74,14 @@ class LeScanningReassembler {
  private:
   /// Determine if scan responses should be processed or ignored.
   bool ignore_scan_responses_{false};
+
+  /// Constants for parsing event_type.
+  static constexpr uint8_t kConnectableBit = 0;
+  static constexpr uint8_t kScannableBit = 1;
+  static constexpr uint8_t kDirectedBit = 2;
+  static constexpr uint8_t kScanResponseBit = 3;
+  static constexpr uint8_t kLegacyBit = 4;
+  static constexpr uint8_t kDataStatusBits = 5;
 
   /// Packs the information necessary to disambiguate advertising events:
   /// - For legacy advertising events, the advertising address and
@@ -89,14 +104,21 @@ class LeScanningReassembler {
   /// Packs incomplete advertising data.
   struct AdvertisingFragment {
     AdvertisingKey key;
-    ExtendedAdvertisingEventType extended_event_type;
+    uint16_t extended_event_type;
     std::vector<uint8_t> data;
 
     AdvertisingFragment(
-        const AdvertisingKey& key,
-        ExtendedAdvertisingEventType extended_event_type,
-        const std::vector<uint8_t>& data)
+        const AdvertisingKey& key, uint16_t extended_event_type, const std::vector<uint8_t>& data)
         : key(key), extended_event_type(extended_event_type), data(data.begin(), data.end()) {}
+  };
+
+  /// Packs incomplete periodic advertising data.
+  struct PeriodicAdvertisingFragment {
+    std::optional<uint16_t> sync_handle;
+    std::vector<uint8_t> data;
+
+    PeriodicAdvertisingFragment(uint16_t sync_handle, const std::vector<uint8_t>& data)
+        : sync_handle(sync_handle), data(data.begin(), data.end()) {}
   };
 
   /// Advertising cache for de-fragmenting extended advertising reports,
@@ -109,15 +131,22 @@ class LeScanningReassembler {
 
   /// Advertising cache management methods.
   std::list<AdvertisingFragment>::iterator AppendFragment(
-      const AdvertisingKey& key,
-      ExtendedAdvertisingEventType extended_event_type,
-      const std::vector<uint8_t>& data);
+      const AdvertisingKey& key, uint16_t extended_event_type, const std::vector<uint8_t>& data);
 
   void RemoveFragment(const AdvertisingKey& key);
 
   bool ContainsFragment(const AdvertisingKey& key);
 
   std::list<AdvertisingFragment>::iterator FindFragment(const AdvertisingKey& key);
+
+  /// Advertising cache for de-fragmenting periodic advertising reports.
+  static constexpr size_t kMaximumPeriodicCacheSize = 16;
+  std::list<PeriodicAdvertisingFragment> periodic_cache_;
+
+  std::list<PeriodicAdvertisingFragment>::iterator AppendPeriodicFragment(
+      uint16_t sync_handle, const std::vector<uint8_t>& data);
+
+  std::list<PeriodicAdvertisingFragment>::iterator FindPeriodicFragment(uint16_t sync_handle);
 
   /// Trim the advertising data by removing empty or overflowing
   /// GAP Data entries.

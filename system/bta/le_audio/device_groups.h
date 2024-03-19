@@ -84,6 +84,7 @@ class LeAudioDeviceGroup {
   /* Whether LE Audio is preferred for OUTPUT_ONLY and DUPLEX cases */
   bool is_output_preference_le_audio;
   bool is_duplex_preference_le_audio;
+  std::pair<bool, bool> lex_codec_disabled;
   DsaMode dsa_mode_;
   bool asymmetric_phy_for_unidirectional_cis_supported;
 
@@ -124,6 +125,7 @@ class LeAudioDeviceGroup {
     is_output_preference_le_audio = true;
     is_duplex_preference_le_audio = true;
 #endif
+    lex_codec_disabled = std::make_pair(false, false);
     asymmetric_phy_for_unidirectional_cis_supported =
         IS_FLAG_ENABLED(asymmetric_phy_for_unidirectional_cis);
   }
@@ -168,6 +170,7 @@ class LeAudioDeviceGroup {
   bool IsGroupReadyToCreateStream(void) const;
   bool IsGroupReadyToSuspendStream(void) const;
   bool IsSeamlessSupported(void);
+  void DisableLeXCodec(bool status);
   bool HaveAllCisesDisconnected(void) const;
   void ClearAllCises(void);
   void UpdateCisConfiguration(uint8_t direction);
@@ -335,14 +338,23 @@ class LeAudioDeviceGroup {
       int direction = types::kLeAudioDirectionBoth) const;
 
   DsaModes GetAllowedDsaModes() {
-    DsaModes dsa_modes = {};
+    if (!IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+      return {DsaMode::DISABLED};
+    }
+
+    DsaModes dsa_modes{};
+    std::set<DsaMode> dsa_mode_set{};
+
     for (auto leAudioDevice : leAudioDevices_) {
       if (leAudioDevice.expired()) continue;
 
-      dsa_modes.insert(dsa_modes.end(),
-                       leAudioDevice.lock()->GetDsaModes().begin(),
-                       leAudioDevice.lock()->GetDsaModes().end());
+      auto device_dsa_modes = leAudioDevice.lock()->GetDsaModes();
+
+      dsa_mode_set.insert(device_dsa_modes.begin(), device_dsa_modes.end());
     }
+
+    dsa_modes.assign(dsa_mode_set.begin(), dsa_mode_set.end());
+
     return dsa_modes;
   }
 

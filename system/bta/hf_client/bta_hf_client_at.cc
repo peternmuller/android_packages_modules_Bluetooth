@@ -21,9 +21,9 @@
 
 #include "bta/hf_client/bta_hf_client_int.h"
 #include "internal_include/bt_trace.h"
+#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
-#include "osi/include/log.h"
 #include "osi/include/properties.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/port_api.h"
@@ -552,14 +552,16 @@ static void bta_hf_client_handle_bvra(tBTA_HF_CLIENT_CB* client_cb,
 
 static void bta_hf_client_handle_clip(tBTA_HF_CLIENT_CB* client_cb,
                                       char* numstr, uint32_t type) {
-  LOG_VERBOSE("%s: %u %s", __func__, type, numstr);
+  std::string cell_number(numstr);
+  LOG_VERBOSE("%s: %u %s", __func__, type, PRIVATE_CELL(cell_number));
 
   bta_hf_client_clip(client_cb, numstr);
 }
 
 static void bta_hf_client_handle_ccwa(tBTA_HF_CLIENT_CB* client_cb,
                                       char* numstr, uint32_t type) {
-  LOG_VERBOSE("%s: %u %s", __func__, type, numstr);
+  std::string cell_number(numstr);
+  LOG_VERBOSE("%s: %u %s", __func__, type, PRIVATE_CELL(cell_number));
 
   bta_hf_client_ccwa(client_cb, numstr);
 }
@@ -573,7 +575,8 @@ static void bta_hf_client_handle_cops(tBTA_HF_CLIENT_CB* client_cb, char* opstr,
 
 static void bta_hf_client_handle_binp(tBTA_HF_CLIENT_CB* client_cb,
                                       char* numstr) {
-  LOG_VERBOSE("%s: %s", __func__, numstr);
+  std::string cell_number(numstr);
+  LOG_VERBOSE("%s: %s", __func__, PRIVATE_CELL(cell_number));
 
   bta_hf_client_binp(client_cb, numstr);
 }
@@ -587,7 +590,8 @@ static void bta_hf_client_handle_clcc(tBTA_HF_CLIENT_CB* client_cb,
               dir, status, mode, mpty);
 
   if (numstr) {
-    LOG_VERBOSE("%s: number: %s  type: %u", __func__, numstr, type);
+    std::string cell_number(numstr);
+    LOG_VERBOSE("%s: number: %s  type: %u", __func__, PRIVATE_CELL(cell_number), type);
   }
 
   bta_hf_client_clcc(client_cb, idx, dir, status, mpty, numstr);
@@ -596,7 +600,8 @@ static void bta_hf_client_handle_clcc(tBTA_HF_CLIENT_CB* client_cb,
 static void bta_hf_client_handle_cnum(tBTA_HF_CLIENT_CB* client_cb,
                                       char* numstr, uint16_t type,
                                       uint16_t service) {
-  LOG_VERBOSE("%s: number: %s type: %u service: %u", __func__, numstr, type,
+  std::string cell_number(numstr);
+  LOG_VERBOSE("%s: number: %s type: %u service: %u", __func__, PRIVATE_CELL(cell_number), type,
               service);
 
   /* TODO: should number be modified according to type? */
@@ -1086,6 +1091,8 @@ static char* bta_hf_client_parse_bind(tBTA_HF_CLIENT_CB* client_cb,
     }
     buffer++;
   }
+
+  AT_CHECK_RN(buffer);
 
   return buffer;
 }
@@ -1623,10 +1630,10 @@ static void bta_hf_client_dump_at(tBTA_HF_CLIENT_CB* client_cb) {
 
   while (*p1 != '\0') {
     if (*p1 == '\r') {
-      strlcpy(p2, "<cr>", 4);
+      strncpy(p2, "<cr>", 4);
       p2 += 4;
     } else if (*p1 == '\n') {
-      strlcpy(p2, "<lf>", 4);
+      strncpy(p2, "<lf>", 4);
       p2 += 4;
     } else {
       *p2 = *p1;

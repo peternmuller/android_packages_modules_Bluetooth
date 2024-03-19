@@ -162,7 +162,7 @@ typedef struct { uint8_t pin[16]; } __attribute__((packed)) bt_pin_code_t;
 
 typedef struct {
   uint8_t status;
-  uint8_t ctrl_state;   /* stack reported state */
+  uint32_t ctrl_state;  /* stack reported state */
   uint64_t tx_time;     /* in ms */
   uint64_t rx_time;     /* in ms */
   uint64_t idle_time;   /* in ms */
@@ -414,6 +414,20 @@ typedef enum {
    */
   BT_PROPERTY_REMOTE_ADDR_TYPE,
 
+  /**
+   * Description - Whether remote device supports Secure Connections mode
+   * Access mode - GET and SET.
+   * Data Type - uint8_t.
+   */
+  BT_PROPERTY_REMOTE_SECURE_CONNECTIONS_SUPPORTED,
+
+  /**
+   * Description - Maximum observed session key for remote device
+   * Access mode - GET and SET.
+   * Data Type - uint8_t.
+   */
+  BT_PROPERTY_REMOTE_MAX_SESSION_KEY_SIZE,
+
   BT_PROPERTY_REMOTE_DEVICE_TIMESTAMP = 0xFF,
 } bt_property_type_t;
 
@@ -606,7 +620,7 @@ typedef void (*energy_info_callback)(bt_activity_energy_info* energy_info,
 typedef void (*generate_local_oob_data_callback)(tBT_TRANSPORT transport,
                                                  bt_oob_data_t oob_data);
 
-typedef void (*key_missing_callback)(RawAddress bd_addr);
+typedef void (*key_missing_callback)(const RawAddress bd_addr);
 
 /** TODO: Add callbacks for Link Up/Down and other generic
  *  notifications/callbacks */

@@ -58,6 +58,7 @@
 #include "stack/include/avrc_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
+#include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/main_thread.h"
 #include "types/raw_address.h"
@@ -1149,8 +1150,12 @@ bt_status_t BtifAvSource::Init(
 
   callbacks_ = callbacks;
   if (a2dp_offload_enabled_) {
+    tBTM_BLE_VSC_CB vsc_cb = {};
+    BTM_BleGetVendorCapabilities(&vsc_cb);
+    bool supports_a2dp_hw_offload_v2 =
+        vsc_cb.version_supported >= 0x0104 && vsc_cb.a2dp_offload_v2_support;
     bluetooth::audio::a2dp::update_codec_offloading_capabilities(
-        offloading_preference);
+        offloading_preference, supports_a2dp_hw_offload_v2);
   }
   bta_av_co_init(codec_priorities, supported_codecs);
 
@@ -4376,31 +4381,31 @@ bool btif_av_peer_is_source(const RawAddress& peer_address) {
   return true;
 }
 
-void btif_av_update_codec_mode(bool is_Gaming_Latency) {
+void btif_av_update_codec_mode(bool is_gaming_latency) {
   btif_av_codec_mode_change_t codec_mode_change;
   A2dpCodecConfig* current_codec = bta_av_get_a2dp_current_codec();
   if (current_codec != nullptr) {
     btav_a2dp_codec_config_t codec_config;
     codec_config = current_codec->getCodecConfig();
-    if(codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
-      if (is_Gaming_Latency) {
+    if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+      if (is_gaming_latency) {
         LOG_INFO(" Is game/low latency, going for Low Latency Mode");
         codec_mode_change.enc_mode = APTX_LL;
       } else {
         LOG_INFO(" Isn't game/low latency, going for High Quality Mode");
         codec_mode_change.enc_mode = APTX_HQ;
       }
+      BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
+                                sizeof(codec_mode_change));
+      LOG_INFO("peer_address=%s event=%s",
+                ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
+                btif_av_event.ToString().c_str());
+      do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
+                                              AVDT_TSEP_SNK,  // peer_sep
+                                              btif_av_source_active_peer(),
+                                              kBtaHandleUnknown, btif_av_event));
     }
   }
-  BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
-                            sizeof(codec_mode_change));
-  LOG_INFO("peer_address=%s event=%s",
-            ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
-            btif_av_event.ToString().c_str());
-  do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
-                                          AVDT_TSEP_SNK,  // peer_sep
-                                          btif_av_source_active_peer(),
-                                          kBtaHandleUnknown, btif_av_event));
 }
 
 void btif_av_update_source_metadata(bool is_Gaming_Enabled) {

@@ -22,6 +22,7 @@ filegroup {
         ":statslog-bluetooth-java-gen",
         "src/**/*.java",
         //"src/AdapterState.kt",
+        "src/AutoOnFeature.kt",
         "src/Log.kt",
         //"src/airplane/ModeListener.kt",
         "src/com/**/*.kt",
@@ -39,9 +40,7 @@ java_library {
     name: "service-bluetooth-pre-jarjar",
     installable: false,
     //defaults: ["service-bluetooth-common-defaults"],
-    srcs: [
-        ":services.bluetooth-sources",
-    ],
+    srcs: [":services.bluetooth-sources"],
 
     errorprone: {
         javacflags: [
@@ -87,6 +86,7 @@ java_library {
         "bluetooth-nano-protos",
         "bluetooth-proto-enums-java-gen",
         "bluetooth_flags_java_lib",
+        "modules-utils-build_system",
         "modules-utils-shell-command-handler",
     ],
 
@@ -109,7 +109,6 @@ java_library {
 
     libs: [
         "app-compat-annotations",
-        "framework-bluetooth.impl",
     ],
     sdk_version: "system_server_current",
 
@@ -185,6 +184,8 @@ java_library {
 //        ":statslog-bluetooth-java-gen",
 //        "src/AdapterState.kt",
 //        "src/AdapterStateTest.kt",
+//        "src/AutoOnFeature.kt",
+//        "src/AutoOnFeatureTest.kt",
 //        "src/Log.kt",
 //        "src/LogTest.kt",
 //        "src/RadioModeListener.kt",
@@ -197,15 +198,12 @@ java_library {
 
 //    static_libs: [
 //        "androidx.test.core",
+//        "kotlin-test",
 //        "kotlinx_coroutines",
 //        "kotlinx_coroutines_test",
 //        "mockito-robolectric-prebuilt",
 //        "platform-test-annotations",
 //        "testng",
-//        "truth-prebuilt",
+//        "truth",
 //    ],
-
-//    upstream: true,
-//    test_suites: ["general-tests"],
 //}
-

@@ -27,6 +27,7 @@
 
 #define LOG_TAG "bt_btif"
 
+#include <android_bluetooth_flags.h>
 #include <base/logging.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bluetooth_headset_interface.h>
@@ -110,6 +111,7 @@
 #include "stack/include/hidh_api.h"
 #include "stack/include/main_thread.h"
 #include "stack/include/pan_api.h"
+#include "storage/config_keys.h"
 #include "types/raw_address.h"
 
 using bluetooth::csis::CsisClientInterface;
@@ -176,7 +178,7 @@ bt_status_t btif_av_sink_execute_service(bool b_enable);
 bt_status_t btif_hh_execute_service(bool b_enable);
 bt_status_t btif_hf_client_execute_service(bool b_enable);
 bt_status_t btif_sdp_execute_service(bool b_enable);
-bt_status_t btif_hh_connect(const RawAddress* bd_addr);
+bt_status_t btif_hh_connect(const tAclLinkSpec* link_spec);
 bt_status_t btif_hd_execute_service(bool b_enable);
 
 /*******************************************************************************
@@ -305,7 +307,12 @@ struct CoreInterfaceImpl : bluetooth::core::CoreInterface {
   void removeDeviceFromProfiles(const RawAddress& bd_addr) override {
 /*special handling for HID devices */
 #if (defined(BTA_HH_INCLUDED) && (BTA_HH_INCLUDED == TRUE))
-    btif_hh_remove_device(bd_addr);
+    tAclLinkSpec link_spec;
+    link_spec.addrt.bda = bd_addr;
+    link_spec.addrt.type = BLE_ADDR_PUBLIC;
+    link_spec.transport = BT_TRANSPORT_AUTO;
+
+    btif_hh_remove_device(link_spec);
 #endif
 #if (defined(BTA_HD_INCLUDED) && (BTA_HD_INCLUDED == TRUE))
     btif_hd_remove_device(bd_addr);
@@ -657,7 +664,11 @@ static int get_connection_state(const RawAddress* bd_addr) {
 
   if (bd_addr == nullptr) return 0;
 
-  return btif_dm_get_connection_state(*bd_addr);
+  if (IS_FLAG_ENABLED(api_get_connection_state_sync_on_main)) {
+    return btif_dm_get_connection_state_sync(*bd_addr);
+  } else {
+    return btif_dm_get_connection_state(*bd_addr);
+  }
 }
 
 static int pin_reply(const RawAddress* bd_addr, uint8_t accept, uint8_t pin_len,
@@ -674,7 +685,7 @@ static int pin_reply(const RawAddress* bd_addr, uint8_t accept, uint8_t pin_len,
 }
 
 static int ssp_reply(const RawAddress* bd_addr, bt_ssp_variant_t variant,
-                     uint8_t accept, uint32_t passkey) {
+                     uint8_t accept, uint32_t /* passkey */) {
   if (!interface_ready()) return BT_STATUS_NOT_READY;
   if (variant == BT_SSP_VARIANT_PASSKEY_ENTRY) return BT_STATUS_FAIL;
 
@@ -829,7 +840,8 @@ static int get_remote_pbap_pce_version(const RawAddress* bd_addr) {
   // Read and restore the PCE version from local storage
   uint16_t pce_version = 0;
   size_t version_value_size = sizeof(pce_version);
-  if (!btif_config_get_bin(bd_addr->ToString(), BT_CONFIG_KEY_PBAP_PCE_VERSION,
+  if (!btif_config_get_bin(bd_addr->ToString(),
+                           BTIF_STORAGE_KEY_PBAP_PCE_VERSION,
                            (uint8_t*)&pce_version, &version_value_size)) {
     LOG_WARN("Failed to read cached peer PCE version for %s",
              ADDRESS_TO_LOGGABLE_CSTR(*bd_addr));
@@ -1035,7 +1047,8 @@ static int set_dynamic_audio_buffer_size(int codec, int size) {
   return btif_set_dynamic_audio_buffer_size(codec, size);
 }
 
-static bool allow_low_latency_audio(bool allowed, const RawAddress& address) {
+static bool allow_low_latency_audio(bool allowed,
+                                    const RawAddress& /* address */) {
   LOG_INFO("%s %s", __func__, allowed ? "true" : "false");
   bluetooth::audio::a2dp::set_audio_low_latency_mode_allowed(allowed);
   return true;

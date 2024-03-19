@@ -74,7 +74,8 @@ class BleScannerInterfaceImpl : public ::BleScannerInterface,
                             MsftAdvMonitorRemoveCallback cb) override;
   void MsftAdvMonitorEnable(bool enable,
                             MsftAdvMonitorEnableCallback cb) override;
-  void SetScanParameters(int scanner_id, std::vector<uint32_t> scan_interval,
+  void SetScanParameters(int scanner_id, uint8_t scan_type,
+                         std::vector<uint32_t> scan_interval,
                          std::vector<uint32_t> scan_window,
                          Callback cb) override;
   void BatchscanConfigStorage(int client_if, int batch_scan_full_max,

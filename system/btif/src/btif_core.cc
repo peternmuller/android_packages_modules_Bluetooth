@@ -49,8 +49,10 @@
 #include "common/message_loop_thread.h"
 #include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
+#include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
+#include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/future.h"
@@ -59,6 +61,7 @@
 #include "stack/include/bt_types.h"
 #include "stack/include/btm_api.h"
 #include "stack/include/btm_ble_api.h"
+#include "storage/config_keys.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
 
@@ -184,13 +187,15 @@ void btif_enable_bluetooth_evt() {
 
   char val[PROPERTY_VALUE_MAX] = "";
   int val_size = PROPERTY_VALUE_MAX;
-  if (!btif_config_get_str("Adapter", "Address", val, &val_size) ||
+  if (!btif_config_get_str(BTIF_STORAGE_SECTION_ADAPTER,
+                           BTIF_STORAGE_KEY_ADDRESS, val, &val_size) ||
       strcmp(bdstr.c_str(), val) != 0) {
     // We failed to get an address or the one in the config file does not match
     // the address given by the controller interface. Update the config cache
-    LOG_INFO("%s: Storing '%s' into the config file", __func__,
-            ADDRESS_TO_LOGGABLE_CSTR(local_bd_addr));
-    btif_config_set_str("Adapter", "Address", bdstr.c_str());
+    LOG_INFO("Storing '%s' into the config file",
+             ADDRESS_TO_LOGGABLE_CSTR(local_bd_addr));
+    btif_config_set_str(BTIF_STORAGE_SECTION_ADAPTER, BTIF_STORAGE_KEY_ADDRESS,
+                        bdstr.c_str());
 
     // fire HAL callback for property change
     bt_property_t prop;
@@ -247,20 +252,6 @@ bt_status_t btif_cleanup_bluetooth() {
 
 /*******************************************************************************
  *
- * Function         btif_dut_mode_cback
- *
- * Description     Callback invoked on completion of vendor specific test mode
- *                 command
- *
- * Returns          None
- *
- ******************************************************************************/
-static void btif_dut_mode_cback(UNUSED_ATTR tBTM_VSC_CMPL* p) {
-  /* For now nothing to be done. */
-}
-
-/*******************************************************************************
- *
  * Function         btif_dut_mode_configure
  *
  * Description      Configure Test Mode - 'enable' to 1 puts the device in test
@@ -288,7 +279,8 @@ void btif_dut_mode_configure(uint8_t enable) {
  ******************************************************************************/
 void btif_dut_mode_send(uint16_t opcode, uint8_t* buf, uint8_t len) {
   LOG_VERBOSE("%s", __func__);
-  BTM_VendorSpecificCommand(opcode, len, buf, btif_dut_mode_cback);
+  /* For now nothing to be done. */
+  BTM_VendorSpecificCommand(opcode, len, buf, [](tBTM_VSC_CMPL*) {});
 }
 
 /*****************************************************************************
@@ -729,48 +721,6 @@ void btif_disable_service(tBTA_SERVICE_ID service_id) {
   }
 }
 
-void DynamicAudiobufferSizeCompleteCallback(tBTM_VSC_CMPL* p_vsc_cmpl_params) {
-  LOG(INFO) << __func__;
-
-  if (p_vsc_cmpl_params->param_len < 1) {
-    LOG(ERROR) << __func__
-               << ": The length of returned parameters is less than 1";
-    return;
-  }
-  uint8_t* p_event_param_buf = p_vsc_cmpl_params->p_param_buf;
-  uint8_t status = 0xff;
-  uint8_t opcode = 0xff;
-  uint16_t respond_buffer_time = 0xffff;
-
-  // [Return Parameter]         | [Size]   | [Purpose]
-  // Status                     | 1 octet  | Command complete status
-  // Dynamic_Audio_Buffer_opcode| 1 octet  | 0x02 - Set buffer time
-  // Audio_Codec_Buffer_Time    | 2 octet  | Current buffer time
-  STREAM_TO_UINT8(status, p_event_param_buf);
-  if (status != HCI_SUCCESS) {
-    LOG(ERROR) << __func__
-               << ": Fail to configure DFTB. status: " << loghex(status);
-    return;
-  }
-
-  if (p_vsc_cmpl_params->param_len != 4) {
-    LOG(FATAL) << __func__
-               << ": The length of returned parameters is not equal to 4: "
-               << std::to_string(p_vsc_cmpl_params->param_len);
-    return;
-  }
-
-  STREAM_TO_UINT8(opcode, p_event_param_buf);
-  LOG(INFO) << __func__ << ": opcode = " << loghex(opcode);
-
-  if (opcode == 0x02) {
-    STREAM_TO_UINT16(respond_buffer_time, p_event_param_buf);
-    LOG(INFO) << __func__
-              << ": Succeed to configure Media Tx Buffer, used_buffer_time = "
-              << loghex(respond_buffer_time);
-  }
-}
-
 bt_status_t btif_set_dynamic_audio_buffer_size(int codec, int size) {
   LOG_VERBOSE("%s", __func__);
 
@@ -787,17 +737,11 @@ bt_status_t btif_set_dynamic_audio_buffer_size(int codec, int size) {
     if (cmn_vsc_cb.dynamic_audio_buffer_support != 0) {
       LOG_VERBOSE("%s Set buffer size (%d) for A2DP offload", __func__, size);
       uint16_t firmware_tx_buffer_length_byte;
-      uint8_t param[3] = {0};
-      uint8_t* p_param = param;
-
       firmware_tx_buffer_length_byte = static_cast<uint16_t>(size);
       LOG(INFO) << __func__ << "firmware_tx_buffer_length_byte: "
                 << firmware_tx_buffer_length_byte;
-
-      UINT8_TO_STREAM(p_param, HCI_CONTROLLER_DAB_SET_BUFFER_TIME);
-      UINT16_TO_STREAM(p_param, firmware_tx_buffer_length_byte);
-      BTM_VendorSpecificCommand(HCI_CONTROLLER_DAB, p_param - param, param,
-                                DynamicAudiobufferSizeCompleteCallback);
+      bluetooth::shim::GetController()->SetDabAudioBufferTime(
+          firmware_tx_buffer_length_byte);
     }
   }
 

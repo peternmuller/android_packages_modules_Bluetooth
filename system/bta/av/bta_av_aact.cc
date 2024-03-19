@@ -57,6 +57,7 @@
 #include "stack/include/btm_client_interface.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/l2c_api.h"
+#include "storage/config_keys.h"
 #include "types/hci_role.h"
 #include "types/raw_address.h"
 
@@ -544,7 +545,7 @@ static void bta_av_a2dp_sdp_cback(bool found, tA2DP_Service* p_service,
 
     if (p_service->avdt_version != 0) {
       if (btif_config_set_bin(p_scb->PeerAddress().ToString(),
-                              AVDTP_VERSION_CONFIG_KEY,
+                              BTIF_STORAGE_KEY_AVDTP_VERSION,
                               (const uint8_t*)&p_service->avdt_version,
                               sizeof(p_service->avdt_version))) {
       } else {
@@ -874,6 +875,7 @@ void bta_av_cleanup(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
   /* if de-registering shut everything down */
   msg.hdr.layer_specific = p_scb->hndl;
   p_scb->started = false;
+  p_scb->suspend_local_sent = false;
   p_scb->use_rtp_header_marker_bit = false;
   p_scb->cong = false;
   p_scb->role = role;
@@ -1213,6 +1215,7 @@ void bta_av_str_opened(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   bta_av_conn_chg((tBTA_AV_DATA*)&msg);
   /* set the congestion flag, so AV would not send media packets by accident */
   p_scb->cong = true;
+  p_scb->suspend_local_sent = false;
   // Don't use AVDTP SUSPEND for restrict listed devices
   btif_storage_get_stored_remote_name(p_scb->PeerAddress(), remote_name);
   if (interop_match_name(INTEROP_DISABLE_AVDTP_SUSPEND, remote_name) ||
@@ -1374,6 +1377,7 @@ void bta_av_do_close(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
 
   /* close stream */
   p_scb->started = false;
+  p_scb->suspend_local_sent = false;
   p_scb->use_rtp_header_marker_bit = false;
 
   /* drop the buffers queued in L2CAP */
@@ -2013,18 +2017,19 @@ void bta_av_str_stopped(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   suspend_rsp.hndl = p_scb->hndl;
 
   if (p_data && p_data->api_stop.suspend) {
-    LOG_VERBOSE("%s: peer %s suspending: %d, sup:%d", __func__,
+    LOG_VERBOSE("%s: peer %s suspending: %d, sup: %d, suspend_local_sent: %d", __func__,
                 ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), start,
-                p_scb->suspend_sup);
-    if ((start) && (p_scb->suspend_sup)) {
+                p_scb->suspend_sup, p_scb->suspend_local_sent);
+    if ((start) && (p_scb->suspend_sup) && (!p_scb->suspend_local_sent)) {
       sus_evt = false;
+      p_scb->suspend_local_sent = true;
       p_scb->l2c_bufs = 0;
       AVDT_SuspendReq(&p_scb->avdt_handle, 1);
     }
 
     /* send SUSPEND_EVT event only if not in reconfiguring state and sus_evt is
      * true*/
-    if ((sus_evt) && (p_scb->state != BTA_AV_RCFG_SST)) {
+    if ((sus_evt) && ((p_scb->suspend_local_sent) || (p_scb->state != BTA_AV_RCFG_SST))) {
       suspend_rsp.status = BTA_AV_SUCCESS;
       suspend_rsp.initiator = true;
       tBTA_AV bta_av_data;
@@ -2577,10 +2582,11 @@ void bta_av_clr_cong(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
 void bta_av_suspend_cfm(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   tBTA_AV_SUSPEND suspend_rsp = {};
   uint8_t err_code = p_data->str_msg.msg.hdr.err_code;
+  p_scb->suspend_local_sent = false;
 
-  LOG_VERBOSE("%s: peer %s bta_handle:0x%x audio_open_cnt:%d err_code:%d",
+  LOG_VERBOSE("%s: peer %s bta_handle:0x%x audio_open_cnt:%d err_code:%d scb_started: %d",
               __func__, ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-              p_scb->hndl, bta_av_cb.audio_open_cnt, err_code);
+              p_scb->hndl, bta_av_cb.audio_open_cnt, err_code, p_scb->started);
 
   if (!p_scb->started) {
     /* handle the condition where there is a collision of SUSPEND req from
@@ -2803,6 +2809,8 @@ void bta_av_suspend_cont(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
 
   p_scb->started = false;
   p_scb->cong = false;
+  p_scb->suspend_local_sent = false;
+
   if (err_code) {
     if (AVDT_ERR_CONNECT == err_code) {
       /* report failure */

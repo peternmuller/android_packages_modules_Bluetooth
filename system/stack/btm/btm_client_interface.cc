@@ -80,9 +80,6 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_BleGetEnergyInfo = BTM_BleGetEnergyInfo,
             .BTM_BleObserve = BTM_BleObserve,
             .BTM_SetBleDataLength = BTM_SetBleDataLength,
-            .BTM_BleConfirmReply = BTM_BleConfirmReply,
-            .BTM_BleLoadLocalKeys = BTM_BleLoadLocalKeys,
-            .BTM_BlePasskeyReply = BTM_BlePasskeyReply,
             .BTM_BleReadControllerFeatures = BTM_BleReadControllerFeatures,
             .BTM_BleSetPhy = BTM_BleSetPhy,
             .BTM_BleSetPrefConnParams = BTM_BleSetPrefConnParams,
@@ -130,6 +127,7 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_ReadVendorAddOnFeatures = BTM_ReadVendorAddOnFeatures,
             .BTM_GetSocAddOnFeatures = BTM_GetSocAddOnFeatures,
             .BTM_GetHostAddOnFeatures = BTM_GetHostAddOnFeatures,
+            .BTM_GetQllLocalSupportedFeatures = BTM_GetQllLocalSupportedFeatures,
             .BTM_GetA2dpOffloadCapablity = BTM_GetA2dpOffloadCapablity,
             .BTM_IsSpiltA2dpSupported = BTM_IsSpiltA2dpSupported,
             .BTM_IsAACFrameCtrlEnabled = BTM_IsAACFrameCtrlEnabled,
@@ -137,6 +135,7 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_IsQHSPhySupported = BTM_IsQHSPhySupported,
             .BTM_RegisterForQleCigLatencyChangedEvt =
                 BTM_RegisterForQleCigLatencyChangedEvt,
+            .BTM_SetPowerBackOffState = BTM_SetPowerBackOffState,
         }
 
 };

@@ -21,9 +21,11 @@
 #include "device/include/controller.h"
 #include "le_audio_set_configuration_provider.h"
 #include "le_audio_utils.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/properties.h"
 #include "stack/include/hcimsgs.h"
+#include "stack/include/btm_client_interface.h"
+#include "stack/include/btm_vendor_types.h"
 
 namespace {
 
@@ -105,6 +107,39 @@ struct codec_manager_impl {
       return;
     }
 
+    uint8_t qll_supported_feat_len = 0;
+    bool is_apx_lossless_le_supported = false;
+    bool is_apx_lossless_le_supported_local = false;
+
+    bt_device_qll_local_supported_features_t *qll_feature_list =
+        get_btm_client_interface().vendor.BTM_GetQllLocalSupportedFeatures(&qll_supported_feat_len);
+
+    bool is_dynamic_bn_over_qhs = BTM_QBCE_QLL_BN_VARIATION_BY_QHS_RATE(qll_feature_list->as_array);
+    bool is_dynamic_ft_change_supported = BTM_QBCE_QLL_FT_CHNAGE(qll_feature_list->as_array);
+
+    if (osi_property_get_bool("persist.vendor.qcom.bluetooth.lossless_aptx_adaptive_le.enabled",
+        false)) {
+      LOG_DEBUG("Aptx LE codec enabled at target level");
+      is_apx_lossless_le_supported = true;
+    }
+
+    // To-Do remove below property once FW change merges
+    if (osi_property_get_bool("bluetooth.aptx_adaptive_le.enabled", false)) {
+      LOG_DEBUG("Aptx LE codec enabled at local level");
+      is_apx_lossless_le_supported_local = true;
+    }
+
+    is_aptx_adaptive_le_supported_ = is_dynamic_bn_over_qhs &&
+                                     is_dynamic_ft_change_supported &&
+                                     is_apx_lossless_le_supported &&
+                                     is_apx_lossless_le_supported_local;
+    is_aptx_adaptive_lex_supported_ = /*(IsAptxLeXSuppoerted(check sysprop, QLL feat)*/ true;
+
+    LOG_DEBUG("FT Changes allowed %d, BN Variation allowed %d, Aptx LE Lossless enabled %d",
+        is_dynamic_ft_change_supported, is_dynamic_bn_over_qhs, is_apx_lossless_le_supported);
+    LOG_DEBUG("Aptx LE supported %d, Aptx LEX Supported %d",
+        is_aptx_adaptive_le_supported_, is_aptx_adaptive_lex_supported_);
+
     LOG_INFO("LeAudioCodecManagerImpl: configure_data_path for encode");
     GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
                                      kIsoDataPathPlatformDefault, {});
@@ -130,6 +165,14 @@ struct codec_manager_impl {
 
   bool IsOffloadDualBiDirSwbSupported(void) const {
     return offload_dual_bidirection_swb_supported_;
+  }
+
+  bool IsAptxAdaptiveLeSupported(void) const {
+    return is_aptx_adaptive_le_supported_;
+  }
+
+  bool IsAptxAdaptiveLeXSupported(void) const {
+    return is_aptx_adaptive_lex_supported_;
   }
 
   std::vector<bluetooth::le_audio::btle_audio_codec_config_t>
@@ -620,9 +663,10 @@ struct codec_manager_impl {
           AudioSetConfigurationProvider::Get()->GetConfigurations(ctx_type);
 
       for (const auto& software_audio_set_conf : *software_audio_set_confs) {
-        if (IsAudioSetConfigurationMatched(software_audio_set_conf,
+        // TO-DO: Add vendor side LC3 gaming bi-directional capabilities
+        if (true/*IsAudioSetConfigurationMatched(software_audio_set_conf,
                                            offload_preference_set,
-                                           adsp_capabilities)) {
+                                           adsp_capabilities)*/) {
 	  if (!osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) &&
 	    software_audio_set_conf->confs[0].codec.id ==
 	      le_audio::set_configurations::LeAudioCodecIdAptxLeX){
@@ -647,6 +691,8 @@ struct codec_manager_impl {
   CodecLocation codec_location_ = CodecLocation::HOST;
   bool offload_enable_ = false;
   bool offload_dual_bidirection_swb_supported_ = false;
+  bool is_aptx_adaptive_le_supported_ = false; // TO-DO: Start with false
+  bool is_aptx_adaptive_lex_supported_ = true; // TO-DO: Make propery and feature based
   types::BidirectionalPair<offloader_stream_maps_t> offloader_stream_maps;
   std::vector<le_audio::broadcast_offload_config> supported_broadcast_config;
   std::unordered_map<types::LeAudioContextType, AudioSetConfigurations>
@@ -710,6 +756,22 @@ bool CodecManager::IsOffloadDualBiDirSwbSupported(void) const {
   }
 
   return pimpl_->codec_manager_impl_->IsOffloadDualBiDirSwbSupported();
+}
+
+bool CodecManager::IsAptxAdaptiveLeSupported(void) const {
+  if (!pimpl_->IsRunning()) {
+    return false;
+  }
+
+  return pimpl_->codec_manager_impl_->IsAptxAdaptiveLeSupported();
+}
+
+bool CodecManager::IsAptxAdaptiveLeXSupported(void) const {
+  if (!pimpl_->IsRunning()) {
+    return false;
+  }
+
+  return pimpl_->codec_manager_impl_->IsAptxAdaptiveLeXSupported();
 }
 
 std::vector<bluetooth::le_audio::btle_audio_codec_config_t>

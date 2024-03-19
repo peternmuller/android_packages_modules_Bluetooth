@@ -44,7 +44,7 @@
 
 #include "a2dp_vendor.h"
 #include "a2dp_vendor_aptx_adaptive.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 
 #include <time.h>
 

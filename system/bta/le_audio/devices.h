@@ -37,8 +37,8 @@
 #include "gatt_api.h"
 #include "le_audio_log_history.h"
 #include "le_audio_types.h"
+#include "os/log.h"
 #include "osi/include/alarm.h"
-#include "osi/include/log.h"
 #include "osi/include/properties.h"
 #include "raw_address.h"
 
@@ -244,7 +244,6 @@ class LeAudioDevice {
   void DisconnectAcl(void);
   std::vector<uint8_t> GetMetadata(types::AudioContexts context_type,
                                    const std::vector<uint8_t>& ccid_list);
-  std::vector<uint8_t> GetVsMetadata();
   bool IsMetadataChanged(
       const types::BidirectionalPair<types::AudioContexts>& context_types,
       const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists);

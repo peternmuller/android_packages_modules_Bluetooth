@@ -21,9 +21,9 @@
 #include <android_bluetooth_flags.h>
 #include <base/logging.h>
 
+#include "audio/asrc/asrc_resampler.h"
 #include "audio_hal_client.h"
 #include "audio_hal_interface/le_audio_software.h"
-#include "audio_source_hal_asrc.h"
 #include "bta/le_audio/codec_manager.h"
 #include "common/repeating_timer.h"
 #include "common/time_util.h"
@@ -101,7 +101,7 @@ class SourceImpl : public LeAudioSourceAudioHalClient {
       nullptr;
   LeAudioSourceAudioHalClient::Callbacks* audioSourceCallbacks_ = nullptr;
   std::mutex audioSourceCallbacksMutex_;
-  std::unique_ptr<SourceAudioHalAsrc> asrc_;
+  std::unique_ptr<bluetooth::audio::asrc::SourceAudioHalAsrc> asrc_;
 };
 
 bool SourceImpl::Acquire() {
@@ -247,7 +247,7 @@ bool SourceImpl::InitAudioSinkThread() {
 void SourceImpl::StartAudioTicks() {
   wakelock_acquire();
   if (IS_FLAG_ENABLED(leaudio_hal_client_asrc)) {
-    asrc_ = std::make_unique<SourceAudioHalAsrc>(
+    asrc_ = std::make_unique<bluetooth::audio::asrc::SourceAudioHalAsrc>(
         source_codec_config_.num_channels, source_codec_config_.sample_rate,
         source_codec_config_.bits_per_sample,
         source_codec_config_.data_interval_us);
@@ -381,7 +381,11 @@ void SourceImpl::ConfirmStreamingRequest() {
   }
 
   LOG_INFO();
-  halSinkInterface_->ConfirmStreamingRequest();
+  if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
+    halSinkInterface_->ConfirmStreamingRequestV2();
+  } else {
+    halSinkInterface_->ConfirmStreamingRequest();
+  }
   if (CodecManager::GetInstance()->GetCodecLocation() !=
       types::CodecLocation::HOST)
     return;
@@ -419,7 +423,11 @@ void SourceImpl::CancelStreamingRequest() {
   }
 
   LOG_INFO();
-  halSinkInterface_->CancelStreamingRequest();
+  if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
+    halSinkInterface_->CancelStreamingRequestV2();
+  } else {
+    halSinkInterface_->CancelStreamingRequest();
+  }
 }
 
 void SourceImpl::UpdateRemoteDelay(uint16_t remote_delay_ms) {

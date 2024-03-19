@@ -20,7 +20,7 @@
 #include "client_interface.h"
 
 #include "audio_hearing_aid_hw/include/audio_hearing_aid_hw.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/properties.h"
 
 namespace {

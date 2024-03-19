@@ -45,6 +45,22 @@ bool CodecManager::IsOffloadDualBiDirSwbSupported(void) const {
   return pimpl_->IsOffloadDualBiDirSwbSupported();
 }
 
+bool CodecManager::IsAptxAdaptiveLeSupported(void) const {
+  if (!pimpl_) {
+    return false;
+  }
+
+  return pimpl_->IsAptxAdaptiveLeSupported();
+}
+
+bool CodecManager::IsAptxAdaptiveLeXSupported(void) const {
+  if (!pimpl_) {
+    return false;
+  }
+
+  return pimpl_->IsAptxAdaptiveLeXSupported();
+}
+
 void CodecManager::UpdateActiveAudioConfig(
     const types::BidirectionalPair<stream_parameters>& stream_params,
     types::BidirectionalPair<uint16_t> delays_ms, types::LeAudioCodecId id,

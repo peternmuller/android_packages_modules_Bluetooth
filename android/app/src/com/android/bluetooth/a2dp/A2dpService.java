@@ -60,14 +60,14 @@ import android.util.Log;
 import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.BluetoothStatsLog;
 import com.android.bluetooth.Utils;
+import com.android.bluetooth.btservice.ActiveDeviceManager;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.AudioRoutingManager;
 import com.android.bluetooth.btservice.MetricsLogger;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.bluetooth.btservice.ServiceFactory;
 import com.android.bluetooth.btservice.storage.DatabaseManager;
-import com.android.bluetooth.flags.FeatureFlags;
-import com.android.bluetooth.flags.FeatureFlagsImpl;
+import com.android.bluetooth.flags.Flags;
 import com.android.bluetooth.hfp.HeadsetService;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -91,7 +91,6 @@ public class A2dpService extends ProfileService {
 
     private static A2dpService sA2dpService;
 
-    private final FeatureFlags mFeatureFlags;
     private AdapterService mAdapterService;
     private DatabaseManager mDatabaseManager;
     private HandlerThread mStateMachinesThread;
@@ -148,18 +147,20 @@ public class A2dpService extends ProfileService {
     public A2dpService(Context ctx) {
         super(ctx);
         mNativeInterface = requireNonNull(A2dpNativeInterface.getInstance());
-        mFeatureFlags = new FeatureFlagsImpl();
     }
 
     @VisibleForTesting
-    A2dpService(Context ctx, A2dpNativeInterface nativeInterface, FeatureFlags featureFlags) {
+    A2dpService(Context ctx, A2dpNativeInterface nativeInterface) {
         super(ctx);
         mNativeInterface = requireNonNull(nativeInterface);
-        mFeatureFlags = featureFlags;
     }
 
     public static boolean isEnabled() {
         return BluetoothProperties.isProfileA2dpSourceEnabled().orElse(false);
+    }
+
+    ActiveDeviceManager getActiveDeviceManager() {
+        return mAdapterService.getActiveDeviceManager();
     }
 
     @Override
@@ -168,7 +169,7 @@ public class A2dpService extends ProfileService {
     }
 
     @Override
-    protected void start() {
+    public void start() {
         Log.i(TAG, "start()");
         if (sA2dpService != null) {
             throw new IllegalStateException("start() called twice");
@@ -228,7 +229,7 @@ public class A2dpService extends ProfileService {
     }
 
     @Override
-    protected void stop() {
+    public void stop() {
         Log.i(TAG, "stop()");
         if (sA2dpService == null) {
             Log.w(TAG, "stop() called before start()");
@@ -282,7 +283,7 @@ public class A2dpService extends ProfileService {
     }
 
     @Override
-    protected void cleanup() {
+    public void cleanup() {
         Log.i(TAG, "cleanup()");
     }
 
@@ -1388,7 +1389,7 @@ public class A2dpService extends ProfileService {
         if (toState == BluetoothProfile.STATE_CONNECTED) {
             MetricsLogger.logProfileConnectionEvent(BluetoothMetricsProto.ProfileId.A2DP);
         }
-        if (!mFeatureFlags.audioRoutingCentralization()) {
+        if (!Flags.audioRoutingCentralization()) {
             // Set the active device if only one connected device is supported and it was connected
             if (toState == BluetoothProfile.STATE_CONNECTED && (mMaxConnectedAudioDevices == 1)) {
                 setActiveDevice(device);
@@ -1543,8 +1544,8 @@ public class A2dpService extends ProfileService {
             try {
                 A2dpService service = getService(source);
                 if (service != null) {
-                    if (service.mFeatureFlags.audioRoutingCentralization()) {
-                        ((AudioRoutingManager) service.mAdapterService.getActiveDeviceManager())
+                    if (Flags.audioRoutingCentralization()) {
+                        ((AudioRoutingManager) service.getActiveDeviceManager())
                                 .activateDeviceProfile(device, BluetoothProfile.A2DP, receiver);
                     } else {
                         boolean result;

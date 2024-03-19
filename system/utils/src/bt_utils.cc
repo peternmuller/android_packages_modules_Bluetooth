@@ -43,8 +43,8 @@
 #endif
 
 #include "btcore/include/module.h"
+#include "os/log.h"
 #include "osi/include/compat.h"
-#include "osi/include/log.h"
 #include "osi/include/properties.h"
 
 /*******************************************************************************

@@ -79,6 +79,8 @@
     <uses-permission android:name="android.permission.WRITE_SECURITY_LOG"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <uses-permission android:name="android.permission.WRITE_SMS"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.OVERRIDE_WIFI_CONFIG" />
 
     <uses-sdk android:minSdkVersion="14"/>
 
@@ -104,12 +106,13 @@
         </service>
 
         <service android:process="@string/process"
-             android:name="com.android.bluetooth.airplane.NotificationHelperService"
-             android:label="Airplane Notification Helper"
+             android:name="com.android.bluetooth.notification.NotificationHelperService"
+             android:label="Notification Helper"
              android:exported="true"
              android:permission="android.permission.BLUETOOTH_PRIVILEGED">
             <intent-filter>
-                <action android:name="android.bluetooth.airplane.action.SEND_NOTIFICATION"/>
+                <action android:name="android.bluetooth.notification.action.SEND_TOGGLE_NOTIFICATION"/>
+                <action android:name="android.bluetooth.notification.action.AUTO_ON_USER_ACTION"/>
             </intent-filter>
         </service>
 

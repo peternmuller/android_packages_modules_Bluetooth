@@ -19,7 +19,7 @@
 #include "bta/le_audio/content_control_id_keeper.h"
 #include "common/strings.h"
 #include "le_audio_types.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 
 using bluetooth::common::ToString;
 using le_audio::types::AudioContexts;
@@ -45,10 +45,15 @@ LeAudioContextType AudioContentToLeAudioContext(
     case AUDIO_USAGE_CALL_ASSISTANT:
       return LeAudioContextType::CONVERSATIONAL;
     case AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING:
-      if (content_type == AUDIO_CONTENT_TYPE_SPEECH)
+      if (content_type == AUDIO_CONTENT_TYPE_SPEECH) {
         return LeAudioContextType::CONVERSATIONAL;
-      else
-        return LeAudioContextType::MEDIA;
+      }
+
+      if (content_type == AUDIO_CONTENT_TYPE_SONIFICATION) {
+        return LeAudioContextType::RINGTONE;
+      }
+
+      return LeAudioContextType::MEDIA;
     case AUDIO_USAGE_GAME:
       return LeAudioContextType::GAME;
     case AUDIO_USAGE_NOTIFICATION:
@@ -237,10 +242,16 @@ AudioContexts GetAudioContextsFromSinkMetadata(
 }
 
 bluetooth::le_audio::btle_audio_codec_index_t
-translateBluetoothCodecFormatToCodecType(uint8_t codec_format) {
+translateBluetoothCodecFormatToCodecType(uint8_t codec_format, uint16_t codec_id) {
   switch (codec_format) {
     case types::kLeAudioCodingFormatLC3:
       return bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_LC3;
+    case types::kLeAudioCodingFormatVendorSpecific:
+      if (codec_id == types::kLeAudioCodingFormatAptxLe) {
+        return bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LE;
+      } else if (codec_id == types::kLeAudioCodingFormatAptxLeX) {
+        return bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX;
+      }
   }
   return bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_INVALID;
 }
@@ -296,9 +307,14 @@ void fillStreamParamsToBtLeAudioCodecConfig(
   }
 
   out_config.codec_type =
-      translateBluetoothCodecFormatToCodecType(codec_id.coding_format);
-  if (out_config.codec_type !=
-      bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_LC3) {
+      translateBluetoothCodecFormatToCodecType(codec_id.coding_format,
+      codec_id.vendor_codec_id);
+  if ((out_config.codec_type !=
+      bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_LC3) &&
+      (out_config.codec_type !=
+      bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LE) &&
+      (out_config.codec_type !=
+      bluetooth::le_audio::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX)) {
     return;
   }
 
@@ -316,6 +332,12 @@ static bool is_known_codec(const types::LeAudioCodecId& codec_id) {
   switch (codec_id.coding_format) {
     case types::kLeAudioCodingFormatLC3:
       return true;
+    case types::kLeAudioCodingFormatVendorSpecific:
+      if (codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) {
+        return true;
+      } else if (codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) {
+        return true;
+      }
   }
   return false;
 }
@@ -330,9 +352,14 @@ static void fillRemotePacsCapabitiliesToBtLeAudioCodecConfig(
     if (!capa.IsSamplingFrequencyConfigSupported(freq_bit)) continue;
     for (uint8_t fd_bit = codec_spec_conf::kLeAudioCodecFrameDur7500us;
          fd_bit <= codec_spec_conf::kLeAudioCodecFrameDur10000us; fd_bit++) {
-      if (!capa.IsFrameDurationConfigSupported(fd_bit)) continue;
+      if (!capa.IsFrameDurationConfigSupported(fd_bit)) {
+        if ((record.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLe) &&
+            (record.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLeX)) continue;
+      }
       if (!capa.HasSupportedAudioChannelCounts()) {
         bluetooth::le_audio::btle_audio_codec_config_t config = {
+            .codec_type= utils::translateBluetoothCodecFormatToCodecType(
+                record.codec_id.coding_format, record.codec_id.vendor_codec_id),
             .sample_rate = utils::translateToBtLeAudioCodecConfigSampleRate(
                 types::LeAudioCoreCodecConfig::GetSamplingFrequencyHz(
                     freq_bit)),
@@ -350,6 +377,8 @@ static void fillRemotePacsCapabitiliesToBtLeAudioCodecConfig(
           if (!capa.IsAudioChannelCountsSupported(chan_bit)) continue;
 
           bluetooth::le_audio::btle_audio_codec_config_t config = {
+              .codec_type= utils::translateBluetoothCodecFormatToCodecType(
+                  record.codec_id.coding_format, record.codec_id.vendor_codec_id),
               .sample_rate = utils::translateToBtLeAudioCodecConfigSampleRate(
                   types::LeAudioCoreCodecConfig::GetSamplingFrequencyHz(
                       freq_bit)),

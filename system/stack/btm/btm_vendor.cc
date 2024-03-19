@@ -23,7 +23,7 @@
 #include "btif/include/btif_config.h"
 #include "btm_api.h"
 #include "btm_int_types.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "stack/acl/acl.h"
 #include "stack/acl/peer_packet_types.h"
 #include "stack/include/bt_types.h"
@@ -48,9 +48,24 @@
 
 #define QBCE_QLL_MULTI_CONFIG_CIS_PARAMETER_UPDATE_HOST_BIT 58
 
+#define HCI_VS_SET_MAX_RADIATED_POWER_SUB_OPCODE 0x0E
+#define BR_TECH_VALUE 0x00
+#define EDR_TECH_VALUE 0x01
+#define BLE_TECH_VALUE 0x02
+#define BT_DEFAULT_POWER (0x80)
+
 typedef struct {
   const uint8_t as_array[8];
 } bt_event_mask_t;
+
+typedef struct {
+  uint8_t BR_max_pow_support;
+  uint8_t EDR_max_pow_support;
+  uint8_t BLE_max_pow_support;
+  bool BR_max_pow_feature = false;
+  bool EDR_max_pow_feature = false;
+  bool BLE_max_pow_feature = false;
+} max_pow_feature_t;
 
 const bt_event_mask_t QBCE_QLM_AND_QLL_EVENT_MASK = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x4A}};
@@ -72,12 +87,15 @@ static uint8_t host_add_on_features_length = 0;
 char qhs_value[PROPERTY_VALUE_MAX] = "0";
 uint8_t qhs_support_mask = 0;
 static bt_device_qll_local_supported_features_t qll_features;
+static uint8_t qll_local_supported_features_length = 0;
 static bt_configstore_interface_t* bt_configstore_intf = NULL;
 tBTM_VS_EVT_CB* p_vnd_qle_cig_latency_changed_cb = nullptr;
+static bool is_power_backoff_enabled = false;
 
 extern tBTM_CB btm_cb;
 
 void BTM_ConfigQHS();
+static void btm_vendor_set_tech_based_max_power(bool status);
 
 static inline bool is_byte_valid(char ch) {
   return ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') ||
@@ -116,6 +134,7 @@ bool decode_max_power_values(char* power_val) {
         ": MAX_POW_ID: BR MAX POW:%02x, EDR MAX POW:%02x, BLE MAX POW:%02x",
         max_power_prop_value[0], max_power_prop_value[1],
         max_power_prop_value[2]);
+    max_power_prop_enabled = true;
   } else {
     LOG_ERROR(": MAX POW property is not in required order");
   }
@@ -173,6 +192,23 @@ bt_device_soc_add_on_features_t* BTM_GetSocAddOnFeatures(
   *soc_add_on_features_len = soc_add_on_features_length;
   return &soc_add_on_features;
 }
+
+/*******************************************************************************
+ *
+ * Function         BTM_GetQllLocalSupportedFeatures
+ *
+ * Description      BTM_GetQllLocalSupportedFeatures
+ *
+ *
+ * Returns          get QLL Local Supported add on features array
+ *
+ ******************************************************************************/
+bt_device_qll_local_supported_features_t* BTM_GetQllLocalSupportedFeatures(
+    uint8_t* qll_local_supported_features_len) {
+  *qll_local_supported_features_len = qll_local_supported_features_length;
+  return &qll_features;
+}
+
 /*******************************************************************************
  *
  * Function         BTM_BleIsCisParamUpdateLocalHostSupported
@@ -334,6 +370,7 @@ static void parse_qll_read_local_supported_features_response(
     STREAM_TO_UINT8(subcmd, stream);
     STREAM_TO_ARRAY(qll_features.as_array, stream,
                     (int)sizeof(bt_device_qll_local_supported_features_t));
+    qll_local_supported_features_length = length - 2;
     LOG_INFO(": opcode = 0x%04X, length = %d, status = %d, subcmd = %d", opcode,
              length, status, subcmd);
     if (status == HCI_SUCCESS) {
@@ -627,6 +664,42 @@ bool BTM_IsQHSPhySupported(const RawAddress& bda, tBT_TRANSPORT transport) {
 
 /*******************************************************************************
  *
+ * Function         btm_vendor_link_power_control_event
+ *
+ * Description      This function process the link power control event.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_vendor_link_power_control_event(uint8_t* p) {
+  uint16_t handle;
+  uint8_t subopcode;
+  uint8_t NumOftechnologiesWithRestrictedPower = 0;
+
+  STREAM_TO_UINT8(subopcode, p);
+
+  if (subopcode == HCI_VS_SET_MAX_RADIATED_POWER_SUB_OPCODE) {
+    STREAM_TO_UINT8(NumOftechnologiesWithRestrictedPower, p);
+
+    for (int i = 0; i < NumOftechnologiesWithRestrictedPower; i++) {
+      uint8_t tech;
+      uint8_t max_allowed_power_index;
+      uint8_t fine_back_off;
+      uint8_t max_support_power;
+      STREAM_TO_UINT8(tech, p);
+      STREAM_TO_UINT8(max_allowed_power_index, p);
+      STREAM_TO_UINT8(fine_back_off, p);
+      STREAM_TO_UINT8(max_support_power, p);
+      LOG_INFO(
+          " :: tech = 0x%02x, max_allowed_power_index = 0x%02x, fine_back_off "
+          "= 0x%02x, max_support_power = 0x%02x",
+          tech, max_allowed_power_index, fine_back_off, max_support_power);
+    }
+  }
+}
+
+/*******************************************************************************
+ *
  * Function         btm_vendor_vse_cback
  *
  * Description      Process event VENDOR_SPECIFIC_EVT
@@ -674,6 +747,8 @@ void btm_vendor_vse_cback(uint8_t evt_len, uint8_t* p) {
     } else if (MSG_QBCE_VS_PARAM_REPORT_EVENT == vse_subcode) {
       bluetooth::hci::IsoManager::GetInstance()->HandleVscHciEvent(
           vse_subcode, pp, evt_len - 1);
+    } else if (HCI_VS_LINK_POWER_CTRL_EVENT == vse_subcode) {
+      btm_vendor_link_power_control_event(pp);
     }
   }
   LOG_DEBUG("BTM Event: Vendor Specific event from controller");
@@ -806,8 +881,7 @@ void BTM_ReadVendorAddOnFeaturesInternal() {
           break;
 
         case BT_PROP_MAX_POWER:
-          max_power_prop_enabled =
-              decode_max_power_values((char*)vendorProp.value);
+          decode_max_power_values((char*)vendorProp.value);
           LOG_INFO(": max_power_prop_enabled = %d", max_power_prop_enabled);
           break;
         default:
@@ -882,6 +956,7 @@ void BTM_ReadVendorAddOnFeatures() {
   char bt_config_store_prop[PROPERTY_VALUE_MAX] = {'\0'};
   int ret = 0;
 
+  is_power_backoff_enabled = false;
   ret = property_get("ro.vendor.bluetooth.btconfigstore", bt_config_store_prop,
                      "true");
 
@@ -891,7 +966,7 @@ void BTM_ReadVendorAddOnFeatures() {
     } else {
       btConfigStore = false;
     }
-    LOG_INFO(":: btConfigStore = %d", spilt_a2dp_supported);
+    LOG_INFO(":: btConfigStore = %d", btConfigStore);
   }
 
   if (btConfigStore) {
@@ -951,7 +1026,7 @@ void BTM_ReadVendorAddOnFeatures() {
              max_pow_support, ret);
 
     if (ret != 0) {
-      max_power_prop_enabled = decode_max_power_values((char*)max_pow_support);
+      decode_max_power_values((char*)max_pow_support);
       LOG_INFO(": max_power_prop_enabled = %d", max_power_prop_enabled);
     }
 
@@ -973,4 +1048,159 @@ void BTM_ReadVendorAddOnFeatures() {
     osi_property_set("persist.vendor.service.bt.adv_audio_mask",
     adv_audio_property); */
   }
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_SetPowerBackOffState
+ *
+ * Description      This function set PowerBackOff state.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void BTM_SetPowerBackOffState(bool status) {
+  if (max_power_prop_enabled) {
+    LOG_INFO("is_power_backoff_enabled: %d status = %d ",
+             is_power_backoff_enabled, status);
+    if (is_power_backoff_enabled != status) {
+      btm_vendor_set_tech_based_max_power(status);
+      is_power_backoff_enabled = status;
+    }
+  } else {
+    LOG_INFO("power back off config is not enabled ");
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_vendor_link_power_cntrl_callback
+ *
+ * Description      Callback to notify link_power_cntrl cmd status
+ *
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_vendor_link_power_ctrl_callback(tBTM_VSC_CMPL* param) {
+  uint8_t status = 0xFF;
+  uint8_t* p;
+
+  /* Check status of command complete event */
+  CHECK(param->opcode == HCI_VS_LINK_POWER_CTRL_REQ_OPCODE);
+  CHECK(param->param_len > 0);
+
+  p = param->p_param_buf;
+  STREAM_TO_UINT8(status, p);
+  if (status != HCI_SUCCESS) {
+    LOG_INFO(": Status = 0x%02x (0 is success)", status);
+    return;
+  }
+
+  LOG_INFO(": param->opcode=0x%02x subopcode=0x%02x status=0x%02x",
+           param->opcode, param->p_param_buf[1], param->p_param_buf[0]);
+}
+
+bool get_max_power_values(max_pow_feature_t* tech_based_max_power) {
+  if (max_power_prop_value[0] != BT_DEFAULT_POWER) {
+    LOG_DEBUG("using BR MAX POW from property");
+    tech_based_max_power->BR_max_pow_feature = true;
+    tech_based_max_power->BR_max_pow_support = max_power_prop_value[0];
+  } else {
+    LOG_DEBUG("discarding BR MAX POW from property as it set to default");
+  }
+
+  if (max_power_prop_value[1] != BT_DEFAULT_POWER) {
+    LOG_DEBUG("using EDR MAX POW from property");
+    tech_based_max_power->EDR_max_pow_feature = true;
+    tech_based_max_power->EDR_max_pow_support = max_power_prop_value[1];
+  } else {
+    LOG_DEBUG("discarding EDR MAX POW from property as it set to default");
+  }
+
+  if (max_power_prop_value[2] != BT_DEFAULT_POWER) {
+    LOG_DEBUG("using BLE MAX POW from property");
+    tech_based_max_power->BLE_max_pow_feature = true;
+    tech_based_max_power->BLE_max_pow_support = max_power_prop_value[2];
+  } else {
+    LOG_DEBUG("discarding BLE MAX POW from property as it set to default");
+  }
+
+  return true;
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_vendor_set_tech_based_max_power
+ *
+ * Description      limit the maximum output power for particular technology
+ *
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static void btm_vendor_set_tech_based_max_power(bool status) {
+  uint8_t param[8] = {0};
+  uint8_t HCI_VS_LINK_POWER_CTRL_PARAM_SIZE;
+
+  param[0] = HCI_VS_SET_MAX_RADIATED_POWER_SUB_OPCODE;
+  if (status == true) {
+    static max_pow_feature_t tech_based_max_power;
+    uint8_t tech_count = 0, i = 2;
+    LOG_INFO(" : entry");
+
+    /* check whether the property is set, if property is enabled
+     * use those power values, else fall back to values set in config
+     * file.
+     */
+    get_max_power_values(&tech_based_max_power);
+
+    if (tech_based_max_power.BR_max_pow_feature == true) {
+      param[1] = ++tech_count;
+      param[i++] = BR_TECH_VALUE;
+      param[i++] = tech_based_max_power.BR_max_pow_support;
+
+      LOG_INFO(" BR_max_power fetch from property 0x%02x",
+               tech_based_max_power.BR_max_pow_support);
+    }
+
+    if (tech_based_max_power.EDR_max_pow_feature == true) {
+      param[1] = ++tech_count;
+      param[i++] = EDR_TECH_VALUE;
+      param[i++] = tech_based_max_power.EDR_max_pow_support;
+
+      LOG_INFO(" EDR_max_power fetch from property: 0x%02x",
+               tech_based_max_power.EDR_max_pow_support);
+    }
+
+    if (tech_based_max_power.BLE_max_pow_feature == true) {
+      param[1] = ++tech_count;
+      param[i++] = BLE_TECH_VALUE;
+      param[i++] = tech_based_max_power.BLE_max_pow_support;
+
+      LOG_INFO(" BLE_max_power fetch from property: 0x%02x",
+               tech_based_max_power.BLE_max_pow_support);
+    }
+
+    if (!tech_count) {
+      LOG_INFO(": max power not configured for any tech ");
+      return;
+    } else {
+      HCI_VS_LINK_POWER_CTRL_PARAM_SIZE = 2 + (tech_count * 2);
+    }
+
+  } else {
+    HCI_VS_LINK_POWER_CTRL_PARAM_SIZE = 8;
+    param[1] = 0x03;
+    param[2] = BR_TECH_VALUE;
+    param[3] = 0x80;
+    param[4] = EDR_TECH_VALUE;
+    param[5] = 0x80;
+    param[6] = BLE_TECH_VALUE;
+    param[7] = 0x80;
+  }
+
+  BTM_VendorSpecificCommand(HCI_VS_LINK_POWER_CTRL_REQ_OPCODE,
+                            HCI_VS_LINK_POWER_CTRL_PARAM_SIZE, param,
+                            btm_vendor_link_power_ctrl_callback);
 }

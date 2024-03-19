@@ -113,6 +113,8 @@ cc_library_shared {
         "libbluetooth_core_rs_bridge",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
+        "libbluetooth_log",
+        "libbt-audio-asrc",
         "libbt-audio-hal-interface",
         "libbt-bta",
         "libbt-bta-core",
@@ -149,6 +151,7 @@ cc_library_shared {
         "server_configurable_flags",
     ],
     shared_libs: [
+        "libPlatformProperties",
         "libaaudio",
         "libbinder_ndk",
         "libcrypto",
@@ -238,6 +241,7 @@ android_app {
     jni_uses_platform_apis: true,
     libs: [
         "app-compat-annotations",
+        "bluetooth_flags_java_lib",
         "framework-bluetooth-pre-jarjar",
         "framework-statsd.stubs.module_lib",
         "framework-tethering.stubs.module_lib",
@@ -245,6 +249,7 @@ android_app {
         "framework-location.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
         "framework-mediaprovider",
+        "framework-wifi",
         "unsupportedappusage",
 
         // Need to link the class at runtime
@@ -265,7 +270,6 @@ android_app {
         "androidx.annotation_annotation",
         "bluetooth.change-ids",
         "bluetooth.mapsapi",
-        "bluetooth_flags_java_lib",
         "com.android.obex",
         "com.android.vcard",
         "guava",
@@ -290,19 +294,17 @@ android_app {
     javacflags: ["-Aroom.schemaLocation=packages/modules/Bluetooth/android/app/tests/unit/src/com/android/bluetooth/btservice/storage/schemas"],
 
     lint: {
-        // TODO(b/318814235): Add back ObsoleteSdkInt to this list.
         error_checks: [
             "ExtraText",
             "MissingClass",
             "NewApi",
+            "ObsoleteSdkInt",
             "Recycle",
             "RtlHardcoded",
             "UseSparseArrays",
             "UseValueOf",
         ],
-        strict_updatability_linting: true,
         baseline_filename: "lint-baseline.xml",
-
     },
 
     optimize: {

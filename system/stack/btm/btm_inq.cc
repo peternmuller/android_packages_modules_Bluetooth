@@ -25,6 +25,8 @@
  *
  ******************************************************************************/
 
+#include "hci_error_code.h"
+#include "neighbor_inquiry.h"
 #define LOG_TAG "bluetooth"
 
 #include <base/logging.h>
@@ -36,11 +38,16 @@
 #include <mutex>
 
 #include "advertise_data_parser.h"
+#include "btif/include/btif_acl.h"
 #include "btif/include/btif_config.h"
 #include "common/time_util.h"
 #include "device/include/controller.h"
+#include "hci/controller_interface.h"
+#include "hci/event_checkers.h"
+#include "hci/hci_layer.h"
 #include "include/check.h"
 #include "internal_include/bt_target.h"
+#include "main/shim/entry.h"
 #include "main/shim/shim.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
@@ -49,7 +56,6 @@
 #include "osi/include/stack_power_telemetry.h"
 #include "stack/btm/btm_int_types.h"
 #include "stack/btm/btm_sec.h"
-#include "stack/include/acl_api.h"
 #include "stack/include/acl_api_types.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_lap.h"
@@ -60,6 +66,7 @@
 #include "stack/include/btm_log_history.h"
 #include "stack/include/hcimsgs.h"
 #include "stack/include/inq_hci_link_interface.h"
+#include "stack/include/main_thread.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
 
@@ -163,6 +170,10 @@ using bluetooth::Uuid;
 
 #define BTIF_DM_DEFAULT_INQ_MAX_DURATION 10
 
+#ifndef PROPERTY_INQ_LENGTH
+#define PROPERTY_INQ_LENGTH "bluetooth.core.classic.inq_length"
+#endif
+
 /******************************************************************************/
 /*               L O C A L    D A T A    D E F I N I T I O N S                */
 /******************************************************************************/
@@ -241,6 +252,8 @@ void SendRemoteNameRequest(const RawAddress& raw_address) {
   btsnd_hcic_rmt_name_req(raw_address, HCI_PAGE_SCAN_REP_MODE_R1,
                           HCI_MANDATARY_PAGE_SCAN_MODE, 0);
 }
+static void btm_process_cancel_complete(tHCI_STATUS status, uint8_t mode);
+static void on_incoming_hci_event(bluetooth::hci::EventView event);
 /*******************************************************************************
  *
  * Function         BTM_SetDiscoverability
@@ -350,7 +363,7 @@ void BTM_EnableInterlacedInquiryScan() {
   uint16_t inq_scan_type =
       osi_property_get_int32(PROPERTY_INQ_SCAN_TYPE, BTM_SCAN_TYPE_INTERLACED);
 
-  if (!controller_get_interface()->SupportsInterlacedInquiryScan() ||
+  if (!bluetooth::shim::GetController()->SupportsInterlacedInquiryScan() ||
       inq_scan_type != BTM_SCAN_TYPE_INTERLACED ||
       btm_cb.btm_inq_vars.inq_scan_type == BTM_SCAN_TYPE_INTERLACED) {
     return;
@@ -366,7 +379,7 @@ void BTM_EnableInterlacedPageScan() {
   uint16_t page_scan_type =
       osi_property_get_int32(PROPERTY_PAGE_SCAN_TYPE, BTM_SCAN_TYPE_INTERLACED);
 
-  if (!controller_get_interface()->SupportsInterlacedInquiryScan() ||
+  if (!bluetooth::shim::GetController()->SupportsInterlacedInquiryScan() ||
       page_scan_type != BTM_SCAN_TYPE_INTERLACED ||
       btm_cb.btm_inq_vars.page_scan_type == BTM_SCAN_TYPE_INTERLACED) {
     return;
@@ -392,15 +405,14 @@ void BTM_EnableInterlacedPageScan() {
  *
  ******************************************************************************/
 tBTM_STATUS BTM_SetInquiryMode(uint8_t mode) {
-  const controller_t* controller = controller_get_interface();
   LOG_VERBOSE("");
   if (mode == BTM_INQ_RESULT_STANDARD) {
     /* mandatory mode */
   } else if (mode == BTM_INQ_RESULT_WITH_RSSI) {
-    if (!controller->SupportsRssiWithInquiryResults())
+    if (!bluetooth::shim::GetController()->SupportsRssiWithInquiryResults())
       return (BTM_MODE_UNSUPPORTED);
   } else if (mode == BTM_INQ_RESULT_EXTENDED) {
-    if (!controller->SupportsExtendedInquiryResponse())
+    if (!bluetooth::shim::GetController()->SupportsExtendedInquiryResponse())
       return (BTM_MODE_UNSUPPORTED);
   } else
     return (BTM_ILLEGAL_VALUE);
@@ -545,7 +557,14 @@ void BTM_CancelInquiry(void) {
     btm_cb.btm_inq_vars.p_inq_cmpl_cb = NULL; /* Do not notify caller anymore */
 
     if ((btm_cb.btm_inq_vars.inqparms.mode & BTM_BR_INQUIRY_MASK) != 0) {
-      bluetooth::legacy::hci::GetInterface().InquiryCancel();
+      bluetooth::shim::GetHciLayer()->EnqueueCommand(
+          bluetooth::hci::InquiryCancelBuilder::Create(),
+          get_main_thread()->BindOnce(
+              [](bluetooth::hci::CommandCompleteView complete_view) {
+                bluetooth::hci::check_complete<
+                    bluetooth::hci::InquiryCancelCompleteView>(complete_view);
+                btm_process_cancel_complete(HCI_SUCCESS, BTM_BR_INQUIRY_MASK);
+              }));
     }
 
     if (!bluetooth::shim::is_classic_discovery_only_enabled()) {
@@ -617,6 +636,16 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
     return BTM_BUSY;
   }
 
+  if (btm_cb.btm_inq_vars.registered_for_hci_events == false) {
+    bluetooth::shim::GetHciLayer()->RegisterEventHandler(
+        bluetooth::hci::EventCode::INQUIRY_COMPLETE,
+        get_main_thread()->Bind([](bluetooth::hci::EventView event) {
+          on_incoming_hci_event(event);
+        }));
+
+    btm_cb.btm_inq_vars.registered_for_hci_events = true;
+  }
+
   /*** Make sure the device is ready ***/
   if (!BTM_IsDeviceUp()) {
     LOG_ERROR("adapter is not up");
@@ -632,12 +661,15 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
                                ? ""
                                : "ERROR Already in progress"));
 
+  const uint8_t inq_length = osi_property_get_int32(
+      PROPERTY_INQ_LENGTH, BTIF_DM_DEFAULT_INQ_MAX_DURATION);
+
   /* Save the inquiry parameters to be used upon the completion of
    * setting/clearing the inquiry filter */
   btm_cb.btm_inq_vars.inqparms = {
       // tBTM_INQ_PARMS
       .mode = BTM_GENERAL_INQUIRY | BTM_BLE_GENERAL_INQUIRY,
-      .duration = BTIF_DM_DEFAULT_INQ_MAX_DURATION,
+      .duration = inq_length,
   };
 
   /* Initialize the inquiry variables */
@@ -666,10 +698,12 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
     }
   }
 
-  btm_acl_update_inquiry_status(BTM_INQUIRY_STARTED);
-
   if (btm_cb.btm_inq_vars.inq_active & BTM_SSP_INQUIRY_ACTIVE) {
     LOG_INFO("Not starting inquiry as SSP is in progress");
+    // Report the status here because inq_complete will cancel it below
+    BTIF_dm_report_inquiry_status_change(
+        tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
+
     btm_process_inq_complete(HCI_ERR_MAX_NUM_OF_CONNECTIONS,
                              BTM_GENERAL_INQUIRY);
     return BTM_CMD_STARTED;
@@ -679,8 +713,25 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
 
   btm_init_inq_result_flt();
 
-  bluetooth::legacy::hci::GetInterface().StartInquiry(
-      general_inq_lap, btm_cb.btm_inq_vars.inqparms.duration, 0);
+  bluetooth::hci::Lap lap;
+  lap.lap_ = general_inq_lap[2];
+
+  // TODO: Register for the inquiry interface and use that
+  bluetooth::shim::GetHciLayer()->EnqueueCommand(
+      bluetooth::hci::InquiryBuilder::Create(
+          lap, btm_cb.btm_inq_vars.inqparms.duration, 0),
+      get_main_thread()->BindOnce(
+          [](bluetooth::hci::CommandStatusView status_view) {
+            ASSERT(status_view.IsValid());
+            auto status = status_view.GetStatus();
+            if (status == bluetooth::hci::ErrorCode::SUCCESS) {
+              BTIF_dm_report_inquiry_status_change(
+                  tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
+            } else {
+              LOG_INFO("Inquiry failed to start status: %s",
+                       bluetooth::hci::ErrorCodeText(status).c_str());
+            }
+          }));
 
   // If we are only doing classic discovery, we should also set a timeout for
   // the inquiry if a duration is set.
@@ -1009,7 +1060,14 @@ void btm_inq_stop_on_ssp(void) {
       if (btm_cb.btm_inq_vars.inq_active & normal_active) {
         /* can not call BTM_CancelInquiry() here. We need to report inquiry
          * complete evt */
-        bluetooth::legacy::hci::GetInterface().InquiryCancel();
+        bluetooth::shim::GetHciLayer()->EnqueueCommand(
+            bluetooth::hci::InquiryCancelBuilder::Create(),
+            get_main_thread()->BindOnce(
+                [](bluetooth::hci::CommandCompleteView complete_view) {
+                  bluetooth::hci::check_complete<
+                      bluetooth::hci::InquiryCancelCompleteView>(complete_view);
+                  btm_process_cancel_complete(HCI_SUCCESS, BTM_BR_INQUIRY_MASK);
+                }));
       }
     }
     /* do not allow inquiry to start */
@@ -1213,7 +1271,129 @@ tINQ_DB_ENT* btm_inq_db_new(const RawAddress& p_bda, bool is_ble) {
 
 /*******************************************************************************
  *
- * Function         btm_process_inq_results
+ * Function         btm_process_inq_results_standard
+ *
+ * Description      This function is called when inquiry results are received
+ *                  from the device. It updates the inquiry database. If the
+ *                  inquiry database is full, the oldest entry is discarded.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static void btm_process_inq_results_standard(const uint8_t* p,
+                                             uint8_t hci_evt_len) {
+  uint8_t num_resp, xx;
+  RawAddress bda;
+  tINQ_DB_ENT* p_i;
+  tBTM_INQ_RESULTS* p_cur = NULL;
+  bool is_new = true;
+  tBTM_INQ_RESULTS_CB* p_inq_results_cb = btm_cb.btm_inq_vars.p_inq_results_cb;
+  uint8_t page_scan_rep_mode = 0;
+  uint8_t page_scan_per_mode = 0;
+  uint8_t page_scan_mode = 0;
+  DEV_CLASS dc;
+  uint16_t clock_offset;
+  const uint8_t* p_eir_data = NULL;
+
+  LOG_DEBUG("Received inquiry result inq_active:0x%x state:%d",
+            btm_cb.btm_inq_vars.inq_active, btm_cb.btm_inq_vars.state);
+
+  /* Only process the results if the BR inquiry is still active */
+  if (!(btm_cb.btm_inq_vars.inq_active & BTM_BR_INQ_ACTIVE_MASK)) {
+    LOG_INFO("Inquiry is inactive so dropping inquiry result");
+    return;
+  }
+
+  STREAM_TO_UINT8(num_resp, p);
+
+  {
+    constexpr uint16_t inquiry_result_size = 14;
+    if (hci_evt_len < num_resp * inquiry_result_size) {
+      LOG_ERROR("can't fit %d results in %d bytes", num_resp, hci_evt_len);
+      return;
+    }
+  }
+
+  btm_cb.neighbor.classic_inquiry.results += num_resp;
+  for (xx = 0; xx < num_resp; xx++) {
+    /* Extract inquiry results */
+    STREAM_TO_BDADDR(bda, p);
+    STREAM_TO_UINT8(page_scan_rep_mode, p);
+    STREAM_TO_UINT8(page_scan_per_mode, p);
+
+    STREAM_TO_UINT8(page_scan_mode, p);
+
+    STREAM_TO_DEVCLASS(dc, p);
+    STREAM_TO_UINT16(clock_offset, p);
+
+    p_i = btm_inq_db_find(bda);
+
+    /* If existing entry, use that, else get a new one (possibly reusing the
+     * oldest) */
+    if (p_i == NULL) {
+      p_i = btm_inq_db_new(bda, false);
+      is_new = true;
+    }
+
+    /* If an entry for the device already exists, overwrite it ONLY if it is
+       from a previous inquiry. (Ignore it if it is a duplicate response from
+       the same inquiry.
+    */
+    else if (p_i->inq_count == btm_cb.btm_inq_vars.inq_counter &&
+             (p_i->inq_info.results.device_type == BT_DEVICE_TYPE_BREDR))
+      is_new = false;
+
+    p_i->inq_info.results.rssi = BTM_INQ_RES_IGNORE_RSSI;
+
+    if (is_new) {
+      /* Save the info */
+      p_cur = &p_i->inq_info.results;
+      p_cur->page_scan_rep_mode = page_scan_rep_mode;
+      p_cur->page_scan_per_mode = page_scan_per_mode;
+      p_cur->page_scan_mode = page_scan_mode;
+      p_cur->dev_class[0] = dc[0];
+      p_cur->dev_class[1] = dc[1];
+      p_cur->dev_class[2] = dc[2];
+      p_cur->clock_offset = clock_offset | BTM_CLOCK_OFFSET_VALID;
+
+      p_i->time_of_resp = bluetooth::common::time_get_os_boottime_ms();
+
+      if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
+        /* A new response was found */
+        btm_cb.btm_inq_vars.inq_cmpl_info.num_resp++;
+        btm_cb.btm_inq_vars.inq_cmpl_info.resp_type[BTM_INQ_RESULT_STANDARD]++;
+      }
+
+      p_cur->inq_result_type |= BT_DEVICE_TYPE_BREDR;
+      if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
+        p_cur->device_type = BT_DEVICE_TYPE_BREDR;
+        p_i->scan_rsp = false;
+      } else
+        p_cur->device_type |= BT_DEVICE_TYPE_BREDR;
+      p_i->inq_count =
+          btm_cb.btm_inq_vars.inq_counter; /* Mark entry for current inquiry */
+
+      /* Initialize flag to false. This flag is set/used by application */
+      p_i->inq_info.appl_knows_rem_name = false;
+    }
+
+    if (is_new) {
+      p_eir_data = NULL;
+
+      /* If a callback is registered, call it with the results */
+      if (p_inq_results_cb) {
+        (p_inq_results_cb)((tBTM_INQ_RESULTS*)p_cur, p_eir_data,
+                           HCI_EXT_INQ_RESPONSE_LEN);
+      } else {
+        LOG_WARN("No callback is registered for inquiry result");
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_process_inq_results_rssi
  *
  * Description      This function is called when inquiry results are received
  *                  from the device. It updates the inquiry database. If the
@@ -1223,11 +1403,12 @@ tINQ_DB_ENT* btm_inq_db_new(const RawAddress& p_bda, bool is_ble) {
  *                                 BTM_INQ_RESULT_WITH_RSSI
  *                                 BTM_INQ_RESULT_EXTENDED
  *
+ *
  * Returns          void
  *
  ******************************************************************************/
-void btm_process_inq_results(const uint8_t* p, uint8_t hci_evt_len,
-                             uint8_t inq_res_mode) {
+static void btm_process_inq_results_rssi(const uint8_t* p, uint8_t hci_evt_len,
+                                         uint8_t inq_res_mode) {
   uint8_t num_resp, xx;
   RawAddress bda;
   tINQ_DB_ENT* p_i;
@@ -1297,9 +1478,6 @@ void btm_process_inq_results(const uint8_t* p, uint8_t hci_evt_len,
 
     /* Check if this address has already been processed for this inquiry */
     if (btm_inq_find_bdaddr(bda)) {
-      /* LOG_VERBOSE("BDA seen before %s", ADDRESS_TO_LOGGABLE_CSTR(bda));
-       */
-
       /* By default suppose no update needed */
       i_rssi = (int8_t)rssi;
 
@@ -1379,7 +1557,7 @@ void btm_process_inq_results(const uint8_t* p, uint8_t hci_evt_len,
         }
       }
 
-      p_cur->inq_result_type |= BTM_INQ_RESULT_BR;
+      p_cur->inq_result_type |= BT_DEVICE_TYPE_BREDR;
       if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
         p_cur->device_type = BT_DEVICE_TYPE_BREDR;
         p_i->scan_rsp = false;
@@ -1410,6 +1588,237 @@ void btm_process_inq_results(const uint8_t* p, uint8_t hci_evt_len,
         LOG_WARN("No callback is registered for inquiry result");
       }
     }
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_process_inq_results_extended
+ *
+ * Description      This function is called when inquiry results are received
+ *                  from the device. It updates the inquiry database. If the
+ *                  inquiry database is full, the oldest entry is discarded.
+ *
+ * Parameters       inq_res_mode - BTM_INQ_RESULT_STANDARD
+ *                                 BTM_INQ_RESULT_WITH_RSSI
+ *                                 BTM_INQ_RESULT_EXTENDED
+ *
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+static void btm_process_inq_results_extended(const uint8_t* p,
+                                             uint8_t hci_evt_len,
+                                             uint8_t inq_res_mode) {
+  uint8_t num_resp, xx;
+  RawAddress bda;
+  tINQ_DB_ENT* p_i;
+  tBTM_INQ_RESULTS* p_cur = NULL;
+  bool is_new = true;
+  bool update = false;
+  int8_t i_rssi;
+  tBTM_INQ_RESULTS_CB* p_inq_results_cb = btm_cb.btm_inq_vars.p_inq_results_cb;
+  uint8_t page_scan_rep_mode = 0;
+  uint8_t page_scan_per_mode = 0;
+  uint8_t page_scan_mode = 0;
+  uint8_t rssi = 0;
+  DEV_CLASS dc;
+  uint16_t clock_offset;
+  const uint8_t* p_eir_data = NULL;
+
+  LOG_DEBUG("Received inquiry result inq_active:0x%x state:%d",
+            btm_cb.btm_inq_vars.inq_active, btm_cb.btm_inq_vars.state);
+
+  /* Only process the results if the BR inquiry is still active */
+  if (!(btm_cb.btm_inq_vars.inq_active & BTM_BR_INQ_ACTIVE_MASK)) {
+    LOG_INFO("Inquiry is inactive so dropping inquiry result");
+    return;
+  }
+
+  STREAM_TO_UINT8(num_resp, p);
+
+  if (inq_res_mode == BTM_INQ_RESULT_EXTENDED) {
+    if (num_resp > 1) {
+      LOG_ERROR("extended results (%d) > 1", num_resp);
+      return;
+    }
+
+    constexpr uint16_t extended_inquiry_result_size = 254;
+    if (hci_evt_len - 1 != extended_inquiry_result_size) {
+      LOG_ERROR("can't fit %d results in %d bytes", num_resp, hci_evt_len);
+      return;
+    }
+  } else if (inq_res_mode == BTM_INQ_RESULT_STANDARD ||
+             inq_res_mode == BTM_INQ_RESULT_WITH_RSSI) {
+    constexpr uint16_t inquiry_result_size = 14;
+    if (hci_evt_len < num_resp * inquiry_result_size) {
+      LOG_ERROR("can't fit %d results in %d bytes", num_resp, hci_evt_len);
+      return;
+    }
+  }
+
+  btm_cb.neighbor.classic_inquiry.results += num_resp;
+  for (xx = 0; xx < num_resp; xx++) {
+    update = false;
+    /* Extract inquiry results */
+    STREAM_TO_BDADDR(bda, p);
+    STREAM_TO_UINT8(page_scan_rep_mode, p);
+    STREAM_TO_UINT8(page_scan_per_mode, p);
+
+    if (inq_res_mode == BTM_INQ_RESULT_STANDARD) {
+      STREAM_TO_UINT8(page_scan_mode, p);
+    }
+
+    STREAM_TO_DEVCLASS(dc, p);
+    STREAM_TO_UINT16(clock_offset, p);
+    if (inq_res_mode != BTM_INQ_RESULT_STANDARD) {
+      STREAM_TO_UINT8(rssi, p);
+    }
+
+    p_i = btm_inq_db_find(bda);
+
+    /* Check if this address has already been processed for this inquiry */
+    if (btm_inq_find_bdaddr(bda)) {
+      /* By default suppose no update needed */
+      i_rssi = (int8_t)rssi;
+
+      /* If this new RSSI is higher than the last one */
+      if ((rssi != 0) && p_i &&
+          (i_rssi > p_i->inq_info.results.rssi ||
+           p_i->inq_info.results.rssi == 0
+           /* BR/EDR inquiry information update */
+           ||
+           (p_i->inq_info.results.device_type & BT_DEVICE_TYPE_BREDR) != 0)) {
+        p_cur = &p_i->inq_info.results;
+        LOG_VERBOSE("update RSSI new:%d, old:%d", i_rssi, p_cur->rssi);
+        p_cur->rssi = i_rssi;
+        update = true;
+      }
+      /* If we received a second Extended Inq Event for an already */
+      /* discovered device, this is because for the first one EIR was not
+         received */
+      else if ((inq_res_mode == BTM_INQ_RESULT_EXTENDED) && (p_i)) {
+        p_cur = &p_i->inq_info.results;
+        update = true;
+      }
+      /* If no update needed continue with next response (if any) */
+      else
+        continue;
+    }
+
+    /* If existing entry, use that, else get a new one (possibly reusing the
+     * oldest) */
+    if (p_i == NULL) {
+      p_i = btm_inq_db_new(bda, false);
+      is_new = true;
+    }
+
+    /* If an entry for the device already exists, overwrite it ONLY if it is
+       from
+       a previous inquiry. (Ignore it if it is a duplicate response from the
+       same
+       inquiry.
+    */
+    else if (p_i->inq_count == btm_cb.btm_inq_vars.inq_counter &&
+             (p_i->inq_info.results.device_type == BT_DEVICE_TYPE_BREDR))
+      is_new = false;
+
+    /* keep updating RSSI to have latest value */
+    if (inq_res_mode != BTM_INQ_RESULT_STANDARD)
+      p_i->inq_info.results.rssi = (int8_t)rssi;
+    else
+      p_i->inq_info.results.rssi = BTM_INQ_RES_IGNORE_RSSI;
+
+    if (is_new) {
+      /* Save the info */
+      p_cur = &p_i->inq_info.results;
+      p_cur->page_scan_rep_mode = page_scan_rep_mode;
+      p_cur->page_scan_per_mode = page_scan_per_mode;
+      p_cur->page_scan_mode = page_scan_mode;
+      p_cur->dev_class[0] = dc[0];
+      p_cur->dev_class[1] = dc[1];
+      p_cur->dev_class[2] = dc[2];
+      p_cur->clock_offset = clock_offset | BTM_CLOCK_OFFSET_VALID;
+
+      p_i->time_of_resp = bluetooth::common::time_get_os_boottime_ms();
+
+      if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
+        /* A new response was found */
+        btm_cb.btm_inq_vars.inq_cmpl_info.num_resp++;
+        switch (static_cast<tBTM_INQ_RESULT>(inq_res_mode)) {
+          case BTM_INQ_RESULT_STANDARD:
+          case BTM_INQ_RESULT_WITH_RSSI:
+          case BTM_INQ_RESULT_EXTENDED:
+            btm_cb.btm_inq_vars.inq_cmpl_info.resp_type[inq_res_mode]++;
+            break;
+          case BTM_INQ_RES_IGNORE_RSSI:
+            btm_cb.btm_inq_vars.inq_cmpl_info
+                .resp_type[BTM_INQ_RESULT_STANDARD]++;
+            break;
+        }
+      }
+
+      p_cur->inq_result_type |= BT_DEVICE_TYPE_BREDR;
+      if (p_i->inq_count != btm_cb.btm_inq_vars.inq_counter) {
+        p_cur->device_type = BT_DEVICE_TYPE_BREDR;
+        p_i->scan_rsp = false;
+      } else
+        p_cur->device_type |= BT_DEVICE_TYPE_BREDR;
+      p_i->inq_count =
+          btm_cb.btm_inq_vars.inq_counter; /* Mark entry for current inquiry */
+
+      /* Initialize flag to false. This flag is set/used by application */
+      p_i->inq_info.appl_knows_rem_name = false;
+    }
+
+    if (is_new || update) {
+      if (inq_res_mode == BTM_INQ_RESULT_EXTENDED) {
+        memset(p_cur->eir_uuid, 0,
+               BTM_EIR_SERVICE_ARRAY_SIZE * (BTM_EIR_ARRAY_BITS / 8));
+        /* set bit map of UUID list from received EIR */
+        btm_set_eir_uuid(p, p_cur);
+        p_eir_data = p;
+      } else
+        p_eir_data = NULL;
+
+      /* If a callback is registered, call it with the results */
+      if (p_inq_results_cb) {
+        (p_inq_results_cb)((tBTM_INQ_RESULTS*)p_cur, p_eir_data,
+                           HCI_EXT_INQ_RESPONSE_LEN);
+      } else {
+        LOG_WARN("No callback is registered for inquiry result");
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_process_inq_results
+ *
+ * Description      This function is called when inquiry results are received
+ *                  from the device. It updates the inquiry database. If the
+ *                  inquiry database is full, the oldest entry is discarded.
+ *
+ * Parameters       inq_res_mode - BTM_INQ_RESULT_STANDARD
+ *                                 BTM_INQ_RESULT_WITH_RSSI
+ *                                 BTM_INQ_RESULT_EXTENDED
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_process_inq_results(const uint8_t* p, uint8_t hci_evt_len,
+                             uint8_t inq_res_mode) {
+  switch (inq_res_mode) {
+    case BTM_INQ_RESULT_STANDARD:
+      btm_process_inq_results_standard(p, hci_evt_len);
+      break;
+    case BTM_INQ_RESULT_WITH_RSSI:
+      btm_process_inq_results_rssi(p, hci_evt_len, BTM_INQ_RESULT_WITH_RSSI);
+      break;
+    case BTM_INQ_RESULT_EXTENDED:
+      btm_process_inq_results_extended(p, hci_evt_len, BTM_INQ_RESULT_EXTENDED);
+      break;
   }
 }
 
@@ -1468,7 +1877,8 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
   btm_cb.btm_inq_vars.inqparms.mode &= ~(mode);
   const auto inq_active = btm_cb.btm_inq_vars.inq_active;
 
-  btm_acl_update_inquiry_status(BTM_INQUIRY_COMPLETE);
+  BTIF_dm_report_inquiry_status_change(
+      tBTM_INQUIRY_STATE::BTM_INQUIRY_COMPLETE);
 
   if (status != HCI_SUCCESS) {
     LOG_WARN("Received unexpected hci status:%s",
@@ -1491,7 +1901,7 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
       btm_clr_inq_result_flt();
 
       if ((status == HCI_SUCCESS) &&
-          controller_get_interface()->SupportsRssiWithInquiryResults()) {
+          bluetooth::shim::GetController()->SupportsRssiWithInquiryResults()) {
         btm_sort_inq_result();
       }
 
@@ -1561,8 +1971,9 @@ void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_process_cancel_complete(tHCI_STATUS status, uint8_t mode) {
-  btm_acl_update_inquiry_status(BTM_INQUIRY_CANCELLED);
+static void btm_process_cancel_complete(tHCI_STATUS status, uint8_t mode) {
+  BTIF_dm_report_inquiry_status_change(
+      tBTM_INQUIRY_STATE::BTM_INQUIRY_CANCELLED);
   btm_process_inq_complete(status, mode);
 }
 /*******************************************************************************
@@ -1605,7 +2016,8 @@ tBTM_STATUS btm_initiate_rem_name(const RawAddress& remote_bda, uint8_t origin,
 
       /* If the database entry exists for the device, use its clock offset */
       tINQ_DB_ENT* p_i = btm_inq_db_find(remote_bda);
-      if (p_i && (p_i->inq_info.results.inq_result_type & BTM_INQ_RESULT_BR)) {
+      if (p_i &&
+          (p_i->inq_info.results.inq_result_type & BT_DEVICE_TYPE_BREDR)) {
         tBTM_INQ_INFO* p_cur = &p_i->inq_info;
         uint16_t clock_offset = p_cur->results.clock_offset | BTM_CLOCK_OFFSET_VALID;
         int clock_offset_in_cfg = 0;
@@ -1753,7 +2165,7 @@ void btm_inq_rmt_name_failed_cancelled(void) {
  *
  ******************************************************************************/
 tBTM_STATUS BTM_WriteEIR(BT_HDR* p_buff) {
-  if (controller_get_interface()->SupportsExtendedInquiryResponse()) {
+  if (bluetooth::shim::GetController()->SupportsExtendedInquiryResponse()) {
     LOG_VERBOSE("Write Extended Inquiry Response to controller");
     btsnd_hcic_write_ext_inquiry_response(p_buff, BTM_EIR_DEFAULT_FEC_REQUIRED);
     return BTM_SUCCESS;
@@ -2129,6 +2541,37 @@ void btm_set_eir_uuid(const uint8_t* p_eir, tBTM_INQ_RESULTS* p_results) {
       p_uuid_data += Uuid::kNumBytes128;
       if (uuid16) BTM_AddEirService(p_results->eir_uuid, uuid16);
     }
+  }
+}
+
+static void on_inquiry_complete(bluetooth::hci::EventView event) {
+  auto complete = bluetooth::hci::InquiryCompleteView::Create(event);
+  ASSERT(complete.IsValid());
+  auto status = to_hci_status_code(static_cast<uint8_t>(complete.GetStatus()));
+
+  btm_process_inq_complete(status, BTM_BR_INQUIRY_MASK);
+}
+/*******************************************************************************
+ *
+ * Function         on_incoming_hci_event
+ *
+ * Description      This function is called to process events from the HCI layer
+ *
+ * Parameters       event - an EventView with the specific event
+ *
+ * Returns          None
+ *
+ ******************************************************************************/
+static void on_incoming_hci_event(bluetooth::hci::EventView event) {
+  ASSERT(event.IsValid());
+  auto event_code = event.GetEventCode();
+  switch (event_code) {
+    case bluetooth::hci::EventCode::INQUIRY_COMPLETE:
+      on_inquiry_complete(event);
+      break;
+    default:
+      LOG_WARN("Dropping unhandled event: %s",
+               bluetooth::hci::EventCodeText(event_code).c_str());
   }
 }
 

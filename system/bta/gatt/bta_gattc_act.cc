@@ -360,12 +360,24 @@ void bta_gattc_open_error(tBTA_GATTC_CLCB* p_clcb,
 
 void bta_gattc_open_fail(tBTA_GATTC_CLCB* p_clcb,
                          UNUSED_ATTR const tBTA_GATTC_DATA* p_data) {
-  LOG(WARNING) << __func__ << ": Cannot establish Connection. conn_id="
-               << loghex(p_clcb->bta_conn_id) << ". Return GATT_ERROR("
-               << +GATT_ERROR << ")";
+  if (IS_FLAG_ENABLED(enumerate_gatt_errors) &&
+      p_data->int_conn.reason == GATT_CONN_TIMEOUT) {
+    LOG(WARNING) << __func__
+                 << ": Connection timed out after 30 seconds. conn_id="
+                 << loghex(p_clcb->bta_conn_id)
+                 << ". Return GATT_CONNECTION_TIMEOUT("
+                 << +GATT_CONNECTION_TIMEOUT << ")";
+    bta_gattc_send_open_cback(p_clcb->p_rcb, GATT_CONNECTION_TIMEOUT,
+                              p_clcb->bda, p_clcb->bta_conn_id,
+                              p_clcb->transport, 0);
+  } else {
+    LOG(WARNING) << __func__ << ": Cannot establish Connection. conn_id="
+                 << loghex(p_clcb->bta_conn_id) << ". Return GATT_ERROR("
+                 << +GATT_ERROR << ")";
+    bta_gattc_send_open_cback(p_clcb->p_rcb, GATT_ERROR, p_clcb->bda,
+                              p_clcb->bta_conn_id, p_clcb->transport, 0);
+  }
 
-  bta_gattc_send_open_cback(p_clcb->p_rcb, GATT_ERROR, p_clcb->bda,
-                            p_clcb->bta_conn_id, p_clcb->transport, 0);
   /* open failure, remove clcb */
   bta_gattc_clcb_dealloc(p_clcb);
 }
@@ -727,7 +739,7 @@ static void bta_gattc_set_discover_st(tBTA_GATTC_SERV* p_srcb) {
   if (!interop_match_addr_or_name(INTEROP_DISABLE_LE_CONN_UPDATES,
                                   &p_srcb->server_bda,
                                   &btif_storage_get_remote_device_property)) {
-    L2CA_EnableUpdateBleConnParams(p_srcb->server_bda, false);
+    L2CA_LockBleConnParamsForServiceDiscovery(p_srcb->server_bda, true);
   }
   for (i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
     if (bta_gattc_cb.clcb[i].p_srcb == p_srcb) {
@@ -811,7 +823,7 @@ void bta_gattc_start_discover_internal(tBTA_GATTC_CLCB* p_clcb) {
     if (!interop_match_addr_or_name(INTEROP_DISABLE_LE_CONN_UPDATES,
                                     &p_clcb->p_srcb->server_bda,
                                     &btif_storage_get_remote_device_property)) {
-      L2CA_EnableUpdateBleConnParams(p_clcb->p_srcb->server_bda, false);
+      L2CA_LockBleConnParamsForServiceDiscovery(p_clcb->p_srcb->server_bda, true);
     }
   }
 
@@ -952,7 +964,8 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
         (!interop_match_addr_or_name(
             INTEROP_DISABLE_LE_CONN_UPDATES, &p_clcb->p_srcb->server_bda,
             &btif_storage_get_remote_device_property))) {
-      L2CA_EnableUpdateBleConnParams(p_clcb->p_srcb->server_bda, true);
+      L2CA_LockBleConnParamsForServiceDiscovery(p_clcb->p_srcb->server_bda,
+                                                false);
     }
   }
 
@@ -991,7 +1004,9 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
      * want to free the underlying buffer that's being
      * referenced by p_clcb->p_q_cmd
      */
-    if (p_q_cmd != p_clcb->p_q_cmd) osi_free_and_reset((void**)&p_q_cmd);
+    if (!bta_gattc_is_data_queued(p_clcb, p_q_cmd)) {
+      osi_free_and_reset((void**)&p_q_cmd);
+    }
   } else {
     bta_gattc_continue(p_clcb);
   }

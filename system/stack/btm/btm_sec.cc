@@ -26,12 +26,9 @@
 
 #include "stack/btm/btm_sec.h"
 
+#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
-#include <base/location.h>
-#include <base/logging.h>
 #include <base/strings/stringprintf.h>
-#include <frameworks/proto_logging/stats/enums/bluetooth/enums.pb.h>
-#include <frameworks/proto_logging/stats/enums/bluetooth/hci/enums.pb.h>
 
 #include <cstdint>
 #include <string>
@@ -44,8 +41,10 @@
 #include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
+#include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
+#include "main/shim/entry.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
 #include "stack/btm/btm_ble_int.h"
@@ -96,7 +95,7 @@ void btm_inq_stop_on_ssp(void);
 bool btm_ble_init_pseudo_addr(tBTM_SEC_DEV_REC* p_dev_rec,
                               const RawAddress& new_pseudo_addr);
 void bta_dm_remove_device(const RawAddress& bd_addr);
-void bta_dm_remote_key_missing(RawAddress bd_addr);
+void bta_dm_remote_key_missing(const RawAddress bd_addr);
 void bta_dm_process_remove_device(const RawAddress& bd_addr);
 void btm_inq_clear_ssp(void);
 
@@ -250,6 +249,110 @@ static tBTM_SEC_DEV_REC* btm_sec_find_dev_by_sec_state(uint8_t state) {
   if (n) return static_cast<tBTM_SEC_DEV_REC*>(list_node(n));
 
   return nullptr;
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_sec_is_device_sc_downgrade
+ *
+ * Description      Check for a stored device record matching the candidate
+ *                  device, and return true if the stored device has reported
+ *                  that it supports Secure Connections mode and the candidate
+ *                  device reports that it does not.  Otherwise, return false.
+ *
+ * Returns          bool
+ *
+ ******************************************************************************/
+static bool btm_sec_is_device_sc_downgrade(uint16_t hci_handle,
+                                           bool secure_connections_supported) {
+  if (secure_connections_supported) return false;
+
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(hci_handle);
+  if (p_dev_rec == nullptr) return false;
+
+  uint8_t property_val = 0;
+  bt_property_t property = {
+      .type = BT_PROPERTY_REMOTE_SECURE_CONNECTIONS_SUPPORTED,
+      .len = sizeof(uint8_t),
+      .val = &property_val};
+
+  bt_status_t cached =
+      btif_storage_get_remote_device_property(&p_dev_rec->bd_addr, &property);
+
+  if (cached == BT_STATUS_FAIL) return false;
+
+  return (bool)property_val;
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_sec_store_device_sc_support
+ *
+ * Description      Save Secure Connections support for this device to file
+ *
+ ******************************************************************************/
+
+static void btm_sec_store_device_sc_support(uint16_t hci_handle,
+                                            bool secure_connections_supported) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(hci_handle);
+  if (p_dev_rec == nullptr) return;
+
+  uint8_t property_val = (uint8_t)secure_connections_supported;
+  bt_property_t property = {
+      .type = BT_PROPERTY_REMOTE_SECURE_CONNECTIONS_SUPPORTED,
+      .len = sizeof(uint8_t),
+      .val = &property_val};
+
+  btif_storage_set_remote_device_property(&p_dev_rec->bd_addr, &property);
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_sec_is_session_key_size_downgrade
+ *
+ * Description      Check if there is a stored device record matching this
+ *                  handle, and return true if the stored record has a lower
+ *                  session key size than the candidate device.
+ *
+ * Returns          bool
+ *
+ ******************************************************************************/
+static bool btm_sec_is_session_key_size_downgrade(uint16_t hci_handle,
+                                                  uint8_t key_size) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(hci_handle);
+  if (p_dev_rec == nullptr) return false;
+
+  uint8_t property_val = 0;
+  bt_property_t property = {.type = BT_PROPERTY_REMOTE_MAX_SESSION_KEY_SIZE,
+                            .len = sizeof(uint8_t),
+                            .val = &property_val};
+
+  bt_status_t cached =
+      btif_storage_get_remote_device_property(&p_dev_rec->bd_addr, &property);
+
+  if (cached == BT_STATUS_FAIL) return false;
+
+  return property_val > key_size;
+}
+
+/*******************************************************************************
+ *
+ * Function         btm_sec_update_session_key_size
+ *
+ * Description      Store the max session key size to disk, if possible.
+ *
+ ******************************************************************************/
+static void btm_sec_update_session_key_size(uint16_t hci_handle,
+                                            uint8_t key_size) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(hci_handle);
+  if (p_dev_rec == nullptr) return;
+
+  uint8_t property_val = key_size;
+  bt_property_t property = {.type = BT_PROPERTY_REMOTE_MAX_SESSION_KEY_SIZE,
+                            .len = sizeof(uint8_t),
+                            .val = &property_val};
+
+  btif_storage_set_remote_device_property(&p_dev_rec->bd_addr, &property);
 }
 
 /*******************************************************************************
@@ -672,7 +775,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
         BTM_SEC_ROLE_SWITCHED | BTM_SEC_LINK_KEY_AUTHED);
 
   LOG_VERBOSE("after update sec_flags=0x%x", p_dev_rec->sec_rec.sec_flags);
-  if (!controller_get_interface()->SupportsSimplePairing()) {
+  if (!bluetooth::shim::GetController()->SupportsSimplePairing()) {
     /* The special case when we authenticate keyboard.  Set pin type to fixed */
     /* It would be probably better to do it from the application, but it is */
     /* complicated */
@@ -704,7 +807,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
   }
 
   LOG_VERBOSE("sec mode: %d sm4:x%x", btm_sec_cb.security_mode, p_dev_rec->sm4);
-  if (!controller_get_interface()->SupportsSimplePairing() ||
+  if (!bluetooth::shim::GetController()->SupportsSimplePairing() ||
       (p_dev_rec->sm4 == BTM_SM4_KNOWN)) {
     if (btm_sec_check_prefetch_pin(p_dev_rec)) return (BTM_CMD_STARTED);
   }
@@ -1306,7 +1409,7 @@ void BTM_RemoteOobDataReply(tBTM_STATUS res, const RawAddress& bd_addr,
  *
  ******************************************************************************/
 bool BTM_BothEndsSupportSecureConnections(const RawAddress& bd_addr) {
-  return ((controller_get_interface()->SupportsSecureConnections()) &&
+  return ((bluetooth::shim::GetController()->SupportsSecureConnections()) &&
           (BTM_PeerSupportsSecureConnections(bd_addr)));
 }
 
@@ -1479,7 +1582,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
 
   if ((!is_originator) && (security_required & BTM_SEC_MODE4_LEVEL4)) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* acceptor receives L2CAP Channel Connect Request for Secure Connections
      * Only service */
     if (!local_supports_sc || !p_dev_rec->SupportsSecureConnections()) {
@@ -1825,7 +1928,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
   if ((!is_originator) && ((security_required & BTM_SEC_MODE4_LEVEL4) ||
                            (btm_sec_cb.security_mode == BTM_SEC_MODE_SC))) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* acceptor receives service connection establishment Request for */
     /* Secure Connections Only service */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
@@ -2058,7 +2161,7 @@ void btm_sec_check_pending_reqs(void) {
  *
  ******************************************************************************/
 void btm_sec_dev_reset(void) {
-  ASSERT_LOG(controller_get_interface()->SupportsSimplePairing(),
+  ASSERT_LOG(bluetooth::shim::GetController()->SupportsSimplePairing(),
              "only controllers with SSP is supported");
 
   /* set the default IO capabilities */
@@ -2515,7 +2618,7 @@ void btm_io_capabilities_req(RawAddress p) {
     err_code = HCI_ERR_PAIRING_NOT_ALLOWED;
   } else if (btm_sec_cb.security_mode == BTM_SEC_MODE_SC) {
     bool local_supports_sc =
-        controller_get_interface()->SupportsSecureConnections();
+        bluetooth::shim::GetController()->SupportsSecureConnections();
     /* device in Secure Connections Only mode */
     if (!(local_supports_sc) || !(p_dev_rec->SupportsSecureConnections())) {
       LOG_DEBUG(
@@ -3348,6 +3451,123 @@ void btm_sec_encrypt_change(uint16_t handle, tHCI_STATUS status,
     btm_sec_dev_rec_cback_event(p_dev_rec, btm_status, false);
 }
 
+constexpr uint8_t MIN_KEY_SIZE = 7;
+
+static void read_encryption_key_size_complete_after_encryption_change(
+    uint8_t status, uint16_t handle, uint8_t key_size) {
+  if (status == HCI_ERR_INSUFFCIENT_SECURITY) {
+    /* If remote device stop the encryption before we call "Read Encryption Key
+     * Size", we might receive Insufficient Security, which means that link is
+     * no longer encrypted. */
+    LOG_INFO("encryption stopped on link:0x%x", handle);
+    return;
+  }
+
+  if (status != HCI_SUCCESS) {
+    LOG_ERROR("disconnecting, status:0x%x", status);
+    acl_disconnect_from_handle(handle, HCI_ERR_PEER_USER,
+                               "stack::btu::btu_hcif::read_encryption_key_size_"
+                               "complete_after_encryption_change Bad key size");
+    return;
+  }
+
+  if (key_size < MIN_KEY_SIZE) {
+    LOG_ERROR(
+        "encryption key too short, disconnecting. handle:0x%x,key_size:%d",
+        handle, key_size);
+
+    acl_disconnect_from_handle(
+        handle, HCI_ERR_HOST_REJECT_SECURITY,
+        "stack::btu::btu_hcif::read_encryption_key_size_complete_after_"
+        "encryption_change Key Too Short");
+    return;
+  }
+
+  if (IS_FLAG_ENABLED(bluffs_mitigation)) {
+    if (btm_sec_is_session_key_size_downgrade(handle, key_size)) {
+      LOG_ERROR(
+          "encryption key size lower than cached value, disconnecting. "
+          "handle: 0x%x attempted key size: %d",
+          handle, key_size);
+      acl_disconnect_from_handle(
+          handle, HCI_ERR_HOST_REJECT_SECURITY,
+          "stack::btu::btu_hcif::read_encryption_key_size_complete_after_"
+          "encryption_change Key Size Downgrade");
+      return;
+    }
+
+    btm_sec_update_session_key_size(handle, key_size);
+  }
+
+  // good key size - succeed
+  btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                         1 /* enable */);
+  btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                         1 /* enable */);
+}
+
+// TODO: Remove
+void smp_cancel_start_encryption_attempt();
+
+/*******************************************************************************
+ *
+ * Function         btm_encryption_change_evt
+ *
+ * Description      Process event HCI_ENCRYPTION_CHANGE_EVT
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_sec_encryption_change_evt(uint16_t handle, tHCI_STATUS status,
+                                   uint8_t encr_enable) {
+  if (IS_FLAG_ENABLED(bluffs_mitigation)) {
+    if (status != HCI_SUCCESS || encr_enable == 0 ||
+        BTM_IsBleConnection(handle) ||
+        !bluetooth::shim::GetController()->IsSupported(
+            bluetooth::hci::OpCode::READ_ENCRYPTION_KEY_SIZE)) {
+      if (status == HCI_ERR_CONNECTION_TOUT) {
+        smp_cancel_start_encryption_attempt();
+        return;
+      }
+
+      btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                             encr_enable);
+      btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                             encr_enable);
+    } else {
+      btsnd_hcic_read_encryption_key_size(
+          handle,
+          base::Bind(
+              &read_encryption_key_size_complete_after_encryption_change));
+    }
+  } else {
+    // This block added to ensure matching code flow with the bluffs_mitigation
+    // flag off.  The entire block should be removed when the flag is.
+    if (status != HCI_SUCCESS || encr_enable == 0 ||
+        BTM_IsBleConnection(handle) ||
+        !bluetooth::shim::GetController()->IsSupported(
+            bluetooth::hci::OpCode::READ_ENCRYPTION_KEY_SIZE) ||
+        // Skip encryption key size check when using set_min_encryption_key_size
+        (bluetooth::common::init_flags::set_min_encryption_is_enabled() &&
+         bluetooth::shim::GetController()->IsSupported(
+             bluetooth::hci::OpCode::SET_MIN_ENCRYPTION_KEY_SIZE))) {
+      if (status == HCI_ERR_CONNECTION_TOUT) {
+        smp_cancel_start_encryption_attempt();
+        return;
+      }
+
+      btm_acl_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                             encr_enable);
+      btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
+                             encr_enable);
+    } else {
+      btsnd_hcic_read_encryption_key_size(
+          handle,
+          base::Bind(
+              &read_encryption_key_size_complete_after_encryption_change));
+    }
+  }
+}
 /*******************************************************************************
  *
  * Function         btm_sec_connect_after_reject_timeout
@@ -3831,8 +4051,6 @@ void btm_sec_role_changed(tHCI_STATUS hci_status, const RawAddress& bd_addr,
   }
 }
 
-constexpr uint8_t MIN_KEY_SIZE = 7;
-
 static void read_encryption_key_size_complete_after_key_refresh(
     uint8_t status, uint16_t handle, uint8_t key_size) {
   if (status == HCI_ERR_INSUFFCIENT_SECURITY) {
@@ -3869,7 +4087,8 @@ void btm_sec_encryption_key_refresh_complete(uint16_t handle,
                                              tHCI_STATUS status) {
   if (status != HCI_SUCCESS || BTM_IsBleConnection(handle) ||
       // Skip encryption key size check when using set_min_encryption_key_size
-      controller_get_interface()->supports_set_min_encryption_key_size()) {
+      bluetooth::shim::GetController()->IsSupported(
+          bluetooth::hci::OpCode::SET_MIN_ENCRYPTION_KEY_SIZE)) {
     btm_sec_encrypt_change(handle, static_cast<tHCI_STATUS>(status),
                            (status == HCI_SUCCESS) ? 1 : 0);
   } else {
@@ -3942,6 +4161,14 @@ void btm_sec_link_key_notification(const RawAddress& p_bda,
       LOG_VERBOSE("set new_encr_key_256 to %d",
                   p_dev_rec->sec_rec.new_encryption_key_is_p256);
     }
+  }
+
+  if (IS_FLAG_ENABLED(bluffs_mitigation) &&
+      p_dev_rec->sec_rec.is_bond_type_persistent() &&
+      (p_dev_rec->is_device_type_br_edr() ||
+       p_dev_rec->is_device_type_dual_mode())) {
+    btm_sec_store_device_sc_support(p_dev_rec->get_br_edr_hci_handle(),
+                                    p_dev_rec->SupportsSecureConnections());
   }
 
   /* If name is not known at this point delay calling callback until the name is
@@ -4964,6 +5191,18 @@ void btm_sec_set_peer_sec_caps(uint16_t hci_handle, bool ssp_supported,
                                bool br_edr_supported, bool le_supported) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(hci_handle);
   if (p_dev_rec == nullptr) return;
+
+  if (IS_FLAG_ENABLED(bluffs_mitigation)) {
+    // Drop the connection here if the remote attempts to downgrade from Secure
+    // Connections mode.
+    if (btm_sec_is_device_sc_downgrade(hci_handle, sc_supported)) {
+      acl_set_disconnect_reason(HCI_ERR_HOST_REJECT_SECURITY);
+      btm_sec_send_hci_disconnect(
+          p_dev_rec, HCI_ERR_AUTH_FAILURE, hci_handle,
+          "attempted to downgrade from Secure Connections mode");
+      return;
+    }
+  }
 
   p_dev_rec->remote_feature_received = true;
   p_dev_rec->remote_supports_hci_role_switch = hci_role_switch_supported;

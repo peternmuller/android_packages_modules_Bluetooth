@@ -1,4 +1,5 @@
 package: "com.android.bluetooth.flags"
+container: "com.android.btservices"
 
 flag {
     name: "mfi_has_uuid"
@@ -12,6 +13,13 @@ flag {
     namespace: "bluetooth"
     description: "Support more device types in bt device metadata"
     bug: "289584302"
+}
+
+flag {
+    name: "support_exclusive_manager"
+    namespace: "bluetooth"
+    description: "Support setting/retrieving the exclusive manager app for a BluetoothDevice"
+    bug: "319716512"
 }
 
 flag {
@@ -33,4 +41,11 @@ flag {
     namespace: "bluetooth"
     description: "Return null for identity address if identity address is not known"
     bug: "317120534"
+}
+
+flag {
+    name: "get_address_type_api"
+    namespace: "bluetooth"
+    description: "Change visibility of BluetoothDevice#getAddressType API to public"
+    bug: "321120941"
 }

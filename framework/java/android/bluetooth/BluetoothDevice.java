@@ -87,6 +87,7 @@ import android.os.RemoteException;
 import android.util.Log;
 import android.util.Pair;
 
+import com.android.bluetooth.flags.Flags;
 import com.android.modules.utils.SynchronousResultReceiver;
 
 import java.io.IOException;
@@ -351,7 +352,7 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      *
      * @hide
      */
-    @FlaggedApi("com.android.bluetooth.flags.key_missing_broadcast")
+    @FlaggedApi(Flags.FLAG_KEY_MISSING_BROADCAST)
     @SuppressLint("ActionValue")
     @RequiresPermission(
             allOf = {
@@ -686,7 +687,8 @@ public final class BluetoothDevice implements Parcelable, Attributable {
                 METADATA_FAST_PAIR_CUSTOMIZED_FIELDS,
                 METADATA_LE_AUDIO,
                 METADATA_GMCS_CCCD,
-                METADATA_GTBS_CCCD
+                METADATA_GTBS_CCCD,
+                METADATA_EXCLUSIVE_MANAGER
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface MetadataKey {}
@@ -932,7 +934,24 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      */
     public static final int METADATA_GTBS_CCCD = 28;
 
-    private static final int METADATA_MAX_KEY = METADATA_GTBS_CCCD;
+    /**
+     * Specify the exclusive manager app for this BluetoothDevice.
+     *
+     * <p>If there's a manager app specified for this BluetoothDevice, and the app is currently
+     * installed on the device, that manager app shall be responsible for providing the
+     * BluetoothDevice management functionality (e.g. connect, disconnect, forget, etc.). Android
+     * Settings app shall not provide any management functionality for such BluetoothDevice.
+     *
+     * <p>Data type should be a {@link String} representing the package name of the app (e.g.
+     * "com.android.settings"), provided as a {@link Byte} array.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_EXCLUSIVE_MANAGER)
+    @SystemApi
+    public static final int METADATA_EXCLUSIVE_MANAGER = 29;
+
+    private static final int METADATA_MAX_KEY = METADATA_EXCLUSIVE_MANAGER;
 
     /**
      * Device type which is used in METADATA_DEVICE_TYPE Indicates this Bluetooth device is a
@@ -971,7 +990,7 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      *
      * @hide
      */
-    @FlaggedApi("com.android.bluetooth.flags.support_metadata_device_types_apis")
+    @FlaggedApi(Flags.FLAG_SUPPORT_METADATA_DEVICE_TYPES_APIS)
     @SystemApi
     public static final String DEVICE_TYPE_SPEAKER = "Speaker";
 
@@ -981,7 +1000,7 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      *
      * @hide
      */
-    @FlaggedApi("com.android.bluetooth.flags.support_metadata_device_types_apis")
+    @FlaggedApi(Flags.FLAG_SUPPORT_METADATA_DEVICE_TYPES_APIS)
     @SystemApi
     public static final String DEVICE_TYPE_HEADSET = "Headset";
 
@@ -991,7 +1010,7 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      *
      * @hide
      */
-    @FlaggedApi("com.android.bluetooth.flags.support_metadata_device_types_apis")
+    @FlaggedApi(Flags.FLAG_SUPPORT_METADATA_DEVICE_TYPES_APIS)
     @SystemApi
     public static final String DEVICE_TYPE_CARKIT = "Carkit";
 
@@ -1001,7 +1020,7 @@ public final class BluetoothDevice implements Parcelable, Attributable {
      *
      * @hide
      */
-    @FlaggedApi("com.android.bluetooth.flags.support_metadata_device_types_apis")
+    @FlaggedApi(Flags.FLAG_SUPPORT_METADATA_DEVICE_TYPES_APIS)
     @SystemApi
     public static final String DEVICE_TYPE_HEARING_AID = "HearingAid";
 
@@ -1478,7 +1497,39 @@ public final class BluetoothDevice implements Parcelable, Attributable {
     public static final int ADDRESS_TYPE_UNKNOWN = 0xFFFF;
 
     /** Address type used to indicate an anonymous advertisement. */
-    private static final int ADDRESS_TYPE_ANONYMOUS = 0xFF;
+    @FlaggedApi(Flags.FLAG_GET_ADDRESS_TYPE_API)
+    public static final int ADDRESS_TYPE_ANONYMOUS = 0xFF;
+
+    /**
+     * Indicates default active audio device policy is applied to this device
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_METADATA_API_INACTIVE_AUDIO_DEVICE_UPON_CONNECTION)
+    @SystemApi
+    public static final int ACTIVE_AUDIO_DEVICE_POLICY_DEFAULT = 0;
+
+    /**
+     * Indicates all profiles active audio device policy is applied to this device
+     *
+     * <p>all profiles are active upon device connection
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_METADATA_API_INACTIVE_AUDIO_DEVICE_UPON_CONNECTION)
+    @SystemApi
+    public static final int ACTIVE_AUDIO_DEVICE_POLICY_ALL_PROFILES_ACTIVE_UPON_CONNECTION = 1;
+
+    /**
+     * Indicates all profiles inactive audio device policy is applied to this device
+     *
+     * <p>all profiles are inactive upon device connection
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_METADATA_API_INACTIVE_AUDIO_DEVICE_UPON_CONNECTION)
+    @SystemApi
+    public static final int ACTIVE_AUDIO_DEVICE_POLICY_ALL_PROFILES_INACTIVE_UPON_CONNECTION = 2;
 
     private static final String NULL_MAC_ADDRESS = "00:00:00:00:00:00";
 
@@ -1687,12 +1738,13 @@ public final class BluetoothDevice implements Parcelable, Attributable {
     }
 
     /**
-     * Returns the address type of this BluetoothDevice.
+     * Returns the address type of this BluetoothDevice, one of {@link ADDRESS_TYPE_PUBLIC}, {@link
+     * ADDRESS_TYPE_RANDOM}, {@link ADDRESS_TYPE_ANONYMOUS}, or {@link ADDRESS_TYPE_UNKNOWN}.
      *
      * @return Bluetooth address type
-     * @hide
      */
-    public int getAddressType() {
+    @FlaggedApi(Flags.FLAG_GET_ADDRESS_TYPE_API)
+    public @AddressType int getAddressType() {
         if (DBG) Log.d(TAG, "mAddressType: " + mAddressType);
         return mAddressType;
     }
@@ -3934,6 +3986,118 @@ public final class BluetoothDevice implements Parcelable, Attributable {
                 return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(defaultValue);
             } catch (RemoteException | TimeoutException e) {
                 Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
+            }
+        }
+        return defaultValue;
+    }
+
+    /** @hide */
+    @IntDef(
+            value = {
+                BluetoothStatusCodes.SUCCESS,
+                BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED,
+                BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ALLOWED,
+                BluetoothStatusCodes.ERROR_MISSING_BLUETOOTH_CONNECT_PERMISSION,
+                BluetoothStatusCodes.ERROR_DEVICE_NOT_BONDED
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface SetActiveAudioDevicePolicyReturnValues {}
+
+    /**
+     * Active audio device policy for this device
+     *
+     * @hide
+     */
+    @IntDef(
+            prefix = "ACTIVE_AUDIO_DEVICE_POLICY_",
+            value = {
+                ACTIVE_AUDIO_DEVICE_POLICY_DEFAULT,
+                ACTIVE_AUDIO_DEVICE_POLICY_ALL_PROFILES_ACTIVE_UPON_CONNECTION,
+                ACTIVE_AUDIO_DEVICE_POLICY_ALL_PROFILES_INACTIVE_UPON_CONNECTION
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ActiveAudioDevicePolicy {}
+
+    /**
+     * Set the active audio device policy for this {@link BluetoothDevice} to indicate what {@link
+     * ActiveAudioDevicePolicy} is applied upon device connection.
+     *
+     * <p>This API allows application to set the audio device profiles active policy upon
+     * connection, only bonded device's policy will be persisted across Bluetooth restart. Policy
+     * setting will be removed when the device's bond state is moved to {@link #BOND_NONE}.
+     *
+     * @param activeAudioDevicePolicy is the active audio device policy to set for this device
+     * @return whether the policy was set properly
+     * @throws IllegalArgumentException if this BluetoothDevice object has an invalid address
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_METADATA_API_INACTIVE_AUDIO_DEVICE_UPON_CONNECTION)
+    @SystemApi
+    @RequiresBluetoothConnectPermission
+    @RequiresPermission(
+            allOf = {
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_PRIVILEGED,
+            })
+    public @SetActiveAudioDevicePolicyReturnValues int setActiveAudioDevicePolicy(
+            @ActiveAudioDevicePolicy int activeAudioDevicePolicy) {
+        if (DBG) log("setActiveAudioDevicePolicy(" + activeAudioDevicePolicy + ")");
+        if (!BluetoothAdapter.checkBluetoothAddress(getAddress())) {
+            throw new IllegalArgumentException("device cannot have an invalid address");
+        }
+
+        final IBluetooth service = getService();
+        final int defaultValue = BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED;
+        if (service == null || !isBluetoothEnabled()) {
+            Log.e(TAG, "Bluetooth is not enabled. Cannot set active audio device policy.");
+            if (DBG) log(Log.getStackTraceString(new Throwable()));
+        } else {
+            try {
+                final SynchronousResultReceiver<Integer> recv = SynchronousResultReceiver.get();
+                service.setActiveAudioDevicePolicy(
+                        this, activeAudioDevicePolicy, mAttributionSource, recv);
+                return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(defaultValue);
+            } catch (TimeoutException e) {
+                Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
+            } catch (RemoteException e) {
+                Log.e(TAG, "", e);
+                throw e.rethrowAsRuntimeException();
+            }
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Get the active audio device policy for this {@link BluetoothDevice}.
+     *
+     * @return active audio device policy of the device
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_METADATA_API_INACTIVE_AUDIO_DEVICE_UPON_CONNECTION)
+    @SystemApi
+    @RequiresBluetoothConnectPermission
+    @RequiresPermission(
+            allOf = {
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_PRIVILEGED,
+            })
+    public @ActiveAudioDevicePolicy int getActiveAudioDevicePolicy() {
+        if (DBG) log("getActiveAudioDevicePolicy");
+        final IBluetooth service = getService();
+        final int defaultValue = ACTIVE_AUDIO_DEVICE_POLICY_DEFAULT;
+        if (service == null || !isBluetoothEnabled()) {
+            Log.e(TAG, "Bluetooth is not enabled. Cannot get active audio device policy.");
+            if (DBG) log(Log.getStackTraceString(new Throwable()));
+        } else {
+            try {
+                final SynchronousResultReceiver<Integer> recv = SynchronousResultReceiver.get();
+                service.getActiveAudioDevicePolicy(this, mAttributionSource, recv);
+                return recv.awaitResultNoInterrupt(getSyncTimeout()).getValue(defaultValue);
+            } catch (TimeoutException e) {
+                Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
+            } catch (RemoteException e) {
+                Log.e(TAG, "", e);
+                throw e.rethrowAsRuntimeException();
             }
         }
         return defaultValue;

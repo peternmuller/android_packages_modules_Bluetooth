@@ -53,7 +53,7 @@
 #include "a2dp_vendor_aptx_adaptive_encoder.h"
 #include "internal_include/bt_trace.h"
 //#include "bt_utils.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/osi.h"
 #include "hardware/bt_av.h"
 

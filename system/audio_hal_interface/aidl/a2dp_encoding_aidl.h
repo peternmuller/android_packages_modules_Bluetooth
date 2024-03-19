@@ -26,7 +26,7 @@
 #include "btif/include/btif_av_co.h"
 #include "btif/include/btif_hf.h"
 #include "common/message_loop_thread.h"
-#include "osi/include/log.h"
+#include "os/log.h"
 #include "osi/include/properties.h"
 #include "types/raw_address.h"
 
@@ -36,7 +36,8 @@ namespace aidl {
 namespace a2dp {
 
 bool update_codec_offloading_capabilities(
-    const std::vector<btav_a2dp_codec_config_t>& framework_preference);
+    const std::vector<btav_a2dp_codec_config_t>& framework_preference,
+    bool supports_a2dp_hw_offload_v2);
 
 /***
  * Check if new bluetooth_audio is enabled

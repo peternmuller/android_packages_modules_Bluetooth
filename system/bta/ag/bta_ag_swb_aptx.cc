@@ -26,8 +26,7 @@
 #include "stack/include/btm_api_types.h"
 
 bool is_hfp_aptx_voice_enabled() {
-  return IS_FLAG_ENABLED(hfp_codec_aptx_voice) &&
-         GET_SYSPROP(Hfp, codec_aptx_voice, false);
+  return GET_SYSPROP(Hfp, codec_aptx_voice, false);
 }
 
 void bta_ag_swb_handle_vs_at_events(tBTA_AG_SCB* p_scb, uint16_t cmd,

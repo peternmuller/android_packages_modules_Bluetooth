@@ -26,10 +26,12 @@
  *
  ******************************************************************************/
 
+#include "bt_dev_class.h"
 #define LOG_TAG "bt_btif_dm"
 
 #include "btif_dm.h"
 
+#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/logging.h>
 #include <base/strings/stringprintf.h>
@@ -50,9 +52,7 @@
 #include <mutex>
 #include <optional>
 
-#include <android_bluetooth_flags.h>
 #include "advertise_data_parser.h"
-#include "android_bluetooth_flags.h"
 #include "bta/dm/bta_dm_disc.h"
 #include "bta/include/bta_api.h"
 #include "btif/include/stack_manager_t.h"
@@ -65,6 +65,7 @@
 #include "btif_storage.h"
 #include "btif_util.h"
 #include "btif_vendor.h"
+#include "common/init_flags.h"
 #include "common/lru_cache.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
@@ -73,10 +74,10 @@
 #include "internal_include/bt_target.h"
 #include "internal_include/stack_config.h"
 #include "main/shim/le_advertising_manager.h"
+#include "main_thread.h"
 #include "os/log.h"
 #include "os/logging/log_adapter.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"
 #include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "stack/btm/btm_dev.h"
@@ -86,6 +87,7 @@
 #include "stack/include/bt_octets.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
+#include "stack/include/btm_ble_addr.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_sec_api.h"
 #include "stack/include/btm_ble_sec_api_types.h"
@@ -95,6 +97,7 @@
 #include "stack/include/btm_sec_api_types.h"
 #include "stack/include/smp_api.h"
 #include "stack/sdp/sdpint.h"
+#include "storage/config_keys.h"
 #include "types/raw_address.h"
 
 #ifdef __ANDROID__
@@ -824,8 +827,8 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
   std::string addrstr = bd_addr.ToString();
   const char* bdstr = addrstr.c_str();
   if (transport == BT_TRANSPORT_LE) {
-    if (!btif_config_get_int(bdstr, "DevType", &device_type)) {
-      btif_config_set_int(bdstr, "DevType", BT_DEVICE_TYPE_BLE);
+    if (!btif_config_get_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, &device_type)) {
+      btif_config_set_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, BT_DEVICE_TYPE_BLE);
     }
     if (btif_storage_get_remote_addr_type(&bd_addr, &addr_type) !=
         BT_STATUS_SUCCESS) {
@@ -839,7 +842,7 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
       btif_storage_set_remote_addr_type(&bd_addr, addr_type);
     }
   }
-  if ((btif_config_get_int(bdstr, "DevType", &device_type) &&
+  if ((btif_config_get_int(bdstr, BTIF_STORAGE_KEY_DEV_TYPE, &device_type) &&
        (btif_storage_get_remote_addr_type(&bd_addr, &addr_type) ==
         BT_STATUS_SUCCESS) &&
        (device_type & BT_DEVICE_TYPE_BLE) == BT_DEVICE_TYPE_BLE) ||
@@ -848,10 +851,15 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
                        static_cast<tBT_DEVICE_TYPE>(device_type));
   }
 
-  if (is_hid && (device_type & BT_DEVICE_TYPE_BLE) == 0) {
+  if (!IS_FLAG_ENABLED(connect_hid_after_service_discovery) &&
+      is_hid && (device_type & BT_DEVICE_TYPE_BLE) == 0) {
+    tAclLinkSpec link_spec;
+    link_spec.addrt.bda = bd_addr;
+    link_spec.addrt.type = addr_type;
+    link_spec.transport = transport;
     const bt_status_t status =
         GetInterfaceToProfiles()->profileSpecific_HACK->btif_hh_connect(
-            &bd_addr);
+            &link_spec);
     if (status != BT_STATUS_SUCCESS)
       bond_state_changed(status, bd_addr, BT_BOND_STATE_NONE);
   } else {
@@ -914,6 +922,50 @@ uint16_t btif_dm_get_connection_state(const RawAddress& bd_addr) {
                          (rc & ENCRYPTED_BREDR) ? 'T' : 'F',
                          (rc & ENCRYPTED_LE) ? 'T' : 'F'));
   return rc;
+}
+
+static uint16_t btif_dm_get_resolved_connection_state(
+    tBLE_BD_ADDR ble_bd_addr) {
+  uint16_t rc = 0;
+  if (maybe_resolve_address(&ble_bd_addr.bda, &ble_bd_addr.type)) {
+    if (BTA_DmGetConnectionState(ble_bd_addr.bda)) {
+      rc = 0x0001;
+      if (BTM_IsEncrypted(ble_bd_addr.bda, BT_TRANSPORT_BR_EDR)) {
+        rc |= ENCRYPTED_BREDR;
+      }
+      if (BTM_IsEncrypted(ble_bd_addr.bda, BT_TRANSPORT_LE)) {
+        rc |= ENCRYPTED_LE;
+      }
+
+      BTM_LogHistory(
+          kBtmLogTag, ble_bd_addr.bda, "RESOLVED connection state",
+          base::StringPrintf(
+              "connected:%c classic_encrypted:%c le_encrypted:%c",
+              (rc & 0x0001) ? 'T' : 'F', (rc & ENCRYPTED_BREDR) ? 'T' : 'F',
+              (rc & ENCRYPTED_LE) ? 'T' : 'F'));
+    }
+  }
+  return rc;
+}
+
+uint16_t btif_dm_get_connection_state_sync(const RawAddress& bd_addr) {
+  std::promise<uint16_t> promise;
+  std::future future = promise.get_future();
+
+  ASSERT(BT_STATUS_SUCCESS ==
+         do_in_main_thread(
+             FROM_HERE,
+             base::BindOnce(
+                 [](const RawAddress bd_addr, std::promise<uint16_t> promise) {
+                   // Experiment to try with maybe resolved address
+                   btif_dm_get_resolved_connection_state({
+                       .type = BLE_ADDR_RANDOM,
+                       .bda = bd_addr,
+                   });
+                   promise.set_value(btif_dm_get_connection_state(bd_addr));
+                 },
+                 bd_addr, std::move(promise))));
+  return future.get();
 }
 
 /******************************************************************************
@@ -1439,7 +1491,7 @@ static void btif_dm_search_devices_evt(tBTA_DM_SEARCH_EVT event,
       uint8_t num_uuids = 0, max_num_uuid = 32;
       uint8_t uuid_list[32 * Uuid::kNumBytes16];
 
-      if (p_search_data->inq_res.inq_result_type != BTM_INQ_RESULT_BLE) {
+      if (p_search_data->inq_res.inq_result_type != BT_DEVICE_TYPE_BLE) {
         p_search_data->inq_res.remt_name_not_required =
             check_eir_remote_name(p_search_data, NULL, NULL);
       }
@@ -1679,6 +1731,28 @@ static bool btif_should_ignore_uuid(const Uuid& uuid) {
   return uuid.IsEmpty() || uuid.IsBase();
 }
 
+static bool btif_is_gatt_service_discovery_post_pairing(const RawAddress bd_addr) {
+  if (!IS_FLAG_ENABLED(reset_pairing_only_for_related_service_discovery)) {
+    if (bd_addr == pairing_cb.bd_addr || bd_addr == pairing_cb.static_bdaddr) {
+      if (pairing_cb.gatt_over_le !=
+          btif_dm_pairing_cb_t::ServiceDiscoveryState::SCHEDULED) {
+        LOG_ERROR("gatt_over_le should be SCHEDULED, did someone clear the "
+                  "control block for %s ?",
+                  ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+ return ((bd_addr == pairing_cb.bd_addr ||
+          bd_addr == pairing_cb.static_bdaddr) &&
+         (pairing_cb.gatt_over_le ==
+          btif_dm_pairing_cb_t::ServiceDiscoveryState::SCHEDULED));
+}
+
 /*******************************************************************************
  *
  * Function         btif_dm_search_services_evt
@@ -1875,15 +1949,7 @@ static void btif_dm_search_services_evt(tBTA_DM_SEARCH_EVT event,
                  ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
         BTM_LogHistory(kBtmLogTag, bd_addr,
                        "Discovered GATT services using LE transport");
-        if ((bd_addr == pairing_cb.bd_addr ||
-             bd_addr == pairing_cb.static_bdaddr)) {
-          if (pairing_cb.gatt_over_le !=
-              btif_dm_pairing_cb_t::ServiceDiscoveryState::SCHEDULED) {
-            LOG_ERROR(
-                "gatt_over_le should be SCHEDULED, did someone clear the "
-                "control block for %s ?",
-                ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
-          }
+        if (btif_is_gatt_service_discovery_post_pairing(bd_addr)) {
           pairing_cb.gatt_over_le =
               btif_dm_pairing_cb_t::ServiceDiscoveryState::FINISHED;
 
@@ -1893,6 +1959,22 @@ static void btif_dm_search_services_evt(tBTA_DM_SEARCH_EVT event,
             // we are safe to clear the service discovery part of CB.
             LOG_DEBUG("clearing pairing_cb");
             pairing_cb = {};
+          }
+
+          if (IS_FLAG_ENABLED(le_audio_fast_bond_params) && lea_supported) {
+            /* LE Audio profile should relax parameters when it connects. If
+             * profile is not enabled, relax parameters after timeout. */
+            LOG_DEBUG("Scheduling conn params unlock for %s",
+                      ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+            do_in_main_thread_delayed(
+                FROM_HERE,
+                base::BindOnce(
+                    [](RawAddress bd_addr) {
+                      L2CA_LockBleConnParamsForProfileConnection(bd_addr,
+                                                                 false);
+                    },
+                    bd_addr),
+                std::chrono::seconds(15));
           }
         }
       } else {
@@ -2041,7 +2123,38 @@ static void btif_dm_search_services_evt(tBTA_DM_SEARCH_EVT event,
     } break;
 
     case BTA_DM_NAME_READ_EVT: {
-      LOG_INFO("Skipping name read event - called on bad callback.");
+      if (IS_FLAG_ENABLED(rnr_present_during_service_discovery)) {
+        const tBTA_DM_DISC_RES& disc_res = p_data->disc_res;
+        if (disc_res.hci_status != HCI_SUCCESS) {
+          LOG_WARN("Received RNR event with bad status addr:%s hci_status:%s",
+                   ADDRESS_TO_LOGGABLE_CSTR(disc_res.bd_addr),
+                   hci_error_code_text(disc_res.hci_status).c_str());
+          break;
+        }
+        if (disc_res.bd_name[0] == '\0') {
+          LOG_WARN("Received RNR event without valid name addr:%s",
+                   ADDRESS_TO_LOGGABLE_CSTR(disc_res.bd_addr));
+          break;
+        }
+        bt_property_t properties[] = {{
+            .type = BT_PROPERTY_BDNAME,
+            .len = (int)strlen((char*)disc_res.bd_name),
+            .val = (void*)disc_res.bd_name,
+        }};
+        const bt_status_t status = btif_storage_set_remote_device_property(
+            &disc_res.bd_addr, properties);
+        ASSERT_LOG(status == BT_STATUS_SUCCESS,
+                   "Failed to save remote device property status:%s",
+                   bt_status_text(status).c_str());
+        const size_t num_props = sizeof(properties) / sizeof(bt_property_t);
+        GetInterfaceToProfiles()->events->invoke_remote_device_properties_cb(
+            status, disc_res.bd_addr, (int)num_props, properties);
+        LOG_INFO("Callback for read name event addr:%s name:%s",
+                 ADDRESS_TO_LOGGABLE_CSTR(disc_res.bd_addr),
+                 PRIVATE_NAME(disc_res.bd_name));
+      } else {
+        LOG_INFO("Skipping name read event - called on bad callback.");
+      }
     } break;
 
     default: {
@@ -2089,25 +2202,17 @@ static void btif_dm_update_allowlisted_media_players() {
   list_free(wl_players);
 }
 
-void BTIF_dm_report_inquiry_status_change(tBTM_STATUS status) {
-  if (status == BTM_INQUIRY_STARTED) {
+void BTIF_dm_report_inquiry_status_change(tBTM_INQUIRY_STATE status) {
+  btif_dm_inquiry_in_progress =
+      (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
+
+  if (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED) {
     GetInterfaceToProfiles()->events->invoke_discovery_state_changed_cb(
         BT_DISCOVERY_STARTED);
-    btif_dm_inquiry_in_progress = true;
-  } else if (status == BTM_INQUIRY_CANCELLED) {
+  } else if (status == tBTM_INQUIRY_STATE::BTM_INQUIRY_CANCELLED) {
     GetInterfaceToProfiles()->events->invoke_discovery_state_changed_cb(
         BT_DISCOVERY_STOPPED);
-    btif_dm_inquiry_in_progress = false;
-  } else if (status == BTM_INQUIRY_COMPLETE) {
-    btif_dm_inquiry_in_progress = false;
   }
-}
-
-void BTIF_dm_on_hw_error() {
-  LOG_ERROR("Received H/W Error");
-  usleep(100000); /* 100milliseconds */
-  /* Killing the process to force a restart as part of fault tolerance */
-  kill(getpid(), SIGKILL);
 }
 
 void BTIF_dm_enable() {
@@ -2392,6 +2497,13 @@ void btif_dm_acl_evt(tBTA_DM_ACL_EVT event, tBTA_DM_ACL* p_data) {
               ? bt_conn_direction_t::BT_CONN_DIRECTION_OUTGOING
               : bt_conn_direction_t::BT_CONN_DIRECTION_INCOMING,
           p_data->link_up.acl_handle);
+
+      if (IS_FLAG_ENABLED(le_audio_fast_bond_params) &&
+          p_data->link_up.transport_link_type == BT_TRANSPORT_LE &&
+          pairing_cb.bd_addr == bd_addr &&
+          is_device_le_audio_capable(bd_addr)) {
+        L2CA_LockBleConnParamsForProfileConnection(bd_addr, true);
+      }
       break;
 
     case BTA_DM_LINK_UP_FAILED_EVT:
@@ -2775,8 +2887,13 @@ void btif_dm_remove_bond(const RawAddress bd_addr) {
   // there is a valid hid connection with this bd_addr. If yes VUP will be
   // issued.
 #if (BTA_HH_INCLUDED == TRUE)
+  tAclLinkSpec link_spec;
+  link_spec.addrt.bda = bd_addr;
+  link_spec.transport = BT_TRANSPORT_AUTO;
+  link_spec.addrt.type = BLE_ADDR_PUBLIC;
+
   if (GetInterfaceToProfiles()->profileSpecific_HACK->btif_hh_virtual_unplug(
-          &bd_addr) != BT_STATUS_SUCCESS)
+          &link_spec) != BT_STATUS_SUCCESS)
 #endif
   {
     LOG_DEBUG("Removing HH device");
@@ -2852,15 +2969,12 @@ void btif_dm_ssp_reply(const RawAddress bd_addr, bt_ssp_variant_t variant,
  *
  * Description      Reads the system property configured class of device
  *
- * Inputs           A pointer to a DEV_CLASS that you want filled with the
- *                  current class of device. Size is assumed to be 3.
- *
- * Returns          Nothing. device_class will contain the current class of
- *                  device. If no value is present, or the value is malformed
- *                  the default "unclassified" value will be used
+ * Returns          A DEV_CLASS containing the current class of device.
+ *                  If no value is present, or the value is malformed
+ *                  the default kEmpty value will be used
  *
  ******************************************************************************/
-void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
+DEV_CLASS btif_dm_get_local_class_of_device() {
   /* A class of device is a {SERVICE_CLASS, MAJOR_CLASS, MINOR_CLASS}
    *
    * The input is expected to be a string of the following format:
@@ -2870,18 +2984,13 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
    *
    * Notice there is always two commas and no spaces.
    */
-
-  device_class[0] = 0x00;
-  device_class[1] = BTM_COD_MAJOR_UNCLASSIFIED;
-  device_class[2] = BTM_COD_MINOR_UNCLASSIFIED;
-
   char prop_cod[PROPERTY_VALUE_MAX];
   osi_property_get(PROPERTY_CLASS_OF_DEVICE, prop_cod, "");
 
   // If the property is empty, use the default
   if (prop_cod[0] == '\0') {
     LOG_ERROR("COD property is empty");
-    return;
+    return kDevClassUnclassified;
   }
 
   // Start reading the contents of the property string. If at any point anything
@@ -2898,7 +3007,7 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
       char c = prop_cod[i++];
       if (!std::isdigit(c)) {
         LOG_ERROR("COD malformed, '%c' is a non-digit", c);
-        return;
+        return kDevClassUnclassified;
       }
       value += c;
     }
@@ -2906,20 +3015,20 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
     // If we hit the end and it wasn't null terminated then return the default
     if (i == PROPERTY_VALUE_MAX && prop_cod[PROPERTY_VALUE_MAX - 1] != '\0') {
       LOG_ERROR("COD malformed, value was truncated");
-      return;
+      return kDevClassUnclassified;
     }
 
     // Each number in the list must be one byte, meaning 0 (0x00) -> 255 (0xFF)
     if (value.size() > 3 || value.size() == 0) {
       LOG_ERROR("COD malformed, '%s' must be between [0, 255]", value.c_str());
-      return;
+      return kDevClassUnclassified;
     }
 
     // Grab the value. If it's too large, then return the default
     uint32_t uint32_val = static_cast<uint32_t>(std::stoul(value.c_str()));
     if (uint32_val > 0xFF) {
       LOG_ERROR("COD malformed, '%s' must be between [0, 255]", value.c_str());
-      return;
+      return kDevClassUnclassified;
     }
 
     // Otherwise, it's safe to use
@@ -2929,7 +3038,7 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
     if (j >= 3) {
       if (prop_cod[i] != '\0') {
         LOG_ERROR("COD malformed, more than three numbers");
-        return;
+        return kDevClassUnclassified;
       }
       break;
     }
@@ -2944,6 +3053,7 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
   }
 
   // We must have read exactly 3 numbers
+  DEV_CLASS device_class = kDevClassUnclassified;
   if (j == 3) {
     device_class[0] = temp_device_class[0];
     device_class[1] = temp_device_class[1];
@@ -2977,6 +3087,7 @@ void btif_dm_get_local_class_of_device(DEV_CLASS device_class) {
       "0x%x'",
       device_class[0], device_class[1], device_class[2]);
 #endif
+  return device_class;
 }
 
 /*******************************************************************************
@@ -3101,9 +3212,8 @@ void btif_dm_proc_io_req(tBTM_AUTH_REQ* p_auth_req, bool is_orig) {
   LOG_VERBOSE("updated p_auth_req=%d", *p_auth_req);
 }
 
-void btif_dm_proc_io_rsp(UNUSED_ATTR const RawAddress& bd_addr,
-                         tBTM_IO_CAP io_cap, UNUSED_ATTR tBTM_OOB_DATA oob_data,
-                         tBTM_AUTH_REQ auth_req) {
+void btif_dm_proc_io_rsp(const RawAddress& /* bd_addr */, tBTM_IO_CAP io_cap,
+                         tBTM_OOB_DATA /* oob_data */, tBTM_AUTH_REQ auth_req) {
   if (auth_req & BTA_AUTH_BONDS) {
     LOG_DEBUG("auth_req:%d", auth_req);
     pairing_cb.auth_req = auth_req;
@@ -4086,7 +4196,9 @@ bool btif_get_device_type(const RawAddress& bda, int* p_device_type) {
   std::string addrstr = bda.ToString();
   const char* bd_addr_str = addrstr.c_str();
 
-  if (!btif_config_get_int(bd_addr_str, "DevType", p_device_type)) return false;
+  if (!btif_config_get_int(bd_addr_str, BTIF_STORAGE_KEY_DEV_TYPE,
+                           p_device_type))
+    return false;
   tBT_DEVICE_TYPE device_type = static_cast<tBT_DEVICE_TYPE>(*p_device_type);
   LOG_DEBUG("bd_addr:%s device_type:%s", ADDRESS_TO_LOGGABLE_CSTR(bda),
             DeviceTypeText(device_type).c_str());
@@ -4101,7 +4213,8 @@ bool btif_get_address_type(const RawAddress& bda, tBLE_ADDR_TYPE* p_addr_type) {
   const char* bd_addr_str = addrstr.c_str();
 
   int val = 0;
-  if (!btif_config_get_int(bd_addr_str, "AddrType", &val)) return false;
+  if (!btif_config_get_int(bd_addr_str, BTIF_STORAGE_KEY_ADDR_TYPE, &val))
+    return false;
   *p_addr_type = static_cast<tBLE_ADDR_TYPE>(val);
   LOG_DEBUG("bd_addr:%s[%s]", ADDRESS_TO_LOGGABLE_CSTR(bda),
             AddressTypeText(*p_addr_type).c_str());
@@ -4168,6 +4281,11 @@ void bta_energy_info_cb(tBTM_BLE_TX_TIME_MS tx_time,
                         tBTM_CONTRL_STATE ctrl_state, tBTA_STATUS status) {
   ::bta_energy_info_cb(tx_time, rx_time, idle_time, energy_used, ctrl_state,
                        status);
+}
+
+void btif_dm_search_services_evt(tBTA_DM_SEARCH_EVT event,
+                                 tBTA_DM_SEARCH* p_data) {
+  ::btif_dm_search_services_evt(event, p_data);
 }
 
 }  // namespace testing

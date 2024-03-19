@@ -21,8 +21,10 @@
 
 #include "common/init_flags.h"
 #include "le_audio_set_configuration_provider.h"
+#include "stack/include/btm_client_interface.h"
 #include "mock_controller.h"
 #include "test/mock/mock_legacy_hci_interface.h"
+#include "test/mock/mock_stack_btm_interface.h"
 
 using ::testing::_;
 using ::testing::Mock;
@@ -91,6 +93,11 @@ class CodecManagerTestBase : public Test {
 
     controller::SetMockControllerInterface(&controller_interface);
     bluetooth::legacy::hci::testing::SetMock(legacy_hci_mock_);
+
+    mock_btm_client_interface.vendor.BTM_GetQllLocalSupportedFeatures =
+        [] (uint8_t *p) -> bt_device_qll_local_supported_features_t* {
+      return nullptr;
+    };
 
     codec_manager = CodecManager::GetInstance();
   }

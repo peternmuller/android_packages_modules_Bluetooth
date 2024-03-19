@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <com_android_bluetooth_flags.h>
+#include <flag_macros.h>
 #include <gtest/gtest.h>
 #include <string.h>
 
@@ -32,6 +34,8 @@
 #include "test/mock/mock_stack_sdp_legacy_api.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
+
+#define TEST_BT com::android::bluetooth::flags
 
 namespace bluetooth {
 namespace legacy {
@@ -165,7 +169,9 @@ TEST_F(StackGattTest, GATT_Register_Deregister) {
   gatt_free();
 }
 
-TEST_F(StackGattTest, gatt_status_text) {
+TEST_F_WITH_FLAGS(StackGattTest, gatt_status_text,
+                  REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(TEST_BT,
+                                                      enumerate_gatt_errors))) {
   std::vector<std::pair<tGATT_STATUS, std::string>> statuses = {
       std::make_pair(GATT_SUCCESS, "GATT_SUCCESS"),  // Also GATT_ENCRYPED_MITM
       std::make_pair(GATT_INVALID_HANDLE, "GATT_INVALID_HANDLE"),
@@ -188,7 +194,6 @@ TEST_F(StackGattTest, gatt_status_text) {
       std::make_pair(GATT_DATABASE_OUT_OF_SYNC, "GATT_DATABASE_OUT_OF_SYNC"),
       std::make_pair(GATT_VALUE_NOT_ALLOWED, "GATT_VALUE_NOT_ALLOWED"),
       std::make_pair(GATT_ILLEGAL_PARAMETER, "GATT_ILLEGAL_PARAMETER"),
-      std::make_pair(GATT_TOO_SHORT, "GATT_TOO_SHORT"),
       std::make_pair(GATT_NO_RESOURCES, "GATT_NO_RESOURCES"),
       std::make_pair(GATT_INTERNAL_ERROR, "GATT_INTERNAL_ERROR"),
       std::make_pair(GATT_WRONG_STATE, "GATT_WRONG_STATE"),
@@ -198,7 +203,6 @@ TEST_F(StackGattTest, gatt_status_text) {
       std::make_pair(GATT_CMD_STARTED, "GATT_CMD_STARTED"),
       std::make_pair(GATT_PENDING, "GATT_PENDING"),
       std::make_pair(GATT_AUTH_FAIL, "GATT_AUTH_FAIL"),
-      std::make_pair(GATT_MORE, "GATT_MORE"),
       std::make_pair(GATT_INVALID_CFG, "GATT_INVALID_CFG"),
       std::make_pair(GATT_SERVICE_STARTED, "GATT_SERVICE_STARTED"),
       std::make_pair(GATT_ENCRYPED_NO_MITM, "GATT_ENCRYPED_NO_MITM"),
@@ -207,6 +211,7 @@ TEST_F(StackGattTest, gatt_status_text) {
       std::make_pair(GATT_DUP_REG, "GATT_DUP_REG"),
       std::make_pair(GATT_ALREADY_OPEN, "GATT_ALREADY_OPEN"),
       std::make_pair(GATT_CANCEL, "GATT_CANCEL"),
+      std::make_pair(GATT_CONNECTION_TIMEOUT, "GATT_CONNECTION_TIMEOUT"),
       std::make_pair(GATT_CCC_CFG_ERR, "GATT_CCC_CFG_ERR"),
       std::make_pair(GATT_PRC_IN_PROGRESS, "GATT_PRC_IN_PROGRESS"),
       std::make_pair(GATT_OUT_OF_RANGE, "GATT_OUT_OF_RANGE"),

@@ -17,10 +17,10 @@
 
 #include "devices.h"
 
+#include <android_bluetooth_flags.h>
 #include <base/strings/string_number_conversions.h>
 
 #include "acl_api.h"
-#include "android_bluetooth_flags.h"
 #include "bta_gatt_queue.h"
 #include "btif/include/btif_storage.h"
 #include "internal_include/bt_trace.h"
@@ -384,6 +384,7 @@ void LeAudioDevice::RegisterPACs(
 
     if (IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
       if (pac.codec_id == types::kLeAudioCodecHeadtracking) {
+        LOG(INFO) << __func__ << ": Headtracking supported";
         /* Todo: Set DSA modes according to the codec configuration */
         dsa_modes_ = {
             DsaMode::DISABLED,
@@ -999,21 +1000,6 @@ void LeAudioDevice::DeactivateAllAses(void) {
     ase.cis_id = le_audio::kInvalidCisId;
     ase.cis_conn_hdl = 0;
   }
-}
-
-std::vector<uint8_t> LeAudioDevice::GetVsMetadata() {
-  const auto* ase = GetFirstActiveAse();
-  for (const auto& pac_tuple : snk_pacs_) {
-    /* Get PAC records from tuple as second element from tuple */
-    auto& pac_recs = std::get<1>(pac_tuple);
-
-    for (const auto& pac : pac_recs) {
-      if (pac.codec_id == ase->codec_id) {
-        return std::vector<uint8_t>(pac.metadata.data()+4, (pac.metadata.data()+4)+(pac.metadata.size()-4));
-      }
-    }
-  }
-  return std::vector<uint8_t>();
 }
 
 std::vector<uint8_t> LeAudioDevice::GetMetadata(
