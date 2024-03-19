@@ -1444,6 +1444,14 @@ public class BassClientService extends ProfileService {
             sEventLogger.logd(TAG, "stopSearchingForSources");
             mCallbacks.notifySearchStopped(BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
         }
+        synchronized (mStateMachines) {
+            for (BassClientStateMachine sm : mStateMachines.values()) {
+                if (sm.isConnected()) {
+                    Message message = sm.obtainMessage(BassClientStateMachine.STOP_PENDING_PA_SYNC);
+                    sm.sendMessage(message);
+                }
+            }
+        }
     }
 
     /**
