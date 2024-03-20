@@ -116,3 +116,8 @@ void btm_vsc_complete(uint8_t* /* p */, uint16_t /* opcode */,
                       tBTM_VSC_CMPL_CB* /* p_vsc_cplt_cback */) {
   inc_func_call_count(__func__);
 }
+
+void btm_vendor_vse_cback(uint8_t /* vse_subcode */, uint8_t /* evt_len */,
+                          uint8_t* /* p */) {
+  inc_func_call_count(__func__);
+}
