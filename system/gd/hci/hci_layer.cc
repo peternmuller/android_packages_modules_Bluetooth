@@ -33,6 +33,7 @@
 #include "os/alarm.h"
 #include "os/metrics.h"
 #include "os/queue.h"
+#include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "packet/raw_builder.h"
 #include "storage/storage_module.h"
@@ -112,6 +113,9 @@ class CommandQueueEntry {
 struct HciLayer::impl {
   impl(hal::HciHal* hal, HciLayer& module) : hal_(hal), module_(module) {
     hci_timeout_alarm_ = new Alarm(module.GetHandler());
+
+    hal_test_supported = osi_property_get_bool("persist.vendor.bluetooth.haltest", false);
+    log::warn("hal_test_supported: {}", hal_test_supported);
   }
 
   ~impl() {
@@ -389,23 +393,41 @@ struct HciLayer::impl {
         auto view = CommandCompleteView::Create(event);
         log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
         auto op_code = view.GetCommandOpCode();
-        log::assert_that(
-            op_code == OpCode::NONE,
-            "Received {} event with OpCode {} without a waiting command(is the HAL "
-            "sending commands, but not handling the events?)",
-            EventCodeText(event_code),
-            OpCodeText(op_code));
+        if (hal_test_supported && op_code != OpCode::NONE) {
+          log::warn(
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+          return;
+        } else {
+          log::assert_that(
+              op_code == OpCode::NONE,
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+        }
       }
       if (event_code == EventCode::COMMAND_STATUS) {
         auto view = CommandStatusView::Create(event);
         log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
         auto op_code = view.GetCommandOpCode();
-        log::assert_that(
-            op_code == OpCode::NONE,
-            "Received {} event with OpCode {} without a waiting command(is the HAL "
-            "sending commands, but not handling the events?)",
-            EventCodeText(event_code),
-            OpCodeText(op_code));
+        if (hal_test_supported && op_code != OpCode::NONE) {
+          log::warn(
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+          return;
+        } else {
+          log::assert_that(
+              op_code == OpCode::NONE,
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+        }
       }
       std::unique_ptr<CommandView> no_waiting_command{nullptr};
       log_hci_event(no_waiting_command, event, module_.GetDependency<storage::StorageModule>());
@@ -476,6 +498,7 @@ struct HciLayer::impl {
 
   hal::HciHal* hal_;
   HciLayer& module_;
+  bool hal_test_supported;
 
   // Command Handling
   std::list<CommandQueueEntry> command_queue_;
