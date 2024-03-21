@@ -351,23 +351,16 @@ void BleScannerInterfaceImpl::OnMsftAdvMonitorEnable(
 /** Sets the LE scan interval and window in units of N*0.625 msec */
 void BleScannerInterfaceImpl::SetScanParameters(int scanner_id,
                                                 uint8_t scan_type,
-                                                std::vector<uint32_t> scan_interval,
-                                                std::vector<uint32_t> scan_window,
+                                                int scan_interval,
+                                                int scan_window,
                                                 Callback /* cb */) {
-  LOG(INFO) << __func__ << " in shim layer";
-  if (scan_interval.size() == 0 || scan_window.size() == 0) {
-    LOG_INFO("Empty scan interval or window");
-    return;
-  }
-  auto first_scan_interval = scan_interval.front(), first_scan_window = scan_window.front();
-
-  if (BTM_BLE_ISVALID_PARAM(first_scan_interval, BTM_BLE_SCAN_INT_MIN,
+  if (BTM_BLE_ISVALID_PARAM(scan_interval, BTM_BLE_SCAN_INT_MIN,
                             BTM_BLE_EXT_SCAN_INT_MAX) &&
-      BTM_BLE_ISVALID_PARAM(first_scan_window, BTM_BLE_SCAN_WIN_MIN,
+      BTM_BLE_ISVALID_PARAM(scan_window, BTM_BLE_SCAN_WIN_MIN,
                             BTM_BLE_EXT_SCAN_WIN_MAX)) {
     btm_cb.ble_ctr_cb.inq_var.scan_type = BTM_BLE_SCAN_MODE_ACTI;
-    btm_cb.ble_ctr_cb.inq_var.scan_interval = first_scan_interval;
-    btm_cb.ble_ctr_cb.inq_var.scan_window = first_scan_window;
+    btm_cb.ble_ctr_cb.inq_var.scan_interval = scan_interval;
+    btm_cb.ble_ctr_cb.inq_var.scan_window = scan_window;
   }
 
   bluetooth::shim::GetScanning()->SetScanParameters(
