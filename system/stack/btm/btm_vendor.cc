@@ -707,16 +707,13 @@ void btm_vendor_link_power_control_event(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-void btm_vendor_vse_cback(uint8_t evt_len, uint8_t* p) {
+void btm_vendor_vse_cback(uint8_t vse_subcode, uint8_t evt_len, uint8_t* p) {
   uint8_t i;
   uint8_t* pp = p;
-  uint8_t vse_subcode;
-  LOG_INFO(" :: VSE event received, pp = 0x%x, evt_len = 0x%02x", pp, evt_len);
 
-  if (evt_len >= 2) {
-    STREAM_TO_UINT8(vse_subcode, pp);
-    LOG_INFO(" :: VSE event received, vse_subcode = 0x%02x", vse_subcode);
-
+  LOG_INFO(" :: VSE event received, vse_subcode = 0x%02x, evt_len = 0x%02x",
+           vse_subcode, evt_len);
+  if (evt_len >= 1) {
     if (HCI_VSE_SUBCODE_QBCE == vse_subcode) {
       uint8_t vse_msg_type;
 
@@ -839,7 +836,6 @@ void BTM_ConfigQHS() {
 
 void BTM_ReadVendorAddOnFeaturesInternal() {
   bt_configstore_intf = get_btConfigStore_interface();
-  BTM_RegisterForVSEvents((tBTM_VS_EVT_CB*)btm_vendor_vse_cback, true);
   if (bt_configstore_intf != NULL) {
     std::vector<vendor_property_t> vPropList;
     bt_configstore_intf->get_vendor_properties(BT_PROP_ALL, vPropList);
