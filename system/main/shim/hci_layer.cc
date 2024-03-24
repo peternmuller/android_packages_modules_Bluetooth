@@ -58,6 +58,8 @@ constexpr size_t kCommandOpcodeSize = sizeof(uint16_t);
 
 static base::Callback<void(const base::Location&, BT_HDR*)> send_data_upwards;
 static const packet_fragmenter_t* packet_fragmenter;
+extern void btm_vendor_vse_cback(uint8_t vse_subopcode, uint8_t evt_len,
+                                 uint8_t* p);
 
 namespace {
 bool register_event_code(bluetooth::hci::EventCode event_code) {
@@ -172,6 +174,32 @@ static void vendor_specific_event_callback(
   btm_vendor_specific_evt(bytes.data(), bytes.size());
 }
 
+static void qbce_vse_cb(
+    bluetooth::hci::VendorSpecificEventView vendor_specific_event_view) {
+  auto payload = vendor_specific_event_view.GetPayload();
+  std::vector<uint8_t> bytes{payload.begin(), payload.end()};
+  btm_vendor_vse_cback((uint8_t)bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
+                       bytes.size(), bytes.data());
+}
+
+static void qbce_param_report_vse_cb(
+    bluetooth::hci::VendorSpecificEventView vendor_specific_event_view) {
+  auto payload = vendor_specific_event_view.GetPayload();
+  std::vector<uint8_t> bytes{payload.begin(), payload.end()};
+  btm_vendor_vse_cback(
+      (uint8_t)bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
+      bytes.size(), bytes.data());
+}
+
+static void qbce_link_power_ctrl_vse_cb(
+    bluetooth::hci::VendorSpecificEventView vendor_specific_event_view) {
+  auto payload = vendor_specific_event_view.GetPayload();
+  std::vector<uint8_t> bytes{payload.begin(), payload.end()};
+  btm_vendor_vse_cback(
+      (uint8_t)bluetooth::hci::VseSubeventCode::QBCE_VS_LINK_POWER_CTRL_EVENT,
+      bytes.size(), bytes.data());
+}
+
 void OnTransmitPacketCommandComplete(command_complete_cb complete_callback,
                                      void* context,
                                      bluetooth::hci::CommandCompleteView view) {
@@ -275,16 +303,15 @@ static void register_event(bluetooth::hci::EventCode event_code) {
 }
 
 static void register_vs_event() {
-  auto handler = bluetooth::shim::GetGdShimHandler();
   bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
       bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
-      handler->Bind(cpp::vendor_specific_event_callback));
+      get_main_thread()->Bind(cpp::qbce_vse_cb));
   bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
       bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
-      handler->Bind(cpp::vendor_specific_event_callback));
+      get_main_thread()->Bind(cpp::qbce_param_report_vse_cb));
   bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
       bluetooth::hci::VseSubeventCode::QBCE_VS_LINK_POWER_CTRL_EVENT,
-      handler->Bind(cpp::vendor_specific_event_callback));
+      get_main_thread()->Bind(cpp::qbce_link_power_ctrl_vse_cb));
 }
 
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {
