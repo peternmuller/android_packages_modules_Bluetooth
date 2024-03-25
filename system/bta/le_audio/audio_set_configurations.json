@@ -12095,6 +12095,7 @@
         },
         {
             "name": "QoS_Config_48_1_1",
+            "target_latency": "LOW",
             "retransmission_number": 5,
             "max_transport_latency": 15
         },
@@ -12130,6 +12131,7 @@
         },
         {
             "name": "VND_QoS_Config_R31_L100",
+            "target_latency": "HIGH_RELIABILITY",
             "retransmission_number": 31,
             "max_transport_latency": 100
         },
@@ -12145,11 +12147,13 @@
         },
         {
             "name": "VND_QoS_Config_R3_L15",
+            "target_latency": "LOW",
             "retransmission_number": 3,
             "max_transport_latency": 15
         },
         {
             "name": "VND_QoS_Config_R24_L100",
+            "target_latency": "HIGH_RELIABILITY",
             "retransmission_number": 24,
             "max_transport_latency": 100
         },
@@ -12160,13 +12164,9 @@
         },
         {
             "name": "VND_QoS_Config_R3_L8",
+            "target_latency": "LOW",
             "retransmission_number": 3,
             "max_transport_latency": 8
-        },
-        {
-            "name": "VND_QoS_Config_R31_L100",
-            "retransmission_number": 31,
-            "max_transport_latency": 100
         },
         {
             "name": "VND_QoS_Config_R13_L100",
@@ -12205,12 +12205,8 @@
             "max_transport_latency": 40
         },
         {
-            "name": "VND_QoS_Config_R31_L100",
-            "retransmission_number": 31,
-            "max_transport_latency": 100
-        },
-        {
             "name": "VND_QoS_Config_R3_L12",
+            "target_latency": "LOW",
             "retransmission_number": 3,
             "max_transport_latency": 12
         },
