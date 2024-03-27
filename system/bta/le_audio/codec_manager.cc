@@ -267,7 +267,29 @@ struct codec_manager_impl {
       int sample_rate = broadcast_config.sampling_rate;
       int frame_duration = broadcast_config.frame_duration;
 
-      if (bcast_high_reliability_qos.find(sample_rate) !=
+      if (osi_property_get_bool("persist.vendor.btstack.bis_qos_config.enabled", true)) {
+        uint8_t rtn = (uint8_t)osi_property_get_int32("persist.vendor.btstack.bis_rtn", 2);
+        uint16_t max_transport_latency =
+              (uint16_t)osi_property_get_int32("persist.vendor.btstack.transport_latency", 0);
+
+        if (max_transport_latency == 0) {
+          switch (frame_duration) {
+            case LeAudioCodecConfiguration::kInterval7500Us:
+              max_transport_latency = 45; //45msec for 7.5msec frame duration
+              break;
+            case LeAudioCodecConfiguration::kInterval10000Us:
+              [[fallthrough]];
+            default:
+              max_transport_latency = 61; //61msec for 10msec frame duration
+              break;
+          }
+        }
+        LOG_INFO("broadcast_config rtn: %d, max_transport_latency: %d",
+            rtn, max_transport_latency);
+        broadcast_config.retransmission_number = rtn;
+        broadcast_config.max_transport_latency = max_transport_latency;
+        supported_broadcast_config.push_back(broadcast_config);
+      } else if (bcast_high_reliability_qos.find(sample_rate) !=
               bcast_high_reliability_qos.end() &&
           bcast_high_reliability_qos[sample_rate].find(frame_duration) !=
               bcast_high_reliability_qos[sample_rate].end()) {
