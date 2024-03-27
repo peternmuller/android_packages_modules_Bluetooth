@@ -277,8 +277,8 @@ void BleScannerIntf::SetScanParameters(
   scanner_intf_->SetScanParameters(
       scanner_id,
       scan_type,
-      {scan_interval},
-      {scan_window},
+      scan_interval,
+      scan_window,
       base::Bind(&BleScannerIntf::OnStatusCallback, base::Unretained(this), scanner_id));
 }
 

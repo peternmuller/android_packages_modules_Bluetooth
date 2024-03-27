@@ -1762,8 +1762,8 @@ void LeScanningManager::Scan(bool start) {
 }
 
 void LeScanningManager::SetScanParameters(
-    ScannerId scanner_id, LeScanType scan_type, std::vector<uint32_t> scan_interval, std::vector<uint32_t> scan_window) {
-  CallOn(pimpl_.get(), &impl::set_scan_parameters, scanner_id, scan_type, scan_interval[0], scan_window[0]);
+    ScannerId scanner_id, LeScanType scan_type, int scan_interval, int scan_window) {
+  CallOn(pimpl_.get(), &impl::set_scan_parameters, scanner_id, scan_type, scan_interval, scan_window);
 }
 
 void LeScanningManager::SetScanFilterPolicy(LeScanningFilterPolicy filter_policy) {
