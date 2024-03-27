@@ -29,6 +29,7 @@
 #include "common/strings.h"
 #include "internal_include/bt_trace.h"
 #include "common/init_flags.h"
+#include "le_audio_utils.h"
 #include "stack/include/bt_types.h"
 
 namespace le_audio {
@@ -767,39 +768,16 @@ bool IsCodecConfigSettingSupported(types::LeAudioContextType context_type,
 
   LOG_DEBUG(": Settings for format: 0x%02x ", codec_id.coding_format);
 
-  switch (codec_id.coding_format) {
-    case kLeAudioCodingFormatLC3:
-      return IsCodecConfigCoreSupported(context_type, pac.codec_spec_caps, pac.metadata,
-		      codec_config_setting.params, vendor_metadata);
-    case types::kLeAudioCodingFormatVendorSpecific:
-      if (!bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
-        LOG_DEBUG(" Multicodec support disabled, disallow vendor codecs for negotiation");
-        return false;
-      }
-      if (codec_id.vendor_company_id != pac.codec_id.vendor_company_id)
-        return false;
-      if (codec_id != pac.codec_id)
-        return false;
-      switch (codec_id.vendor_company_id) {
-        case types::kLeAudioVendorCompanyIdQualcomm:
-          switch (codec_id.vendor_codec_id) {
-            case types::kLeAudioCodingFormatAptxLe:
-              return cm->IsAptxAdaptiveLeSupported() && IsCodecConfigurationSupportedVendorAptxLe(
-                  context_type, pac.codec_spec_caps, pac.metadata,
-                  codec_config_setting.params, vendor_metadata);
-             case types::kLeAudioCodingFormatAptxLeX:
-              return cm->IsAptxAdaptiveLeXSupported() && IsCodecConfigurationSupportedVendorAptxLeX(
-                  context_type, pac.codec_spec_caps, pac.metadata,
-                  codec_config_setting.params, vendor_metadata);
-            default:
-              return false;
-          }
-        default:
-          return false;
-      }
-    default:
-      return false;
+  if (utils::IsCodecUsingLtvFormat(codec_id)) {
+    ASSERT_LOG(!pac.codec_spec_caps.IsEmpty(),
+               "Codec specific capabilities are not parsed approprietly.");
+    return IsCodecConfigCoreSupported(context_type, pac.codec_spec_caps, pac.metadata,
+                    codec_config_setting.params, vendor_metadata);
   }
+
+  LOG_ERROR("Codec %s, seems to be not supported here.",
+            bluetooth::common::ToString(codec_id).c_str());
+  return false;
 }
 
 uint32_t CodecConfigSetting::GetSamplingFrequencyHz() const {
@@ -1131,12 +1109,21 @@ void LeAudioLtvMap::Append(const LeAudioLtvMap& other) {
   for (auto& el : other.values) {
     values[el.first] = el.second;
   }
+
+  invalidate();
 }
 
 LeAudioLtvMap LeAudioLtvMap::Parse(const uint8_t* p_value, uint8_t len,
                                    bool& success) {
   LeAudioLtvMap ltv_map;
+  success = ltv_map.Parse(p_value, len);
+  if (!success) {
+    LOG(ERROR) << __func__ << "Error parsing LTV map";
+  }
+  return ltv_map;
+}
 
+bool LeAudioLtvMap::Parse(const uint8_t* p_value, uint8_t len) {
   if (len > 0) {
     const auto p_value_end = p_value + len;
 
@@ -1150,8 +1137,8 @@ LeAudioLtvMap LeAudioLtvMap::Parse(const uint8_t* p_value, uint8_t len,
       if (p_value_end < (p_value + ltv_len)) {
         LOG(ERROR) << __func__
                    << " Invalid ltv_len: " << static_cast<int>(ltv_len);
-        success = false;
-        return LeAudioLtvMap();
+        invalidate();
+        return false;
       }
 
       uint8_t ltv_type;
@@ -1162,12 +1149,12 @@ LeAudioLtvMap LeAudioLtvMap::Parse(const uint8_t* p_value, uint8_t len,
       p_value += ltv_len;
 
       std::vector<uint8_t> ltv_value(p_temp, p_value);
-      ltv_map.values.emplace(ltv_type, std::move(ltv_value));
+      values.emplace(ltv_type, std::move(ltv_value));
     }
   }
+  invalidate();
 
-  success = true;
-  return ltv_map;
+  return true;
 }
 
 size_t LeAudioLtvMap::RawPacketSize() const {
@@ -1223,6 +1210,24 @@ LeAudioLtvMap::GetAsCoreCodecCapabilities() const {
   return *core_capabilities;
 }
 
+void LeAudioLtvMap::RemoveAllTypes(const LeAudioLtvMap& other) {
+  for (auto const& [key, _] : other.values) {
+    Remove(key);
+  }
+}
+
+LeAudioLtvMap LeAudioLtvMap::GetIntersection(const LeAudioLtvMap& other) const {
+  LeAudioLtvMap result;
+  for (auto const& [key, value] : values) {
+    auto entry = other.Find(key);
+    if (entry->size() != value.size()) continue;
+    if (memcmp(entry->data(), value.data(), value.size()) == 0) {
+      result.Add(key, value);
+    }
+  }
+  return result;
+}
+
 }  // namespace types
 
 void AppendMetadataLtvEntryForCcidList(std::vector<uint8_t>& metadata,
@@ -1260,10 +1265,12 @@ void AppendMetadataLtvEntryForStreamingContext(
 }
 
 uint8_t GetMaxCodecFramesPerSduFromPac(const acs_ac_record* pac) {
-  auto tlv_ent = pac->codec_spec_caps.Find(
-      codec_spec_caps::kLeAudioLtvTypeSupportedMaxCodecFramesPerSdu);
+  if (utils::IsCodecUsingLtvFormat(pac->codec_id)) {
+    auto tlv_ent = pac->codec_spec_caps.Find(
+        codec_spec_caps::kLeAudioLtvTypeSupportedMaxCodecFramesPerSdu);
 
-  if (tlv_ent) return VEC_UINT8_TO_UINT8(tlv_ent.value());
+    if (tlv_ent) return VEC_UINT8_TO_UINT8(tlv_ent.value());
+  }
 
   return 1;
 }
@@ -1305,6 +1312,13 @@ std::ostream& operator<<(std::ostream& os, const types::AseState& state) {
   os << char_value_[static_cast<uint8_t>(state)] << " ("
      << "0x" << std::setfill('0') << std::setw(2) << static_cast<int>(state)
      << ")";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const LeAudioCodecId& codec_id) {
+  os << "LeAudioCodecId(CodingFormat=" << loghex(codec_id.coding_format)
+     << ", CompanyId=" << loghex(codec_id.vendor_company_id)
+     << ", CodecId=" << loghex(codec_id.vendor_codec_id) << ")";
   return os;
 }
 

@@ -294,11 +294,11 @@ android_app {
     javacflags: ["-Aroom.schemaLocation=packages/modules/Bluetooth/android/app/tests/unit/src/com/android/bluetooth/btservice/storage/schemas"],
 
     lint: {
+        // TODO(b/318814235): Add back ObsoleteSdkInt to this list.
         error_checks: [
             "ExtraText",
             "MissingClass",
             "NewApi",
-            "ObsoleteSdkInt",
             "Recycle",
             "RtlHardcoded",
             "UseSparseArrays",
@@ -322,6 +322,9 @@ android_app {
         javacflags: [
             // "-Xep:AndroidFrameworkRequiresPermission:ERROR",
             "-Xep:AlmostJavadoc:ERROR",
+            "-Xep:UnusedMethod:ERROR",
+            "-Xep:UnusedVariable:ERROR",
+            "-XepExcludedPaths:.*/srcjars/.*", // Exclude generated files
         ],
     },
     min_sdk_version: "Tiramisu",
