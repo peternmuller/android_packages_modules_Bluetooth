@@ -620,6 +620,12 @@ public class A2dpService extends ProfileService {
                 mActiveDevice = device;
             }
 
+            LeAudioService leAudioService = mFactory.getLeAudioService();
+            if (leAudioService != null) {
+                Log.i(TAG, "Make sure there is no broadcast active.");
+                leAudioService.setInactiveForBroadcast();
+            }
+
             // Switch from one A2DP to another A2DP device
             Log.d(TAG, "Switch A2DP devices to " + device + " from " + previousActiveDevice);
 
