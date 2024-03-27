@@ -18,6 +18,8 @@
 
 #define LOG_TAG "bta_ag_cmd"
 
+#include <bluetooth/log.h>
+
 #include <android_bluetooth_flags.h>
 #include <base/logging.h>
 
@@ -45,6 +47,8 @@
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/btm/btm_sco_hfp_hal.h"
 #include "stack/include/port_api.h"
+
+using namespace bluetooth;
 
 /*****************************************************************************
  *  Constants
@@ -1474,6 +1478,10 @@ static void bta_ag_hsp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1491,6 +1499,10 @@ static void bta_ag_hsp_result(tBTA_AG_SCB* p_scb,
             !bta_ag_sco_is_open(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1587,6 +1599,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                           bta_ag_result_text(result.result))) {
             break;
           }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
+            break;
+          }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
         }
       }
@@ -1605,6 +1621,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
             !bta_ag_sco_is_open(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1630,6 +1650,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1643,6 +1667,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1654,6 +1682,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
         if (result.data.audio_handle == bta_ag_scb_to_idx(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1672,6 +1704,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
         if (result.data.audio_handle == bta_ag_scb_to_idx(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -2007,7 +2043,14 @@ void bta_ag_send_qcs(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_ag_send_qac(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data) {
-  LOG_VERBOSE("send +QAC codecs supported");
+  if (!get_swb_codec_status(bluetooth::headset::BTHF_SWB_CODEC_VENDOR_APTX,
+                            &p_scb->peer_addr)) {
+    log::verbose("send +QAC codecs unsupported");
+    bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_QAC, SWB_CODECS_UNSUPPORTED, 0);
+    return;
+  }
+
+  log::verbose("send +QAC codecs supported");
   bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_QAC, SWB_CODECS_SUPPORTED, 0);
 
   if (p_scb->sco_codec == BTA_AG_SCO_APTX_SWB_SETTINGS_Q0) {
