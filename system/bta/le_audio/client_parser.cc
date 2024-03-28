@@ -32,6 +32,7 @@
 
 #include "internal_include/bt_trace.h"
 #include "le_audio_types.h"
+#include "le_audio_utils.h"
 #include "os/log.h"
 #include "stack/include/bt_types.h"
 #include "osi/include/properties.h"
@@ -312,18 +313,19 @@ bool ParseAseCtpNotification(struct ctp_ntf& ntf, uint16_t len,
 }
 
 void PrepareAseCtpAptxCodecConfig(std::vector<struct ctp_codec_conf>& confs) {
-  for (auto& conf : confs) {
-     if (conf.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
-          (conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
-          conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
-       types::LeAudioLtvMap ltvmap;
-       ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq,
-                 conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq).value());
-       ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
-                 conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation).value());
-       conf.codec_config = ltvmap;
-     }
-  }
+  // TODO (b/330781955): codec_config changed from LeAudioLtvMap to std::vector<uint8_t>. Logic needs to be revised.
+  // for (auto& conf : confs) {
+  //    if (conf.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
+  //         (conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
+  //         conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
+  //      types::LeAudioLtvMap ltvmap;
+  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq,
+  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq).value());
+  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
+  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation).value());
+  //      conf.codec_config = ltvmap;
+  //    }
+  // }
 }
 
 bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
@@ -331,22 +333,33 @@ bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
   if (confs_.size() == 0) return false;
   std::vector<struct ctp_codec_conf> confs = confs_;
   PrepareAseCtpAptxCodecConfig(confs);
-  std::string conf_ents_str;
+  std::stringstream conf_ents_str;
   size_t msg_len = std::accumulate(
       confs.begin(), confs.end(),
       confs.size() * kCtpCodecConfMinLen + kAseNumSize + kCtpOpSize,
       [&conf_ents_str](size_t cur_len, auto const& conf) {
-        for (const auto& [type, value] : conf.codec_config.Values()) {
-          conf_ents_str +=
-              "\ttype: " + std::to_string(type) +
-              "\tlen: " + std::to_string(value.size()) +
-              "\tdata: " + base::HexEncode(value.data(), value.size()) + "\n";
-        };
+        if (utils::IsCodecUsingLtvFormat(conf.codec_id)) {
+          types::LeAudioLtvMap ltv;
+          if (ltv.Parse(conf.codec_config.data(), conf.codec_config.size())) {
+            for (const auto& [type, value] : ltv.Values()) {
+              conf_ents_str
+                  << "\ttype: " << std::to_string(type)
+                  << "\tlen: " << std::to_string(value.size())
+                  << "\tdata: " << base::HexEncode(value.data(), value.size())
+                  << "\n";
+            }
+            return cur_len + conf.codec_config.size();
+          }
+          LOG_ERROR("Error parsing codec configuration LTV data.");
+        }
 
-        return cur_len + conf.codec_config.RawPacketSize();
+        conf_ents_str << "\t"
+                      << base::HexEncode(conf.codec_config.data(),
+                                         conf.codec_config.size());
+        return cur_len + conf.codec_config.size();
       });
-  value.resize(msg_len);
 
+  value.resize(msg_len);
   uint8_t* msg = value.data();
   UINT8_TO_STREAM(msg, kCtpOpcodeCodecConfiguration);
 
@@ -359,9 +372,9 @@ bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
     UINT16_TO_STREAM(msg, conf.codec_id.vendor_company_id);
     UINT16_TO_STREAM(msg, conf.codec_id.vendor_codec_id);
 
-    auto codec_spec_conf_len = conf.codec_config.RawPacketSize();
-    UINT8_TO_STREAM(msg, codec_spec_conf_len);
-    msg = conf.codec_config.RawPacket(msg);
+    UINT8_TO_STREAM(msg, conf.codec_config.size());
+    ARRAY_TO_STREAM(msg, conf.codec_config.data(),
+                    static_cast<int>(conf.codec_config.size()));
 
     LOG(INFO) << __func__ << ", Codec configuration"
               << "\n\tAse id: " << loghex(conf.ase_id)
@@ -373,10 +386,10 @@ bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
               << "\n\tVendor codec ID: "
               << loghex(conf.codec_id.vendor_codec_id)
               << "\n\tCodec config len: "
-              << static_cast<int>(codec_spec_conf_len)
+              << static_cast<int>(conf.codec_config.size())
               << "\n\tCodec spec conf: "
               << "\n"
-              << conf_ents_str;
+              << conf_ents_str.str();
   }
 
   return true;
@@ -624,10 +637,14 @@ int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
     return -1;
   }
 
-  bool parsed;
-  rec.codec_spec_caps =
-      types::LeAudioLtvMap::Parse(value, codec_spec_cap_len, parsed);
-  if (!parsed) return -1;
+  rec.codec_spec_caps_raw.assign(value, value + codec_spec_cap_len);
+
+  if (utils::IsCodecUsingLtvFormat(rec.codec_id)) {
+    bool parsed;
+    rec.codec_spec_caps =
+        types::LeAudioLtvMap::Parse(value, codec_spec_cap_len, parsed);
+    if (!parsed) return -1;
+  }
 
   value += codec_spec_cap_len;
   len -= codec_spec_cap_len;
@@ -645,7 +662,6 @@ int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
   TestSinkPacRecords(const_cast<uint8_t *>(value), rec.codec_id.vendor_codec_id);
 
   rec.metadata.assign(value, value+metadata_len);
-  if (!parsed) return -1;
 
   value += metadata_len;
   len -= metadata_len;

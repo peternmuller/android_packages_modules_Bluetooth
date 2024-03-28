@@ -53,7 +53,7 @@ class MockLeScanningManager : public LeScanningManager {
   MOCK_METHOD(void, Unregister, (ScannerId));
   MOCK_METHOD(void, Scan, (bool));
   MOCK_METHOD(void, SetScanParameters,
-              (ScannerId, LeScanType, std::vector<uint32_t>, std::vector<uint32_t>));
+              (ScannerId, LeScanType, int, int));
   MOCK_METHOD(void, ScanFilterEnable, (bool));
   MOCK_METHOD(void, ScanFilterParameterSetup, (ApcfAction, uint8_t, AdvertisingFilterParameter));
   MOCK_METHOD(void, ScanFilterAdd, (uint8_t, std::vector<AdvertisingPacketContentFilterCommand>));

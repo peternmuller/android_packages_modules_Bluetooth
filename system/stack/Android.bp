@@ -139,6 +139,7 @@ cc_library_static {
         "pan/pan_utils.cc",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_hci_pdl",
         "libbluetooth_log",
@@ -341,6 +342,8 @@ cc_defaults {
     ],
     static_libs: [
         "libchrome",
+        "libgmock",
+        "libgtest",
     ],
     shared_libs: [
         "libbase",
@@ -470,7 +473,6 @@ cc_fuzz {
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
         "libbt_shim_ffi",
-        "libgmock",
     ],
 }
 
@@ -520,7 +522,6 @@ cc_fuzz {
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
         "libbt_shim_ffi",
-        "libgmock",
     ],
 }
 
@@ -565,7 +566,6 @@ cc_fuzz {
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
         "libbt_shim_ffi",
-        "libgmock",
     ],
 }
 
@@ -603,7 +603,11 @@ cc_fuzz {
         "avrc/*.cc",
         "fuzzers/avrc_fuzzer.cc",
     ],
+    shared_libs: [
+        "server_configurable_flags",
+    ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbase",
         "libbluetooth-types",
         "libbluetooth_hci_pdl",
@@ -614,7 +618,6 @@ cc_fuzz {
         "libbt_shim_bridge",
         "libbt_shim_ffi",
         "libcom.android.sysprop.bluetooth.wrapped",
-        "libgmock",
     ],
 }
 
@@ -650,6 +653,7 @@ cc_fuzz {
         "l2cap/*.cc",
     ],
     static_libs: [
+        "bluetooth_flags_c_lib",
         "libbluetooth-types",
         "libbluetooth_hci_pdl",
         "libbluetooth_l2cap_pdl",
@@ -658,7 +662,9 @@ cc_fuzz {
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
         "libbt_shim_ffi",
-        "libgmock",
+    ],
+    shared_libs: [
+        "server_configurable_flags",
     ],
     target: {
         android: {
@@ -1054,6 +1060,7 @@ cc_test {
     shared_libs: [
         "libcrypto",
         "libcutils",
+        "server_configurable_flags",
     ],
     static_libs: [
         "libbase",
@@ -1359,6 +1366,7 @@ cc_test {
     shared_libs: [
         "libcrypto",
         "libcutils",
+        "server_configurable_flags",
     ],
     static_libs: [
         "libbase",
@@ -2154,6 +2162,7 @@ cc_test {
         ":TestMockStackBtm",
         ":TestMockStackL2cap",
         ":TestMockStackMetrics",
+        "test/sdp/stack_sdp_db_test.cc",
         "test/sdp/stack_sdp_test.cc",
         "test/sdp/stack_sdp_utils_test.cc",
     ],

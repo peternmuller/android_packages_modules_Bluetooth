@@ -184,8 +184,7 @@ class BleScannerInterface {
 
   /** Sets the LE scan interval and window in units of N*0.625 msec */
   virtual void SetScanParameters(int scanner_id, uint8_t scan_type,
-                                 std::vector<uint32_t> scan_interval,
-                                 std::vector<uint32_t> scan_window,
+                                 int scan_interval,int scan_window,
                                  Callback cb) = 0;
 
   /* Configure the batchscan storage */

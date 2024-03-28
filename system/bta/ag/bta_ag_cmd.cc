@@ -18,6 +18,8 @@
 
 #define LOG_TAG "bta_ag_cmd"
 
+#include <bluetooth/log.h>
+
 #include <android_bluetooth_flags.h>
 #include <base/logging.h>
 
@@ -45,6 +47,8 @@
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/btm/btm_sco_hfp_hal.h"
 #include "stack/include/port_api.h"
+
+using namespace bluetooth;
 
 /*****************************************************************************
  *  Constants
@@ -1267,6 +1271,14 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
         event = BTA_AG_ENABLE_EVT;
         bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_SUPPORTED);
       }
+
+      // if SLC didn't happen yet, just send OK
+      if (!p_scb->svc_conn) {
+        event = BTA_AG_ENABLE_EVT;
+        LOG_WARN("%s: sending OK from stack for CLCC before SLC ",
+                            __func__);
+        bta_ag_send_ok(p_scb);
+      }
       break;
 
     case BTA_AG_AT_BAC_EVT:
@@ -1374,6 +1386,13 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
         bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_SUPPORTED);
         break;
       }
+      if (hfp_hal_interface::get_swb_supported() &&
+          (p_scb->peer_codecs & BTM_SCO_CODEC_LC3) &&
+          !(p_scb->disabled_codecs & BTM_SCO_CODEC_LC3)) {
+        LOG_WARN("Phone and BT device support LC3, return error for QAC");
+        bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_SUPPORTED);
+        break;
+      }
       p_scb->peer_codecs |= bta_ag_parse_qac(p_arg);
       // AT+%QAC needs to be responded with +%QAC
       bta_ag_swb_handle_vs_at_events(p_scb, cmd, int_arg, &val);
@@ -1474,6 +1493,10 @@ static void bta_ag_hsp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1491,6 +1514,10 @@ static void bta_ag_hsp_result(tBTA_AG_SCB* p_scb,
             !bta_ag_sco_is_open(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1587,6 +1614,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                           bta_ag_result_text(result.result))) {
             break;
           }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
+            break;
+          }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
         }
       }
@@ -1605,6 +1636,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
             !bta_ag_sco_is_open(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1630,6 +1665,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1643,6 +1682,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
                                         bta_ag_result_text(result.result))) {
           break;
         }
+        if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+          // let Audio HAL open the SCO
+          break;
+        }
         bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       }
       break;
@@ -1654,6 +1697,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
         if (result.data.audio_handle == bta_ag_scb_to_idx(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1672,6 +1719,10 @@ static void bta_ag_hfp_result(tBTA_AG_SCB* p_scb,
         if (result.data.audio_handle == bta_ag_scb_to_idx(p_scb)) {
           if (!bta_ag_is_sco_open_allowed(p_scb,
                                           bta_ag_result_text(result.result))) {
+            break;
+          }
+          if (IS_FLAG_ENABLED(is_sco_managed_by_audio)) {
+            // let Audio HAL open the SCO
             break;
           }
           bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
@@ -1917,16 +1968,16 @@ bool bta_ag_is_sco_open_allowed(tBTA_AG_SCB* p_scb, const std::string event) {
     3. LE Audio is preferred for DUPLEX,
     4. If it's a CS Call not VoIP one */
 
-  bool is_duplex_pref_leaudio =
-      LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr);
-  bool is_in_call = LeAudioClient::Get()->IsInCall();
-
-  LOG_INFO("Is Duplex preferred profile le audio for device %s is %d ",
-           p_scb->peer_addr.ToStringForLogging().c_str(), is_duplex_pref_leaudio);
-  LOG_INFO("Is call in progress %d", is_in_call);
-
   if (bluetooth::os::GetSystemPropertyBool(
           bluetooth::os::kIsDualModeAudioEnabledProperty, false)) {
+      bool is_duplex_pref_leaudio = LeAudioClient::IsLeAudioClientRunning() ?
+         LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr) : false;
+      bool is_in_call = LeAudioClient::IsLeAudioClientRunning() ?
+                                          LeAudioClient::Get()->IsInCall() : false;
+
+      LOG_INFO("Is Duplex preferred profile le audio for device %s is %d ",
+               p_scb->peer_addr.ToStringForLogging().c_str(), is_duplex_pref_leaudio);
+      LOG_INFO("Is call in progress %d", is_in_call);
     if (is_duplex_pref_leaudio && is_in_call) {
       LOG_INFO("NOT opening SCO for EVT %s on dual mode device %s",
                event.c_str(), p_scb->peer_addr.ToStringForLogging().c_str());
@@ -2007,7 +2058,14 @@ void bta_ag_send_qcs(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_ag_send_qac(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data) {
-  LOG_VERBOSE("send +QAC codecs supported");
+  if (!get_swb_codec_status(bluetooth::headset::BTHF_SWB_CODEC_VENDOR_APTX,
+                            &p_scb->peer_addr)) {
+    log::verbose("send +QAC codecs unsupported");
+    bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_QAC, SWB_CODECS_UNSUPPORTED, 0);
+    return;
+  }
+
+  log::verbose("send +QAC codecs supported");
   bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_QAC, SWB_CODECS_SUPPORTED, 0);
 
   if (p_scb->sco_codec == BTA_AG_SCO_APTX_SWB_SETTINGS_Q0) {

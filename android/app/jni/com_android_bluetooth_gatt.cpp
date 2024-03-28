@@ -1587,13 +1587,8 @@ static void gattSetScanParametersNative(JNIEnv* /* env */, jobject /* object */,
   if (!sGattIf) return;
 
   ALOGW("gattSetScanParametersNative");
-  std::vector<uint32_t> scan_interval = {0,0};
-  std::vector<uint32_t> scan_window = {0,0};
-  scan_interval.push_back(scan_interval_unit);
-  scan_window.push_back(scan_window_unit);
-
   sGattIf->scanner->SetScanParameters(
-      client_if, /* use active scan */ 0x01, scan_interval, scan_window,
+      client_if, /* use active scan */ 0x01, scan_interval_unit, scan_window_unit,
       base::Bind(&set_scan_params_cmpl_cb, client_if));
 }
 
@@ -2885,10 +2880,10 @@ static int register_com_android_bluetooth_gatt_(JNIEnv* env) {
        &method_onBatchScanThresholdCrossed},
       {"createOnTrackAdvFoundLostObject",
        "(II[BI[BIIILjava/lang/String;IIII)"
-       "Lcom/android/bluetooth/gatt/AdvtFilterOnFoundOnLostInfo;",
+       "Lcom/android/bluetooth/le_scan/AdvtFilterOnFoundOnLostInfo;",
        &method_createOnTrackAdvFoundLostObject},
       {"onTrackAdvFoundLost",
-       "(Lcom/android/bluetooth/gatt/AdvtFilterOnFoundOnLostInfo;)V",
+       "(Lcom/android/bluetooth/le_scan/AdvtFilterOnFoundOnLostInfo;)V",
        &method_onTrackAdvFoundLost},
       {"onScanParamSetupCompleted", "(II)V", &method_onScanParamSetupCompleted},
       {"getSampleGattDbElement", "()Lcom/android/bluetooth/gatt/GattDbElement;",
