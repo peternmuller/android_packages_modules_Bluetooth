@@ -78,7 +78,7 @@ final class AdapterState extends StateMachine {
             "ro.bluetooth.ble_stop_timeout_delay";
 
     static final int BLE_START_TIMEOUT_DELAY =
-        4000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
+        5000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
     static final int BLE_STOP_TIMEOUT_DELAY =
         4000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
     static final int BREDR_START_TIMEOUT_DELAY =
