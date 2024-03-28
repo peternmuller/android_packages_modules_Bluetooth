@@ -1968,16 +1968,16 @@ bool bta_ag_is_sco_open_allowed(tBTA_AG_SCB* p_scb, const std::string event) {
     3. LE Audio is preferred for DUPLEX,
     4. If it's a CS Call not VoIP one */
 
-  bool is_duplex_pref_leaudio =
-      LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr);
-  bool is_in_call = LeAudioClient::Get()->IsInCall();
-
-  LOG_INFO("Is Duplex preferred profile le audio for device %s is %d ",
-           p_scb->peer_addr.ToStringForLogging().c_str(), is_duplex_pref_leaudio);
-  LOG_INFO("Is call in progress %d", is_in_call);
-
   if (bluetooth::os::GetSystemPropertyBool(
           bluetooth::os::kIsDualModeAudioEnabledProperty, false)) {
+      bool is_duplex_pref_leaudio = LeAudioClient::IsLeAudioClientRunning() ?
+         LeAudioClient::Get()->isDuplexPreferenceLeAudio(p_scb->peer_addr) : false;
+      bool is_in_call = LeAudioClient::IsLeAudioClientRunning() ?
+                                          LeAudioClient::Get()->IsInCall() : false;
+
+      LOG_INFO("Is Duplex preferred profile le audio for device %s is %d ",
+               p_scb->peer_addr.ToStringForLogging().c_str(), is_duplex_pref_leaudio);
+      LOG_INFO("Is call in progress %d", is_in_call);
     if (is_duplex_pref_leaudio && is_in_call) {
       LOG_INFO("NOT opening SCO for EVT %s on dual mode device %s",
                event.c_str(), p_scb->peer_addr.ToStringForLogging().c_str());
