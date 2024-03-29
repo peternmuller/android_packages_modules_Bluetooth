@@ -4,6 +4,7 @@ package android.bluetooth {
   public final class BluetoothA2dp implements android.bluetooth.BluetoothProfile {
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public void disableOptionalCodecs(@NonNull android.bluetooth.BluetoothDevice);
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public void enableOptionalCodecs(@NonNull android.bluetooth.BluetoothDevice);
+    method @Nullable @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public android.bluetooth.BluetoothDevice getActiveDevice();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public android.bluetooth.BufferConstraints getBufferConstraints();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public android.bluetooth.BluetoothCodecStatus getCodecStatus(@NonNull android.bluetooth.BluetoothDevice);
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int getConnectionPolicy(@NonNull android.bluetooth.BluetoothDevice);
@@ -78,6 +79,7 @@ package android.bluetooth {
     method @FlaggedApi("com.android.bluetooth.flags.auto_on_feature") @RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED) public boolean isAutoOnEnabled();
     method @FlaggedApi("com.android.bluetooth.flags.auto_on_feature") @RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED) public boolean isAutoOnSupported();
     method public boolean isBleScanAlwaysAvailable();
+    method @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean isBroadcastActive();
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int isDistanceMeasurementSupported();
     method public boolean isLeEnabled();
     method @NonNull public static String nameForState(int);
@@ -464,6 +466,7 @@ package android.bluetooth {
   }
 
   public final class BluetoothLeAudio implements java.lang.AutoCloseable android.bluetooth.BluetoothProfile {
+    method @NonNull @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public java.util.List<android.bluetooth.BluetoothDevice> getActiveDevices();
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int getAudioLocation(@NonNull android.bluetooth.BluetoothDevice);
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public android.bluetooth.BluetoothLeAudioCodecStatus getCodecStatus(int);
     method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int getConnectionPolicy(@Nullable android.bluetooth.BluetoothDevice);
@@ -514,6 +517,21 @@ package android.bluetooth {
     method public void onGroupNodeRemoved(@NonNull android.bluetooth.BluetoothDevice, int);
     method public void onGroupStatusChanged(int, int);
     method public default void onGroupStreamStatusChanged(int, int);
+  }
+
+  public final class BluetoothLeAudioCodecConfig implements android.os.Parcelable {
+    method public long getCodecSpecific1();
+    method public long getCodecSpecific2();
+    method public long getCodecSpecific3();
+    method public long getCodecSpecific4();
+    field public static final int SOURCE_CODEC_TYPE_APTX_ADAPTIVE_R4 = 2; // 0x2
+  }
+
+  public static final class BluetoothLeAudioCodecConfig.Builder {
+    method @NonNull public android.bluetooth.BluetoothLeAudioCodecConfig.Builder setCodecSpecific1(long);
+    method @NonNull public android.bluetooth.BluetoothLeAudioCodecConfig.Builder setCodecSpecific2(long);
+    method @NonNull public android.bluetooth.BluetoothLeAudioCodecConfig.Builder setCodecSpecific3(long);
+    method @NonNull public android.bluetooth.BluetoothLeAudioCodecConfig.Builder setCodecSpecific4(long);
   }
 
   public final class BluetoothLeAudioCodecConfigMetadata implements android.os.Parcelable {

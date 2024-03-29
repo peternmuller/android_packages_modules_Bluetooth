@@ -2368,6 +2368,7 @@ public final class BluetoothAdapter {
         return false;
     }
     /** @hide */
+    @SystemApi
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean isBroadcastActive() {
         try {
