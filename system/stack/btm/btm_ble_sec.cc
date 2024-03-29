@@ -28,9 +28,10 @@
 
 #include "btif/include/btif_storage.h"
 #include "crypto_toolbox/crypto_toolbox.h"
-#include "device/include/controller.h"
 #include "device/include/interop.h"
 #include "device/include/interop_config.h"
+#include "hci/controller_interface.h"
+#include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
@@ -99,7 +100,7 @@ void BTM_SecAddBleDevice(const RawAddress& bd_addr, tBT_DEVICE_TYPE dev_type,
                ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
   }
 
-  memset(p_dev_rec->sec_bd_name, 0, sizeof(tBTM_BD_NAME));
+  memset(p_dev_rec->sec_bd_name, 0, sizeof(BD_NAME));
 
   p_dev_rec->device_type |= dev_type;
   if (is_ble_addr_type_known(addr_type)) {
@@ -142,7 +143,7 @@ bool BTM_GetRemoteDeviceName(const RawAddress& bd_addr, BD_NAME bd_name) {
   if (btif_storage_get_remote_device_property(&bd_addr, &prop_name) ==
       BT_STATUS_SUCCESS) {
     log::verbose("NV name={}", reinterpret_cast<const char*>(bdname.name));
-    strncpy((char*)bd_name, (char*)bdname.name, BD_NAME_LEN + 1);
+    bd_name_copy(bd_name, bdname.name);
     ret = TRUE;
   }
   return ret;
@@ -575,7 +576,8 @@ bool BTM_ReadConnectedTransportAddress(RawAddress* remote_bda,
 
 tBTM_STATUS BTM_SetBleDataLength(const RawAddress& bd_addr,
                                  uint16_t tx_pdu_length) {
-  if (!controller_get_interface()->SupportsBleDataPacketLengthExtension()) {
+  if (!bluetooth::shim::GetController()
+           ->SupportsBleDataPacketLengthExtension()) {
     log::info("Local controller does not support le packet extension");
     return BTM_ILLEGAL_VALUE;
   }
@@ -602,8 +604,9 @@ tBTM_STATUS BTM_SetBleDataLength(const RawAddress& bd_addr,
 
   uint16_t tx_time = BTM_BLE_DATA_TX_TIME_MAX_LEGACY;
 
-  if (controller_get_interface()->get_bt_version()->hci_version >=
-      HCI_PROTO_VERSION_5_0)
+  if (bluetooth::shim::GetController()
+          ->GetLocalVersionInformation()
+          .hci_version_ >= bluetooth::hci::HciVersion::V_5_0)
     tx_time = BTM_BLE_DATA_TX_TIME_MAX;
 
   if (!BTM_IsAclConnectionUp(bd_addr, BT_TRANSPORT_LE)) {
@@ -619,11 +622,13 @@ tBTM_STATUS BTM_SetBleDataLength(const RawAddress& bd_addr,
     return BTM_ILLEGAL_VALUE;
   }
 
-  tx_pdu_length = std::min<uint16_t>(
-      tx_pdu_length,
-      controller_get_interface()->get_ble_maximum_tx_data_length());
-  tx_time = std::min<uint16_t>(
-      tx_time, controller_get_interface()->get_ble_maximum_tx_time());
+  tx_pdu_length =
+      std::min<uint16_t>(tx_pdu_length, bluetooth::shim::GetController()
+                                            ->GetLeMaximumDataLength()
+                                            .supported_max_tx_octets_);
+  tx_time = std::min<uint16_t>(tx_time, bluetooth::shim::GetController()
+                                            ->GetLeMaximumDataLength()
+                                            .supported_max_tx_time_);
 
   btsnd_hcic_ble_set_data_length(hci_handle, tx_pdu_length, tx_time);
   p_dev_rec->set_suggested_tx_octect(tx_pdu_length);
@@ -1332,7 +1337,7 @@ void btm_ble_link_encrypted(const RawAddress& bd_addr, uint8_t encr_enable) {
       btm_sec_dev_rec_cback_event(p_dev_rec, BTM_ERR_PROCESSING, true);
   }
 
-  tBTM_BD_NAME remote_name = {};
+  BD_NAME remote_name = {};
   /* to notify GATT to send data if any request is pending,
   or if IOP matched, delay notifying until SMP_CMPLT_EVT */
   if (BTM_GetRemoteDeviceName(p_dev_rec->ble.pseudo_addr, remote_name) &&
@@ -1666,7 +1671,7 @@ tBTM_STATUS btm_proc_smp_cback(tSMP_EVT event, const RawAddress& bd_addr,
               p_dev_rec->sec_rec.ble_keys.key_type = BTM_LE_KEY_NONE;
             }
           }
-          tBTM_BD_NAME remote_name = {};
+          BD_NAME remote_name = {};
           if (BTM_GetRemoteDeviceName(p_dev_rec->ble.pseudo_addr,
                                       remote_name) &&
               interop_match_name(INTEROP_SUSPEND_ATT_TRAFFIC_DURING_PAIRING,
@@ -1885,11 +1890,6 @@ static void btm_ble_reset_id_impl(const Octet16& rand1, const Octet16& rand2) {
       crypto_toolbox::aes_128(btm_sec_cb.devcb.id_keys.ir, btm_ble_irk_pt);
 
   btm_notify_new_key(BTM_BLE_KEY_TYPE_ID);
-
-  /* if privacy is enabled, new RPA should be calculated */
-  if (btm_cb.ble_ctr_cb.privacy_mode != BTM_PRIVACY_NONE) {
-    btm_gen_resolvable_private_addr(base::Bind(&btm_gen_resolve_paddr_low));
-  }
 
   /* proceed generate ER */
   btm_sec_cb.devcb.ble_encryption_key_value = rand2;

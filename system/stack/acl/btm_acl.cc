@@ -31,7 +31,6 @@
  *
  *****************************************************************************/
 
-#include "main/shim/entry.h"
 #define LOG_TAG "btm_acl"
 
 #include <bluetooth/log.h>
@@ -42,7 +41,6 @@
 #include "bta/sys/bta_sys.h"
 #include "common/init_flags.h"
 #include "common/metrics.h"
-#include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
 #include "hci/controller_interface.h"
@@ -50,8 +48,9 @@
 #include "include/l2cap_hci_link_interface.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/acl_api.h"
-#include "main/shim/controller.h"
 #include "main/shim/dumpsys.h"
+#include "main/shim/entry.h"
+#include "main/shim/helpers.h"
 #include "os/log.h"
 #include "os/parameter_provider.h"
 #include "osi/include/allocator.h"
@@ -231,8 +230,8 @@ void hci_btm_set_link_supervision_timeout(tACL_CONN& link, uint16_t timeout) {
     return;
   }
 
-  if (!bluetooth::shim::
-          controller_is_write_link_supervision_timeout_supported()) {
+  if (!bluetooth::shim::GetController()->IsSupported(
+          bluetooth::hci::OpCode::WRITE_LINK_SUPERVISION_TIMEOUT)) {
     log::warn(
         "UNSUPPORTED by controller write link supervision timeout:{:.2f}ms "
         "bd_addr:{}",
@@ -250,7 +249,7 @@ void hci_btm_set_link_supervision_timeout(tACL_CONN& link, uint16_t timeout) {
 /* 3 seconds timeout waiting for responses */
 #define BTM_DEV_REPLY_TIMEOUT_MS (3 * 1000)
 
-void BTM_acl_after_controller_started(const controller_t* controller) {
+void BTM_acl_after_controller_started() {
   internal_.btm_set_default_link_policy(
       HCI_ENABLE_CENTRAL_PERIPHERAL_SWITCH | HCI_ENABLE_HOLD_MODE |
       HCI_ENABLE_SNIFF_MODE | HCI_ENABLE_PARK_MODE);
@@ -474,7 +473,7 @@ void btm_acl_created(const RawAddress& bda, uint16_t hci_handle,
     btm_ble_get_acl_remote_addr(hci_handle, p_acl->active_remote_addr,
                                 &p_acl->active_remote_addr_type);
 
-    if (controller_get_interface()
+    if (bluetooth::shim::GetController()
             ->SupportsBlePeripheralInitiatedFeaturesExchange() ||
         link_role == HCI_ROLE_CENTRAL) {
       btsnd_hcic_ble_read_remote_feat(p_acl->hci_handle);
@@ -1127,8 +1126,8 @@ tBTM_STATUS BTM_SetLinkSuperTout(const RawAddress& remote_bda,
 
   /* Only send if current role is Central; 2.0 spec requires this */
   if (p_acl->link_role == HCI_ROLE_CENTRAL) {
-    if (!bluetooth::shim::
-            controller_is_write_link_supervision_timeout_supported()) {
+    if (!bluetooth::shim::GetController()->IsSupported(
+            bluetooth::hci::OpCode::WRITE_LINK_SUPERVISION_TIMEOUT)) {
       log::warn(
           "UNSUPPORTED by controller write link supervision timeout:{:.2f}ms "
           "bd_addr:{}",
@@ -1546,7 +1545,8 @@ uint16_t BTM_GetMaxPacketSize(const RawAddress& addr) {
     pkt_types = p->pkt_types_mask;
   } else {
     /* Special case for when info for the local device is requested */
-    if (addr == *controller_get_interface()->get_address()) {
+    if (addr == bluetooth::ToRawAddress(
+                    bluetooth::shim::GetController()->GetMacAddress())) {
       pkt_types = btm_cb.acl_cb_.DefaultPacketTypes();
     }
   }
@@ -2536,7 +2536,7 @@ void btm_connection_request(const RawAddress& bda,
 
   /* Some device may request a connection before we are done with the HCI_Reset
    * sequence */
-  if (!controller_get_interface()->get_is_ready()) {
+  if (bluetooth::shim::GetController() == nullptr) {
     log::verbose("Security Manager: connect request when device not ready");
     btsnd_hcic_reject_conn(bda, HCI_ERR_HOST_REJECT_DEVICE);
     return;
@@ -2867,3 +2867,14 @@ void btm_flow_spec_complete(uint8_t status, uint16_t handle,
     (*p_cb)(&flow_su);
   }
 }
+
+/*******************************************************************************
+ *
+ * Function         btm_acl_flush
+ *
+ * Description      This function is called by L2CAP to flush an ACL link.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void btm_acl_flush(uint16_t handle) { bluetooth::shim::ACL_Flush(handle); }

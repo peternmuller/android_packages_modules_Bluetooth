@@ -24,6 +24,8 @@
 
 #define LOG_TAG "bt_l2cap"
 
+#include <bluetooth/log.h>
+
 #include "stack/include/l2c_api.h"
 
 #include <base/location.h>
@@ -44,7 +46,6 @@
 #include "os/log.h"
 #include "os/system_properties.h"
 #include "osi/include/allocator.h"
-#include "stack/btm/btm_sec.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_psm_types.h"
 #include "stack/include/btm_api.h"
@@ -54,8 +55,7 @@
 #include "stack/l2cap/l2c_int.h"
 #include "types/raw_address.h"
 
-void btsnd_hcic_enhanced_flush(uint16_t handle,
-                               uint8_t packet_type);  // TODO Remove
+using namespace bluetooth;
 
 using base::StringPrintf;
 
@@ -1584,7 +1584,7 @@ uint16_t L2CA_FlushChannel(uint16_t lcid, uint16_t num_to_flush) {
       if (bluetooth::shim::GetController()->SupportsNonFlushablePb() &&
           (BTM_GetNumScoLinks() == 0)) {
         /* The only packet type defined - 0 - Automatically-Flushable Only */
-        btsnd_hcic_enhanced_flush(p_lcb->Handle(), 0);
+        l2c_acl_flush(p_lcb->Handle());
       }
     }
 
@@ -1772,6 +1772,32 @@ bool L2CA_isMediaChannel(uint16_t handle, uint16_t channel_id,
   }
 
   return ret;
+}
+
+/*******************************************************************************
+ *
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
+  log::verbose("CID: 0x{:04x}", lcid);
+
+  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
+  if (p_ccb == nullptr) {
+    log::error("No CCB for CID:0x{:04x}", lcid);
+    return false;
+  }
+
+  ASSERT(rcid != nullptr);
+  *rcid = p_ccb->remote_cid;
+  return true;
 }
 
 using namespace bluetooth;

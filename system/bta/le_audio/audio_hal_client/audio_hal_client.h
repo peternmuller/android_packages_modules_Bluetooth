@@ -22,17 +22,17 @@
 
 #include "audio_hal_interface/le_audio_software.h"
 
-namespace le_audio {
-/* Represents configuration of audio codec, as exchanged between le audio and
- * phone.
- * It can also be passed to the audio source to configure its parameters.
- */
-
 struct LeAudioCodecId {
     uint8_t coding_format;
     uint16_t vendor_company_id;
     uint16_t vendor_codec_id;
 };
+
+namespace bluetooth::le_audio {
+/* Represents configuration of audio codec, as exchanged between le audio and
+ * phone.
+ * It can also be passed to the audio source to configure its parameters.
+ */
 
 struct LeAudioCodecConfiguration {
   static constexpr uint8_t kChannelNumberMono =
@@ -135,7 +135,8 @@ class LeAudioSinkAudioHalClient {
     virtual ~Callbacks() = default;
     virtual void OnAudioSuspend(void) = 0;
     virtual void OnAudioResume(void) = 0;
-    virtual void OnAudioMetadataUpdate(sink_metadata_v7 sink_metadata) = 0;
+    virtual void OnAudioMetadataUpdate(
+        const std::vector<struct record_track_metadata_v7> sink_metadata) = 0;
 
     base::WeakPtrFactory<Callbacks> weak_factory_{this};
   };
@@ -153,7 +154,7 @@ class LeAudioSinkAudioHalClient {
 
   virtual void UpdateRemoteDelay(uint16_t remote_delay_ms) = 0;
   virtual void UpdateAudioConfigToHal(
-      const ::le_audio::offload_config& config) = 0;
+      const ::bluetooth::le_audio::offload_config& config) = 0;
   virtual void SuspendedForReconfiguration() = 0;
   virtual void ReconfigurationComplete() = 0;
 
@@ -176,8 +177,9 @@ class LeAudioSourceAudioHalClient {
     virtual void OnAudioDataReady(const std::vector<uint8_t>& data) = 0;
     virtual void OnAudioSuspend(void) = 0;
     virtual void OnAudioResume(void) = 0;
-    virtual void OnAudioMetadataUpdate(source_metadata_v7 source_metadata,
-                                       DsaMode dsa_mode) = 0;
+    virtual void OnAudioMetadataUpdate(
+        const std::vector<struct playback_track_metadata_v7> source_metadata,
+        DsaMode dsa_mode) = 0;
 
     base::WeakPtrFactory<Callbacks> weak_factory_{this};
   };
@@ -193,9 +195,9 @@ class LeAudioSourceAudioHalClient {
   virtual void CancelStreamingRequest() = 0;
   virtual void UpdateRemoteDelay(uint16_t remote_delay_ms) = 0;
   virtual void UpdateAudioConfigToHal(
-      const ::le_audio::offload_config& config) = 0;
+      const ::bluetooth::le_audio::offload_config& config) = 0;
   virtual void UpdateBroadcastAudioConfigToHal(
-      const ::le_audio::broadcast_offload_config& config) = 0;
+      const ::bluetooth::le_audio::broadcast_offload_config& config) = 0;
   virtual void SuspendedForReconfiguration() = 0;
   virtual void ReconfigurationComplete() = 0;
 
@@ -206,4 +208,4 @@ class LeAudioSourceAudioHalClient {
  protected:
   LeAudioSourceAudioHalClient() = default;
 };
-}  // namespace le_audio
+}  // namespace bluetooth::le_audio

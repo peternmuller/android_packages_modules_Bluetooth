@@ -108,7 +108,6 @@ import java.util.stream.Collectors;
 
 /**
  * Provides Bluetooth LeAudio profile, as a service in the Bluetooth application.
- * @hide
  */
 public class LeAudioService extends ProfileService {
     private static final boolean DBG = true;
@@ -2492,8 +2491,9 @@ public class LeAudioService extends ProfileService {
                     Log.i(TAG, "updateInbandRingtoneForTheGroup, setting inband ringtone to: "
                                 + groupDescriptor.mInbandRingtoneEnabled + " for " + device
                                 + " " + deviceDescriptor.mDevInbandRingtoneEnabled);
-                    if (groupDescriptor.mInbandRingtoneEnabled
-                                    == deviceDescriptor.mDevInbandRingtoneEnabled) {
+                    if (Objects.equals(
+                            groupDescriptor.mInbandRingtoneEnabled,
+                            deviceDescriptor.mDevInbandRingtoneEnabled)) {
                         if (DBG) {
                             Log.d(TAG, "Device " + device + " has already set inband ringtone to "
                                             + groupDescriptor.mInbandRingtoneEnabled);
@@ -3726,7 +3726,6 @@ public class LeAudioService extends ProfileService {
      *
      * @param device Bluetooth device
      * @return connection policy of the device
-     * @hide
      */
     public int getConnectionPolicy(BluetoothDevice device) {
         int connection_policy = mDatabaseManager
@@ -4237,7 +4236,6 @@ public class LeAudioService extends ProfileService {
      *
      * @param groupId the group id
      * @return the current codec status
-     * @hide
      */
     public BluetoothLeAudioCodecStatus getCodecStatus(int groupId) {
         if (DBG) {
@@ -4256,7 +4254,6 @@ public class LeAudioService extends ProfileService {
      * @param groupId the group id
      * @param inputCodecConfig the input codec configuration preference
      * @param outputCodecConfig the output codec configuration preference
-     * @hide
      */
     public void setCodecConfigPreference(int groupId,
             BluetoothLeAudioCodecConfig inputCodecConfig,
@@ -4693,12 +4690,12 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(source, "source cannot be null");
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
+                int result = BluetoothProfile.CONNECTION_POLICY_UNKNOWN;
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    result = service.getConnectionPolicy(device);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                int result = service.getConnectionPolicy(device);
                 receiver.send(result);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4715,11 +4712,10 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    service.setCcidInformation(userUuid, ccid, contextType);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                service.setCcidInformation(userUuid, ccid, contextType);
                 receiver.send(null);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4734,11 +4730,11 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(source, "source cannot be null");
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
+                int result = LE_AUDIO_GROUP_ID_INVALID;
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    result = service.getGroupId(device);
                 }
-                int result = service.getGroupId(device);
                 receiver.send(result);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4753,12 +4749,12 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(source, "source cannot be null");
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
+                boolean result = false;
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    result = service.groupAddNode(group_id, device);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                boolean result = service.groupAddNode(group_id, device);
                 receiver.send(result);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4773,11 +4769,10 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    service.setInCall(inCall);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                service.setInCall(inCall);
                 receiver.send(null);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4793,11 +4788,10 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    service.setInactiveForHfpHandover(hfpHandoverDevice);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                service.setInactiveForHfpHandover(hfpHandoverDevice);
                 receiver.send(null);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4812,12 +4806,12 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(source, "source cannot be null");
                 Objects.requireNonNull(receiver, "receiver cannot be null");
 
+                boolean result = false;
                 LeAudioService service = getService(source);
-                if (service == null) {
-                    throw new IllegalStateException("service is null");
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    result = service.groupRemoveNode(groupId, device);
                 }
-                enforceBluetoothPrivilegedPermission(service);
-                boolean result = service.groupRemoveNode(groupId, device);
                 receiver.send(result);
             } catch (RuntimeException e) {
                 receiver.propagateException(e);
@@ -4833,7 +4827,8 @@ public class LeAudioService extends ProfileService {
 
                 LeAudioService service = getService(source);
                 if (service == null) {
-                    throw new IllegalStateException("service is null");
+                    receiver.send(null);
+                    return;
                 }
                 enforceBluetoothPrivilegedPermission(service);
                 receiver.send(null);
@@ -5150,7 +5145,7 @@ public class LeAudioService extends ProfileService {
                 for (Map.Entry<BluetoothDevice, LeAudioDeviceDescriptor> deviceEntry
                         : mDeviceDescriptors.entrySet()) {
                     LeAudioDeviceDescriptor deviceDescriptor = deviceEntry.getValue();
-                    if (deviceDescriptor.mGroupId != groupId) {
+                    if (!Objects.equals(deviceDescriptor.mGroupId, groupId)) {
                         if (deviceDescriptor.mGroupId == LE_AUDIO_GROUP_ID_INVALID) {
                             numberOfUngroupedDevs++;
                         }

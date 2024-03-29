@@ -244,16 +244,6 @@
 #define BTM_SEC_MAX_SERVICE_RECORDS 32
 #endif
 
-/* Maximum device name length used in btm database. */
-#ifndef BTM_MAX_REM_BD_NAME_LEN
-#define BTM_MAX_REM_BD_NAME_LEN 248
-#endif
-
-/* Maximum local device name length stored btm database */
-#ifndef BTM_MAX_LOC_BD_NAME_LEN
-#define BTM_MAX_LOC_BD_NAME_LEN 248
-#endif
-
 /* Maximum length of the service name. */
 #ifndef BT_MAX_SERVICE_NAME_LEN
 #define BT_MAX_SERVICE_NAME_LEN 21
@@ -400,8 +390,15 @@
  * create l2cap connection, it will use this fixed ID. */
 #define CONN_MGR_ID_L2CAP (GATT_MAX_APPS + 10)
 
+/* This value is used for static allocation of resources. The actual maximum at
+ * runtime is controlled by a system property. */
 #ifndef GATT_MAX_PHY_CHANNEL
-#define GATT_MAX_PHY_CHANNEL 7
+#define GATT_MAX_PHY_CHANNEL 16
+#endif
+
+/* Devices must support at least 8 GATT channels per the CDD. */
+#ifndef GATT_MAX_PHY_CHANNEL_FLOOR
+#define GATT_MAX_PHY_CHANNEL_FLOOR 8
 #endif
 
 /* Used for conformance testing ONLY */

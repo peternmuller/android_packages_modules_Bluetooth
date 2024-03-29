@@ -1202,7 +1202,7 @@ void bta_av_setconfig_rsp(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  ******************************************************************************/
 void bta_av_str_opened(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   tBTA_AV_CONN_CHG msg;
-  char remote_name[BTM_MAX_REM_BD_NAME_LEN] = "";
+  char remote_name[BD_NAME_LEN] = "";
   uint8_t* p;
 
   LOG_VERBOSE("%s: peer %s bta_handle: 0x%x", __func__,
@@ -2862,7 +2862,7 @@ void bta_av_rcfg_cfm(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   // Disable AVDTP RECONFIGURE for rejectlisted devices
   bool disable_avdtp_reconfigure = false;
   {
-    char remote_name[BTM_MAX_REM_BD_NAME_LEN] = "";
+    char remote_name[BD_NAME_LEN] = "";
     if (btif_storage_get_stored_remote_name(p_scb->PeerAddress(),
                                             remote_name)) {
       if (interop_match_name(INTEROP_DISABLE_AVDTP_RECONFIGURE, remote_name) ||

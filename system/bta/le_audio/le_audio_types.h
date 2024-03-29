@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <bluetooth/log.h>
 #include <stdint.h>
 
 #include <bitset>
@@ -62,7 +63,7 @@ constexpr uint8_t  GAMING_VBC_USE_CASE     = 0X02;
 constexpr uint8_t  VOICE_USE_CASE          = 0X03;
 constexpr uint8_t  STEREO_REC_USE_CASE     = 0X04;
 
-namespace le_audio {
+namespace bluetooth::le_audio {
 
 #define UINT8_TO_VEC_UINT8(u8) \
   std::vector<uint8_t> { u8 }
@@ -549,8 +550,6 @@ struct BidirectionalPair {
 
   const T& get(uint8_t direction) const;
   T& get(uint8_t direction);
-
-  BidirectionalPair<T>& operator=(const BidirectionalPair<T>&) = default;
 };
 
 template <typename T>
@@ -613,7 +612,10 @@ std::string CodecCapabilitiesLtvFormat(const uint8_t& type,
  */
 struct LeAudioCoreCodecConfig {
   static const std::map<uint8_t, uint32_t> sampling_freq_map;
+  static const std::map<uint32_t, uint8_t> sample_rate_map;
+
   static const std::map<uint8_t, uint32_t> frame_duration_map;
+  static const std::map<uint32_t, uint8_t> data_interval_map;
 
   std::optional<uint8_t> sampling_frequency;
   std::optional<uint8_t> frame_duration;
@@ -720,6 +722,40 @@ struct LeAudioCoreCodecCapabilities {
   std::optional<uint16_t> supported_max_octets_per_codec_frame;
   std::optional<uint8_t> supported_max_codec_frames_per_sdu;
 };
+
+#define LTV_ENTRY_SAMPLING_FREQUENCY(value)                 \
+  {                                                         \
+    le_audio::codec_spec_conf::kLeAudioLtvTypeSamplingFreq, \
+        std::vector<uint8_t>({(value) & 0xFF})              \
+  }
+
+#define LTV_ENTRY_FRAME_DURATION(value)                      \
+  {                                                          \
+    le_audio::codec_spec_conf::kLeAudioLtvTypeFrameDuration, \
+        std::vector<uint8_t>({(value) & 0xFF})               \
+  }
+
+#define LTV_ENTRY_AUDIO_CHANNEL_ALLOCATION(value)                     \
+  {                                                                   \
+    le_audio::codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation, \
+        std::vector<uint8_t>({(uint8_t)(value) & 0xFF,                \
+                              (uint8_t)((value) << 8) & 0xFF,         \
+                              (uint8_t)((value) << 16) & 0xFF,        \
+                              (uint8_t)((value) << 24) & 0xFF})       \
+  }
+
+#define LTV_ENTRY_OCTETS_PER_CODEC_FRAME(value)                        \
+  {                                                                    \
+    le_audio::codec_spec_conf::kLeAudioLtvTypeOctetsPerCodecFrame,     \
+        std::vector<uint8_t>(                                          \
+            {(uint8_t)(value) & 0xFF, (uint8_t)((value) << 8) & 0xFF}) \
+  }
+
+#define LTV_ENTRY_FRAME_BLOCKS_PER_SDU(value)                         \
+  {                                                                   \
+    le_audio::codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu, \
+        std::vector<uint8_t>({(value) & 0xFF})                        \
+  }
 
 class LeAudioLtvMap {
  public:
@@ -1016,6 +1052,56 @@ constexpr LeAudioCodecId kLeAudioCodecHeadtracking = {
     kLeAudioCodingFormatVendorSpecific, kLeAudioVendorCompanyIdGoogle,
     kLeAudioVendorCodecIdHeadtracking};
 
+struct IsoDataPathConfiguration {
+  types::LeAudioCodecId codecId;
+  bool isTransparent;
+  uint32_t controllerDelayUs;
+  std::vector<uint8_t> configuration;
+
+  bool operator==(const IsoDataPathConfiguration& other) const {
+    if (codecId != other.codecId) return false;
+    if (isTransparent != other.isTransparent) return false;
+    if (controllerDelayUs != other.controllerDelayUs) return false;
+    if (configuration.size() != other.configuration.size()) return false;
+    if (memcmp(configuration.data(), other.configuration.data(),
+               other.configuration.size())) {
+      return false;
+    }
+    return true;
+  }
+
+  bool operator!=(const IsoDataPathConfiguration& other) const {
+    return !(*this == other);
+  }
+};
+
+std::ostream& operator<<(
+    std::ostream& os, const le_audio::types::IsoDataPathConfiguration& config);
+
+struct DataPathConfiguration {
+  uint8_t dataPathId;
+  std::vector<uint8_t> dataPathConfig;
+  IsoDataPathConfiguration isoDataPathConfig;
+
+  bool operator==(const DataPathConfiguration& other) const {
+    if (dataPathId != other.dataPathId) return false;
+    if (isoDataPathConfig != other.isoDataPathConfig) return false;
+    if (dataPathConfig.size() != other.dataPathConfig.size()) return false;
+    if (memcmp(dataPathConfig.data(), other.dataPathConfig.data(),
+               other.dataPathConfig.size())) {
+      return false;
+    }
+    return true;
+  }
+
+  bool operator!=(const DataPathConfiguration& other) const {
+    return !(*this == other);
+  }
+};
+
+std::ostream& operator<<(std::ostream& os,
+                         const le_audio::types::DataPathConfiguration& config);
+
 struct hdl_pair {
   hdl_pair() = default;
   hdl_pair(uint16_t val_hdl, uint16_t ccc_hdl)
@@ -1152,6 +1238,17 @@ struct CodecConfigSetting {
     return channel_count_per_iso_stream;
   }
 
+  bool operator==(const CodecConfigSetting& other) const {
+    return (id == other.id) &&
+           (channel_count_per_iso_stream ==
+            other.channel_count_per_iso_stream) &&
+           (params == other.params);
+  }
+
+  bool operator!=(const CodecConfigSetting& other) const {
+    return !(*this == other);
+  }
+
   /* TODO: Add vendor parameter or Ltv map viewers for
    * vendor specific LTV types.
    */
@@ -1169,27 +1266,12 @@ struct QosConfigSetting {
   uint16_t max_transport_latency;
 };
 
-struct SetConfiguration {
-  SetConfiguration(uint8_t direction, uint8_t device_cnt, uint8_t ase_cnt,
-                   CodecConfigSetting codec,
-                   QosConfigSetting qos = {.retransmission_number = 0,
-                                           .max_transport_latency = 0},
-                   le_audio::types::LeAudioConfigurationStrategy strategy =
-                       le_audio::types::LeAudioConfigurationStrategy::
-                           MONO_ONE_CIS_PER_DEVICE,
-                   CodecMetadataSetting metadata = {})
-      : direction(direction),
-        device_cnt(device_cnt),
-        ase_cnt(ase_cnt),
-        codec(codec),
-        qos(qos),
-        strategy(strategy),
-        vendor_metadata(metadata) {}
-
-  uint8_t direction;  /* Direction of set */
-  uint8_t device_cnt; /* How many devices must be in set */
-  uint8_t ase_cnt;    /* How many ASE we need in configuration */
-
+struct AseConfiguration {
+  AseConfiguration(CodecConfigSetting codec,
+                   QosConfigSetting qos = {.target_latency = 0,
+                                           .retransmission_number = 0,
+                                           .max_transport_latency = 0})
+      : codec(codec), qos(qos) {}
   /* Whether the codec location is transparent to the controller */
   bool is_codec_in_controller = false;
   /* Datapath ID used to configure an ISO channel for these ASEs */
@@ -1197,14 +1279,28 @@ struct SetConfiguration {
 
   CodecConfigSetting codec;
   QosConfigSetting qos;
-  types::LeAudioConfigurationStrategy strategy;
   std::optional<CodecMetadataSetting> vendor_metadata;
 };
 
 /* Defined audio scenarios */
 struct AudioSetConfiguration {
-  std::string name;
-  std::vector<struct SetConfiguration> confs;
+  std::string name = "";
+  /* ISO data packing within the CIG */
+  uint8_t packing = bluetooth::hci::kIsoCigPackingSequential;
+  types::BidirectionalPair<std::vector<struct AseConfiguration>> confs;
+
+  struct TopologyInfo {
+    /* How many sink and source devices must be in the set */
+    types::BidirectionalPair<uint8_t> device_count;
+    /* Note: Strategy is used for selecting a particular configuration from the
+     * set of configurations if the configuration provider did not select a
+     * single configuration for us (json file configuration provider).
+     */
+    types::BidirectionalPair<types::LeAudioConfigurationStrategy> strategy = {
+        types::LeAudioConfigurationStrategy::RFU,
+        types::LeAudioConfigurationStrategy::RFU};
+  };
+  std::optional<TopologyInfo> topology_info = std::nullopt;
 };
 
 using AudioSetConfigurations = std::vector<const AudioSetConfiguration*>;
@@ -1283,7 +1379,9 @@ struct stream_configuration {
   bool pending_configuration;
 
   /* Currently selected remote device set configuration */
-  const le_audio::set_configurations::AudioSetConfiguration* conf;
+  std::shared_ptr<
+      const bluetooth::le_audio::set_configurations::AudioSetConfiguration>
+      conf;
 
   /* Currently selected local audio codec */
   types::LeAudioCodecId codec_id;
@@ -1297,4 +1395,17 @@ void AppendMetadataLtvEntryForCcidList(std::vector<uint8_t>& metadata,
 void AppendMetadataLtvEntryForStreamingContext(
     std::vector<uint8_t>& metadata, types::AudioContexts context_type);
 uint8_t GetMaxCodecFramesPerSduFromPac(const types::acs_ac_record* pac_record);
-}  // namespace le_audio
+}  // namespace bluetooth::le_audio
+
+namespace fmt {
+template <>
+struct formatter<bluetooth::le_audio::DsaMode>
+    : enum_formatter<bluetooth::le_audio::DsaMode> {};
+template <>
+struct formatter<bluetooth::le_audio::types::CisType>
+    : enum_formatter<bluetooth::le_audio::types::CisType> {};
+template <>
+struct formatter<bluetooth::le_audio::types::LeAudioConfigurationStrategy>
+    : enum_formatter<bluetooth::le_audio::types::LeAudioConfigurationStrategy> {
+};
+}  // namespace fmt
