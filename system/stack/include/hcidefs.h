@@ -768,7 +768,7 @@ typedef enum : uint16_t {
 #define HCI_PAGE_SCAN_ENABLED 0x02
 
 /* Pagescan timer definitions in 0.625 ms */
-#define HCI_DEF_PAGESCAN_INTERVAL 0x0800 /* 1.28 sec */
+#define HCI_DEF_PAGESCAN_INTERVAL 0x0400 /* 640ms */
 
 /* Parameter for pagescan window is passed to LC and is kept in slots */
 #define HCI_DEF_PAGESCAN_WINDOW 0x12   /* 11.25 ms  */
