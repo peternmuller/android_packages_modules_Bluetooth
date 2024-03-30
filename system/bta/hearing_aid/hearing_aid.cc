@@ -17,6 +17,7 @@
  ******************************************************************************/
 
 #include "bta_hearing_aid_api.h"
+#include "main/shim/entry.h"
 
 #define LOG_TAG "bluetooth"
 
@@ -37,12 +38,13 @@
 #include "bta/include/bta_gatt_queue.h"
 #include "bta/include/bta_hearing_aid_api.h"
 #include "btm_iso_api.h"
-#include "device/include/controller.h"
 #include "embdrv/g722/g722_enc_dec.h"
 #include "hal/link_clocker.h"
 #include "hardware/bt_gatt_types.h"
+#include "hci/controller_interface.h"
 #include "include/check.h"
 #include "internal_include/bt_trace.h"
+#include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
@@ -281,7 +283,6 @@ class HearingAidImpl : public HearingAid {
   // Clock recovery uses L2CAP Flow Control Credit Ind acknowledgments
   // from either the left or right connection, whichever is first
   // connected.
-  std::shared_ptr<bluetooth::hal::L2capCreditIndEvents> asrc_clock_source;
   std::unique_ptr<bluetooth::audio::asrc::SourceAudioHalAsrc> asrc;
 
  public:
@@ -373,38 +374,20 @@ class HearingAidImpl : public HearingAid {
 
     // Create a new ASRC context if required.
     if (asrc == nullptr) {
-      asrc_clock_source =
-          std::make_shared<bluetooth::hal::L2capCreditIndEvents>();
+      log::info("Configuring Asha resampler");
       asrc = std::make_unique<bluetooth::audio::asrc::SourceAudioHalAsrc>(
-          asrc_clock_source, /*channels*/ 2,
+          /*channels*/ 2,
           /*sample_rate*/ codec_in_use == CODEC_G722_24KHZ ? 24000 : 16000,
           /*bit_depth*/ 16,
           /*interval_us*/ default_data_interval_ms * 1000,
           /*num_burst_buffers*/ 0,
           /*burst_delay*/ 0);
     }
-
-    for (auto& device : hearingDevices.devices) {
-      if (!device.accepting_audio) {
-        continue;
-      }
-
-      uint16_t lcid = GAP_ConnGetL2CAPCid(device.gap_handle);
-      uint16_t rcid = 0;
-      L2CA_GetRemoteCid(lcid, &rcid);
-
-      auto conn = btm_acl_for_bda(device.address, BT_TRANSPORT_LE);
-      log::info("Updating ASRC context for handle=0x{:x}, cid=0x{:x}",
-                conn->Handle(), rcid);
-
-      asrc_clock_source->Update(device.isLeft(), conn->Handle(), rcid);
-    }
   }
 
   // Reset the ASHA resampling context.
   void ResetAsrc() {
     log::info("Resetting the Asha resampling context");
-    asrc_clock_source = nullptr;
     asrc = nullptr;
   }
 
@@ -568,7 +551,7 @@ class HearingAidImpl : public HearingAid {
     hearingDevice->connection_update_status = STARTED;
     hearingDevice->requested_connection_interval = UpdateBleConnParams(address);
 
-    if (controller_get_interface()->SupportsBle2mPhy()) {
+    if (bluetooth::shim::GetController()->SupportsBle2mPhy()) {
       log::info("{} set preferred 2M PHY", ADDRESS_TO_LOGGABLE_CSTR(address));
       BTM_BleSetPhy(address, PHY_LE_2M, PHY_LE_2M, 0);
     }
@@ -1046,7 +1029,7 @@ class HearingAidImpl : public HearingAid {
     }
 
     if ((codecs & (1 << CODEC_G722_24KHZ)) &&
-        controller_get_interface()->SupportsBle2mPhy() &&
+        bluetooth::shim::GetController()->SupportsBle2mPhy() &&
         default_data_interval_ms == HA_INTERVAL_10_MS) {
       codec_in_use = CODEC_G722_24KHZ;
     } else if (codecs & (1 << CODEC_G722_16KHZ)) {

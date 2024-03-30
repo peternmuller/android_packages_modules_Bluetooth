@@ -67,7 +67,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 #include "osi/include/properties.h"
 #include "a2dp_sbc.h"
 #include <a2dp_vendor.h>
-#include "main/shim/controller.h"
 #include "types/raw_address.h"
 #include "a2dp_vendor_aptx_adaptive.h"
 

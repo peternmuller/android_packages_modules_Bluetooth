@@ -16,7 +16,12 @@
 
 package com.android.bluetooth.le_scan;
 
+import android.annotation.Nullable;
+import android.os.RemoteException;
+import android.util.Log;
+
 import com.android.bluetooth.gatt.FilterParams;
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -28,9 +33,9 @@ public class ScanNativeInterface {
     private static final String TAG = ScanNativeInterface.class.getSimpleName();
 
     private static ScanNativeInterface sInterface;
-    private static final Object INSTANCE_LOCK = new Object();
 
-    private CountDownLatch mLatch;
+    private CountDownLatch mLatch = new CountDownLatch(1);
+    @Nullable private TransitionalScanHelper mScanHelper;
 
     private ScanNativeInterface() {}
 
@@ -40,7 +45,7 @@ public class ScanNativeInterface {
      * @return default instance
      */
     public static ScanNativeInterface getInstance() {
-        synchronized (INSTANCE_LOCK) {
+        synchronized (ScanNativeInterface.class) {
             if (sInterface == null) {
                 sInterface = new ScanNativeInterface();
             }
@@ -48,13 +53,35 @@ public class ScanNativeInterface {
         return sInterface;
     }
 
+    /** Set singleton instance. */
+    @VisibleForTesting
+    public static void setInstance(ScanNativeInterface instance) {
+        synchronized (ScanNativeInterface.class) {
+            sInterface = instance;
+        }
+    }
+
+    void init(TransitionalScanHelper scanHelper) {
+        mScanHelper = scanHelper;
+        initializeNative();
+    }
+
+    void cleanup() {
+        cleanupNative();
+    }
+
     /* Native methods */
+    private native void initializeNative();
+
+    private native void cleanupNative();
     /************************** Regular scan related native methods **************************/
     private native void registerScannerNative(long appUuidLsb, long appUuidMsb);
     private native void unregisterScannerNative(int scannerId);
     private native void gattClientScanNative(boolean start);
-    private native void gattSetScanParametersNative(int clientIf, int scanInterval,
-            int scanWindow);
+
+    private native void gattSetScanParametersNative(
+            int clientIf, int scanInterval, int scanWindow, int scanPhy);
+
     /************************** Filter related native methods ********************************/
     private native void gattClientScanFilterAddNative(int clientId,
             ScanFilterQueue.Entry[] entries, int filterIndex);
@@ -94,11 +121,9 @@ public class ScanNativeInterface {
         gattClientScanNative(start);
     }
 
-    /**
-     * Configure BLE scan parameters
-     */
-    public void gattSetScanParameters(int clientIf, int scanInterval, int scanWindow) {
-        gattSetScanParametersNative(clientIf, scanInterval, scanWindow);
+    /** Configure BLE scan parameters */
+    public void gattSetScanParameters(int clientIf, int scanInterval, int scanWindow, int scanPhy) {
+        gattSetScanParametersNative(clientIf, scanInterval, scanWindow, scanPhy);
     }
 
     /**
@@ -193,5 +218,156 @@ public class ScanNativeInterface {
         } catch (InterruptedException e) {
             return false;
         }
+    }
+
+    /* Callbacks */
+
+    void onScanResult(
+            int eventType,
+            int addressType,
+            String address,
+            int primaryPhy,
+            int secondaryPhy,
+            int advertisingSid,
+            int txPower,
+            int rssi,
+            int periodicAdvInt,
+            byte[] advData,
+            String originalAddress) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScanResult(
+                eventType,
+                addressType,
+                address,
+                primaryPhy,
+                secondaryPhy,
+                advertisingSid,
+                txPower,
+                rssi,
+                periodicAdvInt,
+                advData,
+                originalAddress);
+    }
+
+    void onScannerRegistered(int status, int scannerId, long uuidLsb, long uuidMsb)
+            throws RemoteException {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScannerRegistered(status, scannerId, uuidLsb, uuidMsb);
+    }
+
+    void onScanFilterEnableDisabled(int action, int status, int clientIf) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScanFilterEnableDisabled(action, status, clientIf);
+    }
+
+    void onScanFilterParamsConfigured(int action, int status, int clientIf, int availableSpace) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScanFilterParamsConfigured(action, status, clientIf, availableSpace);
+    }
+
+    void onScanFilterConfig(
+            int action, int status, int clientIf, int filterType, int availableSpace) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScanFilterConfig(action, status, clientIf, filterType, availableSpace);
+    }
+
+    void onBatchScanStorageConfigured(int status, int clientIf) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onBatchScanStorageConfigured(status, clientIf);
+    }
+
+    void onBatchScanStartStopped(int startStopAction, int status, int clientIf) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onBatchScanStartStopped(startStopAction, status, clientIf);
+    }
+
+    void onBatchScanReports(
+            int status, int scannerId, int reportType, int numRecords, byte[] recordData)
+            throws RemoteException {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onBatchScanReports(status, scannerId, reportType, numRecords, recordData);
+    }
+
+    void onBatchScanThresholdCrossed(int clientIf) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onBatchScanThresholdCrossed(clientIf);
+    }
+
+    @Nullable
+    AdvtFilterOnFoundOnLostInfo createOnTrackAdvFoundLostObject(
+            int clientIf,
+            int advPktLen,
+            byte[] advPkt,
+            int scanRspLen,
+            byte[] scanRsp,
+            int filtIndex,
+            int advState,
+            int advInfoPresent,
+            String address,
+            int addrType,
+            int txPower,
+            int rssiValue,
+            int timeStamp) {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return null;
+        }
+        return mScanHelper.createOnTrackAdvFoundLostObject(
+                clientIf,
+                advPktLen,
+                advPkt,
+                scanRspLen,
+                scanRsp,
+                filtIndex,
+                advState,
+                advInfoPresent,
+                address,
+                addrType,
+                txPower,
+                rssiValue,
+                timeStamp);
+    }
+
+    void onTrackAdvFoundLost(AdvtFilterOnFoundOnLostInfo trackingInfo) throws RemoteException {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onTrackAdvFoundLost(trackingInfo);
+    }
+
+    void onScanParamSetupCompleted(int status, int scannerId) throws RemoteException {
+        if (mScanHelper == null) {
+            Log.e(TAG, "Scan helper is null!");
+            return;
+        }
+        mScanHelper.onScanParamSetupCompleted(status, scannerId);
     }
 }

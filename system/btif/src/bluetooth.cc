@@ -183,7 +183,6 @@ bt_status_t btif_av_sink_execute_service(bool b_enable);
 bt_status_t btif_hh_execute_service(bool b_enable);
 bt_status_t btif_hf_client_execute_service(bool b_enable);
 bt_status_t btif_sdp_execute_service(bool b_enable);
-bt_status_t btif_hh_connect(const tAclLinkSpec* link_spec);
 bt_status_t btif_hd_execute_service(bool b_enable);
 
 extern void gatt_tcb_dump(int fd);
@@ -764,8 +763,8 @@ static int le_rand() {
   if (!interface_ready()) return BT_STATUS_NOT_READY;
 
   do_in_main_thread(
-      FROM_HERE,
-      base::BindOnce(btif_dm_le_rand, base::BindOnce(&le_rand_btif_cb)));
+      FROM_HERE, base::BindOnce(btif_dm_le_rand,
+                                get_main_thread()->BindOnce(&le_rand_btif_cb)));
   return BT_STATUS_SUCCESS;
 }
 
@@ -836,7 +835,7 @@ static void dump(int fd, const char** arguments) {
   wakelock_debug_dump(fd);
   alarm_debug_dump(fd);
   bluetooth::csis::CsisClient::DebugDump(fd);
-  ::le_audio::has::HasClient::DebugDump(fd);
+  ::bluetooth::le_audio::has::HasClient::DebugDump(fd);
   HearingAid::DebugDump(fd);
   LeAudioClient::DebugDump(fd);
   LeAudioBroadcaster::DebugDump(fd);
@@ -1370,7 +1369,7 @@ void invoke_oob_data_request_cb(tBT_TRANSPORT t, bool valid, Octet16 c,
   bt_oob_data_t oob_data = {};
   const char* local_name;
   BTM_ReadLocalDeviceName(&local_name);
-  for (int i = 0; i < BTM_MAX_LOC_BD_NAME_LEN; i++) {
+  for (int i = 0; i < BD_NAME_LEN; i++) {
     oob_data.device_name[i] = local_name[i];
   }
 

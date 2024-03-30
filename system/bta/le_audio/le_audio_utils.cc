@@ -16,16 +16,30 @@
 
 #include "le_audio_utils.h"
 
+#include <bluetooth/log.h>
+
 #include "bta/le_audio/content_control_id_keeper.h"
 #include "common/strings.h"
 #include "le_audio_types.h"
 #include "os/log.h"
 
 using bluetooth::common::ToString;
-using le_audio::types::AudioContexts;
-using le_audio::types::LeAudioContextType;
+using bluetooth::le_audio::types::AudioContexts;
+using bluetooth::le_audio::types::LeAudioContextType;
 
-namespace le_audio {
+namespace fmt {
+template <>
+struct formatter<audio_usage_t> : enum_formatter<audio_usage_t> {};
+template <>
+struct formatter<audio_content_type_t> : enum_formatter<audio_content_type_t> {
+};
+template <>
+struct formatter<audio_source_t> : enum_formatter<audio_source_t> {};
+template <>
+struct formatter<audio_devices_t> : enum_formatter<audio_devices_t> {};
+}  // namespace fmt
+
+namespace bluetooth::le_audio {
 namespace utils {
 
 /* The returned LeAudioContextType should have its entry in the
@@ -159,7 +173,7 @@ static bool isMetadataTagPresent(const char* tags, const char* tag) {
   std::istringstream iss(tags);
   std::string t;
   while (std::getline(iss, t, AUDIO_ATTRIBUTES_TAGS_SEPARATOR)) {
-    LOG_VERBOSE("Tag %s", t.c_str());
+    log::verbose("Tag {}", t);
     if (t.compare(tag) == 0) {
       return true;
     }
@@ -168,19 +182,18 @@ static bool isMetadataTagPresent(const char* tags, const char* tag) {
 }
 
 AudioContexts GetAudioContextsFromSourceMetadata(
-    const source_metadata_v7& source_metadata) {
+    const std::vector<struct playback_track_metadata_v7>& source_metadata) {
   AudioContexts track_contexts;
-  for (size_t i = 0; i < source_metadata.track_count; i++) {
-    auto track = source_metadata.tracks[i].base;
+  for (const auto& entry : source_metadata) {
+    auto track = entry.base;
     if (track.content_type == 0 && track.usage == 0) continue;
 
-    LOG_INFO("%s: usage=%s(%d), content_type=%s(%d), gain=%f, tag:%s", __func__,
-             usageToString(track.usage).c_str(), track.usage,
-             contentTypeToString(track.content_type).c_str(),
-             track.content_type, track.gain, source_metadata.tracks[i].tags);
+    log::info("usage={}({}), content_type={}({}), gain={:f}, tag:{}",
+              usageToString(track.usage), track.usage,
+              contentTypeToString(track.content_type),
+              track.content_type, track.gain, entry.tags);
 
-    if (isMetadataTagPresent(source_metadata.tracks[i].tags,
-                             "VX_AOSP_SAMPLESOUND")) {
+    if (isMetadataTagPresent(entry.tags, "VX_AOSP_SAMPLESOUND")) {
       track_contexts.set(LeAudioContextType::SOUNDEFFECTS);
     } else {
       track_contexts.set(
@@ -191,17 +204,17 @@ AudioContexts GetAudioContextsFromSourceMetadata(
 }
 
 AudioContexts GetAudioContextsFromSinkMetadata(
-    const sink_metadata_v7& sink_metadata) {
+    const std::vector<struct record_track_metadata_v7>& sink_metadata) {
   AudioContexts all_track_contexts;
 
-  for (size_t i = 0; i < sink_metadata.track_count; i++) {
-    auto track = sink_metadata.tracks[i].base;
+  for (const auto& entry : sink_metadata) {
+    auto track = entry.base;
     if (track.source == AUDIO_SOURCE_INVALID) continue;
     LeAudioContextType track_context;
 
-    LOG_DEBUG(
-        "source=%s(0x%02x), gain=%f, destination device=0x%08x, destination "
-        "device address=%.32s",
+    log::debug(
+        "source={}(0x{:02x}), gain={:f}, destination device=0x{:08x}, "
+        "destination device address={:32s}",
         audioSourceToStr(track.source), track.source, track.gain,
         track.dest_device, track.dest_device_address);
 
@@ -217,10 +230,10 @@ AudioContexts GetAudioContextsFromSinkMetadata(
        * AUDIO_SOURCE_VOICE_RECOGNITION
        */
       track_context = LeAudioContextType::VOICEASSISTANTS;
-      LOG_WARN(
+      log::warn(
           "Could not match the recording track type to group available "
-          "context. Using context %s.",
-          ToString(track_context).c_str());
+          "context. Using context {}.",
+          ToString(track_context));
     }
 
     all_track_contexts.set(track_context);
@@ -230,14 +243,14 @@ AudioContexts GetAudioContextsFromSinkMetadata(
     all_track_contexts = AudioContexts(
         static_cast<std::underlying_type<LeAudioContextType>::type>(
             LeAudioContextType::UNSPECIFIED));
-    LOG_DEBUG(
+    log::debug(
         "Unable to find supported audio source context for the remote audio "
         "sink device. This may result in voice back channel malfunction.");
   }
 
-  LOG_INFO("Allowed contexts from sink metadata: %s (0x%08hx)",
-           bluetooth::common::ToString(all_track_contexts).c_str(),
-           all_track_contexts.value());
+  log::info("Allowed contexts from sink metadata: {} (0x{:08x})",
+            bluetooth::common::ToString(all_track_contexts),
+            all_track_contexts.value());
   return all_track_contexts;
 }
 
@@ -258,7 +271,7 @@ translateBluetoothCodecFormatToCodecType(uint8_t codec_format, uint16_t codec_id
 
 bluetooth::le_audio::btle_audio_sample_rate_index_t
 translateToBtLeAudioCodecConfigSampleRate(uint32_t sample_rate_capa) {
-  LOG_INFO("%d", sample_rate_capa);
+  log::info("{}", sample_rate_capa);
   return (bluetooth::le_audio::btle_audio_sample_rate_index_t)(
       sample_rate_capa);
 }
@@ -302,7 +315,7 @@ void fillStreamParamsToBtLeAudioCodecConfig(
     types::LeAudioCodecId codec_id, const stream_parameters* stream_params,
     bluetooth::le_audio::btle_audio_codec_config_t& out_config) {
   if (stream_params == nullptr) {
-    LOG_WARN("Stream params are null");
+    log::warn("Stream params are null");
     return;
   }
 
@@ -429,4 +442,4 @@ bool IsCodecUsingLtvFormat(const types::LeAudioCodecId& codec_id) {
   return false;
 }
 }  // namespace utils
-}  // namespace le_audio
+}  // namespace bluetooth::le_audio

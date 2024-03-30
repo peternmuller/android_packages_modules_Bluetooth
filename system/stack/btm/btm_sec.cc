@@ -31,6 +31,7 @@
 #include <base/strings/stringprintf.h>
 #include <bluetooth/log.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -39,13 +40,13 @@
 #include "common/init_flags.h"
 #include "common/metrics.h"
 #include "common/time_util.h"
-#include "device/include/controller.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
 #include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
 #include "main/shim/entry.h"
+#include "main/shim/helpers.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
 #include "stack/btm/btm_ble_int.h"
@@ -499,7 +500,7 @@ void BTM_SetPinType(uint8_t pin_type, PIN_CODE pin_code, uint8_t pin_code_len) {
 
   /* If device is not up security mode will be set as a part of startup */
   if ((btm_sec_cb.cfg.pin_type != pin_type) &&
-      controller_get_interface()->get_is_ready()) {
+      bluetooth::shim::GetController() != nullptr) {
     btsnd_hcic_write_pin_type(pin_type);
   }
 
@@ -724,7 +725,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
     return (BTM_NO_RESOURCES);
   }
 
-  if (!controller_get_interface()->get_is_ready()) {
+  if (bluetooth::shim::GetController() == nullptr) {
     log::error("controller module is not ready");
     return (BTM_NO_RESOURCES);
   }
@@ -2344,8 +2345,7 @@ void btm_sec_rmt_name_request_complete(const RawAddress* p_bd_addr,
         reinterpret_cast<char const*>(p_bd_name),
         security_state_text(p_dev_rec->sec_rec.sec_state).c_str());
 
-    strlcpy((char*)p_dev_rec->sec_bd_name, (const char*)p_bd_name,
-            BTM_MAX_REM_BD_NAME_LEN + 1);
+    bd_name_copy(p_dev_rec->sec_bd_name, p_bd_name);
     p_dev_rec->sec_rec.sec_flags |= BTM_SEC_NAME_KNOWN;
     log::verbose("setting BTM_SEC_NAME_KNOWN sec_flags:0x{:x}",
                  p_dev_rec->sec_rec.sec_flags);
@@ -2805,9 +2805,7 @@ void btm_proc_sp_req_evt(tBTM_SP_EVT event, const RawAddress bda,
       (btm_sec_cb.pairing_bda == p_bda)) {
     evt_data.cfm_req.bd_addr = p_dev_rec->bd_addr;
     evt_data.cfm_req.dev_class = p_dev_rec->dev_class;
-
-    strlcpy((char*)evt_data.cfm_req.bd_name, (char*)p_dev_rec->sec_bd_name,
-            BTM_MAX_REM_BD_NAME_LEN + 1);
+    bd_name_copy(evt_data.cfm_req.bd_name, p_dev_rec->sec_bd_name);
 
     switch (event) {
       case BTM_SP_CFM_REQ_EVT:
@@ -3004,8 +3002,7 @@ void btm_rem_oob_req(const RawAddress bd_addr) {
   if ((p_dev_rec != NULL) && btm_sec_cb.api.p_sp_callback) {
     evt_data.bd_addr = p_dev_rec->bd_addr;
     evt_data.dev_class = p_dev_rec->dev_class;
-    strlcpy((char*)evt_data.bd_name, (char*)p_dev_rec->sec_bd_name,
-            BTM_MAX_REM_BD_NAME_LEN + 1);
+    bd_name_copy(evt_data.bd_name, p_dev_rec->sec_bd_name);
 
     btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_WAIT_LOCAL_OOB_RSP);
     if ((*btm_sec_cb.api.p_sp_callback)(BTM_SP_RMT_OOB_EVT,
@@ -4410,7 +4407,8 @@ void btm_sec_pin_code_request(const RawAddress p_bda) {
              ADDRESS_TO_LOGGABLE_CSTR(p_bda),
              tBTM_SEC_CB::btm_pair_state_descr(btm_sec_cb.pairing_state));
 
-  RawAddress local_bd_addr = *controller_get_interface()->get_address();
+  RawAddress local_bd_addr = bluetooth::ToRawAddress(
+      bluetooth::shim::GetController()->GetMacAddress());
   if (p_bda == local_bd_addr) {
     btsnd_hcic_pin_code_neg_reply(p_bda);
     return;

@@ -30,6 +30,7 @@ import android.util.Log;
 
 
 import com.android.bluetooth.BluetoothMethodProxy;
+import com.android.bluetooth.flags.Flags;
 import com.android.bluetooth.le_scan.AppScanStats;
 import com.android.bluetooth.le_scan.TransitionalScanHelper;
 import com.android.bluetooth.le_scan.TransitionalScanHelper.PendingIntentInfo;
@@ -51,7 +52,6 @@ import java.util.function.Predicate;
 /**
  * Helper class that keeps track of registered GATT applications.
  * This class manages application callbacks and keeps track of GATT connections.
- * @hide
  */
 public class ContextMap<C, T> {
     private static final String TAG = GattServiceConfig.TAG_PREFIX + "ContextMap";
@@ -336,12 +336,16 @@ public class ContextMap<C, T> {
      */
     void removeConnection(int id, int connId) {
         synchronized (mConnectionsLock) {
-            Iterator<Connection> i = mConnections.iterator();
-            while (i.hasNext()) {
-                Connection connection = i.next();
-                if (connection.connId == connId) {
-                    i.remove();
-                    break;
+            if (Flags.bleContextMapRemoveFix()) {
+                mConnections.removeIf(conn -> conn.appId == id && conn.connId == connId);
+            } else {
+                Iterator<Connection> i = mConnections.iterator();
+                while (i.hasNext()) {
+                    Connection connection = i.next();
+                    if (connection.connId == connId) {
+                        i.remove();
+                        break;
+                    }
                 }
             }
         }

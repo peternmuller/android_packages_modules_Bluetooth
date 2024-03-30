@@ -19,7 +19,9 @@
 
 #include "stack/include/bt_types.h"
 
-namespace le_audio {
+using namespace bluetooth;
+
+namespace bluetooth::le_audio {
 namespace has {
 
 std::optional<HasPreset> HasPreset::FromCharacteristicValue(
@@ -115,4 +117,4 @@ std::ostream& operator<<(std::ostream& os, const HasPreset& b) {
 }
 
 }  // namespace has
-}  // namespace le_audio
+}  // namespace bluetooth::le_audio
