@@ -1305,6 +1305,8 @@ template <>
 struct formatter<tGATT_OP_CODE> : enum_formatter<tGATT_OP_CODE> {};
 template <>
 struct formatter<tGATT_DISC_TYPE> : enum_formatter<tGATT_DISC_TYPE> {};
+template <>
+struct formatter<tGATT_DISCONN_REASON> : enum_formatter<tGATT_DISCONN_REASON> {};
 }  // namespace fmt
 
 #endif /* GATT_API_H */

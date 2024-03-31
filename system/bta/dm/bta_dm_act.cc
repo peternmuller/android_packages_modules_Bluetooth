@@ -29,6 +29,7 @@
 #include <android_bluetooth_sysprop.h>
 #include <base/location.h>
 #include <base/logging.h>
+#include <bluetooth/log.h>
 
 #include <cstdint>
 #include <vector>
@@ -44,7 +45,6 @@
 #include "bta/sys/bta_sys.h"
 #include "btif/include/btif_dm.h"
 #include "btif/include/stack_manager_t.h"
-#include "device/include/controller.h"
 #include "hci/controller_interface.h"
 #include "include/bind_helpers.h"
 #include "include/check.h"
@@ -68,6 +68,7 @@
 #include "types/raw_address.h"
 
 using bluetooth::Uuid;
+using namespace bluetooth;
 
 bool ble_vnd_is_included();
 void BTIF_dm_disable();
@@ -1468,8 +1469,9 @@ void bta_dm_ble_update_conn_params(const RawAddress& bd_addr, uint16_t min_int,
 
 /** This function set the maximum transmission packet size */
 void bta_dm_ble_set_data_length(const RawAddress& bd_addr) {
-  const controller_t* controller = controller_get_interface();
-  uint16_t max_len = controller->get_ble_maximum_tx_data_length();
+  uint16_t max_len = bluetooth::shim::GetController()
+                         ->GetLeMaximumDataLength()
+                         .supported_max_tx_octets_;
 
   if (BTM_SetBleDataLength(bd_addr, max_len) != BTM_SUCCESS) {
     LOG_INFO("Unable to set ble data length:%hu", max_len);
@@ -1635,9 +1637,9 @@ void bta_dm_disconnect_all_acls(void) {
  * Parameters:      |cb| Callback to receive the random number.
  *
  ******************************************************************************/
-void bta_dm_le_rand(LeRandCallback cb) {
-  VLOG(1) << "bta_dm_le_rand in bta_dm_act";
-  bluetooth::shim::BTM_LeRand(std::move(cb));
+void bta_dm_le_rand(bluetooth::hci::LeRandCallback cb) {
+  log::verbose("bta_dm_le_rand in bta_dm_act");
+  bluetooth::shim::GetController()->LeRand(std::move(cb));
 }
 
 /*******************************************************************************

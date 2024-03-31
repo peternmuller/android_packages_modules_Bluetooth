@@ -16,14 +16,16 @@
  *
  ******************************************************************************/
 
+#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
 #include <string.h>
 
-#include "device/include/controller.h"
 #include "gap_api.h"
+#include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
 #include "l2cdefs.h"
+#include "main/shim/entry.h"
 #include "osi/include/allocator.h"
 #include "osi/include/fixed_queue.h"
 #include "osi/include/mutex.h"
@@ -209,7 +211,9 @@ uint16_t GAP_ConnOpen(const char* p_serv_name, uint8_t service_id,
     p_ccb->local_coc_cfg.credits = L2CA_LeCreditDefault();
     p_ccb->local_coc_cfg.mtu = p_cfg->mtu;
 
-    uint16_t max_mps = controller_get_interface()->get_acl_data_size_ble();
+    uint16_t max_mps = bluetooth::shim::GetController()
+                           ->GetLeBufferSize()
+                           .le_data_packet_length_;
     if (le_mps > max_mps) {
       log::info("Limiting MPS to one buffer size - {}", max_mps);
       le_mps = max_mps;
@@ -637,9 +641,18 @@ static void gap_connect_ind(const RawAddress& bd_addr, uint16_t l2cap_cid,
 static void gap_checks_con_flags(tGAP_CCB* p_ccb) {
   /* if all the required con_flags are set, report the OPEN event now */
   if ((p_ccb->con_flags & GAP_CCB_FLAGS_CONN_DONE) == GAP_CCB_FLAGS_CONN_DONE) {
+    tGAP_CB_DATA* cb_data_ptr = nullptr;
+    tGAP_CB_DATA cb_data;
+    uint16_t l2cap_remote_cid;
+    if (IS_FLAG_ENABLED(bt_socket_api_l2cap_cid) &&
+        L2CA_GetPeerChannelId(p_ccb->connection_id, &l2cap_remote_cid)) {
+      cb_data.l2cap_cids.local_cid = p_ccb->connection_id;
+      cb_data.l2cap_cids.remote_cid = l2cap_remote_cid;
+      cb_data_ptr = &cb_data;
+    }
     p_ccb->con_state = GAP_CCB_STATE_CONNECTED;
 
-    p_ccb->p_callback(p_ccb->gap_handle, GAP_EVT_CONN_OPENED, nullptr);
+    p_ccb->p_callback(p_ccb->gap_handle, GAP_EVT_CONN_OPENED, cb_data_ptr);
   }
 }
 

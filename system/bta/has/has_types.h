@@ -31,7 +31,7 @@
 #include "stack/include/bt_types.h"
 #include "stack/include/gatt_api.h"
 
-namespace le_audio {
+namespace bluetooth::le_audio {
 namespace has {
 
 /* Helper class to pass some minimal context through the GATT operation API. */
@@ -419,4 +419,4 @@ class HasDevice : public GattServiceDevice {
 };
 
 }  // namespace has
-}  // namespace le_audio
+}  // namespace bluetooth::le_audio

@@ -21,6 +21,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
+import android.annotation.SystemApi;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -65,6 +66,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
      * AptX Adaptive R4 Codec.
      * @hide
      */
+    @SystemApi
     public static final int SOURCE_CODEC_TYPE_APTX_ADAPTIVE_R4 = 2;
     /**
      * Default Codec.
@@ -483,6 +485,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
      * codec specification to obtain the codec specific information.
      * @hide
      */
+    @SystemApi
     public long getCodecSpecific1() {
         return mCodecSpecific1;
     }
@@ -493,6 +496,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
      * codec specification to obtain the codec specific information.
      * @hide
      */
+    @SystemApi
     public long getCodecSpecific2() {
         return mCodecSpecific2;
     }
@@ -503,6 +507,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
      * codec specification to obtain the codec specific information.
      * @hide
      */
+    @SystemApi
     public long getCodecSpecific3() {
         return mCodecSpecific3;
     }
@@ -513,6 +518,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
      * codec specification to obtain the codec specific information.
      * @hide
      */
+    @SystemApi
     public long getCodecSpecific4() {
         return mCodecSpecific4;
     }
@@ -705,6 +711,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
          * @return the same Builder instance
          * @hide
          */
+        @SystemApi
         public @NonNull Builder setCodecSpecific1(long codecSpecific1) {
             mCodecSpecific1 = codecSpecific1;
             return this;
@@ -717,6 +724,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
          * @return the same Builder instance
          * @hide
          */
+        @SystemApi
         public @NonNull Builder setCodecSpecific2(long codecSpecific2) {
             mCodecSpecific2 = codecSpecific2;
             return this;
@@ -729,6 +737,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
          * @return the same Builder instance
          * @hide
          */
+        @SystemApi
         public @NonNull Builder setCodecSpecific3(long codecSpecific3) {
             mCodecSpecific3 = codecSpecific3;
             return this;
@@ -741,6 +750,7 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
          * @return the same Builder instance
          * @hide
          */
+        @SystemApi
         public @NonNull Builder setCodecSpecific4(long codecSpecific4) {
             mCodecSpecific4 = codecSpecific4;
             return this;

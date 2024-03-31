@@ -1086,7 +1086,7 @@ void gatt_chk_srv_chg(tGATTS_SRV_CHG* p_srv_chg_clt) {
   log::verbose("srv_changed={}", p_srv_chg_clt->srv_changed);
 
   if (p_srv_chg_clt->srv_changed) {
-    char remote_name[BTM_MAX_REM_BD_NAME_LEN] = "";
+    char remote_name[BD_NAME_LEN] = "";
     if (btif_storage_get_stored_remote_name(p_srv_chg_clt->bda, remote_name) &&
         (interop_match_name(INTEROP_GATTC_NO_SERVICE_CHANGED_IND,
                             remote_name))) {
@@ -1155,7 +1155,7 @@ void gatt_proc_srv_chg(void) {
     }
 
     // Some LE GATT clients don't respond to service changed indications.
-    char remote_name[BTM_MAX_REM_BD_NAME_LEN] = "";
+    char remote_name[BD_NAME_LEN] = "";
     if (send_indication &&
         btif_storage_get_stored_remote_name(bda, remote_name)) {
       if (interop_match_name(INTEROP_GATTC_NO_SERVICE_CHANGED_IND,
