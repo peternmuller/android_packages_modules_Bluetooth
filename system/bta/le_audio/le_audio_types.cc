@@ -122,8 +122,12 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
       if (is_bidirectional) {
         if ((avail_group_ase_snk_cnt > 0) && (avail_group_ase_src_count) > 0) {
           /* Prepare CIG to enable all microphones per device */
-          out_cis_count_bidir = expected_device_cnt;
-          out_cis_count_unidir_sink = expected_device_cnt;
+          if(context_type == LeAudioContextType::CONVERSATIONAL) {
+            out_cis_count_bidir = 2*expected_device_cnt;
+          } else {
+            out_cis_count_bidir = expected_device_cnt;
+            out_cis_count_unidir_sink = expected_device_cnt;
+          }
         } else {
           if (avail_group_ase_snk_cnt > 0) {
             out_cis_count_unidir_sink = 2 * expected_device_cnt;
