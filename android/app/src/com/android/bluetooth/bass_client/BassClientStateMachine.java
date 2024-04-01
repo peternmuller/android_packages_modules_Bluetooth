@@ -788,6 +788,28 @@ public class BassClientStateMachine extends StateMachine {
             sendMessage(m);
             mSetBroadcastCodePending = false;
             mSetBroadcastPINMetadata = null;
+        } else if (recvState.getBigEncryptionState()
+                == BluetoothLeBroadcastReceiveState.BIG_ENCRYPTION_STATE_BAD_CODE ||
+                recvState.getPaSyncState()
+                        == BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_FAILED_TO_SYNCHRONIZE) {
+            log("Bad code, remove this source...");
+            int sourceId = recvState.getSourceId();
+            if (recvState.getPaSyncState()
+                    == BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_SYNCHRONIZED) {
+                BluetoothLeBroadcastMetadata metaDataToUpdate =
+                        getCurrentBroadcastMetadata(sourceId);
+                if (metaDataToUpdate != null) {
+                    log("Force source to lost PA sync");
+                    Message msg = obtainMessage(UPDATE_BCAST_SOURCE);
+                    msg.arg1 = sourceId;
+                    msg.arg2 = BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_IDLE;
+                    msg.obj = metaDataToUpdate;
+                    sendMessage(msg);
+                }
+            }
+            Message m = obtainMessage(BassClientStateMachine.REMOVE_BCAST_SOURCE);
+            m.arg1 = recvState.getSourceId();
+            sendMessageDelayed(m, BassConstants.REMOVE_SOURCE_TIMEOUT_MS);
         }
     }
 
