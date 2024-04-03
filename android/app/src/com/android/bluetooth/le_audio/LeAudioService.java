@@ -3039,6 +3039,7 @@ public class LeAudioService extends ProfileService {
                 }
 
                 notifyBroadcastStartFailed(BluetoothStatusCodes.ERROR_UNKNOWN);
+                transitionFromBroadcastToUnicast();
             }
 
             mAwaitingBroadcastCreateResponse = false;
