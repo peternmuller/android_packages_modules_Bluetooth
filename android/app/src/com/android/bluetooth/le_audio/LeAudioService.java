@@ -166,6 +166,9 @@ public class LeAudioService extends ProfileService {
             leaudioApiSynchronizedBlockFix() ? mGroupReadWriteLock.readLock() : mGroupLock;
     private final Lock mGroupWriteLock =
             leaudioApiSynchronizedBlockFix() ? mGroupReadWriteLock.writeLock() : mGroupLock;
+
+    // lock for intent broadcasting
+    private ReentrantLock mutex = new ReentrantLock();
     ServiceFactory mServiceFactory = new ServiceFactory();
 
     LeAudioNativeInterface mLeAudioNativeInterface;
@@ -2345,17 +2348,22 @@ public class LeAudioService extends ProfileService {
 
     private void notifyGroupStreamStatusChanged(int groupId, int groupStreamStatus) {
         if (mLeAudioCallbacks != null) {
-            int n = mLeAudioCallbacks.beginBroadcast();
-            for (int i = 0; i < n; i++) {
-                try {
-                    mLeAudioCallbacks
+            try {
+                mutex.lock();
+                int n = mLeAudioCallbacks.beginBroadcast();
+                for (int i = 0; i < n; i++) {
+                    try {
+                        mLeAudioCallbacks
                             .getBroadcastItem(i)
                             .onGroupStreamStatusChanged(groupId, groupStreamStatus);
-                } catch (RemoteException e) {
-                    continue;
+                    } catch (RemoteException e) {
+                        continue;
+                    }
                 }
+                mLeAudioCallbacks.finishBroadcast();
+            } finally {
+               mutex.unlock();
             }
-            mLeAudioCallbacks.finishBroadcast();
         }
     }
 
@@ -3851,15 +3859,20 @@ public class LeAudioService extends ProfileService {
         }
 
         if (mLeAudioCallbacks != null) {
-            int n = mLeAudioCallbacks.beginBroadcast();
-            for (int i = 0; i < n; i++) {
-                try {
-                    mLeAudioCallbacks.getBroadcastItem(i).onGroupNodeAdded(device, groupId);
-                } catch (RemoteException e) {
-                    continue;
+            try {
+                mutex.lock();
+                int n = mLeAudioCallbacks.beginBroadcast();
+                for (int i = 0; i < n; i++) {
+                    try {
+                        mLeAudioCallbacks.getBroadcastItem(i).onGroupNodeAdded(device, groupId);
+                    } catch (RemoteException e) {
+                       continue;
+                    }
                 }
+                mLeAudioCallbacks.finishBroadcast();
+            } finally {
+                mutex.unlock();
             }
-            mLeAudioCallbacks.finishBroadcast();
         }
     }
 
@@ -3933,43 +3946,58 @@ public class LeAudioService extends ProfileService {
 
     private void notifyGroupNodeRemoved(BluetoothDevice device, int groupId) {
         if (mLeAudioCallbacks != null) {
-            int n = mLeAudioCallbacks.beginBroadcast();
-            for (int i = 0; i < n; i++) {
-                try {
-                    mLeAudioCallbacks.getBroadcastItem(i).onGroupNodeRemoved(device, groupId);
-                } catch (RemoteException e) {
-                    continue;
+            try {
+                mutex.lock();
+                int n = mLeAudioCallbacks.beginBroadcast();
+                for (int i = 0; i < n; i++) {
+                    try {
+                        mLeAudioCallbacks.getBroadcastItem(i).onGroupNodeRemoved(device, groupId);
+                    } catch (RemoteException e) {
+                        continue;
+                    }
                 }
+                mLeAudioCallbacks.finishBroadcast();
+            } finally {
+                mutex.unlock();
             }
-            mLeAudioCallbacks.finishBroadcast();
         }
     }
 
     private void notifyGroupStatusChanged(int groupId, int status) {
         if (mLeAudioCallbacks != null) {
-            int n = mLeAudioCallbacks.beginBroadcast();
-            for (int i = 0; i < n; i++) {
-                try {
-                    mLeAudioCallbacks.getBroadcastItem(i).onGroupStatusChanged(groupId, status);
-                } catch (RemoteException e) {
-                    continue;
+            try {
+                mutex.lock();
+                int n = mLeAudioCallbacks.beginBroadcast();
+                for (int i = 0; i < n; i++) {
+                    try {
+                        mLeAudioCallbacks.getBroadcastItem(i).onGroupStatusChanged(groupId, status);
+                    } catch (RemoteException e) {
+                        continue;
+                    }
                 }
+                mLeAudioCallbacks.finishBroadcast();
+            } finally {
+                mutex.unlock();
             }
-            mLeAudioCallbacks.finishBroadcast();
         }
     }
 
     private void notifyUnicastCodecConfigChanged(int groupId, BluetoothLeAudioCodecStatus status) {
         if (mLeAudioCallbacks != null) {
-            int n = mLeAudioCallbacks.beginBroadcast();
-            for (int i = 0; i < n; i++) {
-                try {
-                    mLeAudioCallbacks.getBroadcastItem(i).onCodecConfigChanged(groupId, status);
-                } catch (RemoteException e) {
-                    continue;
+            try {
+                mutex.lock();
+                int n = mLeAudioCallbacks.beginBroadcast();
+                for (int i = 0; i < n; i++) {
+                    try {
+                       mLeAudioCallbacks.getBroadcastItem(i).onCodecConfigChanged(groupId, status);
+                    } catch (RemoteException e) {
+                       continue;
+                    }
                 }
+                mLeAudioCallbacks.finishBroadcast();
+            } finally {
+                mutex.unlock();
             }
-            mLeAudioCallbacks.finishBroadcast();
         }
     }
 
