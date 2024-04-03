@@ -34,7 +34,7 @@ class MockConnectionManagementCallbacks : public ConnectionManagementCallbacks {
   MOCK_METHOD(void, OnAuthenticationComplete, (ErrorCode hci_status), (override));
   MOCK_METHOD(void, OnEncryptionChange, (EncryptionEnabled enabled)), (override);
   MOCK_METHOD(void, OnChangeConnectionLinkKeyComplete, (), (override));
-  MOCK_METHOD(void, OnReadClockOffsetComplete, (uint16_t clock_offse), (override));
+  MOCK_METHOD(void, OnReadClockOffsetComplete, (uint16_t handle, uint16_t clock_offse), (override));
   MOCK_METHOD(
       void, OnModeChange, (ErrorCode status, Mode current_mode, uint16_t interval), (override));
   MOCK_METHOD(

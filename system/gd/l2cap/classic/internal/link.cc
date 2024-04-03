@@ -338,7 +338,7 @@ void Link::OnChangeConnectionLinkKeyComplete() {
   log::info("UNIMPLEMENTED");
 }
 
-void Link::OnReadClockOffsetComplete(uint16_t clock_offset) {
+void Link::OnReadClockOffsetComplete(uint16_t handle, uint16_t clock_offset) {
   link_manager_->OnReadClockOffset(GetDevice().GetAddress(), clock_offset);
 }
 

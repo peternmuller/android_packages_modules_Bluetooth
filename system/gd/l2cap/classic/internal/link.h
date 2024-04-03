@@ -169,7 +169,7 @@ class Link : public l2cap::internal::ILink,
   void OnAuthenticationComplete(hci::ErrorCode hci_status) override;
   void OnEncryptionChange(hci::EncryptionEnabled enabled) override;
   void OnChangeConnectionLinkKeyComplete() override;
-  void OnReadClockOffsetComplete(uint16_t clock_offset) override;
+  void OnReadClockOffsetComplete(uint16_t handle, uint16_t clock_offset) override;
   void OnModeChange(hci::ErrorCode status, hci::Mode current_mode, uint16_t interval) override;
   void OnSniffSubrating(
       hci::ErrorCode hci_status,
