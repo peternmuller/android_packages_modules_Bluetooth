@@ -362,7 +362,7 @@ bool l2c_link_hci_disc_comp(uint16_t handle, tHCI_REASON reason) {
        disconnecting
      */
     if (p_lcb->ccb_queue.p_first_ccb != NULL || p_lcb->p_pending_ccb) {
-      LOG_DEBUG("l2c_link_hci_disc_comp: Restarting pending ACL request");
+      LOG_WARN("l2c_link_hci_disc_comp: Restarting pending ACL request");
       /* Release any held buffers */
       while (!list_is_empty(p_lcb->link_xmit_data_q)) {
         BT_HDR* p_buf =
@@ -374,6 +374,7 @@ bool l2c_link_hci_disc_comp(uint16_t handle, tHCI_REASON reason) {
        */
       if (p_lcb->transport == BT_TRANSPORT_LE) {
         btm_acl_removed(handle);
+        p_lcb->InvalidateHandle();
       } else {
         /* If we are going to re-use the LCB without dropping it, release all
         fixed channels

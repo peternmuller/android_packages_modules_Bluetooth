@@ -67,6 +67,7 @@ tL2C_LCB* l2cu_allocate_lcb(const RawAddress& p_bd_addr, bool is_bonding,
   int xx;
   tL2C_LCB* p_lcb = &l2cb.lcb_pool[0];
 
+  LOG_DEBUG("%s - looking for an unused LCB", __func__);
   for (xx = 0; xx < MAX_L2CAP_LINKS; xx++, p_lcb++) {
     if (!p_lcb->in_use) {
       alarm_free(p_lcb->l2c_lcb_timer);
@@ -154,6 +155,7 @@ void l2cu_update_lcb_4_bonding(const RawAddress& p_bd_addr, bool is_bonding) {
 void l2cu_release_lcb(tL2C_LCB* p_lcb) {
   tL2C_CCB* p_ccb;
 
+  LOG_DEBUG("%s - releasing an LCB", __func__);
   p_lcb->in_use = false;
   p_lcb->ResetBonding();
 
