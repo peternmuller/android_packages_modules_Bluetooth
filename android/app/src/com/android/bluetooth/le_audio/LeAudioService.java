@@ -211,6 +211,7 @@ public class LeAudioService extends ProfileService {
     private final LinkedList<BluetoothLeBroadcastSettings> mCreateBroadcastQueue =
             new LinkedList<>();
     boolean mIsSourceStreamMonitorModeEnabled = false;
+    boolean mLeAudioSuspended = false;
 
     @VisibleForTesting
     TbsService mTbsService;
@@ -536,6 +537,7 @@ public class LeAudioService extends ProfileService {
         mCreateBroadcastQueue.clear();
         mAwaitingBroadcastCreateResponse = false;
         mIsSourceStreamMonitorModeEnabled = false;
+        mLeAudioSuspended = false;
 
         clearBroadcastTimeoutCallback();
 
@@ -1945,6 +1947,12 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
+
+                    if (mLeAudioSuspended) {
+                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
+                        mAudioManager.setLeAudioSuspended(false);
+                        mLeAudioSuspended = false;
+                    }
                 }
 
                 handleAudioDeviceRemoved(
@@ -2197,8 +2205,12 @@ public class LeAudioService extends ProfileService {
             /* Native will clear its states and send us group Inactive.
              * However we would like to notify audio framework that LeAudio is not
              * active anymore and does not want to get more audio data.
+             * Notify audio framework LeAudio InActive until it is inactive
+             * in stack if broadcast create request in queue.
              */
-            handleGroupTransitToInactive(currentlyActiveGroupId);
+            if (mCreateBroadcastQueue.isEmpty()) {
+                handleGroupTransitToInactive(currentlyActiveGroupId);
+            }
         }
         return true;
     }
@@ -2511,6 +2523,11 @@ public class LeAudioService extends ProfileService {
                             || mBroadcastIdDeactivatedForUnicastTransition.isPresent())) {
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
+                if (!mLeAudioSuspended) {
+                    Log.d(TAG, "Suspend LeAudio stream before update unicast device inactive");
+                    mAudioManager.setLeAudioSuspended(true);
+                    mLeAudioSuspended = true;
+                }
 
                 /* Update Broadcast device before streaming state in handover case to avoid switch
                  * to non LE Audio device in Audio Manager e.g. Phone Speaker.
