@@ -71,6 +71,7 @@ import com.android.bluetooth.flags.Flags;
 import com.android.bluetooth.hfpclient.HeadsetClientService;
 import com.android.bluetooth.hfpclient.HeadsetClientStateMachine;
 import com.android.bluetooth.le_audio.LeAudioService;
+import com.android.bluetooth.le_audio.CallAudio;
 import com.android.bluetooth.telephony.BluetoothInCallService;
 import com.android.internal.annotations.VisibleForTesting;
 import java.util.concurrent.locks.Condition;
@@ -518,6 +519,22 @@ public class HeadsetService extends ProfileService {
         }
     }
 
+    public boolean isVoipLeaWarEnabled() {
+        CallAudio mCallAudio = CallAudio.get();
+        if (mCallAudio != null) {
+            return mCallAudio.isVoipLeaWarEnabled();
+        }
+        return false;
+    }
+
+    public void updateConnState(BluetoothDevice device, int newState) {
+        CallAudio mCallAudio = CallAudio.get();
+        if (mCallAudio != null) {
+            mCallAudio.onConnStateChange(device, newState, mCallAudio.HFP);
+        }
+    }
+
+
     /** Handlers for incoming service calls */
     @VisibleForTesting
     static class BluetoothHeadsetBinder extends IBluetoothHeadset.Stub
@@ -546,6 +563,17 @@ public class HeadsetService extends ProfileService {
             return mService;
         }
 
+        private boolean isAospLeaVoipWarEnabled() {
+            boolean ret = false;
+            CallAudio mCallAudio = CallAudio.get();
+            if (mCallAudio.isVoipLeaWarEnabled()
+                && mCallAudio.getActiveProfile()== mCallAudio.LE_AUDIO_VOICE) {
+                ret = true;
+            }
+            Log.i(TAG, "isAospLeaVoipWarEnabled: " + ret);
+            return ret;
+        }
+
         @Override
         public boolean connect(BluetoothDevice device, AttributionSource source) {
             HeadsetService service = getService(source);
@@ -568,23 +596,37 @@ public class HeadsetService extends ProfileService {
 
         @Override
         public List<BluetoothDevice> getConnectedDevices(AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return Collections.emptyList();
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "getConnectedDevices(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.getConnectedDevices();
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    return service.getConnectedDevices();
+                }
             }
-
-            return service.getConnectedDevices();
+            return Collections.emptyList();
         }
 
         @Override
         public List<BluetoothDevice> getDevicesMatchingConnectionStates(
                 int[] states, AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return Collections.emptyList();
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "getConnectedDevicesWithAttribution(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.getDevicesMatchingConnectionStates(states);
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    return service.getDevicesMatchingConnectionStates(states);
+                }
             }
-
-            return service.getDevicesMatchingConnectionStates(states);
+            return Collections.emptyList();
         }
 
         @Override
@@ -663,12 +705,19 @@ public class HeadsetService extends ProfileService {
 
         @Override
         public boolean isAudioOn(AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return false;
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "isAudioOn(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.isAudioOn();
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    return service.isAudioOn();
+                }
             }
-
-            return service.isAudioOn();
+            return false;
         }
 
         @Override
@@ -748,24 +797,38 @@ public class HeadsetService extends ProfileService {
 
         @Override
         public boolean startScoUsingVirtualVoiceCall(AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return false;
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "startScoUsingVirtualVoiceCall(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.startScoUsingVirtualVoiceCall();
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    return service.startScoUsingVirtualVoiceCall();
+                }
             }
-
-            enforceBluetoothPrivilegedPermission(service);
-            return service.startScoUsingVirtualVoiceCall();
+            return false;
         }
 
         @Override
         public boolean stopScoUsingVirtualVoiceCall(AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return false;
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "stopScoUsingVirtualVoiceCall(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.stopScoUsingVirtualVoiceCall();
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    enforceBluetoothPrivilegedPermission(service);
+                    return service.stopScoUsingVirtualVoiceCall();
+                }
             }
-
-            enforceBluetoothPrivilegedPermission(service);
-            return service.stopScoUsingVirtualVoiceCall();
+            return false;
         }
 
         @Override
@@ -832,12 +895,19 @@ public class HeadsetService extends ProfileService {
 
         @Override
         public BluetoothDevice getActiveDevice(AttributionSource source) {
-            HeadsetService service = getService(source);
-            if (service == null) {
-                return null;
+            if (isAospLeaVoipWarEnabled()) {
+                Log.d(TAG, "getActiveDevice(): Adv Audio enabled");
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null) {
+                    return mCallAudio.getActiveDevice();
+                }
+            } else {
+                HeadsetService service = getService(source);
+                if (service != null) {
+                    return service.getActiveDevice();
+                }
             }
-
-            return service.getActiveDevice();
+            return null;
         }
 
         @Override
@@ -1292,6 +1362,16 @@ public class HeadsetService extends ProfileService {
         return getNonIdleAudioDevices().size() > 0;
     }
 
+    public boolean isScoOrCallActive() {
+      Log.d(TAG, "isScoOrCallActive(): Call Active:" + mSystemInterface.isInCall() +
+                                       " Call is Ringing:" + mSystemInterface.isRinging());
+      if (mSystemInterface.isInCall() || (mSystemInterface.isRinging()) || isAudioOn()) {
+          return true;
+      } else {
+          return false;
+      }
+    }
+
     boolean isAudioConnected(BluetoothDevice device) {
         synchronized (mStateMachines) {
             final HeadsetStateMachine stateMachine = mStateMachines.get(device);
@@ -1736,7 +1816,7 @@ public class HeadsetService extends ProfileService {
         return BluetoothStatusCodes.SUCCESS;
     }
 
-    boolean isVirtualCallStarted() {
+    public boolean isVirtualCallStarted() {
         synchronized (mStateMachines) {
             return mVirtualCallStarted;
         }
@@ -1744,7 +1824,7 @@ public class HeadsetService extends ProfileService {
 
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @VisibleForTesting
-    boolean startScoUsingVirtualVoiceCall() {
+    public boolean startScoUsingVirtualVoiceCall() {
         Log.i(TAG, "startScoUsingVirtualVoiceCall: " + Utils.getUidPidString());
         synchronized (mStateMachines) {
             // TODO(b/79660380): Workaround in case voice recognition was not terminated properly
@@ -1819,7 +1899,7 @@ public class HeadsetService extends ProfileService {
     }
 
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
-    boolean stopScoUsingVirtualVoiceCall() {
+    public boolean stopScoUsingVirtualVoiceCall() {
         Log.i(TAG, "stopScoUsingVirtualVoiceCall: " + Utils.getUidPidString());
         synchronized (mStateMachines) {
             // 1. Check if virtual call has already started
@@ -2638,6 +2718,11 @@ public class HeadsetService extends ProfileService {
         logD("broadcastActiveDevice: " + device);
 
         mAdapterService.handleActiveDeviceChange(BluetoothProfile.HEADSET, device);
+
+        if (isVoipLeaWarEnabled()) {
+            logD("broadcastActiveDevice: don't broadcast active device here for VoIP war");
+            return;
+        }
 
         BluetoothStatsLog.write(
                 BluetoothStatsLog.BLUETOOTH_ACTIVE_DEVICE_CHANGED,
