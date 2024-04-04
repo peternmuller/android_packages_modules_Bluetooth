@@ -113,9 +113,23 @@ struct AclScheduler::impl {
       Address address,
       common::ContextualOnceCallback<void()> start_request,
       common::ContextualOnceCallback<void()> cancel_request_completed) {
-    pending_outgoing_operations_.push_back(
-        RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
-    try_dequeue_next_operation();
+
+    if ((incoming_connecting_address_set_.find(address) != incoming_connecting_address_set_.end()) &&
+       !outgoing_entry_.has_value()) {
+
+      LOG_WARN ("send RemoteNameRequest when incoming acl accepted already");
+         pending_outgoing_operations_.push_front(
+          RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
+      auto entry = std::move(pending_outgoing_operations_.front());
+      pending_outgoing_operations_.pop_front();
+      std::visit([](auto&& variant) { variant.callback.Invoke(); }, entry);
+      outgoing_entry_ = std::move(entry);
+
+    } else {
+      pending_outgoing_operations_.push_back(
+          RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
+      try_dequeue_next_operation();
+    }
   }
 
   void ReportRemoteNameRequestCompletion(Address /* address */) {
