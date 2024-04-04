@@ -186,6 +186,7 @@ static void bta_dm_init_cb(void) {
   bta_dm_cb = {};
 
   bta_dm_cb.disable_timer = alarm_new("bta_dm.disable_timer");
+  bta_dm_cb.bond_retrail_timer = alarm_new("bta_dm.bond_retrail_timer");
   bta_dm_cb.switch_delay_timer = alarm_new("bta_dm.switch_delay_timer");
   for (size_t i = 0; i < BTA_DM_NUM_PM_TIMER; i++) {
     for (size_t j = 0; j < BTA_DM_PM_MODE_TIMER_MAX; j++) {
@@ -210,6 +211,7 @@ static void bta_dm_deinit_cb(void) {
    * shutdown.
    */
   alarm_free(bta_dm_cb.disable_timer);
+  alarm_free(bta_dm_cb.bond_retrail_timer);
   alarm_free(bta_dm_cb.switch_delay_timer);
   for (size_t i = 0; i < BTA_DM_NUM_PM_TIMER; i++) {
     for (size_t j = 0; j < BTA_DM_PM_MODE_TIMER_MAX; j++) {
