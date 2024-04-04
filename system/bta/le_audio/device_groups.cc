@@ -487,9 +487,16 @@ uint8_t LeAudioDeviceGroup::GetSCA(void) const {
 }
 
 uint8_t LeAudioDeviceGroup::GetPacking(void) const {
+  uint8_t packing_type = bluetooth::hci::kIsoCigPackingInterleaved;
+
+  if (osi_property_get_bool("persist.vendor.btstack.sequential_packing_enable", false)) {
+    packing_type = bluetooth::hci::kIsoCigPackingSequential;
+    LOG_WARN("Switching to sequential packing type ");
+  }
+
   if (!stream_conf.conf) {
     LOG_ERROR("No stream configuration has been set.");
-    return bluetooth::hci::kIsoCigPackingSequential;
+    return packing_type;
   }
   return stream_conf.conf->packing;
 }

@@ -462,6 +462,11 @@ struct AudioSetConfigurationProviderJson {
     types::BidirectionalPair<types::LeAudioConfigurationStrategy> strategy = {
         le_audio::types::LeAudioConfigurationStrategy::MONO_ONE_CIS_PER_DEVICE,
         le_audio::types::LeAudioConfigurationStrategy::MONO_ONE_CIS_PER_DEVICE};
+    uint8_t packing_type = bluetooth::hci::kIsoCigPackingInterleaved;
+    if (osi_property_get_bool("persist.vendor.btstack.sequential_packing_enable", false)) {
+      packing_type = bluetooth::hci::kIsoCigPackingSequential;
+      LOG_WARN("Switching to sequential packing type ");
+    }
 
     if (codec_cfg != nullptr && codec_cfg->subconfigurations()) {
       /* Load subconfigurations */
@@ -502,7 +507,7 @@ struct AudioSetConfigurationProviderJson {
            single_dev_one_chan_stereo_swb.source)) {
         return {
             .name = flat_cfg->name()->c_str(),
-            .packing = bluetooth::hci::kIsoCigPackingSequential,
+            .packing = packing_type,
             .confs = {},
             .topology_info = {{device_cnt, strategy}},
         };
@@ -511,7 +516,7 @@ struct AudioSetConfigurationProviderJson {
 
     return {
         .name = flat_cfg->name()->c_str(),
-        .packing = bluetooth::hci::kIsoCigPackingSequential,
+        .packing = packing_type,
         .confs = std::move(subconfigs),
         .topology_info = {{device_cnt, strategy}},
     };
