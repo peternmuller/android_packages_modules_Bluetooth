@@ -25,6 +25,8 @@
 #ifndef BTA_AG_API_H
 #define BTA_AG_API_H
 
+#include <bluetooth/log.h>
+
 #include <string>
 #include <vector>
 

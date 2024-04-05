@@ -27,6 +27,7 @@
 
 #include <base/functional/callback_forward.h>
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include <list>
 #include <string>

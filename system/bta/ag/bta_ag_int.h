@@ -24,6 +24,8 @@
 #ifndef BTA_AG_INT_H
 #define BTA_AG_INT_H
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "bta/ag/bta_ag_at.h"
@@ -450,5 +452,13 @@ void bta_ag_send_qcs(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data);
  * @return true if SCO managed by Audio is enabled, false otherwise
  */
 bool bta_ag_is_sco_managed_by_audio();
+
+namespace fmt {
+template <>
+struct formatter<tBTA_AG_SCO_APTX_SWB_SETTINGS>
+    : enum_formatter<tBTA_AG_SCO_APTX_SWB_SETTINGS> {};
+template <>
+struct formatter<tBTA_AG_SCO> : enum_formatter<tBTA_AG_SCO> {};
+}  // namespace fmt
 
 #endif /* BTA_AG_INT_H */

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <base/logging.h>
+#include <bluetooth/log.h>
 
 #include <list>
 #include <optional>
@@ -261,4 +262,11 @@ struct HasCtpGroupOpCoordinator {
 };
 
 }  // namespace has
-}  // namespace blutooth::le_audio
+}  // namespace bluetooth::le_audio
+
+namespace fmt {
+template <>
+struct formatter<bluetooth::le_audio::has::HasCtpNtf> : ostream_formatter {};
+template <>
+struct formatter<bluetooth::le_audio::has::HasCtpOp> : ostream_formatter {};
+}  // namespace fmt
