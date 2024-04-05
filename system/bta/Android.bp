@@ -367,6 +367,7 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
         "server_configurable_flags",
@@ -410,6 +411,7 @@ cc_test {
         "test/bta_hf_client_security_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "libcutils",
         "liblog",
@@ -589,6 +591,7 @@ cc_test {
         "groups/groups_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
@@ -648,6 +651,7 @@ cc_test {
         "vc/vc_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
@@ -1230,6 +1234,7 @@ cc_test {
         "test/common/mock_csis_client.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
