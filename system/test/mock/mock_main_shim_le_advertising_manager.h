@@ -47,19 +47,12 @@ class MockBleAdvertisingManager : public BleAdvertiserInterface {
               (override));
   MOCK_METHOD((void), StartAdvertisingSet,
               (uint8_t client_id, int reg_id,
-               IdTxPowerStatusCallback register_cb, 
-               AdvertiseParameters params,
+               IdTxPowerStatusCallback register_cb, AdvertiseParameters params,
                std::vector<uint8_t> advertise_data,
-               std::vector<uint8_t> advertise_data_enc,
                std::vector<uint8_t> scan_response_data,
-               std::vector<uint8_t> scan_response_data_enc,
                PeriodicAdvertisingParameters periodic_params,
-               std::vector<uint8_t> periodic_data, 
-               std::vector<uint8_t> periodic_data_enc,
-               uint16_t duration,
-               uint8_t maxExtAdvEvents,
-               std::vector<uint8_t> enc_key_value,
-               IdStatusCallback timeout_cb),
+               std::vector<uint8_t> periodic_data, uint16_t duration,
+               uint8_t maxExtAdvEvents, IdStatusCallback timeout_cb),
               (override));
   MOCK_METHOD((void), RegisterAdvertiser, (IdStatusCallback cb), (override));
   MOCK_METHOD((void), Enable,
@@ -73,15 +66,14 @@ class MockBleAdvertisingManager : public BleAdvertiserInterface {
               (override));
   MOCK_METHOD((void), SetData,
               (int advertiser_id, bool set_scan_rsp, std::vector<uint8_t> data,
-               std::vector<uint8_t> data_enc, StatusCallback cb),
+               StatusCallback cb),
               (override));
   MOCK_METHOD((void), SetPeriodicAdvertisingParameters,
               (int advertiser_id, PeriodicAdvertisingParameters periodic_params,
                StatusCallback cb),
               (override));
   MOCK_METHOD((void), SetPeriodicAdvertisingData,
-              (int advertiser_id, std::vector<uint8_t> data, std::vector<uint8_t> data_enc,
-              StatusCallback cb),
+              (int advertiser_id, std::vector<uint8_t> data, StatusCallback cb),
               (override));
   MOCK_METHOD((void), SetPeriodicAdvertisingEnable,
               (int advertiser_id, bool enable, bool include_adi,

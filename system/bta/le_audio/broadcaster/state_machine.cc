@@ -206,8 +206,8 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
 
     sm_config_.broadcast_name = broadcast_name;
     sm_config_.public_announcement = announcement;
-    std::vector<uint8_t> data_enc;
-    advertiser_if_->SetData(advertising_sid_, false, adv_data, data_enc,
+
+    advertiser_if_->SetData(advertising_sid_, false, adv_data,
                             base::DoNothing());
   }
 
@@ -217,8 +217,8 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
     PreparePeriodicData(announcement, periodic_data);
 
     sm_config_.announcement = std::move(announcement);
-    std::vector<uint8_t> data_enc;
-    advertiser_if_->SetPeriodicAdvertisingData(advertising_sid_, periodic_data, data_enc,
+
+    advertiser_if_->SetPeriodicAdvertisingData(advertising_sid_, periodic_data,
                                                base::DoNothing());
   }
 
@@ -372,10 +372,9 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
        */
       advertiser_if_->StartAdvertisingSet(
           kAdvertiserClientIdLeAudio, kLeAudioBroadcastRegId, base::DoNothing(),
-          adv_params, adv_data, std::vector<uint8_t>(), std::vector<uint8_t>(), 
-	  std::vector<uint8_t>(), periodic_params,
-          periodic_data, std::vector<uint8_t>(), 0 /* duration */, 0 /* maxExtAdvEvents */,
-          std::vector<uint8_t>(), base::DoNothing());
+          adv_params, adv_data, std::vector<uint8_t>(), periodic_params,
+          periodic_data, 0 /* duration */, 0 /* maxExtAdvEvents */,
+          base::DoNothing());
     }
   }
 

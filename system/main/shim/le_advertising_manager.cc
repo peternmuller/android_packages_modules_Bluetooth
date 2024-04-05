@@ -12,11 +12,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * ​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- *
  */
 
 #define LOG_TAG "bt_shim_advertiser"
@@ -107,7 +102,7 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
   }
 
   void SetData(int advertiser_id, bool set_scan_rsp, vector<uint8_t> data,
-               vector<uint8_t> data_enc, StatusCallback /* cb */) override {
+               StatusCallback /* cb */) override {
     log::info("in shim layer");
     std::vector<GapData> advertising_data = {};
     parse_gap_data(data, advertising_data);
@@ -145,14 +140,10 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
   void StartAdvertisingSet(uint8_t client_id, int reg_id, IdTxPowerStatusCallback register_cb,
                               AdvertiseParameters params,
                               std::vector<uint8_t> advertise_data,
-                              std::vector<uint8_t> advertise_data_enc,
                               std::vector<uint8_t> scan_response_data,
-                              std::vector<uint8_t> scan_response_data_enc,
                               PeriodicAdvertisingParameters periodic_params,
                               std::vector<uint8_t> periodic_data,
-                              std::vector<uint8_t> periodic_data_enc,
                               uint16_t duration, uint8_t maxExtAdvEvents,
-                              std::vector<uint8_t> enc_key_value,
                               IdStatusCallback /* timeout_cb */) {
     log::info("in shim layer");
 
@@ -195,7 +186,6 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
   }
 
   void SetPeriodicAdvertisingData(int advertiser_id, std::vector<uint8_t> data,
-                                  std::vector<uint8_t> data_enc,
                                   StatusCallback /* cb */) override {
     log::info("in shim layer");
     std::vector<GapData> advertising_data = {};

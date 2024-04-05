@@ -2325,7 +2325,6 @@ static void startAdvertisingSetNative(
   std::vector<uint8_t> scan_resp_vec(scan_resp_data,
                                      scan_resp_data + scan_resp_len);
   env->ReleaseByteArrayElements(scan_resp, scan_resp_data, JNI_ABORT);
-  std::vector<uint8_t> scan_resp_enc_vec;
 
   AdvertiseParameters params = parseParams(env, parameters);
   PeriodicAdvertisingParameters periodicParams =
@@ -2335,22 +2334,18 @@ static void startAdvertisingSetNative(
   uint16_t adv_data_len = (uint16_t)env->GetArrayLength(adv_data);
   std::vector<uint8_t> data_vec(adv_data_data, adv_data_data + adv_data_len);
   env->ReleaseByteArrayElements(adv_data, adv_data_data, JNI_ABORT);
-  std::vector<uint8_t> data_enc_vec;
 
   jbyte* periodic_data_data = env->GetByteArrayElements(periodic_data, NULL);
   uint16_t periodic_data_len = (uint16_t)env->GetArrayLength(periodic_data);
   std::vector<uint8_t> periodic_data_vec(
       periodic_data_data, periodic_data_data + periodic_data_len);
   env->ReleaseByteArrayElements(periodic_data, periodic_data_data, JNI_ABORT);
-  std::vector<uint8_t> periodic_data_enc_vec;
-  std::vector<uint8_t> enc_key_value;
 
   sGattIf->advertiser->StartAdvertisingSet(
-      kAdvertiserClientIdJni,
-      reg_id, base::Bind(&ble_advertising_set_started_cb, reg_id, server_if), params,
-      data_vec, data_enc_vec, scan_resp_vec, scan_resp_enc_vec, periodicParams,
-      periodic_data_vec, periodic_data_enc_vec, duration, maxExtAdvEvents,
-      enc_key_value, base::Bind(ble_advertising_set_timeout_cb));
+      kAdvertiserClientIdJni, reg_id,
+      base::Bind(&ble_advertising_set_started_cb, reg_id, server_if), params,
+      data_vec, scan_resp_vec, periodicParams, periodic_data_vec, duration,
+      maxExtAdvEvents, base::Bind(ble_advertising_set_timeout_cb));
 }
 
 static void stopAdvertisingSetNative(JNIEnv* /* env */, jobject /* object */,
@@ -2414,9 +2409,8 @@ static void setAdvertisingDataNative(JNIEnv* env, jobject /* object */,
                                      jint advertiser_id, jbyteArray data) {
   if (!sGattIf) return;
 
-  std::vector<uint8_t> data_enc;
   sGattIf->advertiser->SetData(
-      advertiser_id, false, toVector(env, data), data_enc,
+      advertiser_id, false, toVector(env, data),
       base::Bind(&callJniCallback, method_onAdvertisingDataSet, advertiser_id));
 }
 
@@ -2424,9 +2418,8 @@ static void setScanResponseDataNative(JNIEnv* env, jobject /* object */,
                                       jint advertiser_id, jbyteArray data) {
   if (!sGattIf) return;
 
-  std::vector<uint8_t> data_enc;
   sGattIf->advertiser->SetData(
-      advertiser_id, true, toVector(env, data), data_enc,
+      advertiser_id, true, toVector(env, data),
       base::Bind(&callJniCallback, method_onScanResponseDataSet,
                  advertiser_id));
 }
@@ -2470,9 +2463,8 @@ static void setPeriodicAdvertisingDataNative(JNIEnv* env, jobject /* object */,
                                              jbyteArray data) {
   if (!sGattIf) return;
 
-  std::vector<uint8_t> data_enc;
   sGattIf->advertiser->SetPeriodicAdvertisingData(
-      advertiser_id, toVector(env, data), data_enc,
+      advertiser_id, toVector(env, data),
       base::Bind(&callJniCallback, method_onPeriodicAdvertisingDataSet,
                  advertiser_id));
 }

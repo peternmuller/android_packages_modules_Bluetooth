@@ -134,17 +134,14 @@ class StateMachineTest : public Test {
     ON_CALL(*mock_ble_advertising_manager_, StartAdvertisingSet)
         .WillByDefault(
             [this](uint8_t client_id, int reg_id,
-                    BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
-                    AdvertiseParameters params, std::vector<uint8_t> advertise_data,
-                    std::vector<uint8_t> advertise_data_enc,
-                    std::vector<uint8_t> scan_response_data,
-                    std::vector<uint8_t> scan_response_data_enc,
-                    PeriodicAdvertisingParameters periodic_params,
-                    std::vector<uint8_t> periodic_data,
-                    std::vector<uint8_t> periodic_data_enc,
-                    uint16_t duration, uint8_t maxExtAdvEvents,
-                    std::vector<uint8_t> enc_key_value,
-                    BleAdvertiserInterface::IdStatusCallback timeout_cb) {
+                   BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
+                   AdvertiseParameters params,
+                   std::vector<uint8_t> advertise_data,
+                   std::vector<uint8_t> scan_response_data,
+                   PeriodicAdvertisingParameters periodic_params,
+                   std::vector<uint8_t> periodic_data, uint16_t duration,
+                   uint8_t maxExtAdvEvents,
+                   BleAdvertiserInterface::IdStatusCallback timeout_cb) {
               static uint8_t advertiser_id = 1;
               uint8_t tx_power = 32;
               uint8_t status = 0;
@@ -353,17 +350,14 @@ TEST_F(StateMachineTest, CreateInstanceFailed) {
   EXPECT_CALL(*mock_ble_advertising_manager_, StartAdvertisingSet)
       .WillOnce(
           [this](uint8_t client_id, int reg_id,
-                    BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
-                    AdvertiseParameters params, std::vector<uint8_t> advertise_data,
-                    std::vector<uint8_t> advertise_data_enc,
-                    std::vector<uint8_t> scan_response_data,
-                    std::vector<uint8_t> scan_response_data_enc,
-                    PeriodicAdvertisingParameters periodic_params,
-                    std::vector<uint8_t> periodic_data,
-                    std::vector<uint8_t> periodic_data_enc,
-                    uint16_t duration, uint8_t maxExtAdvEvents,
-                    std::vector<uint8_t> enc_key_value,
-                    BleAdvertiserInterface::IdStatusCallback timeout_cb) {
+                 BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
+                 AdvertiseParameters params,
+                 std::vector<uint8_t> advertise_data,
+                 std::vector<uint8_t> scan_response_data,
+                 PeriodicAdvertisingParameters periodic_params,
+                 std::vector<uint8_t> periodic_data, uint16_t duration,
+                 uint8_t maxExtAdvEvents,
+                 BleAdvertiserInterface::IdStatusCallback timeout_cb) {
             uint8_t advertiser_id = 1;
             uint8_t tx_power = 0;
             uint8_t status = 1;
@@ -495,7 +489,7 @@ TEST_F(StateMachineTest, UpdateAnnouncement) {
   auto adv_sid = broadcasts_[broadcast_id]->GetAdvertisingSid();
   std::vector<uint8_t> data;
   EXPECT_CALL(*mock_ble_advertising_manager_,
-              SetPeriodicAdvertisingData(adv_sid, _, _, _))
+              SetPeriodicAdvertisingData(adv_sid, _, _))
       .Times(2)
       .WillRepeatedly(SaveArg<1>(&data));
 
@@ -963,18 +957,15 @@ TEST_F(StateMachineTest, AnnouncementTest) {
 
   EXPECT_CALL(*mock_ble_advertising_manager_, StartAdvertisingSet)
       .WillOnce([this, &p_data, &a_data, &adv_params](
-                  uint8_t client_id, int reg_id,
-                  BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
-                  AdvertiseParameters params, std::vector<uint8_t> advertise_data,
-                  std::vector<uint8_t> advertise_data_enc,
-                  std::vector<uint8_t> scan_response_data,
-                  std::vector<uint8_t> scan_response_data_enc,
-                  PeriodicAdvertisingParameters periodic_params,
-                  std::vector<uint8_t> periodic_data,
-                  std::vector<uint8_t> periodic_data_enc,
-                  uint16_t duration, uint8_t maxExtAdvEvents,
-                  std::vector<uint8_t> enc_key_value,
-                  BleAdvertiserInterface::IdStatusCallback timeout_cb) {
+                    uint8_t client_id, int reg_id,
+                    BleAdvertiserInterface::IdTxPowerStatusCallback register_cb,
+                    AdvertiseParameters params,
+                    std::vector<uint8_t> advertise_data,
+                    std::vector<uint8_t> scan_response_data,
+                    PeriodicAdvertisingParameters periodic_params,
+                    std::vector<uint8_t> periodic_data, uint16_t duration,
+                    uint8_t maxExtAdvEvents,
+                    BleAdvertiserInterface::IdStatusCallback timeout_cb) {
         uint8_t advertiser_id = 1;
         uint8_t tx_power = 0;
         uint8_t status = 0;
