@@ -478,7 +478,10 @@ class LeAudioClientImpl : public LeAudioClient {
       SetDeviceAsRemovePendingAndStopGroup(leAudioDevice);
       return;
     }
-
+    if (leAudioDevice->group_id_ == active_group_id_) {
+      log::warn("Set device inactive before removing.");
+      groupSetAndNotifyInactive();
+    }
     group_remove_node(group, address);
   }
 
@@ -1491,9 +1494,16 @@ class LeAudioClientImpl : public LeAudioClient {
         return;
       case DeviceConnectState::CONNECTED:
       case DeviceConnectState::CONNECTED_AUTOCONNECT_GETTING_READY:
-      case DeviceConnectState::CONNECTED_BY_USER_GETTING_READY:
+      case DeviceConnectState::CONNECTED_BY_USER_GETTING_READY: {
         /* ACL exist in this case, disconnect and mark as removing */
-        Disconnect(address);
+          log::info("device group id {} active group id {}", leAudioDevice->group_id_,
+             active_group_id_);
+          if (leAudioDevice->group_id_ == active_group_id_) {
+            log::warn("Set device inactive before removing.");
+            groupSetAndNotifyInactive();
+          }
+          Disconnect(address);
+      }
         [[fallthrough]];
       case DeviceConnectState::DISCONNECTING:
       case DeviceConnectState::DISCONNECTING_AND_RECOVER:
