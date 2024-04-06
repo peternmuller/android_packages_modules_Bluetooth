@@ -160,6 +160,8 @@ class LeAdvertisingManager : public bluetooth::Module {
 
   void RemoveAdvertiser(AdvertiserId advertiser_id);
 
+  void ResetAdvertiser(AdvertiserId advertiser_id);
+
   void RegisterAdvertisingCallback(AdvertisingCallback* advertising_callback);
 
   static const ModuleFactory Factory;

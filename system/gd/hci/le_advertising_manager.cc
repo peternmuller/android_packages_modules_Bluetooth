@@ -379,6 +379,28 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     return id;
   }
 
+  void reset_advertiser(AdvertiserId id) {
+    std::unique_lock lock(id_mutex_);
+    if (advertising_sets_.count(id) == 0) {
+      return;
+    }
+
+    if (advertising_api_type_ == AdvertisingApiType::EXTENDED) {
+      enabled_sets_[id].advertising_handle_ = kInvalidHandle;
+      if (advertising_sets_[id].address_rotation_alarm != nullptr) {
+        advertising_sets_[id].address_rotation_alarm->Cancel();
+        advertising_sets_[id].address_rotation_alarm.reset();
+      }
+    }
+
+    advertising_sets_.erase(id);
+    if (advertising_sets_.empty() && address_manager_registered) {
+      le_address_manager_->Unregister(this);
+      address_manager_registered = false;
+      paused = false;
+    }
+  }
+
   void remove_advertiser(AdvertiserId advertiser_id) {
     stop_advertising(advertiser_id);
     std::unique_lock lock(id_mutex_);
@@ -1999,6 +2021,10 @@ void LeAdvertisingManager::EnablePeriodicAdvertising(AdvertiserId advertiser_id,
 
 void LeAdvertisingManager::RemoveAdvertiser(AdvertiserId advertiser_id) {
   CallOn(pimpl_.get(), &impl::remove_advertiser, advertiser_id);
+}
+
+void LeAdvertisingManager::ResetAdvertiser(AdvertiserId advertiser_id) {
+  CallOn(pimpl_.get(), &impl::reset_advertiser, advertiser_id);
 }
 
 void LeAdvertisingManager::RegisterAdvertisingCallback(AdvertisingCallback* advertising_callback) {
