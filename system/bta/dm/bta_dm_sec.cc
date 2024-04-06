@@ -37,6 +37,7 @@
 #include "stack/include/security_client_callbacks.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
+#include "osi/include/allocator.h"
 
 using namespace bluetooth;
 
@@ -59,6 +60,7 @@ static void bta_dm_ble_id_key_cback(uint8_t key_type,
 static void bta_dm_bond_cancel_complete_cback(tBTM_STATUS result);
 static void bta_dm_remove_sec_dev_entry(const RawAddress& remote_bd_addr);
 static void bta_dm_reset_sec_dev_pending(const RawAddress& remote_bd_addr);
+static void bta_dm_bond_retrail_cback(void* data);
 
 /* bta security callback */
 const tBTM_APPL_INFO bta_security = {
@@ -138,6 +140,20 @@ void bta_dm_bond(const RawAddress& bd_addr, tBLE_ADDR_TYPE addr_type,
 
   tBTM_STATUS status = get_btm_client_interface().security.BTM_SecBond(
       bd_addr, addr_type, transport, device_type);
+
+  if (status == BTM_BUSY) {
+    tBTA_DM_API_BOND *p_msg = (tBTA_DM_API_BOND *) osi_malloc(sizeof(tBTA_DM_API_BOND));
+    if (p_msg) {
+      p_msg->bd_addr = bd_addr;
+      p_msg->addr_type = addr_type;
+      p_msg->device_type = device_type;
+      p_msg->transport = transport;
+      LOG_WARN("Queueing bond request as RNR might be active");
+      alarm_set_on_mloop(bta_dm_cb.bond_retrail_timer, BTA_DM_BOND_TIMER_RETRIAL_MS,
+		       bta_dm_bond_retrail_cback, p_msg);
+      return;
+    }
+  }
 
   if (bta_dm_sec_cb.p_sec_cback && (status != BTM_CMD_STARTED)) {
     memset(&sec_event, 0, sizeof(tBTA_DM_SEC));
@@ -1016,6 +1032,49 @@ void bta_dm_ble_confirm_reply(const RawAddress& bd_addr, bool accept) {
 /** This function set the local device LE privacy settings. */
 void bta_dm_ble_config_local_privacy(bool privacy_enable) {
   BTM_BleConfigPrivacy(privacy_enable);
+}
+
+static void bta_dm_bond_retrail_cback(void* data) {
+  tBTA_DM_SEC sec_event;
+  tBTA_DM_API_BOND *p_msg = (tBTA_DM_API_BOND *) data;
+
+  if (!p_msg) {
+    LOG_ERROR("bta_dm_bond retrying bond data is null");
+    return;
+  }
+
+  LOG_INFO("bta_dm_bond retrying bond");
+
+  RawAddress& bd_addr = p_msg->bd_addr;
+  tBLE_ADDR_TYPE addr_type =  p_msg->addr_type;
+  tBT_TRANSPORT transport = p_msg->transport;
+  tBT_DEVICE_TYPE device_type= p_msg->device_type;
+
+  tBTM_STATUS status = get_btm_client_interface().security.BTM_SecBond(
+      bd_addr, addr_type, transport, device_type);
+
+  if (bta_dm_sec_cb.p_sec_cback && (status != BTM_CMD_STARTED)) {
+    memset(&sec_event, 0, sizeof(tBTA_DM_SEC));
+    sec_event.auth_cmpl.bd_addr = bd_addr;
+    bd_name_from_char_pointer(
+        sec_event.auth_cmpl.bd_name,
+        get_btm_client_interface().security.BTM_SecReadDevName(bd_addr));
+
+    /*      taken care of by memset [above]
+            sec_event.auth_cmpl.key_present = false;
+            sec_event.auth_cmpl.success = false;
+    */
+    sec_event.auth_cmpl.fail_reason = HCI_ERR_ILLEGAL_COMMAND;
+    if (status == BTM_SUCCESS) {
+      sec_event.auth_cmpl.success = true;
+    } else {
+      /* delete this device entry from Sec Dev DB */
+      bta_dm_remove_sec_dev_entry(bd_addr);
+    }
+    bta_dm_sec_cb.p_sec_cback(BTA_DM_AUTH_CMPL_EVT, &sec_event);
+  }
+
+  free(data);
 }
 
 namespace bluetooth {
