@@ -244,6 +244,12 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
                                int8_t tx_power,
                                AdvertisingStatus status) override {
     uint8_t client_id = is_native_advertiser(reg_id);
+
+    if (status != AdvertisingCallback::AdvertisingStatus::SUCCESS) {
+       LOG_INFO("Status is invalid, reset advertiser id: %d",
+                 advertiser_id);
+       bluetooth::shim::GetAdvertising()->ResetAdvertiser(advertiser_id);
+    }
     if (client_id != kAdvertiserClientIdJni) {
       // Invoke callback for native client
       do_in_main_thread(
