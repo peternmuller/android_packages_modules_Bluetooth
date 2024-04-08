@@ -24,6 +24,8 @@
 
 #define LOG_TAG "bt_l2cap"
 
+#include <bluetooth/log.h>
+
 #include "stack/include/l2c_api.h"
 
 #include <base/location.h>
@@ -34,16 +36,16 @@
 #include <string>
 
 #include "common/init_flags.h"
-#include "device/include/controller.h"  // TODO Remove
 #include "hal/snoop_logger.h"
+#include "hci/controller_interface.h"
 #include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
+#include "main/shim/dumpsys.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
 #include "os/system_properties.h"
 #include "osi/include/allocator.h"
-#include "stack/btm/btm_sec.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_psm_types.h"
 #include "stack/include/btm_api.h"
@@ -53,8 +55,7 @@
 #include "stack/l2cap/l2c_int.h"
 #include "types/raw_address.h"
 
-void btsnd_hcic_enhanced_flush(uint16_t handle,
-                               uint8_t packet_type);  // TODO Remove
+using namespace bluetooth;
 
 using base::StringPrintf;
 
@@ -1575,15 +1576,15 @@ uint16_t L2CA_FlushChannel(uint16_t lcid, uint16_t num_to_flush) {
 
   /* Cannot flush eRTM buffers once they have a sequence number */
   if (p_ccb->peer_cfg.fcr.mode != L2CAP_FCR_ERTM_MODE) {
-    const controller_t* controller = controller_get_interface();
     // Don't need send enhanced_flush to controller if it is LE transport.
     if (p_lcb->transport != BT_TRANSPORT_LE &&
         num_to_flush != L2CAP_FLUSH_CHANS_GET) {
       /* If the controller supports enhanced flush, flush the data queued at the
        * controller */
-      if (controller->SupportsNonFlushablePb() && (BTM_GetNumScoLinks() == 0)) {
+      if (bluetooth::shim::GetController()->SupportsNonFlushablePb() &&
+          (BTM_GetNumScoLinks() == 0)) {
         /* The only packet type defined - 0 - Automatically-Flushable Only */
-        btsnd_hcic_enhanced_flush(p_lcb->Handle(), 0);
+        l2c_acl_flush(p_lcb->Handle());
       }
     }
 
@@ -1772,3 +1773,53 @@ bool L2CA_isMediaChannel(uint16_t handle, uint16_t channel_id,
 
   return ret;
 }
+
+/*******************************************************************************
+ *
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
+  log::verbose("CID: 0x{:04x}", lcid);
+
+  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
+  if (p_ccb == nullptr) {
+    log::error("No CCB for CID:0x{:04x}", lcid);
+    return false;
+  }
+
+  ASSERT(rcid != nullptr);
+  *rcid = p_ccb->remote_cid;
+  return true;
+}
+
+using namespace bluetooth;
+
+#define DUMPSYS_TAG "shim::legacy::l2cap"
+
+void L2CA_Dumpsys(int fd) {
+  LOG_DUMPSYS_TITLE(fd, DUMPSYS_TAG);
+  for (int i = 0; i < MAX_L2CAP_LINKS; i++) {
+    const tL2C_LCB& lcb = l2cb.lcb_pool[i];
+    if (!lcb.in_use) continue;
+    LOG_DUMPSYS(fd, "link_state:%s", link_state_text(lcb.link_state).c_str());
+    LOG_DUMPSYS(fd, "handle:0x%04x", lcb.Handle());
+
+    const tL2C_CCB* ccb = lcb.ccb_queue.p_first_ccb;
+    while (ccb != nullptr) {
+      LOG_DUMPSYS(
+          fd, "  active channel lcid:0x%04x rcid:0x%04x is_ecoc:%s in_use:%s",
+          ccb->local_cid, ccb->remote_cid, logbool(ccb->ecoc).c_str(),
+          logbool(ccb->in_use).c_str());
+      ccb = ccb->p_next_ccb;
+    }
+  }
+}
+#undef DUMPSYS_TAG

@@ -35,6 +35,7 @@ import android.bluetooth.IBluetoothLeBroadcastCallback;
 import android.content.AttributionSource;
 import android.os.ParcelUuid;
 import android.os.RemoteCallbackList;
+import android.platform.test.flag.junit.SetFlagsRule;
 
 import androidx.test.InstrumentationRegistry;
 
@@ -42,24 +43,28 @@ import com.android.bluetooth.TestUtils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.AudioRoutingManager;
 import com.android.bluetooth.btservice.storage.DatabaseManager;
-import com.android.bluetooth.flags.FakeFeatureFlagsImpl;
 import com.android.bluetooth.flags.Flags;
-import com.android.bluetooth.x.com.android.modules.utils.SynchronousResultReceiver;
+import com.android.bluetooth.jarjar.com.android.modules.utils.SynchronousResultReceiver;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 import java.util.List;
 import java.util.UUID;
 
 public class LeAudioBinderTest {
 
+    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
     private LeAudioService mLeAudioService;
-    private FakeFeatureFlagsImpl mFakeFlagsImpl;
+    @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
+
     @Mock private AdapterService mAdapterService;
     @Mock private LeAudioNativeInterface mNativeInterface;
     @Mock private DatabaseManager mDatabaseManager;
@@ -77,19 +82,15 @@ public class LeAudioBinderTest {
 
     @Before
     public void setUp() throws Exception {
-        MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         doReturn(false).when(mAdapterService).isQuietModeEnabled();
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
         doReturn(mAudioRoutingManager).when(mAdapterService).getActiveDeviceManager();
 
-        mFakeFlagsImpl = new FakeFeatureFlagsImpl();
         mLeAudioService =
                 spy(
                         new LeAudioService(
-                                InstrumentationRegistry.getTargetContext(),
-                                mNativeInterface,
-                                mFakeFlagsImpl));
+                                InstrumentationRegistry.getTargetContext(), mNativeInterface));
         mLeAudioService.start();
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mBinder = new LeAudioService.BluetoothLeAudioBinder(mLeAudioService);
@@ -171,12 +172,12 @@ public class LeAudioBinderTest {
         BluetoothDevice device = TestUtils.getTestDevice(mAdapter, 0);
         AttributionSource source = new AttributionSource.Builder(0).build();
 
-        mFakeFlagsImpl.setFlag(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION, false);
+        mSetFlagsRule.disableFlags(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION);
         SynchronousResultReceiver<Boolean> recv = SynchronousResultReceiver.get();
         mBinder.setActiveDevice(device, source, recv);
         verify(mLeAudioService).setActiveDevice(device);
 
-        mFakeFlagsImpl.setFlag(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION, true);
+        mSetFlagsRule.enableFlags(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION);
         recv = SynchronousResultReceiver.get();
         mBinder.setActiveDevice(device, source, recv);
         verify(mAudioRoutingManager).activateDeviceProfile(device, BluetoothProfile.LE_AUDIO, recv);
@@ -186,12 +187,12 @@ public class LeAudioBinderTest {
     public void setActiveDevice_withNullDevice_callsRemoveActiveDevice() {
         AttributionSource source = new AttributionSource.Builder(0).build();
 
-        mFakeFlagsImpl.setFlag(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION, false);
+        mSetFlagsRule.disableFlags(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION);
         SynchronousResultReceiver<Boolean> recv = SynchronousResultReceiver.get();
         mBinder.setActiveDevice(null, source, recv);
         verify(mLeAudioService).removeActiveDevice(true);
 
-        mFakeFlagsImpl.setFlag(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION, true);
+        mSetFlagsRule.enableFlags(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION);
         recv = SynchronousResultReceiver.get();
         mBinder.setActiveDevice(null, source, recv);
         verify(mAudioRoutingManager).activateDeviceProfile(null, BluetoothProfile.LE_AUDIO, recv);

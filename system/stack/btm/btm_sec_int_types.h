@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "stack/include/bt_octets.h"
@@ -29,7 +31,7 @@
  * Local device configuration
  */
 typedef struct {
-  tBTM_LOC_BD_NAME bd_name; /* local Bluetooth device name */
+  BD_NAME bd_name;          /* local Bluetooth device name */
   bool pin_type;            /* true if PIN type is fixed */
   uint8_t pin_code_len;     /* Bonding information */
   PIN_CODE pin_code;        /* PIN CODE if pin type is fixed */
@@ -105,3 +107,8 @@ typedef struct tBTM_SEC_DEVCB {
 #define BTM_SEC_ENC_PENDING 5     /* wait for link encryption pending */
 
 typedef uint8_t tBTM_SEC_ACTION;
+
+namespace fmt {
+template <>
+struct formatter<tBTM_PAIRING_STATE> : enum_formatter<tBTM_PAIRING_STATE> {};
+}  // namespace fmt

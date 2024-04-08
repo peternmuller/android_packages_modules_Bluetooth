@@ -56,7 +56,6 @@ import com.android.internal.util.StateMachine;
  */
 
 final class AdapterState extends StateMachine {
-    private static final boolean DBG = true;
     private static final String TAG = AdapterState.class.getSimpleName();
 
     static final int USER_TURN_ON = 1;
@@ -78,7 +77,7 @@ final class AdapterState extends StateMachine {
             "ro.bluetooth.ble_stop_timeout_delay";
 
     static final int BLE_START_TIMEOUT_DELAY =
-        4000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
+        5000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
     static final int BLE_STOP_TIMEOUT_DELAY =
         4000 * SystemProperties.getInt("ro.hw_timeout_multiplier", 1);
     static final int BREDR_START_TIMEOUT_DELAY =
@@ -162,9 +161,7 @@ final class AdapterState extends StateMachine {
         }
 
         void infoLog(String msg) {
-            if (DBG) {
-                Log.i(TAG, BluetoothAdapter.nameForState(getStateValue()) + " : " + msg);
-            }
+            Log.i(TAG, BluetoothAdapter.nameForState(getStateValue()) + " : " + msg);
         }
 
         void errorLog(String msg) {

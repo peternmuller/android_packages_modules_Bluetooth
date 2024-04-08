@@ -52,6 +52,18 @@ impl From<BtTransport> for i32 {
     }
 }
 
+impl From<u8> for BtTransport {
+    fn from(transport: u8) -> Self {
+        BtTransport::from_u8(transport).unwrap_or(BtTransport::Auto)
+    }
+}
+
+impl Into<u8> for BtTransport {
+    fn into(self) -> u8 {
+        self.to_u8().unwrap_or(0)
+    }
+}
+
 #[derive(Clone, Debug, FromPrimitive, ToPrimitive, PartialEq, PartialOrd)]
 #[repr(u32)]
 pub enum BtSspVariant {
@@ -387,6 +399,18 @@ impl From<u32> for BtAddrType {
 impl Into<u32> for BtAddrType {
     fn into(self) -> u32 {
         self.to_u32().unwrap_or(0)
+    }
+}
+
+impl From<u8> for BtAddrType {
+    fn from(address_type: u8) -> Self {
+        BtAddrType::from_u8(address_type).unwrap_or(BtAddrType::Unknown)
+    }
+}
+
+impl Into<u8> for BtAddrType {
+    fn into(self) -> u8 {
+        self.to_u8().unwrap_or(0)
     }
 }
 
@@ -1325,6 +1349,10 @@ impl BluetoothInterface {
 
     pub fn get_swb_supported(&self) -> bool {
         ccall!(self, get_swb_supported)
+    }
+
+    pub fn is_coding_format_supported(&self, coding_format: u8) -> bool {
+        ccall!(self, is_coding_format_supported, coding_format)
     }
 
     pub fn le_rand(&self) -> i32 {

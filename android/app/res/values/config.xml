@@ -180,6 +180,30 @@
     <!-- Enable support for URI based images. Off by default due to increased memory usage -->
     <bool name="avrcp_target_cover_art_uri_images">false</bool>
 
+    <!-- Dual Mode use case based Audio mode policies in terms of Audio device type selected in
+         form of value pairs where first value is for OUTPUT_ONLY and second one is for DUPLEX
+         values being mapped as 1: HFP, 2: A2DP, 22: LE_AUDIO -->
+    <integer-array name="conversational_use_case_policy">
+        <item>2</item>
+        <item>1</item>
+    </integer-array>
+    <integer-array name="media_use_case_policy">
+        <item>2</item>
+        <item>1</item>
+    </integer-array>
+    <integer-array name="game_use_case_policy">
+        <item>22</item>
+        <item>1</item>
+    </integer-array>
+    <integer-array name="live_use_case_policy">
+        <item>22</item>
+        <item>1</item>
+    </integer-array>
+    <integer-array name="default_use_case_policy">
+        <item>2</item>
+        <item>1</item>
+    </integer-array>
+
     <!-- Package that is responsible for user interaction on pairing request,
          success or cancel.
          Receives:

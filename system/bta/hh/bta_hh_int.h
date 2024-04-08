@@ -25,6 +25,8 @@
 #ifndef BTA_HH_INT_H
 #define BTA_HH_INT_H
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "bta/include/bta_api.h"
@@ -206,7 +208,6 @@ typedef struct {
   uint8_t disc_active;
   tBTA_HH_STATUS status;
   tBTM_STATUS btm_status;
-  bool is_le_device;
   tBTA_HH_LE_HID_SRVC hid_srvc;
   uint16_t conn_id;
   bool in_bg_conn;
@@ -316,5 +317,11 @@ void bta_hh_le_notify_enc_cmpl(tBTA_HH_DEV_CB* p_cb,
 #if (BTA_HH_DEBUG == TRUE)
 void bta_hh_trace_dev_db(void);
 #endif
+
+namespace fmt {
+template <>
+struct formatter<tBTA_HH_SERVICE_STATE>
+    : enum_formatter<tBTA_HH_SERVICE_STATE> {};
+}  // namespace fmt
 
 #endif

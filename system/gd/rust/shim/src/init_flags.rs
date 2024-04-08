@@ -14,20 +14,14 @@ mod ffi {
 
         fn always_send_services_if_gatt_disc_done_is_enabled() -> bool;
         fn always_use_private_gatt_for_debugging_is_enabled() -> bool;
-        fn bta_dm_clear_conn_id_on_client_close_is_enabled() -> bool;
         fn bluetooth_power_telemetry_is_enabled() -> bool;
-        fn delay_hidh_cleanup_until_hidh_ready_start_is_enabled() -> bool;
         fn btm_dm_flush_discovery_queue_on_search_cancel_is_enabled() -> bool;
-        fn bta_dm_stop_discovery_on_search_cancel_is_enabled() -> bool;
         fn classic_discovery_only_is_enabled() -> bool;
-        fn clear_hidd_interrupt_cid_on_disconnect_is_enabled() -> bool;
         fn device_iot_config_logging_is_enabled() -> bool;
         fn dynamic_avrcp_version_enhancement_is_enabled() -> bool;
         fn gatt_robust_caching_client_is_enabled() -> bool;
         fn gatt_robust_caching_server_is_enabled() -> bool;
-        fn get_default_log_level() -> i32;
         fn get_hci_adapter() -> i32;
-        fn get_log_level_for_tag(tag: &str) -> i32;
         fn get_asha_packet_drop_frequency_threshold() -> i32;
         fn get_asha_phy_update_retry_limit() -> i32;
         fn hfp_dynamic_version_is_enabled() -> bool;

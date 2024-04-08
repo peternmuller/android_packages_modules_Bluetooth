@@ -19,9 +19,14 @@
 #include <cstdio>
 #include <iostream>
 
+bluetooth::common::MessageLoopThread message_loop_thread("main message loop");
+bluetooth::common::MessageLoopThread* get_main_thread() {
+  return &message_loop_thread;
+}
+
 namespace bluetooth::hal {
-void NocpIsoClocker::Register(NocpIsoHandler*) {}
-void NocpIsoClocker::Unregister() {}
+void LinkClocker::Register(ReadClockHandler*) {}
+void LinkClocker::Unregister() {}
 }  // namespace bluetooth::hal
 
 namespace bluetooth::audio::asrc {

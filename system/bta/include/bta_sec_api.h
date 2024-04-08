@@ -20,6 +20,7 @@
 
 #include <base/functional/callback.h>
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include <cstdint>
 
@@ -336,9 +337,8 @@ void BTA_DmConfirm(const RawAddress& bd_addr, bool accept);
  * Returns          void
  *
  ******************************************************************************/
-void BTA_DmAddDevice(const RawAddress& bd_addr, DEV_CLASS dev_class,
-                     const LinkKey& link_key, uint8_t key_type,
-                     uint8_t pin_length);
+void BTA_DmAddDevice(RawAddress bd_addr, DEV_CLASS dev_class, LinkKey link_key,
+                     uint8_t key_type, uint8_t pin_length);
 
 /*******************************************************************************
  *
@@ -495,3 +495,8 @@ void BTA_DmSirkSecCbRegister(tBTA_DM_SEC_CBACK* p_cback);
  *
  ******************************************************************************/
 void BTA_DmSirkConfirmDeviceReply(const RawAddress& bd_addr, bool accept);
+
+namespace fmt {
+template <>
+struct formatter<tBTA_DM_SEC_EVT> : enum_formatter<tBTA_DM_SEC_EVT> {};
+}  // namespace fmt

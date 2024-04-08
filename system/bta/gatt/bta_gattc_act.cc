@@ -34,10 +34,11 @@
 #include "bta/include/bta_api.h"
 #include "btif/include/btif_debug_conn.h"
 #include "btif/include/btif_storage.h"
-#include "device/include/controller.h"
 #include "hardware/bt_gatt_types.h"
+#include "hci/controller_interface.h"
 #include "include/check.h"
 #include "internal_include/bt_trace.h"
+#include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
@@ -227,8 +228,9 @@ void bta_gattc_register(const Uuid& app_uuid, tBTA_GATTC_CBACK* p_cback,
 /** De-Register a GATT client application with BTA */
 void bta_gattc_deregister(tBTA_GATTC_RCB* p_clreg) {
   uint8_t accept_list_size = 0;
-  if (controller_get_interface()->SupportsBle()) {
-    accept_list_size = controller_get_interface()->get_ble_acceptlist_size();
+  if (bluetooth::shim::GetController()->SupportsBle()) {
+    accept_list_size =
+        bluetooth::shim::GetController()->GetLeFilterAcceptListSize();
   }
 
   /* remove bg connection associated with this rcb */
@@ -249,7 +251,7 @@ void bta_gattc_deregister(tBTA_GATTC_RCB* p_clreg) {
   }
 
   /* close all CLCB related to this app */
-  for (uint8_t i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
+  for (size_t i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
     if (!bta_gattc_cb.clcb[i].in_use || (bta_gattc_cb.clcb[i].p_rcb != p_clreg))
       continue;
 
@@ -703,7 +705,7 @@ void bta_gattc_close(tBTA_GATTC_CLCB* p_clcb, const tBTA_GATTC_DATA* p_data) {
 
 /** when a SRCB finished discovery, tell all related clcb */
 void bta_gattc_reset_discover_st(tBTA_GATTC_SERV* p_srcb, tGATT_STATUS status) {
-  for (uint8_t i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
+  for (size_t i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
     if (bta_gattc_cb.clcb[i].p_srcb == p_srcb) {
       bta_gattc_cb.clcb[i].status = status;
       bta_gattc_sm_execute(&bta_gattc_cb.clcb[i], BTA_GATTC_DISCOVER_CMPL_EVT,
@@ -734,14 +736,12 @@ void bta_gattc_disc_close(tBTA_GATTC_CLCB* p_clcb,
 
 /** when a SRCB start discovery, tell all related clcb and set the state */
 static void bta_gattc_set_discover_st(tBTA_GATTC_SERV* p_srcb) {
-  uint8_t i;
-
   if (!interop_match_addr_or_name(INTEROP_DISABLE_LE_CONN_UPDATES,
                                   &p_srcb->server_bda,
                                   &btif_storage_get_remote_device_property)) {
     L2CA_LockBleConnParamsForServiceDiscovery(p_srcb->server_bda, true);
   }
-  for (i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
+  for (size_t i = 0; i < BTA_GATTC_CLCB_MAX; i++) {
     if (bta_gattc_cb.clcb[i].p_srcb == p_srcb) {
       bta_gattc_cb.clcb[i].status = GATT_SUCCESS;
       bta_gattc_cb.clcb[i].state = BTA_GATTC_DISCOVER_ST;
@@ -1474,7 +1474,7 @@ void bta_gattc_process_api_refresh(const RawAddress& remote_bda) {
     if (p_srvc_cb->connected && p_srvc_cb->num_clcb != 0) {
       bool found = false;
       tBTA_GATTC_CLCB* p_clcb = &bta_gattc_cb.clcb[0];
-      for (uint8_t i = 0; i < BTA_GATTC_CLCB_MAX; i++, p_clcb++) {
+      for (size_t i = 0; i < BTA_GATTC_CLCB_MAX; i++, p_clcb++) {
         if (p_clcb->in_use && p_clcb->p_srcb == p_srvc_cb) {
           found = true;
           break;

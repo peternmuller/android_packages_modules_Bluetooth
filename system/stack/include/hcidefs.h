@@ -768,7 +768,7 @@ typedef enum : uint16_t {
 #define HCI_PAGE_SCAN_ENABLED 0x02
 
 /* Pagescan timer definitions in 0.625 ms */
-#define HCI_DEF_PAGESCAN_INTERVAL 0x0800 /* 1.28 sec */
+#define HCI_DEF_PAGESCAN_INTERVAL 0x0400 /* 640ms */
 
 /* Parameter for pagescan window is passed to LC and is kept in slots */
 #define HCI_DEF_PAGESCAN_WINDOW 0x12   /* 11.25 ms  */
@@ -936,7 +936,7 @@ typedef struct {
 #define HCI_UNISOC_ACL_HIGH_PRIORITY 0xFF
 
 /* Parameter information for HCI_MTK_SET_ACL_PRIORITY */
-#define HCI_MTK_ACL_PRIORITY_PARAM_SIZE 1
+#define HCI_MTK_ACL_PRIORITY_PARAM_SIZE 4
 #define HCI_MTK_SET_ACL_PRIORITY (0xFD95 | HCI_GRP_VENDOR_SPECIFIC)
 #define HCI_MTK_ACL_NORMAL_PRIORITY 0x00
 #define HCI_MTK_ACL_HIGH_PRIORITY 0x01

@@ -173,6 +173,11 @@
             "qos_config_name": ["QoS_Config_32_1_1"]
         },
         {
+            "name": "SingleDev_OneChanMonoSnk_32_1_2",
+            "codec_config_name": "SingleDev_OneChanMonoSnk_32_1",
+            "qos_config_name": ["QoS_Config_32_1_2"]
+        },
+        {
             "name": "SingleDev_OneChanMonoSnk_32_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanMonoSnk_32_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
@@ -181,6 +186,11 @@
             "name": "SingleDev_OneChanMonoSnk_32_2_1",
             "codec_config_name": "SingleDev_OneChanMonoSnk_32_2",
             "qos_config_name": ["QoS_Config_32_2_1"]
+        },
+        {
+            "name": "SingleDev_OneChanMonoSnk_32_2_2",
+            "codec_config_name": "SingleDev_OneChanMonoSnk_32_2",
+            "qos_config_name": ["QoS_Config_32_2_2"]
         },
         {
             "name": "SingleDev_OneChanMonoSnk_16_1_Balanced_Reliability",
@@ -278,16 +288,6 @@
             "qos_config_name": ["QoS_Config_16_2_2"]
         },
         {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1_Low_Latency",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1",
-            "qos_config_name": ["QoS_Config_Low_Latency"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1_1",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1",
-            "qos_config_name": ["QoS_Config_16_1_1"]
-        },
-        {
             "name": "SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_32_2_Low_Latency",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_32_2",
             "qos_config_name": ["QoS_Config_Low_Latency"]
@@ -326,26 +326,6 @@
             "name": "SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_16_1_1",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_TwoChanStereoSrc_16_1",
             "qos_config_name": ["QoS_Config_16_1_1"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1_2",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1",
-            "qos_config_name": ["QoS_Config_16_1_2"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2_Low_Latency",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2",
-            "qos_config_name": ["QoS_Config_Low_Latency"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2_1",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2",
-            "qos_config_name": ["QoS_Config_16_2_1"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2_2",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2",
-            "qos_config_name": ["QoS_Config_16_2_2"]
         },
         {
             "name": "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_16_1_Low_Latency",
@@ -618,16 +598,6 @@
             "qos_config_name": ["QoS_Config_Low_Latency"]
         },
         {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_32_2_Low_Latency",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_32_2",
-            "qos_config_name": ["QoS_Config_Low_Latency"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_32_2_1",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_32_2",
-            "qos_config_name": ["QoS_Config_32_2_1"]
-        },
-        {
             "name": "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_32_2_Low_Latency",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_32_2",
             "qos_config_name": ["QoS_Config_Low_Latency"]
@@ -752,9 +722,9 @@
             "codec_metadata_name": ["VND_AptxLe_V1_VS_Metadata"]
         },
         {
-            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R3_L5_OneChanMonoSrc_32khz_45octs_R3_L5_LC3V2_1",
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R3_L8_OneChanMonoSrc_32khz_45octs_R3_L8_LC3V2_1",
             "codec_config_name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_OneChanMonoSrc_32khz_45octs_1",
-            "qos_config_name": ["VND_QoS_Config_R3_L5", "VND_QoS_Config_R3_L5"],
+            "qos_config_name": ["VND_QoS_Config_R3_L8", "VND_QoS_Config_R3_L8"],
             "codec_metadata_name": ["VND_LC3Q_V2_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
         },
         {
@@ -1028,21 +998,6 @@
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_32_2_Balanced_Reliability",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_32_2",
-            "qos_config_name": ["QoS_Config_Balanced_Reliability"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_24_2_Balanced_Reliability",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_24_2",
-            "qos_config_name": ["QoS_Config_Balanced_Reliability"]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_16_2_Balanced_Reliability",
-            "codec_config_name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_16_2",
-            "qos_config_name": ["QoS_Config_Balanced_Reliability"]
-        },
-        {
             "name": "SingleDev_TwoChanStereoSnk_48_4_TwoChanStereoSrc_32_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_48_4_TwoChanStereoSrc_32_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
@@ -1063,42 +1018,42 @@
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_TwoChanStereoSnk_48_4_1_OneChanMonoSrc_24_2_Balanced_Reliability",
+            "name": "SingleDev_TwoChanStereoSnk_48_4_OneChanMonoSrc_24_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_48_4_OneChanMonoSrc_24_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_TwoChanStereoSnk_48_4_1_OneChanMonoSrc_16_2_Balanced_Reliability",
+            "name": "SingleDev_TwoChanStereoSnk_48_4_OneChanMonoSrc_16_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_TwoChanStereoSnk_48_4_OneChanMonoSrc_16_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanStereoSnk_48_4_1_OneChanMonoSrc_32_2_Balanced_Reliability",
+            "name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_32_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_32_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanStereoSnk_48_4_1_OneChanMonoSrc_24_2_Balanced_Reliability",
+            "name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_24_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_24_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanStereoSnk_48_4_1_OneChanMonoSrc_16_2_Balanced_Reliability",
+            "name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_16_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_4_OneChanMonoSrc_16_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanMonoSnk_48_4_1_OneChanMonoSrc_32_2_Balanced_Reliability",
+            "name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_32_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_32_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanMonoSnk_48_4_1_OneChanMonoSrc_24_2_1_Balanced_Reliability",
+            "name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_24_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_24_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
         {
-            "name": "SingleDev_OneChanMonoSnk_48_4_1_OneChanMonoSrc_16_2_Balanced_Reliability",
+            "name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_16_2_Balanced_Reliability",
             "codec_config_name": "SingleDev_OneChanMonoSnk_48_4_OneChanMonoSrc_16_2",
             "qos_config_name": ["QoS_Config_Balanced_Reliability"]
         },
@@ -1167,6 +1122,12 @@
         {
             "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R5_L12_OneChanStereoSrc_16khz_30octs_R3_L12_LC3V1_1",
             "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanStereoSrc_16_1",
+            "qos_config_name": ["VND_QoS_Config_R5_L12", "VND_QoS_Config_R3_L12"],
+            "codec_metadata_name": ["VND_LC3Q_V1_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
+        },
+        {
+            "name": "VND_SingleDev_OneChanStereoSnk_48khz_75octs_R5_L12_OneChanMonoSrc_16khz_30octs_R3_L12_LC3V1_1",
+            "codec_config_name": "SingleDev_OneChanStereoSnk_48_1_OneChanMonoSrc_16_1",
             "qos_config_name": ["VND_QoS_Config_R5_L12", "VND_QoS_Config_R3_L12"],
             "codec_metadata_name": ["VND_LC3Q_V1_VS_Metadata", "VND_LC3Q_V1_VS_Metadata"]
         },
@@ -3104,262 +3065,6 @@
                             "compound_value": {
                                 "value": [
                                     0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    30,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    3
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    40,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    3
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    40,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_16_1",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    3
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    30,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
                                 ]
                             }
                         },
@@ -6853,7 +6558,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -6980,7 +6685,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -7234,7 +6939,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -7361,391 +7066,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_32_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    120,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_24_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    120,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    5
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_48_4_OneChanMonoSrc_16_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    8
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    120,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    3
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -8003,7 +7324,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -8132,7 +7453,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -8388,7 +7709,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -8516,7 +7837,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -8772,7 +8093,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -8900,7 +8221,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -9154,7 +8475,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    60,
                                     0
                                 ]
                             }
@@ -9343,7 +8664,7 @@
                             "type": 4,
                             "compound_value": {
                                 "value": [
-                                    80,
+                                    40,
                                     0
                                 ]
                             }
@@ -10288,134 +9609,6 @@
                     "device_cnt": 2,
                     "ase_cnt": 2,
                     "direction": "SINK",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "device_cnt": 1,
-                    "ase_cnt": 1,
-                    "direction": "SOURCE",
-                    "codec_id": {
-                        "coding_format": 6,
-                        "vendor_company_id": 0,
-                        "vendor_codec_id": 0
-                    },
-                    "codec_configuration": [
-                        {
-                            "name": "sampling_frequency",
-                            "type": 1,
-                            "compound_value": {
-                                "value": [
-                                    6
-                                ]
-                            }
-                        },
-                        {
-                            "name": "frame_duration",
-                            "type": 2,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        },
-                        {
-                            "name": "audio_channel_allocation",
-                            "type": 3,
-                            "compound_value": {
-                                "value": [
-                                    1,
-                                    0,
-                                    0,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "octets_per_codec_frame",
-                            "type": 4,
-                            "compound_value": {
-                                "value": [
-                                    80,
-                                    0
-                                ]
-                            }
-                        },
-                        {
-                            "name": "codec_frame_blocks_per_sdu",
-                            "type": 5,
-                            "compound_value": {
-                                "value": [
-                                    1
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "DualDev_OneChanDoubleStereoSnk_OneChanMonoSrc_32_2",
-            "subconfigurations": [
-                {
-                    "device_cnt": 2,
-                    "ase_cnt": 4,
-                    "direction": "SINK",
-                    "configuration_strategy": "STEREO_TWO_CISES_PER_DEVICE",
                     "codec_id": {
                         "coding_format": 6,
                         "vendor_company_id": 0,
@@ -12095,6 +11288,7 @@
         },
         {
             "name": "QoS_Config_48_1_1",
+            "target_latency": "LOW",
             "retransmission_number": 5,
             "max_transport_latency": 15
         },
@@ -12130,6 +11324,7 @@
         },
         {
             "name": "VND_QoS_Config_R31_L100",
+            "target_latency": "HIGH_RELIABILITY",
             "retransmission_number": 31,
             "max_transport_latency": 100
         },
@@ -12145,11 +11340,13 @@
         },
         {
             "name": "VND_QoS_Config_R3_L15",
+            "target_latency": "LOW",
             "retransmission_number": 3,
             "max_transport_latency": 15
         },
         {
             "name": "VND_QoS_Config_R24_L100",
+            "target_latency": "HIGH_RELIABILITY",
             "retransmission_number": 24,
             "max_transport_latency": 100
         },
@@ -12159,14 +11356,10 @@
             "max_transport_latency": 200
         },
         {
-            "name": "VND_QoS_Config_R3_L5",
+            "name": "VND_QoS_Config_R3_L8",
+            "target_latency": "LOW",
             "retransmission_number": 3,
-            "max_transport_latency": 5
-        },
-        {
-            "name": "VND_QoS_Config_R31_L100",
-            "retransmission_number": 31,
-            "max_transport_latency": 100
+            "max_transport_latency": 8
         },
         {
             "name": "VND_QoS_Config_R13_L100",
@@ -12205,12 +11398,8 @@
             "max_transport_latency": 40
         },
         {
-            "name": "VND_QoS_Config_R31_L100",
-            "retransmission_number": 31,
-            "max_transport_latency": 100
-        },
-        {
             "name": "VND_QoS_Config_R3_L12",
+            "target_latency": "LOW",
             "retransmission_number": 3,
             "max_transport_latency": 12
         },

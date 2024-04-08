@@ -19,7 +19,6 @@ package com.android.bluetooth.hfp;
 import static android.Manifest.permission.BLUETOOTH_CONNECT;
 
 import static org.mockito.Mockito.*;
-import static org.junit.Assume.assumeTrue;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -37,7 +36,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.HandlerThread;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.CallLog;
@@ -53,6 +51,7 @@ import androidx.test.filters.MediumTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.bluetooth.TestUtils;
+import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.ActiveDeviceManager;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.RemoteDevices;
@@ -71,7 +70,8 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 import java.util.ArrayList;
 
@@ -96,6 +96,8 @@ public class HeadsetStateMachineTest {
     private BluetoothDevice mTestDevice;
     private ArgumentCaptor<Intent> mIntentArgument = ArgumentCaptor.forClass(Intent.class);
 
+    @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
+
     @Mock private AdapterService mAdapterService;
     @Mock private ActiveDeviceManager mActiveDeviceManager;
     @Mock private SilenceDeviceManager mSilenceDeviceManager;
@@ -113,11 +115,10 @@ public class HeadsetStateMachineTest {
     public void setUp() throws Exception {
         mTargetContext = InstrumentationRegistry.getTargetContext();
         // Setup mocks and test assets
-        MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         // Stub system interface
-        when(mSystemInterface.getHeadsetPhoneState()).thenReturn(mPhoneState);
-        when(mSystemInterface.getAudioManager()).thenReturn(mAudioManager);
+        doReturn(mPhoneState).when(mSystemInterface).getHeadsetPhoneState();
+        doReturn(mAudioManager).when(mSystemInterface).getAudioManager();
         // This line must be called to make sure relevant objects are initialized properly
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         // Get a device for testing
@@ -1662,8 +1663,7 @@ public class HeadsetStateMachineTest {
     /** Test setting audio parameters according to received SWB event. SWB AptX is enabled. */
     @Test
     public void testSetAudioParameters_SwbAptxEnabled() {
-        mSetFlagsRule.enableFlags(Flags.FLAG_HFP_CODEC_APTX_VOICE);
-        assumeTrue(SystemProperties.getBoolean("bluetooth.hfp.codec_aptx_voice.enabled", false));
+        configureHeadsetServiceForAptxVoice(true);
         setUpConnectedState();
         mHeadsetStateMachine.sendMessage(
                 HeadsetStateMachine.STACK_EVENT,
@@ -1680,11 +1680,13 @@ public class HeadsetStateMachineTest {
                         HeadsetHalConstants.AUDIO_STATE_CONNECTED,
                         mTestDevice));
         verifyAudioSystemSetParametersInvocation(false, true);
+        configureHeadsetServiceForAptxVoice(false);
     }
 
     /** Test setting audio parameters according to received SWB event. SWB LC3 is enabled. */
     @Test
     public void testSetAudioParameters_SwbLc3Enabled() {
+        configureHeadsetServiceForAptxVoice(true);
         setUpConnectedState();
         mHeadsetStateMachine.sendMessage(
                 HeadsetStateMachine.STACK_EVENT,
@@ -1701,11 +1703,13 @@ public class HeadsetStateMachineTest {
                         HeadsetHalConstants.AUDIO_STATE_CONNECTED,
                         mTestDevice));
         verifyAudioSystemSetParametersInvocation(true, false);
+        configureHeadsetServiceForAptxVoice(false);
     }
 
     /** Test setting audio parameters according to received SWB event. All SWB disabled. */
     @Test
     public void testSetAudioParameters_SwbDisabled() {
+        configureHeadsetServiceForAptxVoice(true);
         setUpConnectedState();
         mHeadsetStateMachine.sendMessage(
                 HeadsetStateMachine.STACK_EVENT,
@@ -1722,6 +1726,32 @@ public class HeadsetStateMachineTest {
                         HeadsetHalConstants.AUDIO_STATE_CONNECTED,
                         mTestDevice));
         verifyAudioSystemSetParametersInvocation(false, false);
+        configureHeadsetServiceForAptxVoice(false);
+    }
+
+    @Test
+    public void testSetAudioParameters_isScoManagedByAudio() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_IS_SCO_MANAGED_BY_AUDIO);
+        Utils.setIsScoManagedByAudioEnabled(true);
+
+        setUpConnectedState();
+        mHeadsetStateMachine.sendMessage(
+                HeadsetStateMachine.STACK_EVENT,
+                new HeadsetStackEvent(
+                        HeadsetStackEvent.EVENT_TYPE_SWB,
+                        HeadsetHalConstants.BTHF_SWB_CODEC_LC3,
+                        HeadsetHalConstants.BTHF_SWB_YES,
+                        mTestDevice));
+
+        mHeadsetStateMachine.sendMessage(
+                HeadsetStateMachine.STACK_EVENT,
+                new HeadsetStackEvent(
+                        HeadsetStackEvent.EVENT_TYPE_AUDIO_STATE_CHANGED,
+                        HeadsetHalConstants.AUDIO_STATE_CONNECTED,
+                        mTestDevice));
+
+        verify(mAudioManager, times(0)).setParameters(any());
+        Utils.setIsScoManagedByAudioEnabled(false);
     }
 
     /**
@@ -1734,7 +1764,7 @@ public class HeadsetStateMachineTest {
         verify(mAudioManager, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
                 .setParameters(lc3Enabled ? "bt_lc3_swb=on" : "bt_lc3_swb=off");
 
-        if (mHeadsetStateMachine.IS_APTX_SUPPORT_ENABLED) {
+        if (Flags.hfpCodecAptxVoice()) {
             verify(mAudioManager, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
                     .setParameters(aptxEnabled ? "bt_swb=0" : "bt_swb=65535");
         }
@@ -1871,5 +1901,16 @@ public class HeadsetStateMachineTest {
                         "+ANDROID=?", mTestDevice));
         verify(mNativeInterface, timeout(ASYNC_CALL_TIMEOUT_MILLIS)).atResponseString(
                 anyObject(), anyString());
+    }
+
+    private void configureHeadsetServiceForAptxVoice(boolean enable) {
+        if (enable) {
+            when(mHeadsetService.isAptXSwbEnabled()).thenReturn(true);
+            mSetFlagsRule.enableFlags(Flags.FLAG_HFP_CODEC_APTX_VOICE);
+            Assert.assertTrue(Flags.hfpCodecAptxVoice());
+        } else {
+            mSetFlagsRule.disableFlags(Flags.FLAG_HFP_CODEC_APTX_VOICE);
+            Assert.assertFalse(Flags.hfpCodecAptxVoice());
+        }
     }
 }

@@ -36,7 +36,6 @@ import android.os.Build;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.PhoneStateListener;
@@ -87,7 +86,6 @@ import java.util.Scanner;
 @VisibleForTesting
 public class HeadsetStateMachine extends StateMachine {
     private static final String TAG = "HeadsetStateMachine";
-    private static final boolean DBG = true;
 
     static final int CONNECT = 1;
     static final int DISCONNECT = 2;
@@ -168,9 +166,6 @@ public class HeadsetStateMachine extends StateMachine {
 
     private BluetoothSinkAudioPolicy mHsClientAudioPolicy;
 
-    static final boolean IS_APTX_SUPPORT_ENABLED =
-                    SystemProperties.getBoolean("bluetooth.hfp.codec_aptx_voice.enabled", false);
-
     // Keys are AT commands, and values are the company IDs.
     private static final Map<String, Integer> VENDOR_SPECIFIC_AT_COMMAND_COMPANY_ID;
 
@@ -206,8 +201,11 @@ public class HeadsetStateMachine extends StateMachine {
             HeadsetService headsetService, AdapterService adapterService,
             HeadsetNativeInterface nativeInterface, HeadsetSystemInterface systemInterface) {
         super(TAG, Objects.requireNonNull(looper, "looper cannot be null"));
-        // Enable/Disable StateMachine debug logs
-        setDbg(DBG);
+
+        // Let the logging framework enforce the log level. TAG is set above in the parent
+        // constructor.
+        setDbg(true);
+
         mDevice = Objects.requireNonNull(device, "device cannot be null");
         mHeadsetService = Objects.requireNonNull(headsetService, "headsetService cannot be null");
         mNativeInterface =
@@ -490,6 +488,39 @@ public class HeadsetStateMachine extends StateMachine {
          */
         abstract int getAudioStateInt();
 
+        protected void setAptxVoice(HeadsetCallState callState) {
+            if (!Flags.hfpCodecAptxVoice()) {
+                return;
+            }
+            if (!mHeadsetService.isAptXSwbEnabled()) {
+                return;
+            }
+            if (!mHeadsetService.isAptXSwbPmEnabled()) {
+                return;
+            }
+            if (mHeadsetService.isVirtualCallStarted()) {
+                stateLogD("CALL_STATE_CHANGED: enable AptX SWB for all voip calls ");
+                mHeadsetService.enableSwbCodec(
+                        HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, true, mDevice);
+            } else if ((callState.mCallState == HeadsetHalConstants.CALL_STATE_DIALING)
+                    || (callState.mCallState == HeadsetHalConstants.CALL_STATE_INCOMING)
+                    || ((callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE)
+                            && (callState.mNumActive > 0))) {
+                if (!mSystemInterface.isHighDefCallInProgress()) {
+                    stateLogD("CALL_STATE_CHANGED: disable AptX SWB for non-HD call ");
+                    mHeadsetService.enableSwbCodec(
+                            HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, false, mDevice);
+                    mHasSwbAptXEnabled = false;
+                } else {
+                    stateLogD("CALL_STATE_CHANGED: enable AptX SWB for HD call ");
+                    mHeadsetService.enableSwbCodec(
+                            HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, true, mDevice);
+                    mHasSwbAptXEnabled = true;
+                }
+            } else {
+                stateLogD("CALL_STATE_CHANGED: AptX SWB state unchanged");
+            }
+        }
     }
 
     class Disconnected extends HeadsetStateBase {
@@ -692,7 +723,8 @@ public class HeadsetStateMachine extends StateMachine {
                     break;
                 }
                 case CALL_STATE_CHANGED:
-                    stateLogD("ignoring CALL_STATE_CHANGED event");
+                    HeadsetCallState callState = (HeadsetCallState) message.obj;
+                    setAptxVoice(callState);
                     break;
                 case DEVICE_STATE_CHANGED:
                     stateLogD("ignoring DEVICE_STATE_CHANGED event");
@@ -954,14 +986,15 @@ public class HeadsetStateMachine extends StateMachine {
                     }
                     break;
                 }
-                case CALL_STATE_CHANGED: {
+                case CALL_STATE_CHANGED:
                     HeadsetCallState callState = (HeadsetCallState) message.obj;
+                    setAptxVoice(callState);
+
                     if (!mNativeInterface.phoneStateChange(mDevice, callState)) {
                         stateLogW("processCallState: failed to update call state " + callState);
                         break;
                     }
                     break;
-                }
                 case DEVICE_STATE_CHANGED:
                     if (mDeviceSilenced) {
                         stateLogW("DEVICE_STATE_CHANGED: " + mDevice
@@ -1196,6 +1229,22 @@ public class HeadsetStateMachine extends StateMachine {
                     if (isAtLeastU()) {
                         mSystemInterface.getAudioManager().setLeAudioSuspended(true);
                     }
+
+                    if (Flags.hfpCodecAptxVoice()
+                            && mHeadsetService.isAptXSwbEnabled()
+                            && mHeadsetService.isAptXSwbPmEnabled()) {
+                        if (!mHeadsetService.isVirtualCallStarted()
+                                && mSystemInterface.isHighDefCallInProgress()) {
+                            stateLogD("CONNECT_AUDIO: enable AptX SWB for HD call ");
+                            mHeadsetService.enableSwbCodec(
+                                    HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, true, mDevice);
+                        } else {
+                            stateLogD("CONNECT_AUDIO: disable AptX SWB for non-HD or Voip calls");
+                            mHeadsetService.enableSwbCodec(
+                                    HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, false, mDevice);
+                        }
+                    }
+
                     if (!mNativeInterface.connectAudio(mDevice)) {
                         mSystemInterface.getAudioManager().setA2dpSuspended(false);
                         if (isAtLeastU()) {
@@ -1685,6 +1734,10 @@ public class HeadsetStateMachine extends StateMachine {
     }
 
     private void setAudioParameters() {
+        if (Utils.isScoManagedByAudioEnabled()) {
+            Log.i(TAG, "isScoManagedByAudio enabled, do not setAudioParameters");
+            return;
+        }
         AudioManager am = mSystemInterface.getAudioManager();
         Log.i(
                 TAG,
@@ -1695,7 +1748,7 @@ public class HeadsetStateMachine extends StateMachine {
                         + (" hasSwbEnabled=" + mHasSwbLc3Enabled)
                         + (" hasAptXSwbEnabled=" + mHasSwbAptXEnabled));
         am.setParameters("bt_lc3_swb=" + (mHasSwbLc3Enabled ? "on" : "off"));
-        if (IS_APTX_SUPPORT_ENABLED) {
+        if (Flags.hfpCodecAptxVoice() && mHeadsetService.isAptXSwbEnabled()) {
             /* AptX bt_swb: 0 -> on, 65535 -> off */
             am.setParameters("bt_swb=" + (mHasSwbAptXEnabled ? "0" : "65535"));
         }
@@ -1843,6 +1896,9 @@ public class HeadsetStateMachine extends StateMachine {
         switch (wbsConfig) {
             case HeadsetHalConstants.BTHF_WBS_YES:
                 mHasWbsEnabled = true;
+                if (Flags.hfpCodecAptxVoice() && mHeadsetService.isAptXSwbEnabled()) {
+                    mHasSwbAptXEnabled = false;
+                }
                 break;
             case HeadsetHalConstants.BTHF_WBS_NO:
             case HeadsetHalConstants.BTHF_WBS_NONE:
@@ -2522,9 +2578,7 @@ public class HeadsetStateMachine extends StateMachine {
 
     @Override
     protected void log(String msg) {
-        if (DBG) {
-            super.log(msg);
-        }
+        super.log(msg);
     }
 
     @Override

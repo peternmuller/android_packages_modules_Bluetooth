@@ -16,6 +16,7 @@
 
 #include <base/functional/bind.h>
 #include <base/location.h>
+#include <bluetooth/log.h>
 #include <com_android_bluetooth_flags.h>
 #include <flag_macros.h>
 #include <gmock/gmock.h>
@@ -45,6 +46,7 @@
 #define TEST_BT com::android::bluetooth::flags
 
 using namespace std::chrono_literals;
+using namespace bluetooth;
 
 namespace {
 constexpr uint8_t kUnusedTimer = BTA_ID_MAX;
@@ -82,7 +84,7 @@ class BtaDmTest : public BtaBaseTest {
   void SetUp() override {
     BtaBaseTest::SetUp();
     main_thread_start_up();
-    post_on_bt_main([]() { LOG_INFO("Main thread started up"); });
+    post_on_bt_main([]() { log::info("Main thread started up"); });
 
     bta_sys_register(BTA_ID_DM_SEARCH, &bta_dm_search_reg);
     bluetooth::legacy::testing::bta_dm_init_cb();
@@ -96,7 +98,7 @@ class BtaDmTest : public BtaBaseTest {
   void TearDown() override {
     bta_sys_deregister(BTA_ID_DM_SEARCH);
     bluetooth::legacy::testing::bta_dm_deinit_cb();
-    post_on_bt_main([]() { LOG_INFO("Main thread shutting down"); });
+    post_on_bt_main([]() { log::info("Main thread shutting down"); });
     main_thread_shut_down();
     BtaBaseTest::TearDown();
   }
@@ -381,12 +383,10 @@ TEST_F(BtaDmTest, bta_dm_remname_cback__typical) {
   tBTM_REMOTE_DEV_NAME name = {
       .status = BTM_SUCCESS,
       .bd_addr = kRawAddress,
-      .length = static_cast<uint16_t>(strlen(kRemoteName)),
       .remote_bd_name = {},
       .hci_status = HCI_SUCCESS,
   };
-  strlcpy(reinterpret_cast<char*>(&name.remote_bd_name), kRemoteName,
-          strlen(kRemoteName));
+  bd_name_from_char_pointer(name.remote_bd_name, kRemoteName);
 
   mock_btm_client_interface.security.BTM_SecDeleteRmtNameNotifyCallback =
       [](tBTM_RMT_NAME_CALLBACK*) -> bool {
@@ -413,12 +413,10 @@ TEST_F(BtaDmTest, bta_dm_remname_cback__wrong_address) {
   tBTM_REMOTE_DEV_NAME name = {
       .status = BTM_SUCCESS,
       .bd_addr = kRawAddress2,
-      .length = static_cast<uint16_t>(strlen(kRemoteName)),
       .remote_bd_name = {},
       .hci_status = HCI_SUCCESS,
   };
-  strlcpy(reinterpret_cast<char*>(&name.remote_bd_name), kRemoteName,
-          strlen(kRemoteName));
+  bd_name_from_char_pointer(name.remote_bd_name, kRemoteName);
 
   mock_btm_client_interface.security.BTM_SecDeleteRmtNameNotifyCallback =
       [](tBTM_RMT_NAME_CALLBACK*) -> bool {
@@ -441,12 +439,10 @@ TEST_F(BtaDmTest, bta_dm_remname_cback__HCI_ERR_CONNECTION_EXISTS) {
   tBTM_REMOTE_DEV_NAME name = {
       .status = BTM_SUCCESS,
       .bd_addr = RawAddress::kEmpty,
-      .length = static_cast<uint16_t>(strlen(kRemoteName)),
       .remote_bd_name = {},
       .hci_status = HCI_ERR_CONNECTION_EXISTS,
   };
-  strlcpy(reinterpret_cast<char*>(&name.remote_bd_name), kRemoteName,
-          strlen(kRemoteName));
+  bd_name_from_char_pointer(name.remote_bd_name, kRemoteName);
 
   mock_btm_client_interface.security.BTM_SecDeleteRmtNameNotifyCallback =
       [](tBTM_RMT_NAME_CALLBACK*) -> bool {

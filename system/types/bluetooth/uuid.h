@@ -19,6 +19,7 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <array>
 #include <string>
 
@@ -156,5 +157,4 @@ namespace fmt {
 template <>
 struct formatter<bluetooth::Uuid> : ostream_formatter {};
 }  // namespace fmt
-
 #endif  // __has_include(<bluetooth/log.h>)

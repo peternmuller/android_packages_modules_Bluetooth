@@ -23,15 +23,19 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.AttributionSource;
 
-import com.android.bluetooth.x.com.android.modules.utils.SynchronousResultReceiver;
+import com.android.bluetooth.jarjar.com.android.modules.utils.SynchronousResultReceiver;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 public class BluetoothHeadsetBinderTest {
     private static final String TEST_DEVICE_ADDRESS = "00:00:00:00:00:00";
+
+    @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock
     private HeadsetService mService;
@@ -43,7 +47,6 @@ public class BluetoothHeadsetBinderTest {
 
     @Before
     public void setUp() throws Exception {
-        MockitoAnnotations.initMocks(this);
         mBinder = new HeadsetService.BluetoothHeadsetBinder(mService);
         mAttributionSource = new AttributionSource.Builder(1).build();
         mTestDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(TEST_DEVICE_ADDRESS);

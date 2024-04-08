@@ -3165,6 +3165,9 @@ void LinkLayerController::ScanIncomingLeLegacyAdvertisingPdu(
     // Save the original advertising type to report if the advertising
     // is connectable in the scan response report.
     scanner_.connectable_scan_response = connectable_advertising;
+    scanner_.extended_scan_response = false;
+    scanner_.primary_scan_response_phy = model::packets::PhyType::LE_1M;
+    scanner_.secondary_scan_response_phy = model::packets::PhyType::NO_PACKETS;
     scanner_.pending_scan_request = advertising_address;
     scanner_.pending_scan_request_timeout =
         std::chrono::steady_clock::now() + kScanRequestTimeout;
@@ -3377,9 +3380,39 @@ void LinkLayerController::ScanIncomingLeExtendedAdvertisingPdu(
   bool scannable_advertising = pdu.GetScannable();
   bool connectable_advertising = pdu.GetConnectable();
   bool directed_advertising = pdu.GetDirected();
+  auto primary_phy = pdu.GetPrimaryPhy();
+  auto secondary_phy = pdu.GetSecondaryPhy();
 
-  // TODO: check originating PHY, compare against active scanning PHYs
-  // (scanner_.le_1m_phy or scanner_.le_coded_phy).
+  // Check originating primary PHY, compare against active scanning PHYs.
+  if ((primary_phy == model::packets::PhyType::LE_1M &&
+       !scanner_.le_1m_phy.enabled) ||
+      (primary_phy == model::packets::PhyType::LE_CODED_S8 &&
+       !scanner_.le_coded_phy.enabled)) {
+    DEBUG(id_,
+          "Extended adverising ignored because the scanner is not scanning on "
+          "the primary phy type {}",
+          model::packets::PhyTypeText(primary_phy));
+    return;
+  }
+
+  // Check originating sceondary PHY, compare against local
+  // supported features. The primary PHY is validated by the command
+  // LE Set Extended Scan Parameters.
+  if ((secondary_phy == model::packets::PhyType::LE_2M &&
+       !properties_.SupportsLLFeature(
+           bluetooth::hci::LLFeaturesBits::LE_2M_PHY)) ||
+      (secondary_phy == model::packets::PhyType::LE_CODED_S8 &&
+       !properties_.SupportsLLFeature(
+           bluetooth::hci::LLFeaturesBits::LE_CODED_PHY)) ||
+      (secondary_phy == model::packets::PhyType::LE_CODED_S2 &&
+       !properties_.SupportsLLFeature(
+           bluetooth::hci::LLFeaturesBits::LE_CODED_PHY))) {
+    DEBUG(id_,
+          "Extended adverising ignored because the scanner does not support "
+          "the secondary phy type {}",
+          model::packets::PhyTypeText(secondary_phy));
+    return;
+  }
 
   // When a scanner receives an advertising packet that contains a resolvable
   // private address for the advertiser’s device address (AdvA field) and
@@ -3476,8 +3509,10 @@ void LinkLayerController::ScanIncomingLeExtendedAdvertisingPdu(
         static_cast<bluetooth::hci::DirectAdvertisingAddressType>(
             resolved_advertising_address.GetAddressType());
     response.address_ = resolved_advertising_address.GetAddress();
-    response.primary_phy_ = bluetooth::hci::PrimaryPhyType::LE_1M;
-    response.secondary_phy_ = bluetooth::hci::SecondaryPhyType::NO_PACKETS;
+    response.primary_phy_ =
+        static_cast<bluetooth::hci::PrimaryPhyType>(primary_phy);
+    response.secondary_phy_ =
+        static_cast<bluetooth::hci::SecondaryPhyType>(secondary_phy);
     response.advertising_sid_ = pdu.GetSid();
     response.tx_power_ = pdu.GetTxPower();
     response.rssi_ = rssi;
@@ -3588,6 +3623,9 @@ void LinkLayerController::ScanIncomingLeExtendedAdvertisingPdu(
     // Save the original advertising type to report if the advertising
     // is connectable in the scan response report.
     scanner_.connectable_scan_response = connectable_advertising;
+    scanner_.extended_scan_response = true;
+    scanner_.primary_scan_response_phy = primary_phy;
+    scanner_.secondary_scan_response_phy = secondary_phy;
     scanner_.pending_scan_request = advertising_address;
 
     INFO(id_,
@@ -4963,15 +5001,39 @@ void LinkLayerController::IncomingLeScanResponsePacket(
             resolved_advertising_address.GetAddressType());
     response.connectable_ = scanner_.connectable_scan_response;
     response.scannable_ = true;
-    response.legacy_ = true;
+    response.legacy_ = !scanner_.extended_scan_response;
     response.scan_response_ = true;
-    response.primary_phy_ = bluetooth::hci::PrimaryPhyType::LE_1M;
+    response.primary_phy_ = static_cast<bluetooth::hci::PrimaryPhyType>(
+        scanner_.primary_scan_response_phy);
+    response.secondary_phy_ = static_cast<bluetooth::hci::SecondaryPhyType>(
+        scanner_.secondary_scan_response_phy);
+    // TODO: SID should be set in scan response PDU
     response.advertising_sid_ = 0xFF;
     response.tx_power_ = 0x7F;
-    response.advertising_data_ = scan_response.GetScanResponseData();
     response.rssi_ = rssi;
-    send_event_(
-        bluetooth::hci::LeExtendedAdvertisingReportBuilder::Create({response}));
+    response.direct_address_type_ =
+        bluetooth::hci::DirectAdvertisingAddressType::NO_ADDRESS_PROVIDED;
+
+    // Each extended advertising report can only pass 229 bytes of
+    // advertising data (255 - size of report fields).
+    // RootCanal must fragment the report as necessary.
+    const size_t max_fragment_size = 229;
+    size_t offset = 0;
+    std::vector<uint8_t> advertising_data = scan_response.GetScanResponseData();
+
+    do {
+      size_t remaining_size = advertising_data.size() - offset;
+      size_t fragment_size = std::min(max_fragment_size, remaining_size);
+      response.data_status_ = remaining_size <= max_fragment_size
+                                  ? bluetooth::hci::DataStatus::COMPLETE
+                                  : bluetooth::hci::DataStatus::CONTINUING;
+      response.advertising_data_ =
+          std::vector(advertising_data.begin() + offset,
+                      advertising_data.begin() + offset + fragment_size);
+      offset += fragment_size;
+      send_event_(bluetooth::hci::LeExtendedAdvertisingReportBuilder::Create(
+          {response}));
+    } while (offset < advertising_data.size());
   }
 }
 

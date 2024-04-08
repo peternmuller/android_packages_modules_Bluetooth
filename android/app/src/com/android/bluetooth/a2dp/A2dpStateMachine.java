@@ -74,8 +74,7 @@ import java.util.Objects;
 import java.util.Scanner;
 
 final class A2dpStateMachine extends StateMachine {
-    private static final boolean DBG = true;
-    private static final String TAG = "A2dpStateMachine";
+    private static final String TAG = A2dpStateMachine.class.getSimpleName();
 
     static final int CONNECT = 1;
     static final int DISCONNECT = 2;
@@ -105,7 +104,11 @@ final class A2dpStateMachine extends StateMachine {
     A2dpStateMachine(BluetoothDevice device, A2dpService a2dpService,
                      A2dpNativeInterface a2dpNativeInterface, Looper looper) {
         super(TAG, looper);
-        setDbg(DBG);
+
+        // Let the logging framework enforce the log level. TAG is set above in the parent
+        // constructor.
+        setDbg(true);
+
         mDevice = device;
         mA2dpService = a2dpService;
         mA2dpNativeInterface = a2dpNativeInterface;
@@ -671,15 +674,17 @@ final class A2dpStateMachine extends StateMachine {
             mCodecStatus = newCodecStatus;
         }
 
-        if (DBG) {
+        // The following is a large enough debug operation such that we want to guard it was an
+        // isLoggable check
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
             Log.d(TAG, "A2DP Codec Config: " + prevCodecConfig + "->"
                     + newCodecStatus.getCodecConfig());
             for (BluetoothCodecConfig codecConfig :
-                     newCodecStatus.getCodecsLocalCapabilities()) {
+                    newCodecStatus.getCodecsLocalCapabilities()) {
                 Log.d(TAG, "A2DP Codec Local Capability: " + codecConfig);
             }
             for (BluetoothCodecConfig codecConfig :
-                     newCodecStatus.getCodecsSelectableCapabilities()) {
+                    newCodecStatus.getCodecsSelectableCapabilities()) {
                 Log.d(TAG, "A2DP Codec Selectable Capability: " + codecConfig);
             }
         }
@@ -724,7 +729,7 @@ final class A2dpStateMachine extends StateMachine {
         mA2dpService.codecConfigUpdated(mDevice, mCodecStatus, sameAudioFeedingParameters);
     }
 
-    // This method does not check for error conditon (newState == prevState)
+    // This method does not check for error condition (newState == prevState)
     private void broadcastConnectionState(int newState, int prevState) {
         log("Connection state " + mDevice + ": " + profileStateToString(prevState)
                     + "->" + profileStateToString(newState));
@@ -868,8 +873,6 @@ final class A2dpStateMachine extends StateMachine {
 
     @Override
     protected void log(String msg) {
-        if (DBG) {
-            super.log(msg);
-        }
+        super.log(msg);
     }
 }

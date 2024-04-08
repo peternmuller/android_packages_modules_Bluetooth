@@ -53,18 +53,12 @@ import com.android.internal.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Provides Bluetooth AVRCP Target profile as a service in the Bluetooth application.
- * @hide
- */
+/** Provides Bluetooth AVRCP Target profile as a service in the Bluetooth application. */
 public class AvrcpTargetService extends ProfileService {
-    private static final String TAG = "AvrcpTargetService";
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final String TAG = AvrcpTargetService.class.getSimpleName();
 
-    private static final int AVRCP_MAX_VOL = 127;
     private static final int MEDIA_KEY_EVENT_LOGGER_SIZE = 20;
     private static final String MEDIA_KEY_EVENT_LOGGER_TITLE = "BTAudio Media Key Events";
-    private static int sDeviceMaxVolume = 0;
     private final BluetoothEventLogger mMediaKeyEventLogger =
             new BluetoothEventLogger(MEDIA_KEY_EVENT_LOGGER_SIZE, MEDIA_KEY_EVENT_LOGGER_TITLE);
 
@@ -121,10 +115,8 @@ public class AvrcpTargetService extends ProfileService {
             boolean state = !MediaPlayerWrapper.playstateEquals(mCurrentData.state, data.state);
             boolean queue = !Objects.equals(mCurrentData.queue, data.queue);
 
-            if (DEBUG) {
-                Log.d(TAG, "onMediaUpdated: track_changed=" + metadata
-                        + " state=" + state + " queue=" + queue);
-            }
+            Log.d(TAG, "onMediaUpdated: track_changed=" + metadata
+                    + " state=" + state + " queue=" + queue);
             mCurrentData = data;
 
             mNativeInterface.sendMediaUpdate(metadata, state, queue);
@@ -202,7 +194,6 @@ public class AvrcpTargetService extends ProfileService {
         mCurrentData = new MediaData(null, null, null);
 
         mAudioManager = getSystemService(AudioManager.class);
-        sDeviceMaxVolume = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
 
         mMediaPlayerList = new MediaPlayerList(Looper.myLooper(), this);
 
@@ -222,7 +213,7 @@ public class AvrcpTargetService extends ProfileService {
 
         if (getResources().getBoolean(R.bool.avrcp_target_enable_cover_art)) {
             if (mAvrcpVersion.isAtleastVersion(AvrcpVersion.AVRCP_VERSION_1_6)) {
-                mAvrcpCoverArtService = new AvrcpCoverArtService(this);
+                mAvrcpCoverArtService = new AvrcpCoverArtService();
                 boolean started = mAvrcpCoverArtService.start();
                 if (!started) {
                     Log.e(TAG, "Failed to start cover art service");
@@ -271,9 +262,6 @@ public class AvrcpTargetService extends ProfileService {
         mNativeInterface = null;
         mAudioManager = null;
         mReceiver = null;
-    }
-
-    private void init() {
     }
 
     private BluetoothDevice getA2dpActiveDevice() {
@@ -332,7 +320,7 @@ public class AvrcpTargetService extends ProfileService {
         if (device == null || mNativeInterface == null) return;
         if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             // If there is no connection, disconnectDevice() will do nothing
-            if (mNativeInterface.disconnectDevice(device.getAddress())) {
+            if (mNativeInterface.disconnectDevice(device)) {
                 Log.d(TAG, "request to disconnect device " + device);
             }
         }
@@ -457,7 +445,6 @@ public class AvrcpTargetService extends ProfileService {
         BluetoothDevice activeDevice = getA2dpActiveDevice();
         MediaPlayerWrapper player = mMediaPlayerList.getActivePlayer();
         mMediaKeyEventLogger.logd(
-                DEBUG,
                 TAG,
                 "sendMediaKeyEvent:"
                         + " device="

@@ -20,16 +20,19 @@
 #include <base/location.h>
 #include <base/logging.h>
 #include <base/threading/platform_thread.h>
+#include <bluetooth/log.h>
 
 #include <cstdint>
 #include <utility>
 
 #include "common/message_loop_thread.h"
+#include "common/postable_context.h"
 #include "include/hardware/bluetooth.h"
 #include "osi/include/allocator.h"
 #include "stack/include/bt_types.h"
 
 using base::PlatformThread;
+using namespace bluetooth;
 
 static bluetooth::common::MessageLoopThread jni_thread("bt_jni_thread");
 
@@ -76,7 +79,7 @@ bt_status_t btif_transfer_context(tBTIF_CBACK* p_cback, uint16_t event,
   tBTIF_CONTEXT_SWITCH_CBACK* p_msg = (tBTIF_CONTEXT_SWITCH_CBACK*)osi_malloc(
       sizeof(tBTIF_CONTEXT_SWITCH_CBACK) + param_len);
 
-  LOG_VERBOSE("btif_transfer_context event %d, len %d", event, param_len);
+  log::verbose("btif_transfer_context event {}, len {}", event, param_len);
 
   /* allocate and send message that will be executed in btif context */
   p_msg->hdr.event = BT_EVT_CONTEXT_SWITCH_EVT; /* internal event */
@@ -101,7 +104,7 @@ bt_status_t btif_transfer_context(tBTIF_CBACK* p_cback, uint16_t event,
 bt_status_t do_in_jni_thread(const base::Location& from_here,
                              base::OnceClosure task) {
   if (!jni_thread.DoInThread(from_here, std::move(task))) {
-    LOG(ERROR) << __func__ << ": Post task to task runner failed!";
+    log::error("Post task to task runner failed!");
     return BT_STATUS_FAIL;
   }
   return BT_STATUS_SUCCESS;
@@ -122,3 +125,5 @@ void post_on_bt_jni(BtJniClosure closure) {
                                                     std::move(closure))) ==
          BT_STATUS_SUCCESS);
 }
+
+bluetooth::common::PostableContext* get_jni() { return jni_thread.Postable(); }

@@ -313,10 +313,6 @@ inline std::string gatt_disconnection_reason_text(
 */
 #define GATT_INVALID_CONN_ID 0xFFFF
 
-#ifndef GATT_CL_MAX_LCB
-#define GATT_CL_MAX_LCB 22
-#endif
-
 /* GATT notification caching timer, default to be three seconds
 */
 #ifndef GATTC_NOTIF_TIMEOUT
@@ -1309,6 +1305,8 @@ template <>
 struct formatter<tGATT_OP_CODE> : enum_formatter<tGATT_OP_CODE> {};
 template <>
 struct formatter<tGATT_DISC_TYPE> : enum_formatter<tGATT_DISC_TYPE> {};
+template <>
+struct formatter<tGATT_DISCONN_REASON> : enum_formatter<tGATT_DISCONN_REASON> {};
 }  // namespace fmt
 
 #endif /* GATT_API_H */

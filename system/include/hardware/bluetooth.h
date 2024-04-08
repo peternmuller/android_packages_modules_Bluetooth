@@ -135,11 +135,11 @@ inline std::string bt_status_text(const bt_status_t& status) {
     case BT_STATUS_UNHANDLED:
       return std::string("unhandled");
     case BT_STATUS_AUTH_FAILURE:
-      return std::string("failure");
+      return std::string("auth_failure");
     case BT_STATUS_RMT_DEV_DOWN:
       return std::string("remote_device_down");
     case BT_STATUS_AUTH_REJECTED:
-      return std::string("rejected");
+      return std::string("auth_rejected");
     case BT_STATUS_JNI_ENVIRONMENT_ERROR:
       return std::string("jni_env_error");
     case BT_STATUS_JNI_THREAD_ATTACH_ERROR:
@@ -968,6 +968,13 @@ typedef struct {
   bool (*get_swb_supported)();
 
   /**
+   *
+   * Is the specified coding format supported by the adapter
+   *
+   */
+  bool (*is_coding_format_supported)(uint8_t coding_format);
+
+  /**
    * Data passed from BluetoothDevice.metadata_changed
    *
    * @param remote_bd_addr remote address
@@ -1006,5 +1013,21 @@ typedef struct {
 } bt_interface_t;
 
 #define BLUETOOTH_INTERFACE_STRING "bluetoothInterface"
+
+#if __has_include(<bluetooth/log.h>)
+#include <bluetooth/log.h>
+
+namespace fmt {
+template <>
+struct formatter<bt_status_t> : enum_formatter<bt_status_t> {};
+template <>
+struct formatter<bt_scan_mode_t> : enum_formatter<bt_scan_mode_t> {};
+template <>
+struct formatter<bt_bond_state_t> : enum_formatter<bt_bond_state_t> {};
+template <>
+struct formatter<bt_property_type_t> : enum_formatter<bt_property_type_t> {};
+}  // namespace fmt
+
+#endif  // __has_include(<bluetooth/log.h>)
 
 #endif /* ANDROID_INCLUDE_BLUETOOTH_H */

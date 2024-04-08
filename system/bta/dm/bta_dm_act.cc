@@ -29,6 +29,7 @@
 #include <android_bluetooth_sysprop.h>
 #include <base/location.h>
 #include <base/logging.h>
+#include <bluetooth/log.h>
 
 #include <cstdint>
 #include <vector>
@@ -44,12 +45,13 @@
 #include "bta/sys/bta_sys.h"
 #include "btif/include/btif_dm.h"
 #include "btif/include/stack_manager_t.h"
-#include "device/include/controller.h"
+#include "hci/controller_interface.h"
 #include "include/bind_helpers.h"
 #include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/acl_api.h"
 #include "main/shim/btm_api.h"
+#include "main/shim/entry.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"  // UNUSED_ATTR
 #include "osi/include/properties.h"
@@ -66,6 +68,7 @@
 #include "types/raw_address.h"
 
 using bluetooth::Uuid;
+using namespace bluetooth;
 
 bool ble_vnd_is_included();
 void BTIF_dm_disable();
@@ -663,7 +666,7 @@ void handle_remote_features_complete(const RawAddress& bd_addr) {
     return;
   }
 
-  if (controller_get_interface()->SupportsSniffSubrating() &&
+  if (bluetooth::shim::GetController()->SupportsSniffSubrating() &&
       acl_peer_supports_sniff_subrating(bd_addr)) {
     LOG_DEBUG("Device supports sniff subrating peer:%s",
               ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
@@ -716,7 +719,7 @@ void bta_dm_acl_up(const RawAddress& bd_addr, tBT_TRANSPORT transport,
   device->reset_device_info();
   device->transport = transport;
 
-  if (controller_get_interface()->SupportsSniffSubrating() &&
+  if (bluetooth::shim::GetController()->SupportsSniffSubrating() &&
       acl_peer_supports_sniff_subrating(bd_addr)) {
     // NOTE: This callback assumes upon ACL connection that
     // the read remote features has completed and is valid.
@@ -1073,11 +1076,7 @@ static void bta_dm_set_eir(char* local_name) {
   uint8_t custom_uuid_idx;
 #endif  // BTA_EIR_SERVER_NUM_CUSTOM_UUID
 #endif  // BTA_EIR_CANNED_UUID_LIST
-#if (BTM_EIR_DEFAULT_FEC_REQUIRED == FALSE)
-  uint8_t free_eir_length = HCI_EXT_INQ_RESPONSE_LEN;
-#else  // BTM_EIR_DEFAULT_FEC_REQUIRED
   uint8_t free_eir_length = HCI_DM5_PACKET_SIZE;
-#endif  // BTM_EIR_DEFAULT_FEC_REQUIRED
   uint8_t num_uuid;
   uint8_t data_type;
   uint8_t local_name_len;
@@ -1470,8 +1469,9 @@ void bta_dm_ble_update_conn_params(const RawAddress& bd_addr, uint16_t min_int,
 
 /** This function set the maximum transmission packet size */
 void bta_dm_ble_set_data_length(const RawAddress& bd_addr) {
-  const controller_t* controller = controller_get_interface();
-  uint16_t max_len = controller->get_ble_maximum_tx_data_length();
+  uint16_t max_len = bluetooth::shim::GetController()
+                         ->GetLeMaximumDataLength()
+                         .supported_max_tx_octets_;
 
   if (BTM_SetBleDataLength(bd_addr, max_len) != BTM_SUCCESS) {
     LOG_INFO("Unable to set ble data length:%hu", max_len);
@@ -1637,9 +1637,9 @@ void bta_dm_disconnect_all_acls(void) {
  * Parameters:      |cb| Callback to receive the random number.
  *
  ******************************************************************************/
-void bta_dm_le_rand(LeRandCallback cb) {
-  VLOG(1) << "bta_dm_le_rand in bta_dm_act";
-  bluetooth::shim::BTM_LeRand(std::move(cb));
+void bta_dm_le_rand(bluetooth::hci::LeRandCallback cb) {
+  log::verbose("bta_dm_le_rand in bta_dm_act");
+  bluetooth::shim::GetController()->LeRand(std::move(cb));
 }
 
 /*******************************************************************************

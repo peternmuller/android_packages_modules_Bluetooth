@@ -21,20 +21,23 @@
  *  This module contains action functions of the link control state machine.
  *
  ******************************************************************************/
-#include <android_bluetooth_sysprop.h>
+#include <android_bluetooth_flags.h>
+#include <bluetooth/log.h>
 #include <string.h>
 
 #include "avct_api.h"
 #include "avct_int.h"
 #include "bta/include/bta_sec_api.h"
+#include "btif/include/btif_av.h"
 #include "device/include/device_iot_config.h"
 #include "internal_include/bt_target.h"
-#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
 #include "stack/avct/avct_defs.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_types.h"
+
+using namespace bluetooth;
 
 /* packet header length lookup table */
 const uint8_t avct_lcb_pkt_type_len[] = {AVCT_HDR_LEN_SINGLE,
@@ -71,13 +74,13 @@ static BT_HDR* avct_lcb_msg_asmbl(tAVCT_LCB* p_lcb, BT_HDR* p_buf) {
   if (p_buf->len < avct_lcb_pkt_type_len[pkt_type] ||
       (sizeof(BT_HDR) + p_buf->offset + p_buf->len) > BT_DEFAULT_BUFFER_SIZE) {
     osi_free(p_buf);
-    LOG_WARN("Bad length during reassembly");
+    log::warn("Bad length during reassembly");
     p_ret = NULL;
   }
   /* single packet */
   else if (pkt_type == AVCT_PKT_TYPE_SINGLE) {
     /* if reassembly in progress drop message and process new single */
-    if (p_lcb->p_rx_msg != NULL) LOG_WARN("Got single during reassembly");
+    if (p_lcb->p_rx_msg != NULL) log::warn("Got single during reassembly");
 
     osi_free_and_reset((void**)&p_lcb->p_rx_msg);
 
@@ -86,7 +89,7 @@ static BT_HDR* avct_lcb_msg_asmbl(tAVCT_LCB* p_lcb, BT_HDR* p_buf) {
   /* start packet */
   else if (pkt_type == AVCT_PKT_TYPE_START) {
     /* if reassembly in progress drop message and process new start */
-    if (p_lcb->p_rx_msg != NULL) LOG_WARN("Got start during reassembly");
+    if (p_lcb->p_rx_msg != NULL) log::warn("Got start during reassembly");
 
     osi_free_and_reset((void**)&p_lcb->p_rx_msg);
 
@@ -125,7 +128,7 @@ static BT_HDR* avct_lcb_msg_asmbl(tAVCT_LCB* p_lcb, BT_HDR* p_buf) {
     /* if no reassembly in progress drop message */
     if (p_lcb->p_rx_msg == NULL) {
       osi_free(p_buf);
-      LOG_WARN("Pkt type=%d out of order", pkt_type);
+      log::warn("Pkt type={} out of order", pkt_type);
       p_ret = NULL;
     } else {
       /* get size of buffer holding assembled message */
@@ -142,7 +145,7 @@ static BT_HDR* avct_lcb_msg_asmbl(tAVCT_LCB* p_lcb, BT_HDR* p_buf) {
       /* verify length */
       if ((p_lcb->p_rx_msg->offset + p_buf->len) > buf_len) {
         /* won't fit; free everything */
-        LOG_WARN("%s: Fragmented message too big!", __func__);
+        log::warn("Fragmented message too big!");
         osi_free_and_reset((void**)&p_lcb->p_rx_msg);
         osi_free(p_buf);
         p_ret = NULL;
@@ -224,13 +227,13 @@ void avct_lcb_open_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
   int i;
   bool bind = false;
 
-  if (GET_SYSPROP(A2dp, src_sink_coexist, false)) {
+  if (btif_av_src_sink_coexist_enabled()) {
     bool is_originater = false;
 
     for (i = 0; i < AVCT_NUM_CONN; i++, p_ccb++) {
       if (p_ccb->allocated && (p_ccb->p_lcb == p_lcb) &&
           p_ccb->cc.role == AVCT_INT) {
-        LOG_VERBOSE("%s, find int handle %d", __func__, i);
+        log::verbose("find int handle {}", i);
         is_originater = true;
       }
     }
@@ -240,9 +243,9 @@ void avct_lcb_open_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
       /* if ccb allocated and */
       /** M: to avoid avctp collision, make sure the collision can be checked @{
        */
-      LOG_VERBOSE("%s, %d ccb to lcb, alloc %d, lcb %p, role %d, pid 0x%x",
-                  __func__, i, p_ccb->allocated, p_ccb->p_lcb, p_ccb->cc.role,
-                  p_ccb->cc.pid);
+      log::verbose("{} ccb to lcb, alloc {}, lcb {}, role {}, pid 0x{:x}", i,
+                   p_ccb->allocated, fmt::ptr(p_ccb->p_lcb), p_ccb->cc.role,
+                   p_ccb->cc.pid);
       if (p_ccb->allocated && (p_ccb->p_lcb == p_lcb)) {
         /* if bound to this lcb send connect confirm event */
         if (p_ccb->cc.role == AVCT_INT) {
@@ -260,7 +263,7 @@ void avct_lcb_open_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
                  avct_lcb_has_pid(p_lcb, p_ccb->cc.pid)) {
           /* bind ccb to lcb and send connect ind event  */
           if (is_originater) {
-            LOG_ERROR("%s, int exist, unbind acp handle:%d", __func__, i);
+            log::error("int exist, unbind acp handle:{}", i);
             p_ccb->p_lcb = NULL;
           } else {
             bind = true;
@@ -427,11 +430,11 @@ void avct_lcb_bind_conn(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
 void avct_lcb_chk_disc(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
   avct_close_bcb(p_lcb, p_data);
   if (avct_lcb_last_ccb(p_lcb, p_data->p_ccb)) {
-    LOG_INFO("Closing last avct channel to device");
+    log::info("Closing last avct channel to device");
     p_data->p_ccb->ch_close = true;
     avct_lcb_event(p_lcb, AVCT_LCB_INT_CLOSE_EVT, p_data);
   } else {
-    LOG_INFO("Closing avct channel with active remaining channels");
+    log::info("Closing avct channel with active remaining channels");
     avct_lcb_unbind_disc(p_lcb, p_data);
   }
 }
@@ -515,7 +518,7 @@ void avct_lcb_cong_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
  *
  ******************************************************************************/
 void avct_lcb_discard_msg(UNUSED_ATTR tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
-  LOG_WARN("%s Dropping message", __func__);
+  log::warn("Dropping message");
   osi_free_and_reset((void**)&p_data->ul_msg.p_buf);
 }
 
@@ -613,7 +616,7 @@ void avct_lcb_send_msg(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
       pkt_type = AVCT_PKT_TYPE_END;
     }
   }
-  LOG_VERBOSE("%s tx_q_count:%zu", __func__, fixed_queue_length(p_lcb->tx_q));
+  log::verbose("tx_q_count:{}", fixed_queue_length(p_lcb->tx_q));
   return;
 }
 
@@ -671,13 +674,13 @@ void avct_lcb_msg_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
 
   /* check for invalid cr_ipid */
   if (cr_ipid == AVCT_CR_IPID_INVALID) {
-    LOG_WARN("Invalid cr_ipid %d", cr_ipid);
+    log::warn("Invalid cr_ipid {}", cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     return;
   }
 
   bool bind = false;
-  if (GET_SYSPROP(A2dp, src_sink_coexist, false)) {
+  if (btif_av_src_sink_coexist_enabled()) {
     bind = avct_msg_ind_for_src_sink_coexist(p_lcb, p_data, label, cr_ipid);
     osi_free_and_reset((void**)&p_data->p_buf);
     if (bind) return;
@@ -695,7 +698,7 @@ void avct_lcb_msg_ind(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data) {
   }
 
   /* PID not found; drop message */
-  LOG_WARN("No ccb for PID=%x", pid);
+  log::warn("No ccb for PID={:x}", pid);
   osi_free_and_reset((void**)&p_data->p_buf);
 
   /* if command send reject */
@@ -716,9 +719,12 @@ bool avct_msg_ind_for_src_sink_coexist(tAVCT_LCB* p_lcb, tAVCT_LCB_EVT* p_data,
   tAVCT_CCB* p_ccb;
   int p_buf_len;
   uint8_t* p;
-  uint16_t pid;
+  uint16_t pid, type;
 
   p = (uint8_t*)(p_data->p_buf + 1) + p_data->p_buf->offset;
+  if (IS_FLAG_ENABLED(a2dp_concurrent_source_sink)) {
+    AVCT_PARSE_HDR(p, label, type, cr_ipid);
+  }
 
   BE_STREAM_TO_UINT16(pid, p);
 

@@ -31,16 +31,14 @@
 #include <frameworks/proto_logging/stats/enums/bluetooth/enums.pb.h>
 
 #include <cstdint>
-#include <string>
 
 #include "hal/snoop_logger.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "main/shim/entry.h"
-#include "os/log.h"
+#include "os/logging/log_adapter.h"
 #include "osi/include/allocator.h"
 #include "osi/include/mutex.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/stack_metrics_logging.h"
@@ -320,8 +318,7 @@ void PORT_ParNegInd(tRFC_MCB* p_mcb, uint8_t dlci, uint16_t mtu, uint8_t cl,
    */
   /* already defined for this mux, we respond with that value. */
   if (p_mcb->flow == PORT_FC_UNDEFINED) {
-    if ((PORT_FC_DEFAULT == PORT_FC_TS710) ||
-        (cl == RFCOMM_PN_CONV_LAYER_TYPE_1)) {
+    if (cl == RFCOMM_PN_CONV_LAYER_TYPE_1) {
       p_mcb->flow = PORT_FC_TS710;
     } else {
       p_mcb->flow = PORT_FC_CREDIT;
@@ -380,16 +377,7 @@ void PORT_ParNegCnf(tRFC_MCB* p_mcb, uint8_t dlci, uint16_t mtu, uint8_t cl,
 
   /* Flow control mechanism not set yet.  Negotiate flow control mechanism. */
   if (p_mcb->flow == PORT_FC_UNDEFINED) {
-    /* Our stack is configured for TS07.10 and they responded with credit-based.
-     */
-    /* This is illegal-- negotiation fails. */
-    if ((PORT_FC_DEFAULT == PORT_FC_TS710) &&
-        (cl == RFCOMM_PN_CONV_LAYER_CBFC_R)) {
-      log::warn("negotiation fails, index={}", p_port->handle);
-      rfc_send_disc(p_mcb, p_port->dlci);
-      rfc_port_closed(p_port);
-      return;
-    } else if (cl == RFCOMM_PN_CONV_LAYER_CBFC_R) {
+    if (cl == RFCOMM_PN_CONV_LAYER_CBFC_R) {
       // Our stack is configured for credit-based and they responded with
       // credit-based.
       p_mcb->flow = PORT_FC_CREDIT;
@@ -562,8 +550,8 @@ void PORT_PortNegInd(tRFC_MCB* p_mcb, uint8_t dlci, tPORT_STATE* p_pars,
  *                  state for the port.  Propagate change to the user.
  *
  ******************************************************************************/
-void PORT_PortNegCnf(tRFC_MCB* p_mcb, uint8_t dlci,
-                     UNUSED_ATTR tPORT_STATE* p_pars, uint16_t result) {
+void PORT_PortNegCnf(tRFC_MCB* p_mcb, uint8_t dlci, tPORT_STATE* /* p_pars */,
+                     uint16_t result) {
   tPORT* p_port = port_find_mcb_dlci_port(p_mcb, dlci);
 
   log::verbose("PORT_PortNegCnf");
@@ -650,8 +638,7 @@ void PORT_ControlInd(tRFC_MCB* p_mcb, uint8_t dlci, tPORT_CTRL* p_pars) {
  *                  peer acknowleges change of the modem signals.
  *
  ******************************************************************************/
-void PORT_ControlCnf(tRFC_MCB* p_mcb, uint8_t dlci,
-                     UNUSED_ATTR tPORT_CTRL* p_pars) {
+void PORT_ControlCnf(tRFC_MCB* p_mcb, uint8_t dlci, tPORT_CTRL* /* p_pars */) {
   tPORT* p_port = port_find_mcb_dlci_port(p_mcb, dlci);
   uint32_t event = 0;
 

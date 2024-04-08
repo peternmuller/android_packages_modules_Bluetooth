@@ -35,14 +35,17 @@
 #include "bta/sys/bta_sys.h"
 #include "btif/include/core_callbacks.h"
 #include "btif/include/stack_manager_t.h"
-#include "device/include/controller.h"
+#include "hci/controller_interface.h"
 #include "main/shim/dumpsys.h"
+#include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/properties.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/btm_client_interface.h"
 #include "stack/include/main_thread.h"
 #include "types/raw_address.h"
+
+using namespace bluetooth;
 
 static void bta_dm_pm_cback(tBTA_SYS_CONN_STATUS status, const tBTA_SYS_ID id,
                             uint8_t app_id, const RawAddress& peer_addr);
@@ -54,12 +57,16 @@ static void bta_dm_pm_btm_cback(const RawAddress& bd_addr,
                                 tBTM_PM_STATUS status, uint16_t value,
                                 tHCI_STATUS hci_status);
 static bool bta_dm_pm_park(const RawAddress& peer_addr);
-void bta_dm_pm_sniff(tBTA_DM_PEER_DEVICE* p_peer_dev, uint8_t index);
+static void bta_dm_pm_sniff(tBTA_DM_PEER_DEVICE* p_peer_dev, uint8_t index);
 static void bta_dm_sniff_cback(uint8_t id, uint8_t app_id,
                                const RawAddress& peer_addr);
 static int bta_dm_get_sco_index();
 static void bta_dm_pm_stop_timer_by_index(tBTA_PM_TIMER* p_timer,
                                           uint8_t timer_idx);
+
+static tBTM_PM_PWR_MD get_sniff_entry(uint8_t index);
+static void bta_dm_pm_timer(const RawAddress& bd_addr,
+                            tBTA_DM_PM_ACTION pm_request);
 
 #include "../hh/bta_hh_int.h"
 /* BTA_DM_PM_SSR1 will be dedicated for HH SSR setting entry, no other profile
@@ -542,9 +549,8 @@ static void bta_dm_pm_cback(tBTA_SYS_CONN_STATUS status, const tBTA_SYS_ID id,
       LOG_DEBUG("%s: Do not perform SSR when AVDTP start", __func__);
     }
   } else {
-    const controller_t* controller = controller_get_interface();
     uint8_t* p = NULL;
-    if (controller->SupportsSniffSubrating() &&
+    if (bluetooth::shim::GetController()->SupportsSniffSubrating() &&
         ((NULL != (p = get_btm_client_interface().peer.BTM_ReadRemoteFeatures(
                        peer_addr))) &&
          HCI_SNIFF_SUB_RATE_SUPPORTED(p)) &&
@@ -789,7 +795,7 @@ static bool bta_dm_pm_park(const RawAddress& peer_addr) {
  * Returns          tBTM_PM_PWR_MD with specified |index|.
  *
  ******************************************************************************/
-tBTM_PM_PWR_MD get_sniff_entry(uint8_t index) {
+static tBTM_PM_PWR_MD get_sniff_entry(uint8_t index) {
   static std::vector<tBTM_PM_PWR_MD> pwr_mds_cache;
   if (pwr_mds_cache.size() == BTA_DM_PM_PARK_IDX) {
     if (index >= BTA_DM_PM_PARK_IDX) {
@@ -842,7 +848,7 @@ tBTM_PM_PWR_MD get_sniff_entry(uint8_t index) {
  * Returns          true if sniff attempted, false otherwise.
  *
  ******************************************************************************/
-void bta_dm_pm_sniff(tBTA_DM_PEER_DEVICE* p_peer_dev, uint8_t index) {
+static void bta_dm_pm_sniff(tBTA_DM_PEER_DEVICE* p_peer_dev, uint8_t index) {
   tBTM_PM_MODE mode = BTM_PM_MD_ACTIVE;
   tBTM_PM_PWR_MD pwr_md;
   tBTM_STATUS status;
@@ -859,10 +865,9 @@ void bta_dm_pm_sniff(tBTA_DM_PEER_DEVICE* p_peer_dev, uint8_t index) {
   uint8_t* p_rem_feat = get_btm_client_interface().peer.BTM_ReadRemoteFeatures(
       p_peer_dev->peer_bdaddr);
 
-  const controller_t* controller = controller_get_interface();
   if (mode != BTM_PM_MD_SNIFF ||
-      (controller->SupportsSniffSubrating() && p_rem_feat &&
-       HCI_SNIFF_SUB_RATE_SUPPORTED(p_rem_feat) &&
+      (bluetooth::shim::GetController()->SupportsSniffSubrating() &&
+       p_rem_feat && HCI_SNIFF_SUB_RATE_SUPPORTED(p_rem_feat) &&
        !(p_peer_dev->is_ssr_active()))) {
     /* Dont initiate Sniff if controller has alreay accepted
      * remote sniff params. This avoid sniff loop issue with
@@ -1019,6 +1024,10 @@ void bta_dm_pm_active(const RawAddress& peer_addr) {
   }
 }
 
+static void bta_dm_pm_btm_status(const RawAddress& bd_addr,
+                                 tBTM_PM_STATUS status, uint16_t interval,
+                                 tHCI_STATUS hci_status);
+
 /** BTM power manager callback */
 static void bta_dm_pm_btm_cback(const RawAddress& bd_addr,
                                 tBTM_PM_STATUS status, uint16_t value,
@@ -1070,13 +1079,14 @@ static void bta_dm_pm_timer_cback(void* data) {
 }
 
 /** Process pm status event from btm */
-void bta_dm_pm_btm_status(const RawAddress& bd_addr, tBTM_PM_STATUS status,
-                          uint16_t interval, tHCI_STATUS hci_status) {
-  LOG_DEBUG(
-      "Power mode notification event status:%s peer:%s interval:%hu "
-      "hci_status:%s",
-      power_mode_status_text(status).c_str(), ADDRESS_TO_LOGGABLE_CSTR(bd_addr),
-      interval, hci_error_code_text(hci_status).c_str());
+static void bta_dm_pm_btm_status(const RawAddress& bd_addr,
+                                 tBTM_PM_STATUS status, uint16_t interval,
+                                 tHCI_STATUS hci_status) {
+  log::debug(
+      "Power mode notification event status:{} peer:{} interval:{} "
+      "hci_status:{}",
+      power_mode_status_text(status), ADDRESS_TO_LOGGABLE_CSTR(bd_addr),
+      interval, hci_error_code_text(hci_status));
 
   tBTA_DM_PEER_DEVICE* p_dev = bta_dm_find_peer_device(bd_addr);
   if (p_dev == nullptr) {
@@ -1165,8 +1175,9 @@ void bta_dm_pm_btm_status(const RawAddress& bd_addr, tBTM_PM_STATUS status,
 }
 
 /** Process pm timer event from btm */
-void bta_dm_pm_timer(const RawAddress& bd_addr, tBTA_DM_PM_ACTION pm_request) {
-  LOG_VERBOSE("%s", __func__);
+static void bta_dm_pm_timer(const RawAddress& bd_addr,
+                            tBTA_DM_PM_ACTION pm_request) {
+  log::verbose("");
   bta_dm_pm_set_mode(bd_addr, pm_request, BTA_DM_PM_EXECUTE);
 }
 

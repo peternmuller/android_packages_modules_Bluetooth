@@ -17,6 +17,7 @@
  ******************************************************************************/
 #define LOG_TAG "bt_bta_hh"
 
+#include <bluetooth/log.h>
 #include <string.h>  // memset
 
 #include <cstring>
@@ -32,6 +33,7 @@
 #include "types/raw_address.h"
 
 using namespace bluetooth::legacy::stack::sdp;
+using namespace bluetooth;
 
 /* if SSR max latency is not defined by remote device, set the default value
    as half of the link supervision timeout */
@@ -72,7 +74,8 @@ static void blacklist_adjust_sniff_subrate(RawAddress peer_dev,
  *
  * Function         bta_hh_find_cb
  *
- * Description      Find best available control block according to BD address.
+ * Description      Find best available control block according to ACL link
+ *                  specification.
  *
  *
  * Returns          void
@@ -84,19 +87,19 @@ uint8_t bta_hh_find_cb(const tAclLinkSpec& link_spec) {
   /* See how many active devices there are. */
   for (xx = 0; xx < BTA_HH_MAX_DEVICE; xx++) {
     /* check if any active/known devices is a match */
-    if ((link_spec.addrt.bda == bta_hh_cb.kdev[xx].link_spec.addrt.bda &&
+    if ((link_spec == bta_hh_cb.kdev[xx].link_spec &&
          !link_spec.addrt.bda.IsEmpty())) {
 #if (BTA_HH_DEBUG == TRUE)
-      LOG_VERBOSE("found kdev_cb[%d] hid_handle=%d", xx,
-                  bta_hh_cb.kdev[xx].hid_handle);
+      log::verbose("found kdev_cb[{}] hid_handle={}", xx,
+                   bta_hh_cb.kdev[xx].hid_handle);
 #endif
       return xx;
     }
 #if (BTA_HH_DEBUG == TRUE)
     else
-      LOG_VERBOSE("in_use ? [%d] kdev[%d].hid_handle=%d state=[%d]",
-                  bta_hh_cb.kdev[xx].in_use, xx, bta_hh_cb.kdev[xx].hid_handle,
-                  bta_hh_cb.kdev[xx].state);
+      log::verbose("in_use ? [{}] kdev[{}].hid_handle={} state=[{}]",
+                   bta_hh_cb.kdev[xx].in_use, xx, bta_hh_cb.kdev[xx].hid_handle,
+                   bta_hh_cb.kdev[xx].state);
 #endif
   }
 
@@ -109,7 +112,7 @@ uint8_t bta_hh_find_cb(const tAclLinkSpec& link_spec) {
   }
 /* If device list full, report BTA_HH_IDX_INVALID */
 #if (BTA_HH_DEBUG == TRUE)
-  LOG_VERBOSE("index=%d while max=%d", xx, BTA_HH_MAX_DEVICE);
+  log::verbose("index={} while max={}", xx, BTA_HH_MAX_DEVICE);
 #endif
 
   if (xx == BTA_HH_MAX_DEVICE) xx = BTA_HH_IDX_INVALID;
@@ -138,16 +141,16 @@ tBTA_HH_DEV_CB* bta_hh_get_cb(const tAclLinkSpec& link_spec) {
 void bta_hh_clean_up_kdev(tBTA_HH_DEV_CB* p_cb) {
   uint8_t index;
 
-  if (p_cb->is_le_device) {
+  if (p_cb->link_spec.transport == BT_TRANSPORT_LE) {
     uint8_t le_hid_handle = BTA_HH_GET_LE_CB_IDX(p_cb->hid_handle);
     if (le_hid_handle >= BTA_HH_LE_MAX_KNOWN) {
-      LOG_WARN("Invalid LE hid_handle %d", p_cb->hid_handle);
+      log::warn("Invalid LE hid_handle {}", p_cb->hid_handle);
     } else {
       bta_hh_cb.le_cb_index[le_hid_handle] = BTA_HH_IDX_INVALID;
     }
   } else {
     if (p_cb->hid_handle >= BTA_HH_MAX_KNOWN) {
-      LOG_WARN("Invalid hid_handle %d", p_cb->hid_handle);
+      log::warn("Invalid hid_handle {}", p_cb->hid_handle);
     } else {
       bta_hh_cb.cb_index[p_cb->hid_handle] = BTA_HH_IDX_INVALID;
     }
@@ -178,8 +181,8 @@ void bta_hh_update_di_info(tBTA_HH_DEV_CB* p_cb, uint16_t vendor_id,
                            uint16_t product_id, uint16_t version, uint8_t flag,
                            uint8_t ctry_code) {
 #if (BTA_HH_DEBUG == TRUE)
-  LOG_VERBOSE("vendor_id=0x%2x product_id=0x%2x version=0x%2x", vendor_id,
-              product_id, version);
+  log::verbose("vendor_id=0x{:2x} product_id=0x{:2x} version=0x{:2x}",
+               vendor_id, product_id, version);
 #endif
   p_cb->dscp_info.vendor_id = vendor_id;
   p_cb->dscp_info.product_id = product_id;
@@ -202,7 +205,7 @@ void bta_hh_add_device_to_list(tBTA_HH_DEV_CB* p_cb, uint8_t handle,
                                uint8_t sub_class, uint16_t ssr_max_latency,
                                uint16_t ssr_min_tout, uint8_t app_id) {
 #if (BTA_HH_DEBUG == TRUE)
-  LOG_VERBOSE("subclass=0x%2x", sub_class);
+  log::verbose("subclass=0x{:2x}", sub_class);
 #endif
 
   p_cb->hid_handle = handle;
@@ -248,13 +251,13 @@ bool bta_hh_tod_spt(tBTA_HH_DEV_CB* p_cb, uint8_t sub_class) {
     if (cod == (uint8_t)p_bta_hh_cfg->p_devt_list[xx].tod) {
       p_cb->app_id = p_bta_hh_cfg->p_devt_list[xx].app_id;
 #if (BTA_HH_DEBUG == TRUE)
-      LOG_VERBOSE("sub_class:0x%x supported", sub_class);
+      log::verbose("sub_class:0x{:x} supported", sub_class);
 #endif
       return true;
     }
   }
 #if (BTA_HH_DEBUG == TRUE)
-  LOG_VERBOSE("sub_class:0x%x NOT supported", sub_class);
+  log::verbose("sub_class:0x{:x} NOT supported", sub_class);
 #endif
   return false;
 }
@@ -274,7 +277,7 @@ tBTA_HH_STATUS bta_hh_read_ssr_param(const tAclLinkSpec& link_spec,
                                      uint16_t* p_min_ssr_tout) {
   tBTA_HH_DEV_CB* p_cb = bta_hh_get_cb(link_spec);
   if (p_cb == nullptr) {
-    LOG_WARN("Unable to find device:%s", ADDRESS_TO_LOGGABLE_CSTR(link_spec));
+    log::warn("Unable to find device:{}", ADDRESS_TO_LOGGABLE_CSTR(link_spec));
     return BTA_HH_ERR;
   }
 
@@ -286,8 +289,8 @@ tBTA_HH_STATUS bta_hh_read_ssr_param(const tAclLinkSpec& link_spec,
     uint16_t ssr_max_latency;
     if (get_btm_client_interface().link_controller.BTM_GetLinkSuperTout(
             p_cb->link_spec.addrt.bda, &ssr_max_latency) != BTM_SUCCESS) {
-      LOG_WARN("Unable to get supervision timeout for peer:%s",
-               ADDRESS_TO_LOGGABLE_CSTR(p_cb->link_spec));
+      log::warn("Unable to get supervision timeout for peer:{}",
+                ADDRESS_TO_LOGGABLE_CSTR(p_cb->link_spec));
       return BTA_HH_ERR;
     }
     ssr_max_latency = BTA_HH_GET_DEF_SSR_MAX_LAT(ssr_max_latency);
@@ -298,7 +301,7 @@ tBTA_HH_STATUS bta_hh_read_ssr_param(const tAclLinkSpec& link_spec,
     if (ssr_max_latency > BTA_HH_SSR_MAX_LATENCY_DEF)
       ssr_max_latency = BTA_HH_SSR_MAX_LATENCY_DEF;
 
-    char remote_name[BTM_MAX_REM_BD_NAME_LEN] = "";
+    char remote_name[BD_NAME_LEN] = "";
     if (btif_storage_get_stored_remote_name(link_spec.addrt.bda, remote_name)) {
       if (interop_match_name(INTEROP_HID_HOST_LIMIT_SNIFF_INTERVAL,
                              remote_name)) {
@@ -373,7 +376,7 @@ uint8_t bta_hh_dev_handle_to_cb_idx(uint8_t dev_handle) {
     if (BTA_HH_IS_LE_DEV_HDL_VALID(dev_handle))
       index = bta_hh_cb.le_cb_index[BTA_HH_GET_LE_CB_IDX(dev_handle)];
 #if (BTA_HH_DEBUG == TRUE)
-    LOG_VERBOSE("dev_handle=%d index=%d", dev_handle, index);
+    log::verbose("dev_handle={} index={}", dev_handle, index);
 #endif
   } else
       /* regular HID device checking */
@@ -395,16 +398,17 @@ uint8_t bta_hh_dev_handle_to_cb_idx(uint8_t dev_handle) {
 void bta_hh_trace_dev_db(void) {
   uint8_t xx;
 
-  LOG_VERBOSE("bta_hh_trace_dev_db:: Device DB list********************");
+  log::verbose("bta_hh_trace_dev_db:: Device DB list********************");
 
   for (xx = 0; xx < BTA_HH_MAX_DEVICE; xx++) {
-    LOG_VERBOSE("kdev[%d] in_use[%d]  handle[%d] ", xx,
-                bta_hh_cb.kdev[xx].in_use, bta_hh_cb.kdev[xx].hid_handle);
+    log::verbose("kdev[{}] in_use[{}]  handle[{}]", xx,
+                 bta_hh_cb.kdev[xx].in_use, bta_hh_cb.kdev[xx].hid_handle);
 
-    LOG_VERBOSE("\t\t\t attr_mask[%04x] state [%d] sub_class[%02x] index = %d",
-                bta_hh_cb.kdev[xx].attr_mask, bta_hh_cb.kdev[xx].state,
-                bta_hh_cb.kdev[xx].sub_class, bta_hh_cb.kdev[xx].index);
+    log::verbose(
+        "\t\t\t attr_mask[{:04x}] state [{}] sub_class[{:02x}] index = {}",
+        bta_hh_cb.kdev[xx].attr_mask, bta_hh_cb.kdev[xx].state,
+        bta_hh_cb.kdev[xx].sub_class, bta_hh_cb.kdev[xx].index);
   }
-  LOG_VERBOSE("*********************************************************");
+  log::verbose("*********************************************************");
 }
 #endif

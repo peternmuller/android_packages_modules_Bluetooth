@@ -18,6 +18,7 @@
 
 #include "audio_hal_client.h"
 
+#include <bluetooth/log.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -42,11 +43,13 @@ using ::testing::ReturnPointee;
 using ::testing::SaveArg;
 using std::chrono_literals::operator""ms;
 
-using le_audio::DsaMode;
-using le_audio::DsaModes;
-using le_audio::LeAudioCodecConfiguration;
-using le_audio::LeAudioSinkAudioHalClient;
-using le_audio::LeAudioSourceAudioHalClient;
+using bluetooth::le_audio::DsaMode;
+using bluetooth::le_audio::DsaModes;
+using bluetooth::le_audio::LeAudioCodecConfiguration;
+using bluetooth::le_audio::LeAudioSinkAudioHalClient;
+using bluetooth::le_audio::LeAudioSourceAudioHalClient;
+
+using namespace bluetooth;
 
 bluetooth::common::MessageLoopThread message_loop_thread("test message loop");
 bluetooth::common::MessageLoopThread* get_main_thread() {
@@ -55,7 +58,7 @@ bluetooth::common::MessageLoopThread* get_main_thread() {
 bt_status_t do_in_main_thread(const base::Location& from_here,
                               base::OnceClosure task) {
   if (!message_loop_thread.DoInThread(from_here, std::move(task))) {
-    LOG(ERROR) << __func__ << ": failed from " << from_here.ToString();
+    log::error("failed from {}", from_here.ToString());
     return BT_STATUS_FAIL;
   }
   return BT_STATUS_SUCCESS;
@@ -71,7 +74,7 @@ static void init_message_loop_thread() {
   }
 
   if (!message_loop_thread.EnableRealTimeScheduling())
-    LOG(ERROR) << "Unable to set real time scheduling";
+    log::error("Unable to set real time scheduling");
 
   message_loop_ = message_loop_thread.message_loop();
   if (message_loop_ == nullptr) FAIL() << "unable to get message loop.";
@@ -96,9 +99,9 @@ class MockLeAudioClientInterfaceSink : public LeAudioClientInterface::Sink {
   MOCK_METHOD((void), ConfirmStreamingRequest, (), (override));
   MOCK_METHOD((void), CancelStreamingRequest, (), (override));
   MOCK_METHOD((void), UpdateAudioConfigToHal,
-              (const ::le_audio::offload_config&));
+              (const ::bluetooth::le_audio::offload_config&));
   MOCK_METHOD((void), UpdateBroadcastAudioConfigToHal,
-              (const ::le_audio::broadcast_offload_config&));
+              (const ::bluetooth::le_audio::broadcast_offload_config&));
   MOCK_METHOD((size_t), Read, (uint8_t * p_buf, uint32_t len));
 };
 
@@ -114,7 +117,7 @@ class MockLeAudioClientInterfaceSource : public LeAudioClientInterface::Source {
   MOCK_METHOD((void), ConfirmStreamingRequest, (), (override));
   MOCK_METHOD((void), CancelStreamingRequest, (), (override));
   MOCK_METHOD((void), UpdateAudioConfigToHal,
-              (const ::le_audio::offload_config&));
+              (const ::bluetooth::le_audio::offload_config&));
   MOCK_METHOD((size_t), Write, (const uint8_t* p_buf, uint32_t len));
 };
 
@@ -175,14 +178,15 @@ void LeAudioClientInterface::Sink::SetPcmParameters(
 void LeAudioClientInterface::Sink::SetRemoteDelay(uint16_t delay_report_ms) {}
 void LeAudioClientInterface::Sink::StartSession() {}
 void LeAudioClientInterface::Sink::StopSession() {}
+void LeAudioClientInterface::Sink::ConfirmSuspendRequest(){};
 void LeAudioClientInterface::Sink::ConfirmStreamingRequest(){};
 void LeAudioClientInterface::Sink::CancelStreamingRequest(){};
 void LeAudioClientInterface::Sink::ConfirmStreamingRequestV2(){};
 void LeAudioClientInterface::Sink::CancelStreamingRequestV2(){};
 void LeAudioClientInterface::Sink::UpdateAudioConfigToHal(
-    const ::le_audio::offload_config& config){};
+    const ::bluetooth::le_audio::offload_config& config){};
 void LeAudioClientInterface::Sink::UpdateBroadcastAudioConfigToHal(
-    const ::le_audio::broadcast_offload_config& config){};
+    const ::bluetooth::le_audio::broadcast_offload_config& config){};
 void LeAudioClientInterface::Sink::SuspendedForReconfiguration() {}
 void LeAudioClientInterface::Sink::ReconfigurationComplete() {}
 
@@ -192,12 +196,13 @@ void LeAudioClientInterface::Source::SetPcmParameters(
 void LeAudioClientInterface::Source::SetRemoteDelay(uint16_t delay_report_ms) {}
 void LeAudioClientInterface::Source::StartSession() {}
 void LeAudioClientInterface::Source::StopSession() {}
+void LeAudioClientInterface::Source::ConfirmSuspendRequest(){};
 void LeAudioClientInterface::Source::ConfirmStreamingRequest(){};
 void LeAudioClientInterface::Source::CancelStreamingRequest(){};
 void LeAudioClientInterface::Source::ConfirmStreamingRequestV2(){};
 void LeAudioClientInterface::Source::CancelStreamingRequestV2(){};
 void LeAudioClientInterface::Source::UpdateAudioConfigToHal(
-    const ::le_audio::offload_config& config){};
+    const ::bluetooth::le_audio::offload_config& config){};
 void LeAudioClientInterface::Source::SuspendedForReconfiguration() {}
 void LeAudioClientInterface::Source::ReconfigurationComplete() {}
 
@@ -220,9 +225,11 @@ class MockLeAudioClientAudioSinkEventReceiver
               (override));
   MOCK_METHOD((void), OnAudioSuspend, (), (override));
   MOCK_METHOD((void), OnAudioResume, (), (override));
-  MOCK_METHOD((void), OnAudioMetadataUpdate,
-              (source_metadata_v7 source_metadata, DsaMode dsa_mode),
-              (override));
+  MOCK_METHOD(
+      (void), OnAudioMetadataUpdate,
+      (const std::vector<struct playback_track_metadata_v7> source_metadata,
+       DsaMode dsa_mode),
+      (override));
 };
 
 class MockAudioHalClientEventReceiver
@@ -230,8 +237,10 @@ class MockAudioHalClientEventReceiver
  public:
   MOCK_METHOD((void), OnAudioSuspend, (), (override));
   MOCK_METHOD((void), OnAudioResume, (), (override));
-  MOCK_METHOD((void), OnAudioMetadataUpdate, (sink_metadata_v7 sink_metadata),
-              (override));
+  MOCK_METHOD(
+      (void), OnAudioMetadataUpdate,
+      (const std::vector<struct record_track_metadata_v7> sink_metadata),
+      (override));
 };
 
 class LeAudioClientAudioTest : public ::testing::Test {

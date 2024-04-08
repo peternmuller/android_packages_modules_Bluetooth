@@ -43,6 +43,7 @@ class LeAudioClientImpl : public LeAudioClient {
   std::vector<RawAddress> GetGroupDevices(const int group_id) override {
     return {};
   }
+  void ProcessPendingGroupNotifyInactive(const int group_id) override {}
 };
 
 void LeAudioClient::Initialize(

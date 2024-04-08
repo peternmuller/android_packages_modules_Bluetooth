@@ -56,13 +56,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 
 /** Remote device manager. This class is currently mostly used for HF and AG remote devices. */
 public class RemoteDevices {
-    private static final boolean DBG = false;
     private static final String TAG = "BluetoothRemoteDevices";
 
     // Maximum number of device properties to remember
@@ -1032,7 +1032,7 @@ public class RemoteDevices {
         intent.putExtra(BluetoothDevice.EXTRA_IS_COORDINATED_SET_MEMBER,
                 deviceProp.isCoordinatedSetMember());
 
-        final ArrayList<DiscoveringPackage> packages = mAdapterService.getDiscoveringPackages();
+        final List<DiscoveringPackage> packages = mAdapterService.getDiscoveringPackages();
         synchronized (packages) {
             for (DiscoveringPackage pkg : packages) {
                 if (pkg.hasDisavowedLocation()) {
@@ -1155,15 +1155,7 @@ public class RemoteDevices {
                 Utils.sendBroadcast(mAdapterService, intent, BLUETOOTH_CONNECT,
                         Utils.getTempAllowlistBroadcastOptions());
             } else if (device.getBondState() == BluetoothDevice.BOND_NONE) {
-                String key = Utils.getAddressStringFromByte(address);
-                synchronized (mDevices) {
-                    mDevices.remove(key);
-                    mDeviceQueue.remove(key); // Remove from LRU cache
-
-                    // Remove from dual mode device mappings
-                    mDualDevicesMap.values().remove(key);
-                    mDualDevicesMap.remove(key);
-                }
+                removeAddressMapping(address);
             }
             if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_OFF) {
                 mAdapterService.notifyAclDisconnected(device, transportLinkType);
@@ -1243,6 +1235,24 @@ public class RemoteDevices {
         } else {
             Log.e(TAG, "aclStateChangeCallback intent is null. deviceBondState: "
                     + device.getBondState());
+        }
+    }
+
+    private void removeAddressMapping(byte[] address) {
+        String key = Utils.getAddressStringFromByte(address);
+        synchronized (mDevices) {
+            mDevices.remove(key);
+            mDeviceQueue.remove(key); // Remove from LRU cache
+
+            // Remove from dual mode device mappings
+            mDualDevicesMap.values().remove(key);
+            mDualDevicesMap.remove(key);
+        }
+    }
+
+    void onBondStateChange(byte[] address, int newState) {
+        if (newState == BluetoothDevice.BOND_NONE) {
+            removeAddressMapping(address);
         }
     }
 
@@ -1541,15 +1551,11 @@ public class RemoteDevices {
     }
 
     private static void debugLog(String msg) {
-        if (DBG) {
-            Log.d(TAG, msg);
-        }
+        Log.d(TAG, msg);
     }
 
     private static void infoLog(String msg) {
-        if (DBG) {
-            Log.i(TAG, msg);
-        }
+        Log.i(TAG, msg);
     }
 
     private static void warnLog(String msg) {

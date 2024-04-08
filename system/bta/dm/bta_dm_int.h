@@ -32,6 +32,7 @@
 #include "bta/include/bta_api.h"
 #include "bta/include/bta_sec_api.h"
 #include "bta/sys/bta_sys.h"
+#include "hci/le_rand_callback.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "macros.h"
@@ -316,10 +317,6 @@ void bta_dm_disable();
 void bta_dm_set_dev_name(const std::vector<uint8_t>&);
 void bta_dm_close_acl(const RawAddress&, bool, tBT_TRANSPORT);
 
-void bta_dm_pm_btm_status(const RawAddress&, tBTM_PM_STATUS, uint16_t,
-                          tHCI_STATUS);
-void bta_dm_pm_timer(const RawAddress&, tBTA_DM_PM_ACTION);
-
 void bta_dm_ble_set_conn_params(const RawAddress&, uint16_t, uint16_t, uint16_t,
                                 uint16_t);
 void bta_dm_ble_update_conn_params(const RawAddress&, uint16_t, uint16_t,
@@ -339,7 +336,7 @@ void bta_dm_clear_event_filter(void);
 void bta_dm_clear_event_mask(void);
 void bta_dm_clear_filter_accept_list(void);
 void bta_dm_disconnect_all_acls(void);
-void bta_dm_le_rand(LeRandCallback cb);
+void bta_dm_le_rand(bluetooth::hci::LeRandCallback cb);
 void bta_dm_set_event_filter_connection_setup_all_devices();
 void bta_dm_allow_wake_by_hid(
     std::vector<RawAddress> classic_hid_devices,

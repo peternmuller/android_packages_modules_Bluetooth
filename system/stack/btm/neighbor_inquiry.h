@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "internal_include/bt_target.h"
@@ -159,7 +161,7 @@ typedef struct {
                                required to be done. Having the flag here avoid
                                duplicate store of inquiry results */
   uint16_t remote_name_len;
-  tBTM_BD_NAME remote_name;
+  BD_NAME remote_name;
   uint8_t remote_name_type;
 } tBTM_INQ_INFO;
 
@@ -215,7 +217,6 @@ inline std::string btm_inquiry_cmpl_status_text(
 typedef struct {
   tBTM_STATUS status;
   RawAddress bd_addr;
-  uint16_t length;
   BD_NAME remote_bd_name;
   tHCI_STATUS hci_status;
 } tBTM_REMOTE_DEV_NAME;
@@ -262,7 +263,6 @@ struct tBTM_INQUIRY_VAR_ST {
 
   uint8_t state;      /* Current state that the inquiry process is in */
   uint8_t inq_active; /* Bit Mask indicating type of inquiry is active */
-  bool no_inc_ssp;    /* true, to stop inquiry on incoming SSP */
 
   bool registered_for_hci_events;
 
@@ -298,7 +298,6 @@ struct tBTM_INQUIRY_VAR_ST {
     per_max_delay = 0;
     state = BTM_INQ_INACTIVE_STATE;
     inq_active = 0;
-    no_inc_ssp = BTM_NO_SSP_ON_INQUIRY;
     registered_for_hci_events = false;
   }
   void Free() {
@@ -309,3 +308,9 @@ struct tBTM_INQUIRY_VAR_ST {
 
 bool btm_inq_find_bdaddr(const RawAddress& p_bda);
 tINQ_DB_ENT* btm_inq_db_find(const RawAddress& p_bda);
+
+namespace fmt {
+template <>
+struct formatter<tBTM_INQUIRY_CMPL::STATUS>
+    : enum_formatter<tBTM_INQUIRY_CMPL::STATUS> {};
+}  // namespace fmt

@@ -61,16 +61,12 @@ import java.util.Objects;
 /**
  * Provides Bluetooth Pan Device profile, as a service in
  * the Bluetooth application.
- * @hide
  */
 public class PanService extends ProfileService {
-    private static final String TAG = "PanService";
-    private static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final String TAG = PanService.class.getSimpleName();
     private static PanService sPanService;
 
-    private static final String BLUETOOTH_IFACE_ADDR_START = "192.168.44.1";
     private static final int BLUETOOTH_MAX_PAN_CONNECTIONS = 5;
-    private static final int BLUETOOTH_PREFIX_LENGTH = 24;
 
     @VisibleForTesting
     HashMap<BluetoothDevice, BluetoothPanDevice> mPanDevices;
@@ -78,7 +74,6 @@ public class PanService extends ProfileService {
     private String mPanIfName;
     @VisibleForTesting
     boolean mIsTethering = false;
-    private boolean mNativeAvailable;
     private HashMap<String, IBluetoothPanCallback> mBluetoothTetheringCallbacks;
 
     private TetheringManager mTetheringManager;
@@ -142,9 +137,7 @@ public class PanService extends ProfileService {
     }
 
     private static synchronized void setPanService(PanService instance) {
-        if (DBG) {
-            Log.d(TAG, "setPanService(): set to: " + instance);
-        }
+        Log.d(TAG, "setPanService(): set to: " + instance);
         sPanService = instance;
     }
 
@@ -269,14 +262,12 @@ public class PanService extends ProfileService {
                             final BluetoothDevice device =
                                     mAdapterService.getDeviceFromByte(cs.addr);
                             // TBD get iface from the msg
-                            if (DBG) {
-                                Log.d(
-                                        TAG,
-                                        "MESSAGE_CONNECT_STATE_CHANGED: "
-                                                + device
-                                                + " state: "
-                                                + cs.state);
-                            }
+                            Log.d(
+                                    TAG,
+                                    "MESSAGE_CONNECT_STATE_CHANGED: "
+                                            + device
+                                            + " state: "
+                                            + cs.state);
                             // It could be null if the connection up is coming when the
                             // Bluetooth is turning off.
                             if (device == null) {
@@ -490,9 +481,7 @@ public class PanService extends ProfileService {
     })
     void setBluetoothTethering(IBluetoothPanCallback callback, int id, int callerUid,
             boolean value) {
-        if (DBG) {
-            Log.d(TAG, "setBluetoothTethering: " + value + ", mTetherOn: " + mTetherOn);
-        }
+        Log.d(TAG, "setBluetoothTethering: " + value + ", mTetherOn: " + mTetherOn);
         enforceCallingOrSelfPermission(
                 BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         enforceCallingOrSelfPermission(
@@ -554,9 +543,7 @@ public class PanService extends ProfileService {
     public boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
         enforceCallingOrSelfPermission(
                 BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
-        if (DBG) {
-            Log.d(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
-        }
+        Log.d(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
 
         if (!mDatabaseManager.setProfileConnectionPolicy(device, BluetoothProfile.PAN,
                   connectionPolicy)) {
@@ -580,7 +567,6 @@ public class PanService extends ProfileService {
      *
      * @param device Bluetooth device
      * @return connection policy of the device
-     * @hide
      */
     public int getConnectionPolicy(BluetoothDevice device) {
         return mDatabaseManager
@@ -630,10 +616,8 @@ public class PanService extends ProfileService {
 
     void onConnectStateChanged(byte[] address, int state, int error, int localRole,
             int remoteRole) {
-        if (DBG) {
-            Log.d(TAG, "onConnectStateChanged: " + state + ", local role:" + localRole
-                    + ", remoteRole: " + remoteRole);
-        }
+        Log.d(TAG, "onConnectStateChanged: " + state + ", local role:" + localRole
+                + ", remoteRole: " + remoteRole);
         Message msg = mHandler.obtainMessage(MESSAGE_CONNECT_STATE_CHANGED);
         msg.obj = new ConnectState(address, state, error, localRole, remoteRole);
         mHandler.sendMessage(msg);
@@ -641,10 +625,8 @@ public class PanService extends ProfileService {
 
     @VisibleForTesting
     void onControlStateChanged(int localRole, int state, int error, String ifname) {
-        if (DBG) {
-            Log.d(TAG, "onControlStateChanged: " + state + ", error: " + error + ", ifname: "
-                    + ifname);
-        }
+        Log.d(TAG, "onControlStateChanged: " + state + ", error: " + error + ", ifname: "
+                + ifname);
         if (error == 0) {
             mPanIfName = ifname;
         }
@@ -653,25 +635,22 @@ public class PanService extends ProfileService {
 
     void handlePanDeviceStateChange(BluetoothDevice device, String iface, int state,
             @LocalPanRole int localRole, @RemotePanRole int remoteRole) {
-        if (DBG) {
-            Log.d(TAG, "handlePanDeviceStateChange: device: " + device + ", iface: " + iface
-                    + ", state: " + state + ", localRole:" + localRole + ", remoteRole:"
-                    + remoteRole);
-        }
+        Log.d(TAG, "handlePanDeviceStateChange: device: " + device + ", iface: " + iface
+                + ", state: " + state + ", localRole:" + localRole + ", remoteRole:"
+                + remoteRole);
         int prevState;
 
         BluetoothPanDevice panDevice = mPanDevices.get(device);
         if (panDevice == null) {
             Log.i(TAG, "state " + state + " Num of connected pan devices: " + mPanDevices.size());
             prevState = BluetoothProfile.STATE_DISCONNECTED;
-            panDevice = new BluetoothPanDevice(state, iface, localRole, remoteRole);
+            panDevice = new BluetoothPanDevice(state, localRole, remoteRole);
             mPanDevices.put(device, panDevice);
         } else {
             prevState = panDevice.mState;
             panDevice.mState = state;
             panDevice.mLocalRole = localRole;
             panDevice.mRemoteRole = remoteRole;
-            panDevice.mIface = iface;
         }
 
         // Avoid race condition that gets this class stuck in STATE_DISCONNECTING. While we
@@ -776,13 +755,11 @@ public class PanService extends ProfileService {
     @VisibleForTesting
     static class BluetoothPanDevice {
         private int mState;
-        private String mIface;
         private int mLocalRole; // Which local role is this PAN device bound to
         private int mRemoteRole; // Which remote role is this PAN device bound to
 
-        BluetoothPanDevice(int state, String iface, int localRole, int remoteRole) {
+        BluetoothPanDevice(int state, int localRole, int remoteRole) {
             mState = state;
-            mIface = iface;
             mLocalRole = localRole;
             mRemoteRole = remoteRole;
         }

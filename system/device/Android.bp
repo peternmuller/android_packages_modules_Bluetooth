@@ -21,7 +21,6 @@ cc_library_static {
         "packages/modules/Bluetooth/system/stack/include",
     ],
     srcs: [
-        "src/controller.cc",
         "src/device_iot_config.cc",
         "src/device_iot_config_int.cc",
         "src/esco_parameters.cc",
@@ -59,6 +58,7 @@ cc_test {
         "test/interop_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "liblog",
     ],
     static_libs: [
@@ -95,6 +95,7 @@ cc_test {
         "test/device_iot_config_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libdl",
         "liblog",
     ],

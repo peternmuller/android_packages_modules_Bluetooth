@@ -43,8 +43,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.platform.test.flag.junit.SetFlagsRule;
+import android.sysprop.BluetoothProperties;
 
-import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
@@ -56,13 +56,14 @@ import com.android.bluetooth.flags.Flags;
 import com.google.common.base.Objects;
 
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,13 +75,14 @@ public class BluetoothOppReceiverTest {
 
     Context mContext;
 
+    @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
+
     @Mock
     BluetoothMethodProxy mBluetoothMethodProxy;
     BluetoothOppReceiver mReceiver;
 
     @Before
     public void setUp() throws Exception {
-        MockitoAnnotations.initMocks(this);
         mContext = spy(new ContextWrapper(
                 InstrumentationRegistry.getInstrumentation().getTargetContext()));
 
@@ -101,9 +103,10 @@ public class BluetoothOppReceiverTest {
         Intents.release();
     }
 
-    @Ignore("b/262201478")
     @Test
     public void onReceive_withActionDeviceSelected_callsStartTransfer() {
+        Assume.assumeTrue(BluetoothProperties.isProfileOppEnabled().orElse(false));
+
         BluetoothOppManager bluetoothOppManager = spy(BluetoothOppManager.getInstance(mContext));
         BluetoothOppManager.setInstance(bluetoothOppManager);
         String address = "AA:BB:CC:DD:EE:FF";
@@ -114,15 +117,9 @@ public class BluetoothOppReceiverTest {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
 
         try {
-            BluetoothOppTestUtils.enableActivity(
-                    BluetoothOppBtEnableActivity.class, true, mContext);
-            ActivityScenario<BluetoothOppBtEnableActivity> activityScenario =
-                    ActivityScenario.launch(BluetoothOppBtEnableActivity.class);
-            activityScenario.onActivity(
-                    activity -> {
-                        mReceiver.onReceive(mContext, intent);
-                    });
             doNothing().when(bluetoothOppManager).startTransfer(eq(device));
+            InstrumentationRegistry.getInstrumentation()
+                    .runOnMainSync(() -> mReceiver.onReceive(mContext, intent));
             verify(bluetoothOppManager).startTransfer(eq(device));
             BluetoothOppManager.setInstance(null);
         } finally {
@@ -335,6 +332,8 @@ public class BluetoothOppReceiverTest {
 
     @Test
     public void onReceive_withActionTransferComplete_noBroadcastSent() throws Exception {
+        Assume.assumeTrue(BluetoothProperties.isProfileOppEnabled().orElse(false));
+
         List<BluetoothOppTestUtils.CursorMockData> cursorMockDataList;
         Cursor cursor = mock(Cursor.class);
         int idValue = 1234;
@@ -371,14 +370,8 @@ public class BluetoothOppReceiverTest {
 
         Intent intent = new Intent();
         intent.setAction(BluetoothShare.TRANSFER_COMPLETED_ACTION);
-
-        ActivityScenario<BluetoothOppBtEnableActivity> activityScenario
-                = ActivityScenario.launch(BluetoothOppBtEnableActivity.class);
-
-        activityScenario.onActivity(activity -> {
-            mReceiver.onReceive(mContext, intent);
-        });
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> mReceiver.onReceive(mContext, intent));
 
         // check Toast with Espresso seems not to work on Android 11+. Check not send broadcast
         // context instead

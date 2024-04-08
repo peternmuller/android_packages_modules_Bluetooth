@@ -38,8 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * properties, download the image, and place it into a Content Provider for others to retrieve from
  */
 public class AvrcpCoverArtManager {
-    private static final String TAG = "AvrcpCoverArtManager";
-    private static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final String TAG = AvrcpCoverArtManager.class.getSimpleName();
 
     // Image Download Schemes for cover art
     public static final String AVRCP_CONTROLLER_COVER_ART_SCHEME =
@@ -90,13 +89,8 @@ public class AvrcpCoverArtManager {
      * Currently contains the mapping of image handles seen to assigned UUIDs.
      */
     private class AvrcpBipSession {
-        private final BluetoothDevice mDevice;
         private Map<String, String> mUuids = new ConcurrentHashMap<>(1); /* handle -> UUID */
         private Map<String, String> mHandles = new ConcurrentHashMap<>(1); /* UUID -> handle */
-
-        AvrcpBipSession(BluetoothDevice device) {
-            mDevice = device;
-        }
 
         public String getHandleUuid(String handle) {
             if (!isValidImageHandle(handle)) return null;
@@ -161,7 +155,7 @@ public class AvrcpCoverArtManager {
         AvrcpBipClient client = new AvrcpBipClient(device, psm, new BipClientCallback(device));
         client.connectAsync();
         mClients.put(device, client);
-        mBipSessions.put(device, new AvrcpBipSession(device));
+        mBipSessions.put(device, new AvrcpBipSession());
         return true;
     }
 
@@ -489,9 +483,7 @@ public class AvrcpCoverArtManager {
      * Print to debug if debug is enabled for this class
      */
     private void debug(String msg) {
-        if (DBG) {
-            Log.d(TAG, msg);
-        }
+        Log.d(TAG, msg);
     }
 
     /**

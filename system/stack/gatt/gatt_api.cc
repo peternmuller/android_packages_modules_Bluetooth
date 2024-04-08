@@ -25,13 +25,13 @@
 
 #include "stack/include/gatt_api.h"
 
+#include <android_bluetooth_flags.h>
 #include <base/logging.h>
 #include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
 
 #include <string>
 
-#include "device/include/controller.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "internal_include/stack_config.h"
@@ -45,8 +45,8 @@
 #include "stack/gatt/connection_manager.h"
 #include "stack/gatt/gatt_int.h"
 #include "stack/include/bt_hdr.h"
-#include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
+#include "stack/include/l2cap_acl_interface.h"
 #include "stack/include/sdp_api.h"
 #include "types/bluetooth/uuid.h"
 #include "types/bt_transport.h"
@@ -767,7 +767,7 @@ tGATTC_TryMtuRequestResult GATTC_TryMtuRequest(const RawAddress& remote_bda,
                                                tBT_TRANSPORT transport,
                                                uint16_t conn_id,
                                                uint16_t* current_mtu) {
-  log::info("{} conn_id=0x{:04x}", remote_bda.ToString(), conn_id);
+  log::info("{} conn_id=0x{:04x}", ADDRESS_TO_LOGGABLE_STR(remote_bda), conn_id);
   *current_mtu = GATT_DEF_BLE_MTU_SIZE;
 
   if (transport == BT_TRANSPORT_BR_EDR) {
@@ -1396,7 +1396,8 @@ void GATT_StartIf(tGATT_IF gatt_if) {
 bool GATT_Connect(tGATT_IF gatt_if, const RawAddress& bd_addr,
                   tBTM_BLE_CONN_TYPE connection_type, tBT_TRANSPORT transport,
                   bool opportunistic) {
-  uint8_t phy = controller_get_interface()->get_le_all_initiating_phys();
+  constexpr uint8_t kPhyLe1M = 0x01;  // From the old controller shim.
+  uint8_t phy = kPhyLe1M;
   return GATT_Connect(gatt_if, bd_addr, connection_type, transport,
                       opportunistic, phy);
 }
@@ -1429,8 +1430,18 @@ bool GATT_Connect(tGATT_IF gatt_if, const RawAddress& bd_addr,
   if (is_direct) {
     log::debug("Starting direct connect gatt_if={} address={}", gatt_if,
                ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
-    ret =
-        gatt_act_connect(p_reg, bd_addr, addr_type, transport, initiating_phys);
+    bool tcb_exist = !!gatt_find_tcb_by_addr(bd_addr, transport);
+
+    if (!IS_FLAG_ENABLED(gatt_reconnect_on_bt_on_fix) || tcb_exist) {
+      /* Consider to remove gatt_act_connect at all */
+      ret = gatt_act_connect(p_reg, bd_addr, addr_type, transport,
+                             initiating_phys);
+    } else {
+      log::verbose("Connecting without tcb address: {}",
+                   ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+      ret = acl_create_le_connection_with_id(gatt_if, bd_addr, addr_type);
+    }
+
   } else {
     log::debug("Starting background connect gatt_if={} address={}", gatt_if,
                ADDRESS_TO_LOGGABLE_CSTR(bd_addr));

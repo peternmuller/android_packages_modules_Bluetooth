@@ -22,6 +22,7 @@
 #include "bta/include/bta_api.h"
 #include "bta/include/bta_sec_api.h"
 #include "btif_uid.h"
+#include "hci/le_rand_callback.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bte_appl.h"
 #include "types/raw_address.h"
@@ -90,14 +91,14 @@ void btif_dm_set_oob_for_io_req(tBTM_OOB_DATA* p_oob_data);
 void btif_dm_set_oob_for_le_io_req(const RawAddress& bd_addr,
                                    tBTM_OOB_DATA* p_oob_data,
                                    tBTM_LE_AUTH_REQ* p_auth_req);
-#ifdef BTIF_DM_OOB_TEST
 void btif_dm_load_local_oob(void);
 void btif_dm_proc_loc_oob(tBT_TRANSPORT transport, bool is_valid,
                           const Octet16& c, const Octet16& r);
 bool btif_dm_proc_rmt_oob(const RawAddress& bd_addr, Octet16* p_c,
                           Octet16* p_r);
 void btif_dm_generate_local_oob_data(tBT_TRANSPORT transport);
-#endif /* BTIF_DM_OOB_TEST */
+
+void btif_check_device_in_inquiry_db(const RawAddress& address);
 
 void btif_dm_clear_event_filter();
 
@@ -107,7 +108,7 @@ void btif_dm_clear_filter_accept_list();
 
 void btif_dm_disconnect_all_acls();
 
-void btif_dm_le_rand(LeRandCallback callback);
+void btif_dm_le_rand(bluetooth::hci::LeRandCallback callback);
 void btif_dm_set_event_filter_connection_setup_all_devices();
 void btif_dm_allow_wake_by_hid(
     std::vector<RawAddress> classic_addrs,

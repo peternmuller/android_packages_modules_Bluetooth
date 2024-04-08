@@ -42,15 +42,15 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.bluetooth.TestUtils;
 import com.android.bluetooth.btservice.AdapterService;
-import com.android.bluetooth.flags.FakeFeatureFlagsImpl;
-import com.android.bluetooth.flags.Flags;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 @MediumTest
 @RunWith(AndroidJUnit4.class)
@@ -60,8 +60,9 @@ public class LeAudioStateMachineTest {
     private HandlerThread mHandlerThread;
     private LeAudioStateMachine mLeAudioStateMachine;
     private BluetoothDevice mTestDevice;
-    private FakeFeatureFlagsImpl mFakeFlagsImpl;
     private static final int TIMEOUT_MS = 1000;
+
+    @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock private AdapterService mAdapterService;
     @Mock private LeAudioService mLeAudioService;
@@ -70,14 +71,9 @@ public class LeAudioStateMachineTest {
     @Before
     public void setUp() throws Exception {
         mTargetContext = InstrumentationRegistry.getTargetContext();
-        // Set up mocks and test assets
-        MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
 
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        mFakeFlagsImpl = new FakeFeatureFlagsImpl();
-        mFakeFlagsImpl.setFlag(Flags.FLAG_AUDIO_ROUTING_CENTRALIZATION, false);
-        mFakeFlagsImpl.setFlag(Flags.FLAG_LEAUDIO_BROADCAST_AUDIO_HANDOVER_POLICIES, false);
 
         // Get a device for testing
         mTestDevice = mAdapter.getRemoteDevice("00:01:02:03:04:05");
@@ -92,8 +88,7 @@ public class LeAudioStateMachineTest {
                         mTestDevice,
                         mLeAudioService,
                         mLeAudioNativeInterface,
-                        mHandlerThread.getLooper(),
-                        mFakeFlagsImpl);
+                        mHandlerThread.getLooper());
     }
 
     @After

@@ -63,8 +63,7 @@ import java.util.regex.Pattern;
  * player would effectively cause player switch by sending a play command to that player.
  */
 public class MediaPlayerList {
-    private static final String TAG = "MediaPlayerList";
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final String TAG = MediaPlayerList.class.getSimpleName();
     static boolean sTesting = false;
 
     private static final String PACKAGE_SCHEME = "package";
@@ -767,7 +766,7 @@ public class MediaPlayerList {
                     || action.equals(Intent.ACTION_PACKAGE_CHANGED)) {
                 String packageName = intent.getData().getSchemeSpecificPart();
                 if (packageName != null) {
-                    if (DEBUG) Log.d(TAG, "Name of package changed: " + packageName);
+                    Log.d(TAG, "Name of package changed: " + packageName);
                     // TODO (apanicke): Handle either updating or adding the new package.
                     // Check if its browsable and send the UIDS changed to update the
                     // root folder
@@ -842,11 +841,11 @@ public class MediaPlayerList {
                 }
             }
             if (isActive != mAudioPlaybackIsActive) {
-                mAudioPlaybackStateLogger.logd(DEBUG, TAG, "onPlaybackConfigChanged: "
+                mAudioPlaybackStateLogger.logd(TAG, "onPlaybackConfigChanged: "
                         + (mAudioPlaybackIsActive ? "Active" : "Non-active") + " -> "
                         + (isActive ? "Active" : "Non-active"));
                 if (isActive) {
-                    mAudioPlaybackStateLogger.logd(DEBUG, TAG, "onPlaybackConfigChanged: "
+                    mAudioPlaybackStateLogger.logd(TAG, "onPlaybackConfigChanged: "
                             + "active config: " + activeConfig);
                 }
                 mAudioPlaybackIsActive = isActive;
@@ -968,8 +967,6 @@ public class MediaPlayerList {
     }
 
     private static void d(String message) {
-        if (DEBUG) {
-            Log.d(TAG, message);
-        }
+        Log.d(TAG, message);
     }
 }

@@ -18,7 +18,6 @@
 
 #include <android/hardware/bluetooth/audio/2.1/IBluetoothAudioProvidersFactory.h>
 #include <android/hardware/bluetooth/audio/2.1/types.h>
-#include <com_android_bluetooth_flags.h>
 
 namespace bluetooth {
 namespace audio {
@@ -39,7 +38,6 @@ constexpr char kFullyQualifiedQTIInterfaceName_2_0[] =
 constexpr char kFullyQualifiedQTIInterfaceName_2_1[] =
     "vendor.qti.hardware.bluetooth_audio@2.1::IBluetoothAudioProvidersFactory";
 
-#if COM_ANDROID_BLUETOOTH_FLAGS_AUDIO_HAL_VERSION_CLASS
 /**
  * The type of HAL transport, it's important to have
  * BluetoothAudioHalTransport::HIDL value defined smaller than
@@ -50,6 +48,7 @@ enum class BluetoothAudioHalTransport : uint8_t {
   UNKNOWN,
   HIDL,
   AIDL,
+  QTI_HIDL,
 };
 
 std::string toString(BluetoothAudioHalTransport transport);
@@ -112,36 +111,14 @@ class BluetoothAudioHalVersion {
   static const BluetoothAudioHalVersion VERSION_AIDL_V2;
   static const BluetoothAudioHalVersion VERSION_AIDL_V3;
   static const BluetoothAudioHalVersion VERSION_AIDL_V4;
+  static const BluetoothAudioHalVersion VERSION_QTI_HIDL_2_0;
+  static const BluetoothAudioHalVersion VERSION_QTI_HIDL_2_1;
 
  private:
   BluetoothAudioHalTransport mTransport = BluetoothAudioHalTransport::UNKNOWN;
   uint16_t mMajor = 0;
   uint16_t mMinor = 0;
 };
-
-#else  // COM_ANDROID_BLUETOOTH_FLAGS_AUDIO_HAL_VERSION_CLASS
-
-enum class BluetoothAudioHalVersion : uint8_t {
-  VERSION_UNAVAILABLE = 0,
-  VERSION_2_0,
-  VERSION_2_1,
-  VERSION_AIDL_V1,
-  VERSION_AIDL_V2,
-  VERSION_AIDL_V3,
-  VERSION_AIDL_V4,
-  VERSION_QTI_HIDL_2_0,
-  VERSION_QTI_HIDL_2_1,
-};
-
-enum class BluetoothAudioHalTransport : uint8_t {
-  // Uninit, default value
-  UNKNOWN,
-  AIDL,
-  HIDL,
-  QTI_HIDL,
-};
-
-#endif  // COM_ANDROID_BLUETOOTH_FLAGS_AUDIO_HAL_VERSION_CLASS
 
 class HalVersionManager {
  public:

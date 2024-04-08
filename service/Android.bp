@@ -49,6 +49,8 @@ java_library {
             "-Xep:ClassCanBeStatic:ERROR",
             "-Xep:EqualsIncompatibleType:ERROR",
             "-Xep:ReferenceEquality:ERROR",
+            "-Xep:UnusedMethod:ERROR",
+            "-Xep:UnusedVariable:ERROR",
         ],
     },
 
@@ -195,9 +197,9 @@ java_library {
 //        "src/satellite/ModeListener.kt",
 //        "src/satellite/ModeListenerTest.kt",
 //    ],
-
-//    static_libs: [
+//  static_libs: [
 //        "androidx.test.core",
+//        "androidx.test.ext.truth",
 //        "kotlin-test",
 //        "kotlinx_coroutines",
 //        "kotlinx_coroutines_test",
@@ -206,4 +208,7 @@ java_library {
 //        "testng",
 //        "truth",
 //    ],
+//
+//    upstream: true,
+//    test_suites: ["general-tests"],
 //}

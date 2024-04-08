@@ -17,6 +17,7 @@
 #ifndef ANDROID_INCLUDE_BT_AV_H
 #define ANDROID_INCLUDE_BT_AV_H
 
+#include <bluetooth/log.h>
 #include <hardware/bluetooth.h>
 #include <raw_address.h>
 
@@ -346,6 +347,19 @@ typedef void (*btav_audio_sink_config_callback)(const RawAddress& bd_addr,
 typedef bool (*btav_mandatory_codec_preferred_callback)(
     const RawAddress& bd_addr);
 
+/** Callback for querying whether the mandatory codec is more preferred.
+ *  Used only for the A2DP Source interface.
+ *  Return true if optional codecs are not preferred.
+ */
+typedef bool (*btav_mandatory_codec_preferred_callback)(
+    const RawAddress& bd_addr);
+
+/** Callback for sending update metadata context to Application.
+ *  Used only for the A2DP Source interface.
+ *  context: preferred context out of multiple contexts
+ */
+typedef void (*btav_metadata_update_callback)(uint16_t context);
+
 /** BT-AV A2DP Source callback structure. */
 typedef struct {
   /** set to sizeof(btav_source_callbacks_t) */
@@ -354,6 +368,7 @@ typedef struct {
   btav_audio_state_callback audio_state_cb;
   btav_audio_source_config_callback audio_config_cb;
   btav_mandatory_codec_preferred_callback mandatory_codec_preferred_cb;
+  btav_metadata_update_callback update_metadata_cb;
 } btav_source_callbacks_t;
 
 /** BT-AV A2DP Sink callback structure. */
@@ -445,4 +460,28 @@ typedef struct {
 } btav_sink_interface_t;
 
 __END_DECLS
+
+namespace fmt {
+template <>
+struct formatter<btav_connection_state_t>
+    : enum_formatter<btav_connection_state_t> {};
+template <>
+struct formatter<btav_audio_state_t> : enum_formatter<btav_audio_state_t> {};
+template <>
+struct formatter<btav_a2dp_codec_bits_per_sample_t>
+    : enum_formatter<btav_a2dp_codec_bits_per_sample_t> {};
+template <>
+struct formatter<btav_a2dp_codec_priority_t>
+    : enum_formatter<btav_a2dp_codec_priority_t> {};
+template <>
+struct formatter<btav_a2dp_codec_index_t>
+    : enum_formatter<btav_a2dp_codec_index_t> {};
+template <>
+struct formatter<btav_a2dp_codec_sample_rate_t>
+    : enum_formatter<btav_a2dp_codec_sample_rate_t> {};
+template <>
+struct formatter<btav_a2dp_codec_channel_mode_t>
+    : enum_formatter<btav_a2dp_codec_channel_mode_t> {};
+}  // namespace fmt
+
 #endif /* ANDROID_INCLUDE_BT_AV_H */
