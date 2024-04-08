@@ -1732,6 +1732,9 @@ public class BassClientService extends ProfileService {
 
             BluetoothLeBroadcastMetadata metaData =
                     stateMachine.getCurrentBroadcastMetadata(sourceId);
+            if (metaData == null) {
+                metaData = stateMachine.getBroadcastMetadataFromReceiveState(sourceId);
+            }
             if (metaData != null && stateMachine.isSyncedToTheSource(sourceId)) {
                 sEventLogger.logd(
                         TAG,
