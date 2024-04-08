@@ -32,6 +32,10 @@ class MockInterface : public Interface {
               (hci_data_direction_t data_path_direction, uint8_t data_path_id,
                std::vector<uint8_t> vendor_config),
               (const));
+  MOCK_METHOD(void, SendVendorSpecificCmd,
+              (unsigned short opcode, unsigned char len, unsigned char* param,
+               void (*cb)(tBTM_VSC_CMPL*)),
+              (const));
 };
 void SetMock(const MockInterface& interface);
 }  // namespace bluetooth::legacy::hci::testing

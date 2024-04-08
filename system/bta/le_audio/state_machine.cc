@@ -93,6 +93,178 @@
  */
 // clang-format on
 
+constexpr uint16_t  HCI_VS_QBCE_OCF                     = 0xFC51;
+
+constexpr uint8_t  LTV_TYPE_VS_METADATA                 = 0xFF;
+constexpr uint8_t  LTV_TYPE_VS_METADATA_FE              = 0xFE;
+
+constexpr uint8_t  LTV_TYPE_MIN_FT                      = 0X00;
+constexpr uint8_t  LTV_TYPE_MIN_BIT_RATE                = 0X01;
+constexpr uint8_t  LTV_TYPE_MIN_MAX_ERROR_RESILIENCE    = 0X02;
+constexpr uint8_t  LTV_TYPE_LATENCY_MODE                = 0X03;
+constexpr uint8_t  LTV_TYPE_MAX_FT                      = 0X04;
+
+constexpr uint8_t  LTV_LEN_MIN_FT                       = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_BIT_RATE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_MAX_ERROR_RESILIENCE     = 0X01;
+constexpr uint8_t  LTV_LEN_LATENCY_MODE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MAX_FT                       = 0X01;
+
+constexpr uint8_t  ENCODER_LIMITS_SUB_OP                = 0x24;
+
+typedef struct {
+  uint8_t cig_id;
+  uint8_t cis_id;
+  std::vector<uint8_t> encoder_params;
+  uint8_t encoder_mode;
+} tBTM_BLE_SET_ENCODER_LIMITS_PARAM;
+
+bool isRecordReadable(uint8_t total_len, uint8_t processed_len,
+                      uint8_t req_len) {
+  LOG(WARNING) << __func__ << ": total_len: " << loghex(total_len)
+                           << ", processed_len: " << loghex(processed_len)
+                           << ", req_len: " << loghex(req_len);
+  if((total_len > processed_len) &&
+     ((total_len - processed_len) >= req_len)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+uint8_t* PrepareSetEncoderLimitsPayload(tBTM_BLE_SET_ENCODER_LIMITS_PARAM *params,
+                                        uint8_t *length, uint8_t *p) {
+  uint8_t param_len = 0;
+  uint8_t size = params->encoder_params.size();
+  uint8_t num_limits = (size == 0) ? 1 : size;
+  LOG(INFO) <<__func__  << "num_limits = "<<loghex(num_limits);
+  LOG(INFO) <<__func__  << "params->cig_id = "<<loghex(params->cig_id);
+  LOG(INFO) <<__func__  << "params->cis_id = "<<loghex(params->cis_id);
+  UINT8_TO_STREAM(p, ENCODER_LIMITS_SUB_OP); //sub-opcode
+  param_len++;
+  UINT8_TO_STREAM(p, params->cig_id);
+  param_len++;
+  UINT8_TO_STREAM(p, params->cis_id);
+  param_len++;
+  UINT8_TO_STREAM(p, num_limits); //numlimits
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[0]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[2]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[3]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[4]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[1]);
+  param_len++;
+  *length = param_len;
+  LOG(INFO) <<__func__  << "param_len = "<<loghex(param_len);
+  return p;
+}
+
+void UpdateEncoderParams(uint8_t cig_id, uint8_t cis_id,
+                                 std::vector<uint8_t> encoder_limit_params,
+                                 uint8_t encoder_mode) {
+  tBTM_BLE_SET_ENCODER_LIMITS_PARAM encoder_params = {
+                                       .cig_id = cig_id,
+                                       .cis_id = cis_id,
+                                       .encoder_params = encoder_limit_params,
+                                       .encoder_mode = encoder_mode};
+    uint8_t length = 0;
+    uint8_t size = 1;
+    if (encoder_params.encoder_params.size())
+      size = encoder_params.encoder_params.size();
+    uint16_t len = 4 + size * 3;
+    LOG(INFO) <<__func__  << "len = "<<loghex(len);
+    uint8_t param_arr[len];
+    uint8_t *param = param_arr;
+    PrepareSetEncoderLimitsPayload(&encoder_params, &length, param);
+    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF, length, param, NULL);
+}
+
+void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
+                     uint8_t cig_id, uint8_t cis_id) {
+  LOG(INFO) << __func__ ;
+  uint8_t* p = metadata.data();
+  uint8_t ltv_len, ltv_type;
+  uint8_t processed_len = 0;
+  std::vector<uint8_t> vs_meta_data;
+  uint8_t meta_data_len = total_len;
+
+  while(meta_data_len > 0) {
+    STREAM_TO_UINT8(ltv_len, p);
+    processed_len++;
+
+    if(!ltv_len || !isRecordReadable(total_len, processed_len, ltv_len)) {
+      LOG(INFO) << __func__ << ": Data is not readable ";
+      break;
+    }
+
+    STREAM_TO_UINT8(ltv_type, p);
+    processed_len++;
+
+    if(ltv_type == LTV_TYPE_VS_METADATA) {
+      uint16_t company_id;
+      uint8_t vs_meta_data_len, vs_meta_data_type;
+      STREAM_TO_UINT16(company_id, p);
+      LOG(INFO) << ": company_id = " << loghex(company_id);
+      processed_len += 2;
+      ltv_len -= 3; //company id and ltv_type
+      while(ltv_len) {
+        STREAM_TO_UINT8(vs_meta_data_len, p);
+        LOG(INFO) << __func__ << ": vs_meta_data_len = " << loghex(vs_meta_data_len);
+        processed_len++;
+
+        if(!vs_meta_data_len || !isRecordReadable(total_len, processed_len, vs_meta_data_len)) {
+          LOG(INFO) << __func__ << ": Data is not readable ";
+          break;
+        }
+
+        STREAM_TO_UINT8(vs_meta_data_type, p);
+        LOG(INFO) << __func__ << ": vs_meta_data_type = " << loghex(vs_meta_data_type);
+        processed_len++;
+        if(vs_meta_data_type == LTV_TYPE_VS_METADATA_FE) {
+          vs_meta_data.resize(vs_meta_data_len - 1);
+          STREAM_TO_ARRAY(vs_meta_data.data(), p, vs_meta_data_len - 1); // "ltv_len - 1" because 1B for type
+          LOG(INFO) << __func__ << ": STREAM_TO_ARRAY done ";
+          processed_len += static_cast<int> (sizeof(vs_meta_data));
+          LOG(INFO) << __func__ << ": straight away call UpdateEncoderParams ";
+          UpdateEncoderParams(cig_id, cis_id, vs_meta_data, 0xFF);
+          vs_meta_data.clear();
+        } else {
+          (p) += (vs_meta_data_len - 1); //just ignore and increase pointer
+          processed_len += (vs_meta_data_len - 1);
+        }
+        ltv_len -= (vs_meta_data_len + 1);
+      }
+    } else {
+      (p) += (ltv_len - 1);
+    }
+    meta_data_len -= (ltv_len + 1);
+  }
+}
+
 using bluetooth::common::ToString;
 using bluetooth::hci::IsoManager;
 using bluetooth::legacy::hci::GetInterface;
@@ -460,7 +632,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         AseStateMachineProcessQosConfigured(arh, ase, group, leAudioDevice);
         break;
       case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
-        AseStateMachineProcessEnabling(arh, ase, group, leAudioDevice);
+        AseStateMachineProcessEnabling(
+            arh, ase, value + le_audio::client_parser::ascs::kAseRspHdrMinLen,
+            len - le_audio::client_parser::ascs::kAseRspHdrMinLen, group,
+            leAudioDevice);
         break;
       case AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING:
         AseStateMachineProcessStreaming(
@@ -2962,7 +3137,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void AseStateMachineProcessEnabling(
       struct bluetooth::le_audio::client_parser::ascs::ase_rsp_hdr& arh,
-      struct ase* ase, LeAudioDeviceGroup* group,
+      struct ase* ase, uint8_t* data, uint16_t len, LeAudioDeviceGroup* group,
       LeAudioDevice* leAudioDevice) {
     if (!group) {
       log::error("leAudioDevice doesn't belong to any group");
@@ -3012,7 +3187,16 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         break;
 
-      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
+      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING: {
+        struct le_audio::client_parser::ascs::ase_transient_state_params rsp;
+
+        if (ParseAseStatusTransientStateParams(rsp, len, data)) {
+          parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
+        }
+
+        /* Enable/Switch Content */
+        break;
+      }
         /* Enable/Switch Content */
         break;
       default:
@@ -3104,6 +3288,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
+        parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
         /* Cache current set up metadata values for for further possible
          * reconfiguration
          */
