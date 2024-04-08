@@ -1655,6 +1655,10 @@ class InterfaceImpl : public Interface {
     btsnd_hcic_configure_data_path(data_path_direction, data_path_id,
                                    vendor_config);
   }
+  void SendVendorSpecificCmd(unsigned short opcode,
+        unsigned char len, unsigned char* param, void (*cb)(tBTM_VSC_CMPL*)) const override {
+    btsnd_hcic_vendor_spec_cmd(opcode, len, param, cb);
+  }
 };
 
 namespace {

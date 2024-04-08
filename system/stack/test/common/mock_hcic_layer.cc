@@ -124,6 +124,9 @@ class MockInterface : public Interface {
       std::vector<uint8_t> vendor_config) const override {
     FAIL();
   }
+  virtual void SendVendorSpecificCmd(unsigned short,
+    unsigned char, unsigned char*, void (*)(tBTM_VSC_CMPL*)) const override {
+  }
 } interface_;
 
 const Interface& GetInterface() { return interface_; }

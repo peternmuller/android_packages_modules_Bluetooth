@@ -51,6 +51,8 @@ class Interface {
   virtual void ConfigureDataPath(hci_data_direction_t data_path_direction,
                                  uint8_t data_path_id,
                                  std::vector<uint8_t> vendor_config) const = 0;
+  virtual void SendVendorSpecificCmd(unsigned short,
+                  unsigned char, unsigned char*, void (*)(tBTM_VSC_CMPL*)) const = 0;
   virtual ~Interface() = default;
 };
 
