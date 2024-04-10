@@ -82,6 +82,9 @@ public class PhonePolicy implements AdapterService.BluetoothStateCallback {
     // Timeouts
     @VisibleForTesting static int sConnectOtherProfilesTimeoutMillis = 6000; // 6s
 
+    private static final int CONNECT_OTHER_PROFILES_TIMEOUT_DELAYED = 10000; //10s
+    private static final int CONNECT_OTHER_PROFILES_REDUCED_TIMEOUT_DELAYED = 2000; //2s
+
     private DatabaseManager mDatabaseManager;
     private final AdapterService mAdapterService;
     private final ServiceFactory mFactory;
@@ -101,6 +104,27 @@ public class PhonePolicy implements AdapterService.BluetoothStateCallback {
             autoConnect();
         }
     }
+
+
+     private boolean isConnectTimeoutDelayApplicable(BluetoothDevice device) {
+        if (device == null) return false;
+
+        boolean matched = InteropUtil.interopMatchAddrOrName(
+            InteropUtil.InteropFeature.INTEROP_PHONE_POLICY_INCREASED_DELAY_CONNECT_OTHER_PROFILES,
+            device.getAddress());
+
+        return matched;
+     }
+
+     private boolean isConnectReducedTimeoutDelayApplicable(BluetoothDevice device) {
+        if (device == null) return false;
+
+        boolean matched = InteropUtil.interopMatchAddrOrName(
+            InteropUtil.InteropFeature.INTEROP_PHONE_POLICY_REDUCED_DELAY_CONNECT_OTHER_PROFILES,
+            device.getAddress());
+
+        return matched;
+     }
 
     public void profileConnectionStateChanged(
             int profile, BluetoothDevice device, int fromState, int toState) {
@@ -735,7 +759,19 @@ public class PhonePolicy implements AdapterService.BluetoothStateCallback {
         mConnectOtherProfilesDeviceSet.add(device);
         Message m = mHandler.obtainMessage(MESSAGE_CONNECT_OTHER_PROFILES);
         m.obj = device;
-        mHandler.sendMessageDelayed(m, sConnectOtherProfilesTimeoutMillis);
+        boolean isConnectTimeoutDelayApplicable = isConnectTimeoutDelayApplicable(device);
+        boolean isConnectReducedTimeoutDelayApplicable =
+                             isConnectReducedTimeoutDelayApplicable(device);
+        debugLog("connectOtherProfile: isConnectTimeoutDelayApplicable is "
+               + isConnectTimeoutDelayApplicable);
+        debugLog("connectOtherProfile: isConnectReducedTimeoutDelayApplicable is "
+               + isConnectReducedTimeoutDelayApplicable);
+        if (isConnectTimeoutDelayApplicable)
+            mHandler.sendMessageDelayed(m,CONNECT_OTHER_PROFILES_TIMEOUT_DELAYED);
+        else if (isConnectReducedTimeoutDelayApplicable)
+            mHandler.sendMessageDelayed(m,CONNECT_OTHER_PROFILES_REDUCED_TIMEOUT_DELAYED);
+        else
+            mHandler.sendMessageDelayed(m, sConnectOtherProfilesTimeoutMillis);
     }
 
     // This function is called whenever a profile is connected.  This allows any other bluetooth
