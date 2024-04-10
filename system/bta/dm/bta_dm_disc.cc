@@ -1988,6 +1988,24 @@ static void bta_dm_close_gatt_conn(UNUSED_ATTR tBTA_DM_MSG* p_data) {
   bta_dm_search_cb.pending_close_bda = RawAddress::kEmpty;
   bta_dm_search_cb.conn_id = GATT_INVALID_CONN_ID;
 }
+
+/*******************************************************************************
+ *
+ * Function         bta_dm_cancel_gatt_discovery
+ *
+ * Description      This is GATT cancel the GATT service search.
+ *
+ * Parameters:
+ *
+ ******************************************************************************/
+static void bta_dm_cancel_gatt_discovery(const RawAddress& bd_addr) {
+  if (bta_dm_search_cb.conn_id == GATT_INVALID_CONN_ID) {
+    BTA_GATTC_CancelOpen(bta_dm_search_cb.client_if, bd_addr, true);
+  }
+
+  bta_dm_gatt_disc_complete(bta_dm_search_cb.conn_id, (tGATT_STATUS)GATT_ERROR);
+}
+
 /*******************************************************************************
  *
  * Function         btm_dm_start_gatt_discovery
@@ -2022,14 +2040,14 @@ static void btm_dm_start_gatt_discovery(const RawAddress& bd_addr) {
                                           BTM_BLE_DIRECT_CONNECTION,
                                           kUseOpportunistic);
     } else {
-      log::debug(
-          "Opening new gatt client connection for discovery peer:{} "
-          "transport:{} opportunistic:{:c}",
-          ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bt_transport_text(BT_TRANSPORT_LE),
-          (!kUseOpportunistic) ? 'T' : 'F');
-      get_gatt_interface().BTA_GATTC_Open(bta_dm_search_cb.client_if, bd_addr,
-                                          BTM_BLE_DIRECT_CONNECTION,
-                                          !kUseOpportunistic);
+
+      log::warn("btm_dm_start_gatt_discovery:ACL disconnected, Not creating acl"
+      " for client_if = %d", bta_dm_search_cb.client_if);
+
+      if (bta_dm_search_cb.gatt_disc_active) {
+        bta_dm_cancel_gatt_discovery(bd_addr);
+      }
+      bta_dm_search_cb.gatt_disc_active = false;
     }
   }
 }
