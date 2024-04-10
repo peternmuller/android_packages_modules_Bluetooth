@@ -1359,10 +1359,10 @@ public class BassClientService extends ProfileService {
                     if (broadcastId != BassConstants.INVALID_BROADCAST_ID
                             && mCachedBroadcasts.get(broadcastId) == null) {
                         log("selectBroadcastSource: broadcastId " + broadcastId);
-                        mCachedBroadcasts.put(broadcastId, result);
                         synchronized (mStateMachines) {
                             for (BassClientStateMachine sm : mStateMachines.values()) {
                                 if (sm.isConnected()) {
+                                    mCachedBroadcasts.put(broadcastId, result);
                                     selectSource(sm.getDevice(), result, false);
                                 }
                             }
