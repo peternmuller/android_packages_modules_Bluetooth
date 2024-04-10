@@ -34,7 +34,10 @@
 
 #define APTX_HQ 0X1000
 #define APTX_LL 0X2000
+#define APTX_ULL_S 0X4000
+#define APTX_ULL 0X5000//for 16 bit source
 #define APTX_MODE_MASK 0X7000
+#define APTX_BATTERY_INFO 0X0F
 
 #define APTX_HQ_LATENCY 2000
 #define APTX_LL_LATENCY 700

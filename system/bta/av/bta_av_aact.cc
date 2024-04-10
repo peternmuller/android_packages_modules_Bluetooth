@@ -97,6 +97,8 @@ constexpr char kBtmLogTag[] = "A2DP";
 static void bta_av_offload_codec_builder(tBTA_AV_SCB* p_scb,
                                          tBT_A2DP_OFFLOAD* p_a2dp_offload);
 
+void enc_mode_change_callback(tBTM_VSC_CMPL *param);
+
 /* state machine states */
 enum {
   BTA_AV_INIT_SST,
@@ -3310,6 +3312,24 @@ void update_sub_band_info(uint8_t **param, int *p_param_len, uint8_t id, uint16_
   *param = p_param;
 }
 
+void enc_mode_change_callback(tBTM_VSC_CMPL *param)
+{
+  log::error("Received Encoder Mode Change Callback from Controller");
+}
+
+void update_sub_band_info(uint8_t **param, int *p_param_len, uint8_t id, uint8_t *data, uint8_t size)
+{
+  uint8_t *p_param = *param;
+  *p_param++ = BTA_AV_ENCODER_DATA_ID;
+  *p_param_len += 1;
+  *p_param++ = 2;
+  *p_param_len += 1;
+  *p_param++ = id;
+  *p_param++ = *data;
+  *p_param_len += 2;
+  *param = p_param;
+}
+
 /*******************************************************************************
  *
  * Function         bta_av_update_codec_mode
@@ -3339,6 +3359,25 @@ void bta_av_set_codec_mode(tBTA_AV_DATA* p_data) {
   *num_sub_band += 1;
   BTM_VendorSpecificCommand(HCI_QTI_CONTROLLER_A2DP_OPCODE, param_len,
                                 param, NULL);
+}
+
+void bta_av_update_aptx_data(tBTA_AV_DATA* p_data) {
+  uint8_t param[48];
+  uint8_t *p_param;
+  uint8_t *num_sub_band;
+  int param_len = 0;
+  uint8_t subband_id = p_data->aptx_data.type;
+  uint8_t subband_data = p_data->aptx_data.data;
+  memset(param, 0, 48);
+  p_param = param;
+  *p_param++ = VS_QHCI_ENCODER_MODE_CHANGE;
+  param_len++;
+  num_sub_band = p_param++;
+  param_len++;
+  update_sub_band_info(&p_param, &param_len, subband_id, &subband_data, 1);
+  *num_sub_band += 1;
+   BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, param_len,
+                                 param, enc_mode_change_callback);
 }
 
 /*******************************************************************************

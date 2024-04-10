@@ -369,6 +369,16 @@ struct BTA_AvSetCodecMode {
 };
 extern struct BTA_AvSetCodecMode BTA_AvSetCodecMode;
 
+// Name: BTA_AvUpdateAptxData
+// Params: uint32_t data
+// Return: void
+struct BTA_AvUpdateAptxData {
+  std::function<void(uint32_t data)> body{
+      [](uint32_t /* data */) {}};
+  void operator()(uint32_t data) { body(data); };
+};
+extern struct BTA_AvUpdateAptxData BTA_AvUpdateAptxData;
+
 }  // namespace bta_av_api
 }  // namespace mock
 }  // namespace test
