@@ -578,8 +578,15 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     // differs in codec configuration.
     CodecManager::BroadcastConfigurationRequirements requirements;
     for (auto& idx : subgroup_quality) {
-      requirements.subgroup_quality.push_back(
-          {ChooseConfigurationContextType(context_type), idx});
+      if (osi_property_get_bool("persist.vendor.btstack.bis_audio_config.enabled", true)
+          && !is_public) {
+        // Use high quality audio for non-public broadcast
+        requirements.subgroup_quality.push_back(
+            {ChooseConfigurationContextType(context_type), bluetooth::le_audio::QUALITY_HIGH});
+      } else {
+        requirements.subgroup_quality.push_back(
+            {ChooseConfigurationContextType(context_type), idx});
+      }
     }
     auto config = CodecManager::GetInstance()->GetBroadcastConfig(requirements);
 

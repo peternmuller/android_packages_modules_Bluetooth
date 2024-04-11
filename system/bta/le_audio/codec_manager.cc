@@ -418,6 +418,59 @@ struct codec_manager_impl {
     }
   }
 
+  int GetBroadcastTargetConfigByProperty(uint8_t preferred_quality) {
+    char prop_value[PROPERTY_VALUE_MAX] = {0};
+    osi_property_get("persist.vendor.btstack.bis_audio_config_setting", prop_value, "");
+    uint32_t preferred_sampling_rate = -1;
+    uint32_t preferred_octets_per_frame = -1;
+
+    if (!strcmp(prop_value, "16_2")) {
+      preferred_sampling_rate = 16000u;
+      preferred_octets_per_frame = 40;
+    } else if (!strcmp(prop_value, "24_2")) {
+      preferred_sampling_rate = 24000u;
+      preferred_octets_per_frame = 60;
+    } else if (!strcmp(prop_value, "48_1")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 75;
+    } else if (!strcmp(prop_value, "48_2")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 100;
+    } else if (!strcmp(prop_value, "48_3")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 90;
+    } else if (!strcmp(prop_value, "48_4")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 120;
+    } else if (!strcmp(prop_value, "48_5")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 117;
+    } else if (!strcmp(prop_value, "48_6")) {
+      preferred_sampling_rate = 48000u;
+      preferred_octets_per_frame = 155;
+    } else {
+      if (preferred_quality == bluetooth::le_audio::QUALITY_STANDARD) {
+        preferred_sampling_rate = 16000u; //16_2
+        preferred_octets_per_frame = 40;
+      } else { //perferred_quality = bluetooth::le_audio::QUALITY_HIGH
+        preferred_sampling_rate = 48000u; //48_2
+        preferred_octets_per_frame = 100;
+      }
+    }
+
+    int target_config = -1;
+    for (int i = 0; i < (int)supported_broadcast_config.size(); i++) {
+      if (supported_broadcast_config[i].sampling_rate == preferred_sampling_rate
+          && supported_broadcast_config[i].octets_per_frame == preferred_octets_per_frame) {
+        target_config = i;
+        break;
+      }
+    }
+
+    log::info("GetBroadcastTargetConfigByProperty: target_config: {}", target_config);
+    return target_config;
+  }
+
   const broadcast_offload_config* GetBroadcastOffloadConfig(
       uint8_t preferred_quality) {
     if (supported_broadcast_config.empty()) {
@@ -467,6 +520,10 @@ struct codec_manager_impl {
              supported_broadcast_config[broadcast_target_config].sampling_rate))
           broadcast_target_config = i;
       }
+    }
+
+    if (osi_property_get_bool("persist.vendor.btstack.bis_audio_config.enabled", true)) {
+      broadcast_target_config = GetBroadcastTargetConfigByProperty(preferred_quality);
     }
 
     if (broadcast_target_config == -1) {
