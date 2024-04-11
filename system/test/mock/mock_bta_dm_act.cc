@@ -52,7 +52,6 @@ struct bta_dm_ble_config_local_privacy bta_dm_ble_config_local_privacy;
 struct bta_dm_ble_confirm_reply bta_dm_ble_confirm_reply;
 struct bta_dm_ble_csis_observe bta_dm_ble_csis_observe;
 struct bta_dm_ble_get_energy_info bta_dm_ble_get_energy_info;
-struct bta_dm_ble_observe bta_dm_ble_observe;
 struct bta_dm_ble_passkey_reply bta_dm_ble_passkey_reply;
 struct bta_dm_ble_scan bta_dm_ble_scan;
 struct bta_dm_ble_set_conn_params bta_dm_ble_set_conn_params;
@@ -62,7 +61,6 @@ struct bta_dm_bond bta_dm_bond;
 struct bta_dm_bond_cancel bta_dm_bond_cancel;
 struct bta_dm_check_if_only_hd_connected bta_dm_check_if_only_hd_connected;
 struct bta_dm_ci_rmt_oob_act bta_dm_ci_rmt_oob_act;
-struct bta_dm_close_acl bta_dm_close_acl;
 struct bta_dm_confirm bta_dm_confirm;
 struct bta_dm_disable bta_dm_disable;
 struct bta_dm_eir_update_cust_uuid bta_dm_eir_update_cust_uuid;
@@ -153,11 +151,6 @@ void bta_dm_ble_get_energy_info(
   inc_func_call_count(__func__);
   test::mock::bta_dm_act::bta_dm_ble_get_energy_info(p_energy_info_cback);
 }
-void bta_dm_ble_observe(bool start, uint8_t duration,
-                        tBTA_DM_SEARCH_CBACK* p_cback) {
-  inc_func_call_count(__func__);
-  test::mock::bta_dm_act::bta_dm_ble_observe(start, duration, p_cback);
-}
 void bta_dm_ble_passkey_reply(const RawAddress& bd_addr, bool accept,
                               uint32_t passkey) {
   inc_func_call_count(__func__);
@@ -205,11 +198,6 @@ bool bta_dm_check_if_only_hd_connected(const RawAddress& peer_addr) {
 void bta_dm_ci_rmt_oob_act(std::unique_ptr<tBTA_DM_CI_RMT_OOB> msg) {
   inc_func_call_count(__func__);
   test::mock::bta_dm_act::bta_dm_ci_rmt_oob_act(std::move(msg));
-}
-void bta_dm_close_acl(const RawAddress& bd_addr, bool remove_dev,
-                      tBT_TRANSPORT transport) {
-  inc_func_call_count(__func__);
-  test::mock::bta_dm_act::bta_dm_close_acl(bd_addr, remove_dev, transport);
 }
 void bta_dm_confirm(const RawAddress& bd_addr, bool accept) {
   inc_func_call_count(__func__);
@@ -262,9 +250,9 @@ void bta_dm_rm_cback(tBTA_SYS_CONN_STATUS status, uint8_t id, uint8_t app_id,
   inc_func_call_count(__func__);
   test::mock::bta_dm_act::bta_dm_rm_cback(status, id, app_id, peer_addr);
 }
-void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
+void bta_dm_sdp_result(tBTA_DM_SDP_RESULT& sdp_event) {
   inc_func_call_count(__func__);
-  test::mock::bta_dm_act::bta_dm_sdp_result(p_data);
+  test::mock::bta_dm_act::bta_dm_sdp_result(sdp_event);
 }
 void bta_dm_set_dev_name(const std::vector<uint8_t>& name) {
   inc_func_call_count(__func__);

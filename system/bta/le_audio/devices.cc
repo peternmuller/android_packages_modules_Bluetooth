@@ -232,7 +232,7 @@ bool LeAudioDevice::ConfigureAses(
     return false;
   }
 
-  ASSERT_LOG(
+  log::assert_that(
       audio_set_conf->topology_info.has_value(),
       "No topology info, which is required to properly configure the ASEs");
   auto device_cnt = audio_set_conf->topology_info->device_count.get(direction);
@@ -376,7 +376,7 @@ void LeAudioDevice::RegisterPACs(
     std::vector<struct types::acs_ac_record>* pac_recs) {
   /* Clear PAC database for characteristic in case if re-read, indicated */
   if (!pac_db->empty()) {
-    DLOG(INFO) << __func__ << ", upgrade PACs for characteristic";
+    log::debug("upgrade PACs for characteristic");
     pac_db->clear();
   }
 
@@ -734,12 +734,13 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
       if (!utils::IsCodecUsingLtvFormat(pac.codec_id) &&
           pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLe &&
           pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLeX) {
-        LOG_WARN("Unknown codec PAC record for codec: %s",
-                 bluetooth::common::ToString(pac.codec_id).c_str());
+        log::warn("Unknown codec PAC record for codec: {}",
+                  bluetooth::common::ToString(pac.codec_id));
         continue;
       }
-      ASSERT_LOG(!pac.codec_spec_caps.IsEmpty(),
-                 "Codec specific capabilities are not parsed approprietly.");
+      log::assert_that(
+          !pac.codec_spec_caps.IsEmpty(),
+          "Codec specific capabilities are not parsed approprietly.");
 
       if (pac.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
           (pac.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
@@ -861,10 +862,11 @@ uint8_t LeAudioDevice::GetPreferredPhyBitmask(uint8_t preferred_phy) const {
   // Take the preferences if possible
   if (preferred_phy && (phy_bitmask & preferred_phy)) {
     phy_bitmask &= preferred_phy;
-    LOG_DEBUG("Using ASE preferred phy 0x%02x", static_cast<int>(phy_bitmask));
+    log::debug("Using ASE preferred phy 0x{:02x}",
+               static_cast<int>(phy_bitmask));
   } else {
-    LOG_WARN(
-        "ASE preferred 0x%02x has nothing common with phy_bitfield  0x%02x ",
+    log::warn(
+        "ASE preferred 0x{:02x} has nothing common with phy_bitfield  0x{:02x}",
         static_cast<int>(preferred_phy), static_cast<int>(phy_bitmask));
   }
   return phy_bitmask;

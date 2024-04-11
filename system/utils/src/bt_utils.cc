@@ -136,7 +136,7 @@ void raise_priority_a2dp(tHIGH_PRIORITY_TASK high_task) {
   }
 
   if (rc) {
-    LOG_WARN("failed to change sched policy, tid %d, err: %d", tid, errno);
+    log::warn("failed to change sched policy, tid {}, err: {}", tid, errno);
   }
 
   // make A2DP threads use RT scheduling policy since they are part of the
@@ -147,8 +147,7 @@ void raise_priority_a2dp(tHIGH_PRIORITY_TASK high_task) {
 
     const int rc = sched_setscheduler(tid, SCHED_FIFO, &rt_params);
     if (rc != 0) {
-      LOG_ERROR("%s unable to set SCHED_FIFO priority %d for tid %d, error %s",
-                __func__, A2DP_RT_PRIORITY, tid, strerror(errno));
+      log::error("unable to set SCHED_FIFO priority {} for tid {}, error {}", A2DP_RT_PRIORITY, tid, strerror(errno));
     }
   }
 }

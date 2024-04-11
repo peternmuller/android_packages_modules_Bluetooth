@@ -16,12 +16,12 @@
 
 #define LOG_TAG "BluetoothA2dpServiceJni"
 
+#include <string.h>
+
+#include <shared_mutex>
+
 #include "com_android_bluetooth.h"
 #include "hardware/bt_av.h"
-#include "utils/Log.h"
-
-#include <string.h>
-#include <shared_mutex>
 
 namespace android {
 static jmethodID method_onConnectionStateChanged;
@@ -186,7 +186,7 @@ static bool bta2dp_mandatory_codec_preferred_callback(
 }
 
 static void bta2dp_metadata_update_callback(uint16_t context) {
-  ALOGI("%s", __func__);
+  log::info("{}", __func__);
 
   std::shared_lock<std::shared_timed_mutex> lock(callbacks_mutex);
   CallbackEnv sCallbackEnv(__func__);
@@ -519,7 +519,7 @@ static void setStreamModeNative(JNIEnv* env, jobject object,
                                       jboolean lowLatencyEnabled) {
     std::shared_lock<std::shared_timed_mutex> lock(interface_mutex);
   if (!sBluetoothA2dpInterface) {
-    ALOGE("%s: Failed to get the Bluetooth A2DP Interface", __func__);
+    log::error("{}: Failed to get the Bluetooth A2DP Interface", __func__);
     return;
   }
 

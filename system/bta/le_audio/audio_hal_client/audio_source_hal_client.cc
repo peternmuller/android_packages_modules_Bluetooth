@@ -19,7 +19,6 @@
  ******************************************************************************/
 
 #include <android_bluetooth_flags.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 
 #include "audio/asrc/asrc_resampler.h"
@@ -135,7 +134,7 @@ bool SourceImpl::Acquire() {
     return false;
   }
 
-  LOG_INFO();
+  log::info("");
   le_audio_sink_hal_state_ = HAL_STOPPED;
   return this->InitAudioSinkThread();
 }
@@ -146,7 +145,7 @@ void SourceImpl::Release() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   worker_thread_->ShutDown();
 
   if (halSinkInterface_) {
@@ -370,7 +369,7 @@ void SourceImpl::Stop() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
 
   halSinkInterface_->StopSession();
   le_audio_sink_hal_state_ = HAL_STOPPED;
@@ -393,11 +392,10 @@ void SourceImpl::Stop() {
 void SourceImpl::ConfirmSuspendRequest() {
   if ((halSinkInterface_ == nullptr) ||
       (le_audio_sink_hal_state_ != HAL_STARTED)) {
-    LOG_ERROR("Audio HAL Audio sink was not started!");
+    log::error("Audio HAL Audio sink was not started!");
     return;
   }
 
-  LOG_INFO();
   halSinkInterface_->ConfirmSuspendRequest();
 }
 
@@ -408,7 +406,7 @@ void SourceImpl::ConfirmStreamingRequest() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
     halSinkInterface_->ConfirmStreamingRequestV2();
   } else {
@@ -434,7 +432,7 @@ void SourceImpl::SuspendedForReconfiguration() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   halSinkInterface_->SuspendedForReconfiguration();
 }
 
@@ -445,7 +443,7 @@ void SourceImpl::ReconfigurationComplete() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   halSinkInterface_->ReconfigurationComplete();
 }
 
@@ -456,7 +454,7 @@ void SourceImpl::CancelStreamingRequest() {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
     halSinkInterface_->CancelStreamingRequestV2();
   } else {
@@ -471,7 +469,7 @@ void SourceImpl::UpdateRemoteDelay(uint16_t remote_delay_ms) {
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   halSinkInterface_->SetRemoteDelay(remote_delay_ms);
 }
 
@@ -483,7 +481,7 @@ void SourceImpl::UpdateAudioConfigToHal(
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   halSinkInterface_->UpdateAudioConfigToHal(config);
 }
 
@@ -494,7 +492,7 @@ void SourceImpl::UpdateBroadcastAudioConfigToHal(
     return;
   }
 
-  LOG_INFO();
+  log::info("");
   halSinkInterface_->UpdateBroadcastAudioConfigToHal(config);
 }
 }  // namespace
@@ -508,7 +506,7 @@ LeAudioSourceAudioHalClient::AcquireUnicast() {
     return nullptr;
   }
 
-  LOG_INFO();
+  log::info("");
   return std::move(impl);
 }
 
@@ -521,7 +519,7 @@ LeAudioSourceAudioHalClient::AcquireBroadcast() {
     return nullptr;
   }
 
-  LOG_INFO();
+  log::info("");
   return std::move(impl);
 }
 

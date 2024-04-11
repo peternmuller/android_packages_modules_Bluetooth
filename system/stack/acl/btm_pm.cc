@@ -517,8 +517,8 @@ static tBTM_PM_MODE btm_pm_get_set_mode(uint8_t pm_id, tBTM_PM_MCB* p_cb,
 static tBTM_STATUS btm_pm_snd_md_req(uint16_t handle, uint8_t pm_id,
                                      int link_ind,
                                      const tBTM_PM_PWR_MD* p_mode) {
-  ASSERT_LOG(pm_mode_db.count(handle) != 0,
-             "Unable to find active acl for handle %d", handle);
+  log::assert_that(pm_mode_db.count(handle) != 0,
+                   "Unable to find active acl for handle {}", handle);
   tBTM_PM_PWR_MD md_res;
   tBTM_PM_MODE mode;
   tBTM_PM_MCB* p_cb = &pm_mode_db[handle];
@@ -796,15 +796,15 @@ void process_ssr_event(tHCI_STATUS status, uint16_t handle,
   log::debug(
       "Notified sniff subrating registered clients cnt:{} peer:{} use_ssr:{} "
       "status:{}",
-      cnt, ADDRESS_TO_LOGGABLE_CSTR(bd_addr), logbool(use_ssr).c_str(),
+      cnt, ADDRESS_TO_LOGGABLE_CSTR(bd_addr), use_ssr,
       hci_error_code_text(status).c_str());
 }
 
 void btm_pm_on_sniff_subrating(tHCI_STATUS status, uint16_t handle,
                                uint16_t maximum_transmit_latency,
                                uint16_t maximum_receive_latency,
-                               uint16_t minimum_remote_timeout,
-                               uint16_t minimum_local_timeout) {
+                               uint16_t /* minimum_remote_timeout */,
+                               uint16_t /* minimum_local_timeout */) {
   process_ssr_event(status, handle, maximum_transmit_latency,
                     maximum_receive_latency);
 }
@@ -939,7 +939,7 @@ uint32_t BTM_PM_ReadBleScanDutyCycle(void) {
   }
   uint32_t scan_window = btm_cb.ble_ctr_cb.inq_var.scan_window;
   uint32_t scan_interval = btm_cb.ble_ctr_cb.inq_var.scan_interval;
-  LOG_VERBOSE("LE scan_window:%d scan interval:%d", scan_window, scan_interval);
+  log::verbose("LE scan_window:{} scan interval:{}", scan_window, scan_interval);
   return (scan_window * 100) / scan_interval;
 }
 

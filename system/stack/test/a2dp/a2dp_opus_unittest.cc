@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <base/logging.h>
 #include <gtest/gtest.h>
 #include <stdio.h>
 
@@ -164,7 +163,8 @@ TEST_F(A2dpOpusTest, a2dp_source_read_underflow) {
 TEST_F(A2dpOpusTest, a2dp_enqueue_cb_is_invoked) {
   promise = {};
   auto read_cb = +[](uint8_t* p_buf, uint32_t len) -> uint32_t {
-    ASSERT(GetReadSize() == len);
+    log::assert_that(GetReadSize() == len,
+                     "assert failed: GetReadSize() == len");
     return len;
   };
   auto enqueue_cb = +[](BT_HDR* p_buf, size_t frames_n, uint32_t len) -> bool {

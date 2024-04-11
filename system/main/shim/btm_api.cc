@@ -19,10 +19,10 @@
 #include "main/shim/btm_api.h"
 
 #include <base/functional/callback.h>
-#include <base/logging.h>
 
 #include "hci/controller.h"
 #include "hci/controller_interface.h"
+#include "main/shim/acl.h"
 #include "main/shim/btm.h"
 #include "main/shim/entry.h"
 #include "main/shim/helpers.h"

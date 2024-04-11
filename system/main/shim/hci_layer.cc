@@ -30,7 +30,6 @@
 #include "hci/hci_packets.h"
 #include "hci/include/packet_fragmenter.h"
 #include "hci/vendor_specific_event_manager.h"
-#include "include/check.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
@@ -225,28 +224,17 @@ void OnTransmitPacketStatus(command_status_cb status_callback, void* context,
 static void transmit_command(const BT_HDR* command,
                              command_complete_cb complete_callback,
                              command_status_cb status_callback, void* context) {
-  CHECK(command != nullptr);
+  log::assert_that(command != nullptr, "assert failed: command != nullptr");
   const uint8_t* data = command->data + command->offset;
   size_t len = command->len;
-  CHECK(len >= (kCommandOpcodeSize + kCommandLengthSize));
+  log::assert_that(
+      len >= (kCommandOpcodeSize + kCommandLengthSize),
+      "assert failed: len >= (kCommandOpcodeSize + kCommandLengthSize)");
 
   // little endian command opcode
   uint16_t command_op_code = (data[1] << 8 | data[0]);
 
   bool is_qbce_sub_opcode_return_command_status = false;
-  if (command_op_code == (uint16_t)bluetooth::hci::OpCode::HCI_VS_QBCE_OCF) {
-    uint8_t cmd_len = data[2];
-    uint8_t sub_opcode;
-    if (cmd_len > 0) {
-      sub_opcode = data[3];
-      LOG_INFO(
-          "Sending command, is_qbce_sub_opcode_return_command qbce "
-          "sub_opcode=%d",
-          sub_opcode);
-      // 0x0c is for QBCE_READ_REMOTE_QLL_SUPPORTED_FEATURE
-      if (sub_opcode == 0x0c) is_qbce_sub_opcode_return_command_status = true;
-    }
-  }
 
   // Gd stack API requires opcode specification and calculates length, so
   // no need to provide opcode or length here.
@@ -285,8 +273,9 @@ static void transmit_iso_fragment(const uint8_t* stream, size_t length) {
   auto ts_flag =
       static_cast<bluetooth::hci::TimeStampFlag>(handle_with_flags >> 14);
   uint16_t handle = HCID_GET_HANDLE(handle_with_flags);
-  ASSERT_LOG(handle <= HCI_HANDLE_MAX, "Require handle <= 0x%X, but is 0x%X",
-             HCI_HANDLE_MAX, handle);
+  log::assert_that(handle <= HCI_HANDLE_MAX,
+                   "Require handle <= 0x{:X}, but is 0x{:X}", HCI_HANDLE_MAX,
+                   handle);
   length -= 2;
   // skip data total length
   stream += 2;
@@ -328,7 +317,7 @@ static void iso_data_callback() {
     return;
   }
   auto packet = hci_iso_queue_end->TryDequeue();
-  ASSERT(packet != nullptr);
+  log::assert_that(packet != nullptr, "assert failed: packet != nullptr");
   if (!packet->IsValid()) {
     log::info("Dropping invalid packet of size {}", packet->size());
     return;
@@ -412,8 +401,11 @@ static void transmit_fragment(BT_HDR* packet, bool send_transmit_finished) {
 }
 static void dispatch_reassembled(BT_HDR* packet) {
   // Only ISO should be handled here
-  CHECK((packet->event & MSG_EVT_MASK) == MSG_HC_TO_STACK_HCI_ISO);
-  CHECK(!send_data_upwards.is_null());
+  log::assert_that((packet->event & MSG_EVT_MASK) == MSG_HC_TO_STACK_HCI_ISO,
+                   "assert failed: (packet->event & MSG_EVT_MASK) == "
+                   "MSG_HC_TO_STACK_HCI_ISO");
+  log::assert_that(!send_data_upwards.is_null(),
+                   "assert failed: !send_data_upwards.is_null()");
   send_data_upwards.Run(FROM_HERE, packet);
 }
 
@@ -437,7 +429,8 @@ const hci_t* bluetooth::shim::hci_layer_get_interface() {
 }
 
 void bluetooth::shim::hci_on_reset_complete() {
-  ASSERT(send_data_upwards);
+  log::assert_that(!send_data_upwards.is_null(),
+                   "assert failed: !send_data_upwards.is_null()");
 
   for (uint16_t event_code_raw = 0; event_code_raw < 0x100; event_code_raw++) {
     auto event_code = static_cast<bluetooth::hci::EventCode>(event_code_raw);

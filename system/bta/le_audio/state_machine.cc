@@ -31,7 +31,6 @@
 #include "devices.h"
 #include "hci/hci_packets.h"
 #include "hcimsgs.h"
-#include "include/check.h"
 #include "internal_include/bt_trace.h"
 #include "le_audio_health_status.h"
 #include "le_audio_log_history.h"
@@ -693,9 +692,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    ASSERT_LOG(group->cig.GetState() == CigState::CREATING,
-               "Unexpected CIG creation group id: %d, cig state: %s",
-               group->group_id_, ToString(group->cig.GetState()).c_str());
+    log::assert_that(group->cig.GetState() == CigState::CREATING,
+                     "Unexpected CIG creation group id: {}, cig state: {}",
+                     group->group_id_, ToString(group->cig.GetState()));
 
     group->cig.SetState(CigState::CREATED);
     log::info("Group: {}, id: {} cig state: {}, number of cis handles: {}",
@@ -817,9 +816,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    ASSERT_LOG(group->cig.GetState() == CigState::REMOVING,
-               "Unexpected CIG remove group id: %d, cig state %s",
-               group->group_id_, ToString(group->cig.GetState()).c_str());
+    log::assert_that(group->cig.GetState() == CigState::REMOVING,
+                     "Unexpected CIG remove group id: {}, cig state {}",
+                     group->group_id_, ToString(group->cig.GetState()));
 
     group->cig.SetState(CigState::NONE);
 
@@ -1215,6 +1214,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           group->asymmetric_phy_for_unidirectional_cis_supported == true &&
           group->GetSduInterval(
               bluetooth::le_audio::types::kLeAudioDirectionSource) == 0) {
+        log::info(
+            "Remote device may not support asymmetric phy for CIS, retry "
+            "symmetric setting again");
         group->asymmetric_phy_for_unidirectional_cis_supported = false;
       }
 
@@ -1288,11 +1290,11 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
      * to streaming state.
      */
     struct ase* ase = leAudioDevice->GetFirstActiveAse();
-    ASSERT_LOG(ase != nullptr,
-               "shouldn't be called without an active ASE, device %s, group "
-               "id: %d, cis handle 0x%04x",
-               ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), event->cig_id,
-               event->cis_conn_hdl);
+    log::assert_that(ase != nullptr,
+                     "shouldn't be called without an active ASE, device {}, "
+                     "group id: {}, cis handle 0x{:04x}",
+                     ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_),
+                     event->cig_id, event->cis_conn_hdl);
 
     PrepareAndSendReceiverStartReady(leAudioDevice, ase);
   }
@@ -1516,7 +1518,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       ase = leAudioDevice->GetFirstActiveAse();
     }
 
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     if (ase->data_path_state == DataPathState::CONFIGURED) {
       RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
     }
@@ -1580,8 +1582,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     auto iter = std::find_if(
         params.stream_locations.begin(), params.stream_locations.end(),
         [cis_conn_hdl](auto& pair) { return cis_conn_hdl == pair.first; });
-    ASSERT_LOG(iter == params.stream_locations.end(),
-               "Stream is already there 0x%04x", cis_conn_hdl);
+    log::assert_that(iter == params.stream_locations.end(),
+                     "Stream is already there 0x{:04x}", cis_conn_hdl);
 
     auto core_config = ase->codec_config.GetAsCoreCodecConfig();
 
@@ -1600,18 +1602,18 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     if (params.sample_frequency_hz == 0) {
       params.sample_frequency_hz = core_config.GetSamplingFrequencyHz();
     } else {
-      ASSERT_LOG(
+      log::assert_that(
           params.sample_frequency_hz == core_config.GetSamplingFrequencyHz(),
-          "sample freq mismatch: %d!=%d", params.sample_frequency_hz,
+          "sample freq mismatch: {}!={}", params.sample_frequency_hz,
           core_config.GetSamplingFrequencyHz());
     }
 
     if (params.octets_per_codec_frame == 0) {
       params.octets_per_codec_frame = *core_config.octets_per_codec_frame;
     } else {
-      ASSERT_LOG(
+      log::assert_that(
           params.octets_per_codec_frame == *core_config.octets_per_codec_frame,
-          "octets per frame mismatch: %d!=%d", params.octets_per_codec_frame,
+          "octets per frame mismatch: {}!={}", params.octets_per_codec_frame,
           *core_config.octets_per_codec_frame);
     }
 
@@ -1619,19 +1621,20 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       params.codec_frames_blocks_per_sdu =
           *core_config.codec_frames_blocks_per_sdu;
     } else {
-      ASSERT_LOG(params.codec_frames_blocks_per_sdu ==
-                     *core_config.codec_frames_blocks_per_sdu,
-                 "codec_frames_blocks_per_sdu: %d!=%d",
-                 params.codec_frames_blocks_per_sdu,
-                 *core_config.codec_frames_blocks_per_sdu);
+      log::assert_that(params.codec_frames_blocks_per_sdu ==
+                           *core_config.codec_frames_blocks_per_sdu,
+                       "codec_frames_blocks_per_sdu: {}!={}",
+                       params.codec_frames_blocks_per_sdu,
+                       *core_config.codec_frames_blocks_per_sdu);
     }
 
     if (params.frame_duration_us == 0) {
       params.frame_duration_us = core_config.GetFrameDurationUs();
     } else {
-      ASSERT_LOG(params.frame_duration_us == core_config.GetFrameDurationUs(),
-                 "frame_duration_us: %d!=%d", params.frame_duration_us,
-                 core_config.GetFrameDurationUs());
+      log::assert_that(
+          params.frame_duration_us == core_config.GetFrameDurationUs(),
+          "frame_duration_us: {}!={}", params.frame_duration_us,
+          core_config.GetFrameDurationUs());
     }
 
     params.codec_spec_metadata = group->GetCodecVendorMetadata(ase->direction, context_type);
@@ -1911,8 +1914,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     struct ase* ase;
     std::vector<EXT_CIS_CREATE_CFG> conn_pairs;
 
-    LOG_ASSERT(leAudioDevice)
-        << __func__ << " Shouldn't be called without an active device.";
+    log::assert_that(leAudioDevice,
+                     "Shouldn't be called without an active device.");
 
     /* Make sure CIG is there */
     if (group->cig.GetState() != CigState::CREATED) {
@@ -1923,8 +1926,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     do {
       ase = leAudioDevice->GetFirstActiveAse();
-      LOG_ASSERT(ase) << __func__
-                      << " shouldn't be called without an active ASE";
+      log::assert_that(ase, "shouldn't be called without an active ASE");
       do {
         /* First is ase pair is Sink, second Source */
         auto ases_pair = leAudioDevice->GetAsesByCisConnHdl(ase->cis_conn_hdl);
@@ -1940,8 +1942,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
             BTM_GetHCIConnHandle(leAudioDevice->address_, BT_TRANSPORT_LE);
         conn_pairs.push_back({.cis_conn_handle = ase->cis_conn_hdl,
                               .acl_conn_handle = acl_handle});
-        DLOG(INFO) << __func__ << " cis handle: " << +ase->cis_conn_hdl
-                   << " acl handle : " << loghex(+acl_handle);
+        log::debug("cis handle: {} acl handle : {}", ase->cis_conn_hdl,
+                   loghex(+acl_handle));
 
       } while ((ase = leAudioDevice->GetNextActiveAse(ase)));
     } while ((leAudioDevice = group->GetNextActiveDevice(leAudioDevice)));
@@ -1985,13 +1987,12 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   static void ReleaseDataPath(LeAudioDeviceGroup* group) {
     LeAudioDevice* leAudioDevice = group->GetFirstActiveDevice();
-    LOG_ASSERT(leAudioDevice)
-        << __func__ << " Shouldn't be called without an active device.";
+    log::assert_that(leAudioDevice,
+                     "Shouldn't be called without an active device.");
 
     auto ase = leAudioDevice->GetFirstActiveAseByCisAndDataPathState(
         CisState::CONNECTED, DataPathState::CONFIGURED);
-    LOG_ASSERT(ase) << __func__
-                    << " Shouldn't be called without an active ASE.";
+    log::assert_that(ase, "Shouldn't be called without an active ASE.");
     RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
   }
 
@@ -2260,7 +2261,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     msg_stream << kLogAseConfigOp;
 
     ase = leAudioDevice->GetFirstActiveAse();
-    ASSERT_LOG(ase, "shouldn't be called without an active ASE");
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     for (; ase != nullptr; ase = leAudioDevice->GetNextActiveAse(ase)) {
       log::debug("device: {}, ase_id: {}, cis_id: {}, ase state: {}",
                  ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), ase->id,
@@ -2332,10 +2333,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         out_cfg.max_transport_latency = rsp.max_transport_latency;
         out_cfg.retrans_nb = rsp.preferred_retrans_nb;
         out_cfg.phy = leAudioDevice->GetPreferredPhyBitmask(rsp.preferred_phy);
-        LOG_INFO(
-            "Using server preferred QoS settings. Max Transport Latency: %d, "
-            "Retransmission Number: %d, Phy: %d",
-            +out_cfg.max_transport_latency, out_cfg.retrans_nb, +out_cfg.phy);
+        log::info(
+            "Using server preferred QoS settings. Max Transport Latency: {}, "
+            "Retransmission Number: {}, Phy: {}",
+            out_cfg.max_transport_latency, out_cfg.retrans_nb, out_cfg.phy);
       }
     };
 
@@ -2809,7 +2810,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     msg_stream << kLogAseEnableOp;
 
     ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     do {
       log::debug("device: {}, ase_id: {}, cis_id: {}, ase state: {}",
                  ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), ase->id,
@@ -2857,7 +2858,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void PrepareAndSendDisable(LeAudioDevice* leAudioDevice) {
     ase* ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
 
     std::stringstream msg_stream;
     msg_stream << kLogAseDisableOp;
@@ -2903,7 +2904,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void PrepareAndSendRelease(LeAudioDevice* leAudioDevice) {
     ase* ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
 
     std::vector<uint8_t> ids;
     std::stringstream stream;
@@ -3174,9 +3175,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
            * to streaming state.
            */
           struct ase* ase = leAudioDevice->GetFirstActiveAse();
-          ASSERT_LOG(ase != nullptr,
-                     "shouldn't be called without an active ASE, device %s",
-                     leAudioDevice->address_.ToString().c_str());
+          log::assert_that(
+              ase != nullptr,
+              "shouldn't be called without an active ASE, device {}",
+              leAudioDevice->address_.ToString());
           PrepareAndSendReceiverStartReady(leAudioDevice, ase);
 
           return;
@@ -3478,8 +3480,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                    ase->data_path_state == DataPathState::IDLE) {
           DisconnectCisIfNeeded(group, leAudioDevice, ase);
         } else {
-          DLOG(INFO) << __func__ << ", Nothing to do ase data path state: "
-                     << static_cast<int>(ase->data_path_state);
+          log::debug("Nothing to do ase data path state: {}",
+                     static_cast<int>(ase->data_path_state));
         }
         break;
       }
@@ -3602,7 +3604,7 @@ void LeAudioGroupStateMachine::Cleanup() {
 }
 
 LeAudioGroupStateMachine* LeAudioGroupStateMachine::Get() {
-  CHECK(instance);
+  log::assert_that(instance != nullptr, "assert failed: instance != nullptr");
   return instance;
 }
 }  // namespace bluetooth::le_audio

@@ -43,10 +43,8 @@
 #include "btif/include/btif_storage.h"
 #include "device/include/device_iot_config.h"
 #include "device/include/interop.h"
-#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"
 #include "osi/include/properties.h"
 #include "stack/include/a2dp_ext.h"
 #include "stack/include/a2dp_sbc.h"
@@ -281,7 +279,7 @@ static void notify_start_failed(tBTA_AV_SCB* p_scb) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_st_rc_timer(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_st_rc_timer(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("rc_handle:{}, use_rc: {}", p_scb->rc_handle, p_scb->use_rc);
   /* for outgoing RC connection as INT/CT */
   if ((p_scb->rc_handle == BTA_AV_RC_HANDLE_NONE) &&
@@ -356,7 +354,8 @@ static bool bta_av_next_getcap(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
 void bta_av_proc_stream_evt(uint8_t handle, const RawAddress& bd_addr,
                             uint8_t event, tAVDT_CTRL* p_data,
                             uint8_t scb_index) {
-  CHECK_LT(scb_index, BTA_AV_NUM_STRS);
+  log::assert_that(scb_index < BTA_AV_NUM_STRS,
+                   "assert failed: scb_index < BTA_AV_NUM_STRS");
   tBTA_AV_SCB* p_scb = bta_av_cb.p_scb[scb_index];
   uint16_t sec_len = 0;
 
@@ -594,7 +593,7 @@ static void bta_av_adjust_seps_idx(tBTA_AV_SCB* p_scb, uint8_t avdt_handle) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_switch_role(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_switch_role(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   tBTA_AV_RS_RES switch_res = BTA_AV_RS_NONE;
   tBTA_AV_API_OPEN* p_buf = &p_scb->q_info.open;
 
@@ -855,7 +854,7 @@ void bta_av_do_disc_a2dp(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_cleanup(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_cleanup(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   tBTA_AV_CONN_CHG msg;
   uint8_t role = BTA_AV_ROLE_AD_INT;
 
@@ -920,7 +919,7 @@ void bta_av_cleanup(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_free_sdb(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_free_sdb(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   p_scb->sdp_discovery_started = false;
 }
 
@@ -1021,8 +1020,7 @@ void bta_av_config_ind(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_disconnect_req(tBTA_AV_SCB* p_scb,
-                           UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_disconnect_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   tBTA_AV_RCB* p_rcb;
 
   log::verbose("conn_lcb: 0x{:x} peer_addr: {}", bta_av_cb.conn_lcb,
@@ -1360,7 +1358,7 @@ void bta_av_security_cfm(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_do_close(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_do_close(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("p_scb->co_started={}", p_scb->co_started);
 
   /* stop stream if started */
@@ -1396,7 +1394,7 @@ void bta_av_do_close(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_connect_req(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_connect_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("peer {} coll_mask=0x{:02x}",
                ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
                p_scb->coll_mask);
@@ -1634,7 +1632,7 @@ void bta_av_save_caps(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_set_use_rc(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_set_use_rc(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   p_scb->use_rc = true;
 }
 
@@ -1647,7 +1645,7 @@ void bta_av_set_use_rc(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_cco_close(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_cco_close(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("peer {} bta_handle:0x{:x}",
                ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), p_scb->hndl);
   p_scb->p_cos->close(p_scb->hndl, p_scb->PeerAddress());
@@ -1841,7 +1839,7 @@ void bta_av_setconfig_rej(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_discover_req(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_discover_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   /* send avdtp discover request */
 
   AVDT_DiscoverReq(p_scb->PeerAddress(), p_scb->hdi, p_scb->sep_info,
@@ -1879,9 +1877,8 @@ void bta_av_do_start(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   log::info(
       "A2dp stream start peer:{} sco_occupied:{} av_role:0x{:x} started:{} "
       "wait:0x{:x}",
-      ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-      logbool(bta_av_cb.sco_occupied), p_scb->role, logbool(p_scb->started),
-      p_scb->wait);
+      ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), bta_av_cb.sco_occupied,
+      p_scb->role, p_scb->started, p_scb->wait);
   if (bta_av_cb.sco_occupied) {
     log::warn("A2dp stream start failed");
     bta_av_start_failed(p_scb, p_data);
@@ -1895,8 +1892,7 @@ void bta_av_do_start(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
           "peer {} start stream request ignored: already waiting: "
           "sco_occupied:{} role:0x{:x} started:{} wait:0x{:x}",
           ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-          logbool(bta_av_cb.sco_occupied), p_scb->role, logbool(p_scb->started),
-          p_scb->wait);
+          bta_av_cb.sco_occupied, p_scb->role, p_scb->started, p_scb->wait);
       return;
     }
     if (p_scb->role & BTA_AV_ROLE_SUSPEND) {
@@ -1914,9 +1910,8 @@ void bta_av_do_start(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
     log::warn(
         "peer {} start stream request ignored: already initiated: "
         "sco_occupied:{} role:0x{:x} started:{} wait:0x{:x}",
-        ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-        logbool(bta_av_cb.sco_occupied), p_scb->role, logbool(p_scb->started),
-        p_scb->wait);
+        ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), bta_av_cb.sco_occupied,
+        p_scb->role, p_scb->started, p_scb->wait);
     return;
   }
 
@@ -1945,9 +1940,8 @@ void bta_av_do_start(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   log::info(
       "peer {} start requested: sco_occupied:{} role:0x{:x} started:{} "
       "wait:0x{:x}",
-      ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-      logbool(bta_av_cb.sco_occupied), p_scb->role, logbool(p_scb->started),
-      p_scb->wait);
+      ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), bta_av_cb.sco_occupied,
+      p_scb->role, p_scb->started, p_scb->wait);
 }
 
 /*******************************************************************************
@@ -2140,7 +2134,7 @@ void bta_av_reconfig(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_data_path(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_data_path(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   BT_HDR* p_buf = NULL;
   uint32_t timestamp;
   bool new_buf = false;
@@ -2284,7 +2278,8 @@ void bta_av_start_ok(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
     // The RTP Header marker bit for the A2DP Source encoder
     A2dpCodecConfig* codec_config =
         bta_av_get_a2dp_peer_current_codec(p_scb->PeerAddress());
-    CHECK(codec_config != nullptr);
+    log::assert_that(codec_config != nullptr,
+                     "assert failed: codec_config != nullptr");
     p_scb->use_rtp_header_marker_bit = codec_config->useRtpHeaderMarkerBit();
   }
 
@@ -2463,11 +2458,11 @@ void bta_av_start_ok(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_start_failed(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_start_failed(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::error(
       "peer {} bta_handle:0x{:x} audio_open_cnt:{} started:{} co_started:{}",
       ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), p_scb->hndl,
-      bta_av_cb.audio_open_cnt, logbool(p_scb->started), p_scb->co_started);
+      bta_av_cb.audio_open_cnt, p_scb->started, p_scb->co_started);
 
   if (!p_scb->started && !p_scb->co_started) {
     bta_sys_idle(BTA_ID_AV, bta_av_cb.audio_open_cnt, p_scb->PeerAddress());
@@ -2548,7 +2543,7 @@ void bta_av_str_closed(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_clr_cong(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_clr_cong(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("");
   if (p_scb->co_started) {
     p_scb->cong = false;
@@ -2730,7 +2725,7 @@ void bta_av_rcfg_failed(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_rcfg_connect(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_rcfg_connect(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("");
 
   p_scb->cong = false;
@@ -2753,7 +2748,7 @@ void bta_av_rcfg_connect(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_rcfg_discntd(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_rcfg_discntd(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   log::error("num_recfg={} conn_lcb=0x{:x} peer_addr={}", p_scb->num_recfg,
              bta_av_cb.conn_lcb,
              ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()));
@@ -2894,7 +2889,7 @@ void bta_av_rcfg_cfm(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_rcfg_open(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_rcfg_open(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   log::verbose("peer {} bta_handle:0x{:x} num_disc_snks:{}",
                ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), p_scb->hndl,
                p_scb->num_disc_snks);
@@ -2932,62 +2927,9 @@ void bta_av_rcfg_open(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_av_security_rej(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
+void bta_av_security_rej(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /* p_data */) {
   AVDT_SecurityRsp(p_scb->avdt_handle, p_scb->avdt_label, AVDT_ERR_BAD_STATE,
                    NULL, 0);
-}
-
-/*******************************************************************************
- *
- * Function         bta_av_chk_2nd_start
- *
- * Description      check if this is 2nd stream and if it needs to be started.
- *                  This function needs to be kept very similar to
- *                  bta_av_chk_start
- *
- * Returns          void
- *
- ******************************************************************************/
-void bta_av_chk_2nd_start(tBTA_AV_SCB* p_scb,
-                          UNUSED_ATTR tBTA_AV_DATA* p_data) {
-  log::info(
-      "peer {} channel:{} bta_av_cb.audio_open_cnt:{} role:0x{:x} "
-      "features:0x{:x}",
-      ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()), p_scb->chnl,
-      bta_av_cb.audio_open_cnt, p_scb->role, bta_av_cb.features);
-
-  if ((p_scb->chnl == BTA_AV_CHNL_AUDIO) && (bta_av_cb.audio_open_cnt >= 2) &&
-      (((p_scb->role & BTA_AV_ROLE_AD_ACP) == 0) ||  // Outgoing connection or
-       (bta_av_cb.features & BTA_AV_FEAT_ACP_START))) {  // Auto-starting option
-    // More than one audio channel is connected.
-    if (!(p_scb->role & BTA_AV_ROLE_SUSPEND_OPT)) {
-      // This channel does not need to be reconfigured.
-      // If there is other channel streaming, start the stream now.
-      bool new_started = false;
-      for (int i = 0; i < BTA_AV_NUM_STRS; i++) {
-        tBTA_AV_SCB* p_scbi = bta_av_cb.p_scb[i];
-        if (p_scb == p_scbi) {
-          continue;
-        }
-        if (p_scbi && p_scbi->chnl == BTA_AV_CHNL_AUDIO && p_scbi->co_started) {
-          if (!new_started) {
-            // Start the new stream
-            new_started = true;
-            log::info(
-                "starting new stream for peer {} because peer {} already "
-                "started",
-                ADDRESS_TO_LOGGABLE_CSTR(p_scb->PeerAddress()),
-                ADDRESS_TO_LOGGABLE_CSTR(p_scbi->PeerAddress()));
-            bta_av_ssm_execute(p_scb, BTA_AV_AP_START_EVT, NULL);
-          }
-          // May need to update the flush timeout of this already started stream
-          if (p_scbi->co_started != bta_av_cb.audio_open_cnt) {
-            p_scbi->co_started = bta_av_cb.audio_open_cnt;
-          }
-        }
-      }
-    }
-  }
 }
 
 /*******************************************************************************
@@ -3194,7 +3136,7 @@ void bta_av_vendor_offload_start(tBTA_AV_SCB* p_scb,
 void bta_qti_av_vendor_offload_stop() {
   uint8_t param[sizeof(tBT_A2DP_OFFLOAD)];
 
-  LOG_INFO("%s", __func__);
+  log::info("");
   param[0] = HCI_VSQC_CONTROLLER_A2DP_STOP_OPCODE;
   param[1] = 0;
 
@@ -3355,9 +3297,7 @@ void bta_av_qti_offload_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   tBT_A2DP_OFFLOAD offload_start;
   uint8_t param[sizeof(tBT_QTI_A2DP_OFFLOAD)];
 
-  LOG_INFO("%s: stream %s, audio channels open %d", __func__,
-                   p_scb->started ? "STARTED" : "STOPPED",
-                   bta_av_cb.audio_open_cnt);
+  log::info("stream {}, audio channels open {}", p_scb->started ? "STARTED" : "STOPPED", bta_av_cb.audio_open_cnt);
 
   /* Check if stream has already been started. */
   /* Support offload if only one audio source stream is open. */
@@ -3401,7 +3341,7 @@ void bta_av_qti_offload_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
       break;
 
     default:
-      LOG_INFO("%s: Unknown Codec %d", __func__, offload_start.codec_type);
+      log::info("Unknown Codec {}", offload_start.codec_type);
       return;
       break;
   }
@@ -3455,7 +3395,8 @@ void bta_av_offload_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
                bta_av_cb.audio_open_cnt);
 
   A2dpCodecConfig* codec_config = bta_av_get_a2dp_current_codec();
-  ASSERT(codec_config != nullptr);
+  log::assert_that(codec_config != nullptr,
+                   "assert failed: codec_config != nullptr");
 
   /* Check if stream has already been started. */
   /* Support offload if only one audio source stream is open. */

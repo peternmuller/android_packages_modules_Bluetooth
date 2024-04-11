@@ -56,3 +56,23 @@ flag {
     description: "during ongoing call, pretend network service in +CIND when network is unavailable"
     bug: "317307596"
 }
+
+flag {
+    name: "bta_ag_cmd_brsf_allow_uint32"
+    namespace: "bluetooth"
+    description: "Allow and ignore the RFU bits set to 0b1 rather than responding ERROR"
+    bug: "331129986"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "reset_after_collision"
+    namespace: "bluetooth"
+    description: "Reset p_scb when collision occured and rfcomm is not opened yet"
+    bug: "332324315"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

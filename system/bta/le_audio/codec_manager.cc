@@ -34,6 +34,8 @@
 #include "stack/include/btm_client_interface.h"
 #include "stack/include/btm_vendor_types.h"
 
+using namespace bluetooth;
+
 namespace {
 
 using bluetooth::hci::iso_manager::kIsoDataPathHci;
@@ -61,9 +63,9 @@ namespace bluetooth::le_audio {
 template <>
 offloader_stream_maps_t& types::BidirectionalPair<offloader_stream_maps_t>::get(
     uint8_t direction) {
-  ASSERT_LOG(direction < types::kLeAudioDirectionBoth,
-             "Unsupported complex direction. Reference to a single complex"
-             " direction value is not supported.");
+  log::assert_that(direction < types::kLeAudioDirectionBoth,
+                   "Unsupported complex direction. Reference to a single "
+                   "complex direction value is not supported.");
   return (direction == types::kLeAudioDirectionSink) ? sink : source;
 }
 
@@ -258,7 +260,8 @@ struct codec_manager_impl {
   const AudioSetConfigurations* GetSupportedCodecConfigurations(
       types::LeAudioContextType ctx_type) {
     if (GetCodecLocation() == le_audio::types::CodecLocation::ADSP) {
-      LOG_VERBOSE("Get offload config for the context type: %d", (int)ctx_type);
+      log::verbose("Get offload config for the context type: {}",
+                   (int)ctx_type);
 
       // TODO: Need to have a mechanism to switch to software session if offload
       // doesn't support.
@@ -267,7 +270,7 @@ struct codec_manager_impl {
                  : nullptr;
     }
 
-    LOG_VERBOSE("Get software config for the context type: %d", (int)ctx_type);
+    log::verbose("Get software config for the context type: {}", (int)ctx_type);
     return AudioSetConfigurationProvider::Get()->GetConfigurations(ctx_type);
   }
 
@@ -297,7 +300,7 @@ struct codec_manager_impl {
     log::info("UpdateSupportedBroadcastConfig");
 
     for (const auto& adsp_audio_set_conf : adsp_capabilities) {
-      ASSERT_LOG(
+      log::assert_that(
           adsp_audio_set_conf.topology_info.has_value(),
           "No topology info, which is required to properly configure the ASEs");
       if (adsp_audio_set_conf.confs.sink.size() != 1 ||
@@ -339,8 +342,7 @@ struct codec_manager_impl {
               break;
           }
         }
-        LOG_INFO("broadcast_config rtn: %d, max_transport_latency: %d",
-            rtn, max_transport_latency);
+        log::info("broadcast_config rtn: {}, max_transport_latency: {}", rtn, max_transport_latency);
         broadcast_config.retransmission_number = rtn;
         broadcast_config.max_transport_latency = max_transport_latency;
         supported_broadcast_config.push_back(broadcast_config);
@@ -380,47 +382,43 @@ struct codec_manager_impl {
      */
     broadcast_target_config = -1;
     for (int i = 0; i < (int)supported_broadcast_config.size(); i++) {
-      if (supported_broadcast_config[i].sampling_rate == 48000u) {
-        if (preferred_quality == bluetooth::le_audio::QUALITY_STANDARD)
-          continue;
+      if (preferred_quality == bluetooth::le_audio::QUALITY_STANDARD) {
+        if (supported_broadcast_config[i].sampling_rate == 24000u &&
+            supported_broadcast_config[i].octets_per_frame == 60) {  // 24_2
+          broadcast_target_config = i;
+          break;
+        }
 
-        if (supported_broadcast_config[i].octets_per_frame == 120) {  // 48_4
-          broadcast_target_config = i;
-          break;
-        } else if (supported_broadcast_config[i].octets_per_frame ==
-                   100) {  // 48_2
+        if (supported_broadcast_config[i].sampling_rate == 16000u &&
+            supported_broadcast_config[i].octets_per_frame == 40) {  // 16_2
           broadcast_target_config = i;
         }
-      } else if (supported_broadcast_config[i].sampling_rate == 24000u &&
-                 supported_broadcast_config[i].octets_per_frame ==
-                     60) {  // 24_2
-        if (preferred_quality == bluetooth::le_audio::QUALITY_STANDARD) {
+
+        continue;
+      }
+
+      // perferred_quality = bluetooth::le_audio::QUALITY_HIGH
+      if (supported_broadcast_config[i].sampling_rate == 48000u &&
+          supported_broadcast_config[i].octets_per_frame == 120) {  // 48_4
+        broadcast_target_config = i;
+        break;
+      }
+
+      if ((supported_broadcast_config[i].sampling_rate == 48000u &&
+           supported_broadcast_config[i].octets_per_frame == 100) ||  // 48_2
+          (supported_broadcast_config[i].sampling_rate == 24000u &&
+           supported_broadcast_config[i].octets_per_frame == 60) ||  // 24_2
+          (supported_broadcast_config[i].sampling_rate == 16000u &&
+           supported_broadcast_config[i].octets_per_frame == 40)) {  // 16_2
+        if (broadcast_target_config == -1 ||
+            (supported_broadcast_config[i].sampling_rate >
+             supported_broadcast_config[broadcast_target_config].sampling_rate))
           broadcast_target_config = i;
-          break;
-        } else if (broadcast_target_config ==
-                   -1) {  // preferred_quality is QUALITY_HIGH, and
-                          // haven't get the 48_4 or 48_2
-          broadcast_target_config = i;
-        }
-      } else if (supported_broadcast_config[i].sampling_rate == 16000u &&
-                 supported_broadcast_config[i].octets_per_frame ==
-                     40) {  // 16_2
-        if (preferred_quality == bluetooth::le_audio::QUALITY_STANDARD) {
-          broadcast_target_config = i;
-        } else if (broadcast_target_config == -1 ||
-                   (supported_broadcast_config[broadcast_target_config]
-                            .sampling_rate != 24000u &&
-                    supported_broadcast_config[broadcast_target_config]
-                            .sampling_rate !=
-                        48000u)) {  // preferred_quality is QUALITY_HIGH, and
-                                    // haven't get the 48_4 or 48_2 or 24_2
-          broadcast_target_config = i;
-        }
       }
     }
 
     if (broadcast_target_config == -1) {
-      LOG_ERROR(
+      log::error(
           "There is no valid broadcast offload config with preferred_quality");
       return nullptr;
     }
@@ -466,8 +464,8 @@ struct codec_manager_impl {
 
     auto offload_config = GetBroadcastOffloadConfig(BIG_audio_quality);
     if (offload_config == nullptr) {
-      LOG_ERROR("No Offload configuration supported for quality index: %d.",
-                BIG_audio_quality);
+      log::error("No Offload configuration supported for quality index: {}.",
+                 BIG_audio_quality);
       return nullptr;
     }
 
@@ -516,7 +514,7 @@ struct codec_manager_impl {
     }
 
     if (subgroup_quality.size() > 1) {
-      LOG_ERROR("More than one subgroup is not supported!");
+      log::error("More than one subgroup is not supported!");
     }
 
     return std::make_unique<broadcaster::BroadcastConfiguration>(
@@ -543,12 +541,14 @@ struct codec_manager_impl {
 
     if (broadcast_target_config == -1 ||
         broadcast_target_config >= (int)supported_broadcast_config.size()) {
-      LOG_ERROR("There is no valid broadcast offload config");
+      log::error("There is no valid broadcast offload config");
       return;
     }
 
     auto broadcast_config = supported_broadcast_config[broadcast_target_config];
-    LOG_ASSERT(conn_handle.size() == broadcast_config.stream_map.size());
+    log::assert_that(conn_handle.size() == broadcast_config.stream_map.size(),
+                     "assert failed: conn_handle.size() == "
+                     "broadcast_config.stream_map.size()");
 
     if (broadcast_config.stream_map.size() ==
         LeAudioCodecConfiguration::kChannelNumberStereo) {
@@ -747,8 +747,8 @@ struct codec_manager_impl {
       size_t match_cnt = 0;
       size_t expected_match_cnt = 0;
 
-      ASSERT_LOG(adsp_audio_set_conf.topology_info.has_value(),
-                 "ADSP capability is missing the topology information.");
+      log::assert_that(adsp_audio_set_conf.topology_info.has_value(),
+                       "ADSP capability is missing the topology information.");
 
       for (auto direction : {le_audio::types::kLeAudioDirectionSink,
                              le_audio::types::kLeAudioDirectionSource}) {
@@ -769,8 +769,8 @@ struct codec_manager_impl {
 
         // Check for number of ASEs mismatch
         if (adsp_set_ase_confs.size() != software_set_ase_confs.size()) {
-          LOG_ERROR(
-              "%s: ADSP config size mismatches the software: %zu != %zu",
+          log::error(
+              "{}: ADSP config size mismatches the software: {} != {}",
               direction == types::kLeAudioDirectionSink ? "Sink" : "Source",
               adsp_set_ase_confs.size(), software_set_ase_confs.size());
           continue;
@@ -1001,13 +1001,15 @@ struct CodecManager::impl {
 
   void Start(
       const std::vector<btle_audio_codec_config_t>& offloading_preference) {
-    LOG_ASSERT(!codec_manager_impl_);
+    log::assert_that(!codec_manager_impl_,
+                     "assert failed: !codec_manager_impl_");
     codec_manager_impl_ = std::make_unique<codec_manager_impl>();
     codec_manager_impl_->start(offloading_preference);
   }
 
   void Stop() {
-    LOG_ASSERT(codec_manager_impl_);
+    log::assert_that(codec_manager_impl_ != nullptr,
+                     "assert failed: codec_manager_impl_ != nullptr");
     codec_manager_impl_.reset();
   }
 

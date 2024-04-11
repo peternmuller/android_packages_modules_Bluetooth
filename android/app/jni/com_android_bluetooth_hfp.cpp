@@ -960,12 +960,12 @@ static jboolean enableSwbNative(JNIEnv* env, jobject /* object */,
                                 jbyteArray address) {
   std::shared_lock<std::shared_timed_mutex> lock(interface_mutex);
   if (!sBluetoothHfpInterface) {
-    ALOGW("%s: sBluetoothHfpInterface is null", __func__);
+    log::warn("{}: sBluetoothHfpInterface is null", __func__);
     return JNI_FALSE;
   }
   jbyte* addr = env->GetByteArrayElements(address, NULL);
   if (!addr) {
-    ALOGE("%s: failed to get device address", __func__);
+    log::error("{}: failed to get device address", __func__);
     jniThrowIOException(env, EINVAL);
     return JNI_FALSE;
   }
@@ -973,10 +973,10 @@ static jboolean enableSwbNative(JNIEnv* env, jobject /* object */,
       (bluetooth::headset::bthf_swb_codec_t)swbCodec, (bool)enable,
       (RawAddress*)addr);
   if (ret != BT_STATUS_SUCCESS) {
-    ALOGE("%s: Failed to %s", __func__, (enable ? "enable" : "disable"));
+    log::error("{}: Failed to {}", __func__, (enable ? "enable" : "disable"));
     return JNI_FALSE;
   }
-  ALOGV("%s: Successfully %s", __func__, (enable ? "enabled" : "disabled"));
+  log::verbose("{}: Successfully {}", __func__, (enable ? "enabled" : "disabled"));
   return JNI_TRUE;
 }
 
