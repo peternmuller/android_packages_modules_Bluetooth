@@ -31,6 +31,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.NumberPicker;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -83,6 +84,8 @@ public class BroadcasterActivity extends AppCompatActivity {
                                 alertView.findViewById(R.id.is_public_checkbox);
                         final EditText public_content =
                                 alertView.findViewById(R.id.broadcast_public_content_input);
+                        final Switch high_quality =
+                                alertView.findViewById(R.id.broadcast_high_quality);
                         // Add context type selector
                         contextPicker.setMinValue(1);
                         contextPicker.setMaxValue(
@@ -140,7 +143,10 @@ public class BroadcasterActivity extends AppCompatActivity {
                                                             contextPicker.getValue(),
                                                             publicCheckbox.isChecked(),
                                                             broadcast_name.getText().toString(),
-                                                            code_input_text.getText().toString());
+                                                            code_input_text.getText().toString(),
+                                                            high_quality.isChecked()
+                                                                    ? BluetoothLeBroadcastSubgroupSettings.QUALITY_HIGH
+                                                                    : BluetoothLeBroadcastSubgroupSettings.QUALITY_STANDARD);
 
                                             if (mViewModel.startBroadcast(broadcastSettings))
                                                 Toast.makeText(
@@ -159,7 +165,10 @@ public class BroadcasterActivity extends AppCompatActivity {
                                                             contextPicker.getValue(),
                                                             publicCheckbox.isChecked(),
                                                             broadcast_name.getText().toString(),
-                                                            code_input_text.getText().toString());
+                                                            code_input_text.getText().toString(),
+                                                            high_quality.isChecked()
+                                                            ? BluetoothLeBroadcastSubgroupSettings.QUALITY_HIGH
+                                                            : BluetoothLeBroadcastSubgroupSettings.QUALITY_STANDARD);
 
                                             if (mViewModel.startBroadcast(broadcastSettings)) {
                                                 // Save only if started successfully
@@ -466,7 +475,8 @@ public class BroadcasterActivity extends AppCompatActivity {
             int contextTypeUI,
             boolean isPublic,
             String broadcastName,
-            String broadcastCode) {
+            String broadcastCode,
+            int preferredQuality) {
 
         final BluetoothLeAudioContentMetadata.Builder contentBuilder =
                 new BluetoothLeAudioContentMetadata.Builder();
@@ -496,6 +506,7 @@ public class BroadcasterActivity extends AppCompatActivity {
                 new BluetoothLeBroadcastSubgroupSettings.Builder()
                         .setContentMetadata(
                                 BluetoothLeAudioContentMetadata.fromRawBytes(stream.toByteArray()));
+        subgroupBuilder.setPreferredQuality(preferredQuality);
         BluetoothLeBroadcastSettings.Builder builder =
                 new BluetoothLeBroadcastSettings.Builder()
                         .setPublicBroadcast(isPublic)
