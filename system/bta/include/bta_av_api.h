@@ -718,18 +718,6 @@ void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode);
  ******************************************************************************/
 void BTA_AvOffloadStart(tBTA_AV_HNDL hndl);
 
-/*******************************************************************************
- *
- * Function         BTA_AvOffloadStartRsp
- *
- * Description      Response from vendor library indicating response for
- *                  OffloadStart.
- *
- * Returns          void
- *
- ******************************************************************************/
-void BTA_AvOffloadStartRsp(tBTA_AV_HNDL hndl, tBTA_AV_STATUS status);
-
 /**
  * Obtain the Channel Index for a peer.
  * If the peer already has associated internal state, the corresponding

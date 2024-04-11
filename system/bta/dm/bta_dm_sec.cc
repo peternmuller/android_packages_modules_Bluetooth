@@ -28,7 +28,6 @@
 #include "btif/include/btif_dm.h"
 #include "btif/include/btif_storage.h"
 #include "internal_include/bt_target.h"
-#include "osi/include/osi.h"     // UNUSED_ATTR
 #include "stack/include/bt_dev_class.h"
 #include "stack/include/btm_ble_sec_api_types.h"
 #include "stack/include/btm_client_interface.h"
@@ -148,7 +147,7 @@ void bta_dm_bond(const RawAddress& bd_addr, tBLE_ADDR_TYPE addr_type,
       p_msg->addr_type = addr_type;
       p_msg->device_type = device_type;
       p_msg->transport = transport;
-      LOG_WARN("Queueing bond request as RNR might be active");
+      log::warn("Queueing bond request as RNR might be active");
       alarm_set_on_mloop(bta_dm_cb.bond_retrail_timer, BTA_DM_BOND_TIMER_RETRIAL_MS,
 		       bta_dm_bond_retrail_cback, p_msg);
       return;
@@ -321,7 +320,7 @@ static uint8_t bta_dm_pin_cback(const RawAddress& bd_addr, DEV_CLASS dev_class,
  *
  ******************************************************************************/
 static uint8_t bta_dm_new_link_key_cback(const RawAddress& bd_addr,
-                                         UNUSED_ATTR DEV_CLASS dev_class,
+                                         DEV_CLASS /* dev_class */,
                                          BD_NAME bd_name, const LinkKey& key,
                                          uint8_t key_type, bool is_ctkd) {
   tBTA_DM_SEC sec_event;
@@ -367,9 +366,10 @@ static uint8_t bta_dm_new_link_key_cback(const RawAddress& bd_addr,
  * Returns          void
  *
  ******************************************************************************/
-static void bta_dm_authentication_complete_cback(
-    const RawAddress& bd_addr, UNUSED_ATTR DEV_CLASS dev_class, BD_NAME bd_name,
-    tHCI_REASON reason) {
+static void bta_dm_authentication_complete_cback(const RawAddress& bd_addr,
+                                                 DEV_CLASS /* dev_class */,
+                                                 BD_NAME bd_name,
+                                                 tHCI_REASON reason) {
   if (reason != HCI_SUCCESS) {
     if (bta_dm_sec_cb.p_sec_cback) {
       // Build out the security event data structure
@@ -833,7 +833,7 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
  *
  ******************************************************************************/
 void bta_dm_encrypt_cback(const RawAddress* bd_addr, tBT_TRANSPORT transport,
-                          UNUSED_ATTR void* p_ref_data, tBTM_STATUS result) {
+                          void* /* p_ref_data */, tBTM_STATUS result) {
   tBTA_DM_ENCRYPT_CBACK* p_callback = nullptr;
   tBTA_DM_PEER_DEVICE* device = find_connected_device(*bd_addr, transport);
   if (device != nullptr) {
@@ -1039,11 +1039,11 @@ static void bta_dm_bond_retrail_cback(void* data) {
   tBTA_DM_API_BOND *p_msg = (tBTA_DM_API_BOND *) data;
 
   if (!p_msg) {
-    LOG_ERROR("bta_dm_bond retrying bond data is null");
+    log::error("bta_dm_bond retrying bond data is null");
     return;
   }
 
-  LOG_INFO("bta_dm_bond retrying bond");
+  log::info("bta_dm_bond retrying bond");
 
   RawAddress& bd_addr = p_msg->bd_addr;
   tBLE_ADDR_TYPE addr_type =  p_msg->addr_type;

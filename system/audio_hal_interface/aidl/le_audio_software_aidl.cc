@@ -19,6 +19,7 @@
 
 #include "le_audio_software_aidl.h"
 
+#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
 
 #include <atomic>
@@ -168,7 +169,7 @@ BluetoothAudioCtrlAck LeAudioTransport::SuspendRequest() {
   log::info("");
   if (stream_cb_.on_suspend_()) {
     flush_();
-    LOG_INFO("Suspend pending.");
+    log::info("Suspend pending.");
     return BluetoothAudioCtrlAck::PENDING;
     //return BluetoothAudioCtrlAck::SUCCESS_FINISHED;
   } else {
@@ -351,6 +352,9 @@ bool LeAudioTransport::IsRequestCompletedAfterUpdate(
 }
 
 StartRequestState LeAudioTransport::GetStartRequestState(void) {
+  if (IS_FLAG_ENABLED(leaudio_start_request_state_mutex_check)) {
+    std::lock_guard<std::mutex> guard(start_request_state_mutex_);
+  }
   return start_request_state_;
 }
 void LeAudioTransport::ClearStartRequestState(void) {
@@ -807,7 +811,7 @@ AudioConfiguration offload_config_to_hal_audio_config(
     const ::bluetooth::le_audio::offload_config& offload_config) {
   if (offload_config.codec_id.coding_format == ::bluetooth::le_audio::types::kLeAudioCodingFormatLC3) {
     if (offload_config.codec_metadata.empty()) {
-      LOG(INFO) << __func__ << " LC3";
+      log::info("LC3");
       Lc3Configuration lc3_config{
           .pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample),
           .samplingFrequencyHz = static_cast<int32_t>(offload_config.sampling_rate),
@@ -828,7 +832,7 @@ AudioConfiguration offload_config_to_hal_audio_config(
       }
       return AudioConfiguration(ucast_config);
     } else {
-      LOG(INFO) << __func__ << " LC3Q";
+      log::info("LC3Q");
       VendorConfiguration vendor_config;
       LeAudioVendorConfiguration lc3q_config;
       lc3q_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);
@@ -856,7 +860,7 @@ AudioConfiguration offload_config_to_hal_audio_config(
       return AudioConfiguration(ucast_config);
     }
   } else {
-    LOG(INFO) << __func__ << " APTX";
+    log::info("APTX");
     VendorConfiguration vendor_config;
     LeAudioVendorConfiguration  aptx_config;
     aptx_config.pcmBitDepth = static_cast<int8_t>(offload_config.bits_per_sample);

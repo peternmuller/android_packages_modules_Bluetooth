@@ -86,7 +86,7 @@ static int get_properties(int num_properties, bt_vendor_property_t* properties,
     ScopedLocalRef<jbyteArray> propVal(
         sCallbackEnv.get(), sCallbackEnv->NewByteArray(properties[i].len));
     if (!propVal.get()) {
-      ALOGE("Error while allocation of array in %s", __func__);
+      log::error("Error while allocation of array in {}", __func__);
       return -1;
     }
 
@@ -99,7 +99,7 @@ static int get_properties(int num_properties, bt_vendor_property_t* properties,
 }
 
 static void ssr_cleanup_callback(void) {
-  ALOGI("%s", __FUNCTION__);
+  log::info("{}", __FUNCTION__);
   CallbackEnv sCallbackEnv(__func__);
 
   if (!sCallbackEnv.valid()) return;
@@ -111,16 +111,16 @@ static void adapter_vendor_properties_callback(
     bt_status_t status, int num_properties, bt_vendor_property_t* properties) {
   CallbackEnv sCallbackEnv(__func__);
   if (!sCallbackEnv.valid()) return;
-  ALOGE("%s: Status is: %d, Properties: %d", __func__, status, num_properties);
+  log::error("{}: Status is: {}, Properties: {}", __func__, status, num_properties);
   if (status != BT_STATUS_SUCCESS) {
-    ALOGE("%s: Status %d is incorrect", __func__, status);
+    log::error("{}: Status {} is incorrect", __func__, status);
     return;
   }
   ScopedLocalRef<jbyteArray> val(
       sCallbackEnv.get(),
       (jbyteArray)sCallbackEnv->NewByteArray(num_properties));
   if (!val.get()) {
-    ALOGE("%s: Error allocating byteArray", __func__);
+    log::error("{}: Error allocating byteArray", __func__);
     return;
   }
   ScopedLocalRef<jclass> mclass(sCallbackEnv.get(),
@@ -129,13 +129,13 @@ static void adapter_vendor_properties_callback(
       sCallbackEnv.get(),
       sCallbackEnv->NewObjectArray(num_properties, mclass.get(), NULL));
   if (!props.get()) {
-    ALOGE("%s: Error allocating object Array for properties", __func__);
+    log::error("{}: Error allocating object Array for properties", __func__);
     return;
   }
   ScopedLocalRef<jintArray> types(
       sCallbackEnv.get(), (jintArray)sCallbackEnv->NewIntArray(num_properties));
   if (!types.get()) {
-    ALOGE("%s: Error allocating int Array for values", __func__);
+    log::error("{}: Error allocating int Array for values", __func__);
     return;
   }
   jintArray typesPtr = types.get();
@@ -168,12 +168,12 @@ static void initNative(JNIEnv* env, jobject object) {
   std::unique_lock<std::shared_timed_mutex> interface_lock(interface_mutex);
 
   if ((btInf = getBluetoothInterface()) == NULL) {
-    ALOGE("Bluetooth module is not loaded");
+    log::error("Bluetooth module is not loaded");
     return;
   }
 
   if (mCallbacksObj != NULL) {
-    ALOGW("Cleaning up Bluetooth Vendor callback object");
+    log::warn("Cleaning up Bluetooth Vendor callback object");
     env->DeleteGlobalRef(mCallbacksObj);
     mCallbacksObj = NULL;
   }
@@ -181,13 +181,13 @@ static void initNative(JNIEnv* env, jobject object) {
   if ((sBluetoothVendorInterface =
            (btvendor_interface_t*)btInf->get_profile_interface(
                BT_PROFILE_VENDOR_ID)) == NULL) {
-    ALOGE("Failed to get Bluetooth Vendor Interface");
+    log::error("Failed to get Bluetooth Vendor Interface");
     return;
   }
 
   if ((status = sBluetoothVendorInterface->init(&sBluetoothVendorCallbacks)) !=
       BT_STATUS_SUCCESS) {
-    ALOGE("Failed to initialize Bluetooth Vendor, status: %d", status);
+    log::error("Failed to initialize Bluetooth Vendor, status: {}", status);
     sBluetoothVendorInterface = NULL;
     return;
   }
@@ -200,36 +200,36 @@ static void cleanupNative(JNIEnv* env, jobject object) {
   std::unique_lock<std::shared_timed_mutex> interface_lock(interface_mutex);
 
   if ((btInf = getBluetoothInterface()) == NULL) {
-    ALOGE("Bluetooth module is not loaded");
+    log::error("Bluetooth module is not loaded");
     return;
   }
 
   if (sBluetoothVendorInterface != NULL) {
-    ALOGW("Cleaning up Bluetooth Vendor Interface...");
+    log::warn("Cleaning up Bluetooth Vendor Interface...");
     sBluetoothVendorInterface->cleanup();
     sBluetoothVendorInterface = NULL;
   }
 
   if (mCallbacksObj != NULL) {
-    ALOGW("Cleaning up Bluetooth Vendor callback object");
+    log::warn("Cleaning up Bluetooth Vendor callback object");
     env->DeleteGlobalRef(mCallbacksObj);
     mCallbacksObj = NULL;
   }
 }
 
 static bool informTimeoutToHidlNative(JNIEnv* env, jobject obj) {
-  ALOGI("%s", __FUNCTION__);
+  log::info("{}", __FUNCTION__);
 
   if (1) {
     // todo need to inform hidl
-    ALOGE("%s: Failed to inform to HIDL about timeout", __FUNCTION__);
+    log::error("{}: Failed to inform to HIDL about timeout", __FUNCTION__);
   }
 
   return JNI_TRUE;
 }
 
 static bool setWifiStateNative(JNIEnv* env, jobject obj, jboolean status) {
-  ALOGI("%s", __FUNCTION__);
+  log::info("{}", __FUNCTION__);
 
   jboolean result = JNI_FALSE;
   if (!sBluetoothVendorInterface) return result;
@@ -239,7 +239,7 @@ static bool setWifiStateNative(JNIEnv* env, jobject obj, jboolean status) {
 }
 
 static bool setPowerBackoffNative(JNIEnv* env, jobject obj, jboolean status) {
-  ALOGI("%s", __FUNCTION__);
+  log::info("{}", __FUNCTION__);
 
   jboolean result = JNI_FALSE;
   if (!sBluetoothVendorInterface) return result;
@@ -258,7 +258,7 @@ static JNINativeMethod sMethods[] = {
 };
 
 int register_com_android_bluetooth_btservice_vendor(JNIEnv* env) {
-  ALOGE("%s:", __FUNCTION__);
+  log::error("{}:", __FUNCTION__);
   return jniRegisterNativeMethods(env, "com/android/bluetooth/btservice/Vendor",
                                   sMethods, NELEM(sMethods));
 }

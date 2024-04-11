@@ -35,10 +35,8 @@
 #include "bta/include/bta_hh_co.h"
 #include "bta/sys/bta_sys.h"
 #include "btif/include/btif_storage.h"
-#include "include/check.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
@@ -69,7 +67,6 @@ static void bta_hh_cback(uint8_t dev_handle, const RawAddress& addr,
                          uint8_t event, uint32_t data, BT_HDR* pdata);
 static tBTA_HH_STATUS bta_hh_get_trans_status(uint32_t result);
 
-static const char* bta_hh_get_w4_event(uint16_t event);
 static const char* bta_hh_hid_event_name(uint16_t event);
 
 /*****************************************************************************
@@ -266,7 +263,7 @@ static void bta_hh_sdp_cback(uint16_t result, uint16_t attr_mask,
  * Returns          void
  *
  ******************************************************************************/
-static void bta_hh_di_sdp_cback(UNUSED_ATTR const RawAddress& bd_addr,
+static void bta_hh_di_sdp_cback(const RawAddress& /* bd_addr */,
                                 tSDP_RESULT result) {
   tBTA_HH_DEV_CB* p_cb = bta_hh_cb.p_cur;
   tBTA_HH_STATUS status = BTA_HH_ERR_SDP;
@@ -372,7 +369,7 @@ static void bta_hh_start_sdp(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_hh_sdp_cmpl(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
-  CHECK(p_data != nullptr);
+  log::assert_that(p_data != nullptr, "assert failed: p_data != nullptr");
 
   tBTA_HH_CONN conn_dat;
   tBTA_HH_STATUS status = p_data->status;
@@ -520,7 +517,7 @@ void bta_hh_connect(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_hh_api_disc_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
-  CHECK(p_cb != nullptr);
+  log::assert_that(p_cb != nullptr, "assert failed: p_cb != nullptr");
 
   if (p_cb->link_spec.transport == BT_TRANSPORT_LE) {
     log::debug("Host initiating close to le device:{}",
@@ -679,7 +676,7 @@ void bta_hh_data_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
  ******************************************************************************/
 void bta_hh_handsk_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
   log::verbose("HANDSHAKE received for: event={} data={}",
-               bta_hh_get_w4_event(p_cb->w4_evt), p_data->hid_cback.data);
+               bta_hh_event_text(p_cb->w4_evt), p_data->hid_cback.data);
 
   tBTA_HH bta_hh;
   memset(&bta_hh, 0, sizeof(tBTA_HH));
@@ -697,7 +694,7 @@ void bta_hh_handsk_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
       if (bta_hh.hs_data.status == BTA_HH_OK)
         bta_hh.hs_data.status = BTA_HH_HS_TRANS_NOT_SPT;
       (*bta_hh_cb.p_cback)(p_cb->w4_evt, &bta_hh);
-      p_cb->w4_evt = 0;
+      p_cb->w4_evt = BTA_HH_EMPTY_EVT;
       break;
 
     /* acknoledgement from HID device for SET_ transaction */
@@ -708,7 +705,7 @@ void bta_hh_handsk_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
       bta_hh.dev_status.status =
           bta_hh_get_trans_status(p_data->hid_cback.data);
       (*bta_hh_cb.p_cback)(p_cb->w4_evt, &bta_hh);
-      p_cb->w4_evt = 0;
+      p_cb->w4_evt = BTA_HH_EMPTY_EVT;
       break;
 
     /* SET_PROTOCOL when open connection */
@@ -719,12 +716,13 @@ void bta_hh_handsk_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
       bta_hh.conn.link_spec = p_cb->link_spec;
       (*bta_hh_cb.p_cback)(p_cb->w4_evt, &bta_hh);
       bta_hh_trace_dev_db();
-      p_cb->w4_evt = 0;
+      p_cb->w4_evt = BTA_HH_EMPTY_EVT;
       break;
 
     default:
       /* unknow transaction handshake response */
-      log::verbose("unknown transaction type");
+      log::verbose("unknown transaction type {}",
+                   bta_hh_event_text(p_cb->w4_evt));
       break;
   }
 
@@ -748,9 +746,9 @@ void bta_hh_ctrl_dat_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
   tBTA_HH_HSDATA hs_data;
 
   log::verbose("Ctrl DATA received w4: event[{}]",
-               bta_hh_get_w4_event(p_cb->w4_evt));
+               bta_hh_event_text(p_cb->w4_evt));
   if (pdata->len == 0) {
-    p_cb->w4_evt = 0;
+    p_cb->w4_evt = BTA_HH_EMPTY_EVT;
     osi_free_and_reset((void**)&pdata);
     return;
   }
@@ -783,7 +781,7 @@ void bta_hh_ctrl_dat_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
       FALLTHROUGH_INTENDED; /* FALLTHROUGH */
     default:
       log::verbose("invalid  transaction type for DATA payload:4_evt[{}]",
-                   bta_hh_get_w4_event(p_cb->w4_evt));
+                   bta_hh_event_text(p_cb->w4_evt));
       break;
   }
 
@@ -793,7 +791,7 @@ void bta_hh_ctrl_dat_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
 
   (*bta_hh_cb.p_cback)(p_cb->w4_evt, (tBTA_HH*)&hs_data);
 
-  p_cb->w4_evt = 0;
+  p_cb->w4_evt = BTA_HH_EMPTY_EVT;
   osi_free_and_reset((void**)&pdata);
 }
 
@@ -892,7 +890,7 @@ void bta_hh_close_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
 
   /* clean up control block, but retain SDP info and device handle */
   p_cb->vp = false;
-  p_cb->w4_evt = 0;
+  p_cb->w4_evt = BTA_HH_EMPTY_EVT;
 
   /* if no connection is active and HH disable is signaled, disable service */
   if (bta_hh_cb.cnt_num == 0 && bta_hh_cb.w4_disable) {
@@ -913,7 +911,7 @@ void bta_hh_close_act(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_hh_get_dscp_act(tBTA_HH_DEV_CB* p_cb,
-                         UNUSED_ATTR const tBTA_HH_DATA* p_data) {
+                         const tBTA_HH_DATA* /* p_data */) {
   if (p_cb->link_spec.transport == BT_TRANSPORT_LE) {
     if (p_cb->hid_srvc.state >= BTA_HH_SERVICE_DISCOVERED) {
       p_cb->dscp_info.hid_handle = p_cb->hid_handle;
@@ -1233,27 +1231,6 @@ static tBTA_HH_STATUS bta_hh_get_trans_status(uint32_t result) {
 /*****************************************************************************
  *  Debug Functions
  ****************************************************************************/
-
-static const char* bta_hh_get_w4_event(uint16_t event) {
-  switch (event) {
-    case BTA_HH_GET_RPT_EVT:
-      return "BTA_HH_GET_RPT_EVT";
-    case BTA_HH_SET_RPT_EVT:
-      return "BTA_HH_SET_RPT_EVT";
-    case BTA_HH_GET_PROTO_EVT:
-      return "BTA_HH_GET_PROTO_EVT";
-    case BTA_HH_SET_PROTO_EVT:
-      return "BTA_HH_SET_PROTO_EVT";
-    case BTA_HH_GET_IDLE_EVT:
-      return "BTA_HH_GET_IDLE_EVT";
-    case BTA_HH_SET_IDLE_EVT:
-      return "BTA_HH_SET_IDLE_EVT";
-    case BTA_HH_OPEN_EVT:
-      return "BTA_HH_OPEN_EVT";
-    default:
-      return "Unknown event";
-  }
-}
 
 static const char* bta_hh_hid_event_name(uint16_t event) {
   switch (event) {

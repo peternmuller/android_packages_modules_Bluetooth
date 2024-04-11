@@ -79,6 +79,7 @@ struct Advertiser {
   uint16_t duration;
   uint8_t max_extended_advertising_events;
   bool started = false;
+  bool is_legacy = false;
   bool connectable = false;
   bool discoverable = false;
   bool directed = false;
@@ -247,7 +248,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   void multi_advertising_state_change(hci::VendorSpecificEventView event) {
     auto view = hci::LEAdvertiseStateChangeEventView::Create(event);
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
 
     auto advertiser_id = view.GetAdvertisingInstance();
 
@@ -815,6 +816,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   void set_parameters(AdvertiserId advertiser_id, AdvertisingConfig config) {
     config.tx_power = get_tx_power_after_calibration(static_cast<int8_t>(config.tx_power));
+    advertising_sets_[advertiser_id].is_legacy = config.legacy_pdus;
     advertising_sets_[advertiser_id].connectable = config.connectable;
     advertising_sets_[advertiser_id].discoverable = config.discoverable;
     advertising_sets_[advertiser_id].tx_power = config.tx_power;
@@ -1089,10 +1091,13 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
           data_len += data[i].size();
         }
 
-        if (data_len > le_maximum_advertising_data_length_) {
-          log::warn(
-              "advertising data len exceeds le_maximum_advertising_data_length_ {}",
-              le_maximum_advertising_data_length_);
+        int maxDataLength = (IS_FLAG_ENABLED(ble_check_data_length_on_legacy_advertising) &&
+                             advertising_sets_[advertiser_id].is_legacy)
+                                ? kLeMaximumLegacyAdvertisingDataLength
+                                : le_maximum_advertising_data_length_;
+
+        if (data_len > maxDataLength) {
+          log::warn("advertising data len {} exceeds maxDataLength {}", data_len, maxDataLength);
           if (advertising_callbacks_ != nullptr) {
             if (set_scan_rsp) {
               advertising_callbacks_->OnScanResponseDataSet(
@@ -1609,7 +1614,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         return;
       }
     }
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
       return;
@@ -1623,9 +1628,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       std::vector<EnabledSet> enabled_sets,
       bool trigger_callbacks,
       CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto complete_view = View::Create(view);
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     AdvertisingCallback::AdvertisingStatus advertising_status = AdvertisingCallback::AdvertisingStatus::SUCCESS;
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
@@ -1667,9 +1672,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       std::vector<EnabledSet> enabled_sets,
       bool trigger_callbacks,
       CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto complete_view = LeSetExtendedAdvertisingEnableCompleteView::Create(view);
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     AdvertisingCallback::AdvertisingStatus advertising_status = AdvertisingCallback::AdvertisingStatus::SUCCESS;
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
@@ -1710,9 +1715,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   template <class View>
   void on_set_extended_advertising_parameters_complete(AdvertiserId id, CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto complete_view = LeSetExtendedAdvertisingParametersCompleteView::Create(view);
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     AdvertisingCallback::AdvertisingStatus advertising_status = AdvertisingCallback::AdvertisingStatus::SUCCESS;
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
@@ -1727,9 +1732,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   template <class View>
   void on_set_periodic_advertising_enable_complete(bool enable, AdvertiserId id, CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto complete_view = LeSetPeriodicAdvertisingEnableCompleteView::Create(view);
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     AdvertisingCallback::AdvertisingStatus advertising_status = AdvertisingCallback::AdvertisingStatus::SUCCESS;
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
@@ -1746,9 +1751,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   template <class View>
   void on_set_advertising_set_random_address_complete(
       AdvertiserId advertiser_id, AddressWithType address_with_type, CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto complete_view = LeSetAdvertisingSetRandomAddressCompleteView::Create(view);
-    ASSERT(complete_view.IsValid());
+    log::assert_that(complete_view.IsValid(), "assert failed: complete_view.IsValid()");
     if (complete_view.GetStatus() != ErrorCode::SUCCESS) {
       log::error("Got a command complete with status {}", ErrorCodeText(complete_view.GetStatus()));
     } else {
@@ -1762,9 +1767,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   template <class View>
   void check_status_with_id(bool send_callback, AdvertiserId id, CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
     auto status_view = View::Create(view);
-    ASSERT(status_view.IsValid());
+    log::assert_that(status_view.IsValid(), "assert failed: status_view.IsValid()");
     if (status_view.GetStatus() != ErrorCode::SUCCESS) {
       log::info(
           "Got a Command complete {}, status {}",
@@ -1812,7 +1817,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         break;
       case OpCode::LE_MULTI_ADVT: {
         auto command_view = LeMultiAdvtCompleteView::Create(view);
-        ASSERT(command_view.IsValid());
+        log::assert_that(command_view.IsValid(), "assert failed: command_view.IsValid()");
         auto sub_opcode = command_view.GetSubCmd();
         switch (sub_opcode) {
           case SubOcf::SET_PARAM:
@@ -1835,7 +1840,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   }
 
   void start_advertising_fail(int reg_id, AdvertisingCallback::AdvertisingStatus status) {
-    ASSERT(status != AdvertisingCallback::AdvertisingStatus::SUCCESS);
+    log::assert_that(
+        status != AdvertisingCallback::AdvertisingStatus::SUCCESS,
+        "assert failed: status != AdvertisingCallback::AdvertisingStatus::SUCCESS");
     advertising_callbacks_->OnAdvertisingSetStarted(reg_id, kInvalidId, 0, status);
   }
 };

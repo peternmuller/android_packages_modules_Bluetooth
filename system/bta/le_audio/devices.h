@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include <base/logging.h>
-
 #include <map>
 #include <memory>
 #include <optional>
@@ -120,6 +118,7 @@ class LeAudioDevice {
   std::string model_name_;
   bool allowlist_flag_;
   bool acl_asymmetric_;
+  bool acl_phy_update_done_;
 
   alarm_t* link_quality_timer;
   uint16_t link_quality_timer_data;
@@ -142,6 +141,7 @@ class LeAudioDevice {
         model_name_(""),
         allowlist_flag_(false),
         acl_asymmetric_(false),
+        acl_phy_update_done_(false),
         link_quality_timer(nullptr),
         dsa_({{DsaMode::DISABLED},
               types::DataPathState::IDLE,
@@ -204,8 +204,8 @@ class LeAudioDevice {
 
   inline types::AudioContexts GetSupportedContexts(
       int direction = types::kLeAudioDirectionBoth) const {
-    ASSERT_LOG(direction <= (types::kLeAudioDirectionBoth),
-               "Invalid direction used.");
+    log::assert_that(direction <= (types::kLeAudioDirectionBoth),
+                     "Invalid direction used.");
 
     if (direction < types::kLeAudioDirectionBoth)
       return supp_contexts_.get(direction);
@@ -219,8 +219,8 @@ class LeAudioDevice {
 
   inline types::AudioContexts GetAvailableContexts(
       int direction = types::kLeAudioDirectionBoth) const {
-    ASSERT_LOG(direction <= (types::kLeAudioDirectionBoth),
-               "Invalid direction used.");
+    log::assert_that(direction <= (types::kLeAudioDirectionBoth),
+                     "Invalid direction used.");
 
     if (direction < types::kLeAudioDirectionBoth)
       return avail_contexts_.get(direction);

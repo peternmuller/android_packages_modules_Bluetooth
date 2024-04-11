@@ -21,7 +21,6 @@
 #include <bluetooth/log.h>
 
 #include <android_bluetooth_flags.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 
 #include <cstdint>
@@ -42,10 +41,8 @@
 #include "device/include/interop.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
-#include "os/log.h"
 #include "os/system_properties.h"
 #include "osi/include/compat.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/btm/btm_sco_hfp_hal.h"
 #include "stack/include/port_api.h"
 
@@ -64,17 +61,6 @@ using namespace bluetooth;
 #define BTA_AG_INVALID_CHLD 255
 
 #define COLON_IDX_4_VGSVGM 4
-
-/* Local events which will not trigger a higher layer callback */
-enum {
-  BTA_AG_LOCAL_EVT_FIRST = 0x100,
-  BTA_AG_LOCAL_EVT_CCWA,
-  BTA_AG_LOCAL_EVT_CLIP,
-  BTA_AG_LOCAL_EVT_CMER,
-  BTA_AG_LOCAL_EVT_BRSF,
-  BTA_AG_LOCAL_EVT_CMEE,
-  BTA_AG_LOCAL_EVT_BCC,
-};
 
 /* AT command interpreter table for HSP */
 static const tBTA_AG_AT_CMD bta_ag_hsp_cmd[] = {
@@ -251,7 +237,7 @@ static void bta_ag_send_result(tBTA_AG_SCB* p_scb, size_t code,
       case BTA_AG_MULTI_CALL_RES:
         if (!bta_ag_is_sco_open_allowed (p_scb,
                                          "CALL Indiacator event")) {
-          LOG_ERROR("%s: HFP is not preference, not sending responses", __func__);
+          log::error("HFP is not preference, not sending responses");
           return;
         }
     }
@@ -456,7 +442,7 @@ static bool bta_ag_parse_cmer(char* p_s, char* p_end, bool* p_enabled) {
  digit
  *
  ******************************************************************************/
-static uint8_t bta_ag_parse_chld(UNUSED_ATTR tBTA_AG_SCB* p_scb, char* p_s) {
+static uint8_t bta_ag_parse_chld(tBTA_AG_SCB* /* p_scb */, char* p_s) {
   uint8_t retval = 0;
 
   if (!isdigit(p_s[0])) {
@@ -1274,8 +1260,7 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       // if SLC didn't happen yet, just send OK
       if (!p_scb->svc_conn) {
         event = BTA_AG_ENABLE_EVT;
-        LOG_WARN("%s: sending OK from stack for CLCC before SLC ",
-                            __func__);
+        log::warn("sending OK from stack for CLCC before SLC");
         bta_ag_send_ok(p_scb);
       }
       break;
@@ -1294,7 +1279,7 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
         bool swb_supported = hfp_hal_interface::get_swb_supported();
         const bool aptx_voice =
             is_hfp_aptx_voice_enabled() && p_scb->is_aptx_swb_codec;
-        log::verbose("BTA_AG_AT_BAC_EVT aptx_voice={}", logbool(aptx_voice));
+        log::verbose("BTA_AG_AT_BAC_EVT aptx_voice={}", aptx_voice);
 
         if (swb_supported && (p_scb->peer_codecs & BTM_SCO_CODEC_LC3) &&
             !(p_scb->disabled_codecs & BTM_SCO_CODEC_LC3)) {
@@ -1386,7 +1371,7 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       if (hfp_hal_interface::get_swb_supported() &&
           (p_scb->peer_codecs & BTM_SCO_CODEC_LC3) &&
           !(p_scb->disabled_codecs & BTM_SCO_CODEC_LC3)) {
-        LOG_WARN("Phone and BT device support LC3, return error for QAC");
+        log::warn("Phone and BT device support LC3, return error for QAC");
         bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_SUPPORTED);
         break;
       }
@@ -1997,8 +1982,7 @@ bool bta_ag_is_sco_open_allowed(tBTA_AG_SCB* p_scb, const std::string event) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_ag_send_ring(tBTA_AG_SCB* p_scb,
-                      UNUSED_ATTR const tBTA_AG_DATA& data) {
+void bta_ag_send_ring(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
   if ((p_scb->conn_service == BTA_AG_HFP) &&
       p_scb->callsetup_ind != BTA_AG_CALLSETUP_INCOMING) {
     log::warn("don't send RING, conn_service={}, callsetup_ind={}",

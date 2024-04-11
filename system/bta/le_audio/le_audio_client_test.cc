@@ -577,6 +577,26 @@ class UnicastTestNoInit : public Test {
             base::Unretained(this->gatt_callback), event_data));
   }
 
+  void InjectPhyChangedEvent(uint16_t conn_id, uint8_t tx_phy, uint8_t rx_phy,
+                             tGATT_STATUS status) {
+    ASSERT_NE(conn_id, GATT_INVALID_CONN_ID);
+    tBTA_GATTC_PHY_UPDATE event_data = {
+        .conn_id = conn_id,
+        .tx_phy = tx_phy,
+        .rx_phy = rx_phy,
+        .status = status,
+    };
+
+    do_in_main_thread(FROM_HERE,
+                      base::BindOnce(
+                          [](tBTA_GATTC_CBACK* gatt_callback,
+                             tBTA_GATTC_PHY_UPDATE event_data) {
+                            gatt_callback(BTA_GATTC_PHY_UPDATE_EVT,
+                                          (tBTA_GATTC*)&event_data);
+                          },
+                          base::Unretained(this->gatt_callback), event_data));
+  }
+
   void InjectSearchCompleteEvent(uint16_t conn_id) {
     ASSERT_NE(conn_id, GATT_INVALID_CONN_ID);
     tBTA_GATTC_SEARCH_CMPL event_data = {
@@ -1098,10 +1118,10 @@ class UnicastTestNoInit : public Test {
                     stream_conf->stream_params.source.sample_frequency_hz =
                         core_config.GetSamplingFrequencyHz();
                   } else {
-                    ASSERT_LOG(
+                    log::assert_that(
                         stream_conf->stream_params.source.sample_frequency_hz ==
                             core_config.GetSamplingFrequencyHz(),
-                        "sample freq mismatch: %d!=%d",
+                        "sample freq mismatch: {}!={}",
                         stream_conf->stream_params.source.sample_frequency_hz,
                         core_config.GetSamplingFrequencyHz());
                   }
@@ -1111,13 +1131,13 @@ class UnicastTestNoInit : public Test {
                     stream_conf->stream_params.source.octets_per_codec_frame =
                         *core_config.octets_per_codec_frame;
                   } else {
-                    ASSERT_LOG(stream_conf->stream_params.source
-                                       .octets_per_codec_frame ==
-                                   *core_config.octets_per_codec_frame,
-                               "octets per frame mismatch: %d!=%d",
-                               stream_conf->stream_params.source
-                                   .octets_per_codec_frame,
-                               *core_config.octets_per_codec_frame);
+                    log::assert_that(stream_conf->stream_params.source
+                                             .octets_per_codec_frame ==
+                                         *core_config.octets_per_codec_frame,
+                                     "octets per frame mismatch: {}!={}",
+                                     stream_conf->stream_params.source
+                                         .octets_per_codec_frame,
+                                     *core_config.octets_per_codec_frame);
                   }
 
                   if (stream_conf->stream_params.source
@@ -1126,13 +1146,14 @@ class UnicastTestNoInit : public Test {
                         .codec_frames_blocks_per_sdu =
                         *core_config.codec_frames_blocks_per_sdu;
                   } else {
-                    ASSERT_LOG(stream_conf->stream_params.source
-                                       .codec_frames_blocks_per_sdu ==
-                                   *core_config.codec_frames_blocks_per_sdu,
-                               "codec_frames_blocks_per_sdu: %d!=%d",
-                               stream_conf->stream_params.source
-                                   .codec_frames_blocks_per_sdu,
-                               *core_config.codec_frames_blocks_per_sdu);
+                    log::assert_that(
+                        stream_conf->stream_params.source
+                                .codec_frames_blocks_per_sdu ==
+                            *core_config.codec_frames_blocks_per_sdu,
+                        "codec_frames_blocks_per_sdu: {}!={}",
+                        stream_conf->stream_params.source
+                            .codec_frames_blocks_per_sdu,
+                        *core_config.codec_frames_blocks_per_sdu);
                   }
 
                   log::info(
@@ -1169,10 +1190,10 @@ class UnicastTestNoInit : public Test {
                     stream_conf->stream_params.sink.sample_frequency_hz =
                         core_config.GetSamplingFrequencyHz();
                   } else {
-                    ASSERT_LOG(
+                    log::assert_that(
                         stream_conf->stream_params.sink.sample_frequency_hz ==
                             core_config.GetSamplingFrequencyHz(),
-                        "sample freq mismatch: %d!=%d",
+                        "sample freq mismatch: {}!={}",
                         stream_conf->stream_params.sink.sample_frequency_hz,
                         core_config.GetSamplingFrequencyHz());
                   }
@@ -1182,11 +1203,11 @@ class UnicastTestNoInit : public Test {
                     stream_conf->stream_params.sink.octets_per_codec_frame =
                         *core_config.octets_per_codec_frame;
                   } else {
-                    ASSERT_LOG(
+                    log::assert_that(
                         stream_conf->stream_params.sink
                                 .octets_per_codec_frame ==
                             *core_config.octets_per_codec_frame,
-                        "octets per frame mismatch: %d!=%d",
+                        "octets per frame mismatch: {}!={}",
                         stream_conf->stream_params.sink.octets_per_codec_frame,
                         *core_config.octets_per_codec_frame);
                   }
@@ -1197,13 +1218,14 @@ class UnicastTestNoInit : public Test {
                         .codec_frames_blocks_per_sdu =
                         *core_config.codec_frames_blocks_per_sdu;
                   } else {
-                    ASSERT_LOG(stream_conf->stream_params.sink
-                                       .codec_frames_blocks_per_sdu ==
-                                   *core_config.codec_frames_blocks_per_sdu,
-                               "codec_frames_blocks_per_sdu: %d!=%d",
-                               stream_conf->stream_params.sink
-                                   .codec_frames_blocks_per_sdu,
-                               *core_config.codec_frames_blocks_per_sdu);
+                    log::assert_that(
+                        stream_conf->stream_params.sink
+                                .codec_frames_blocks_per_sdu ==
+                            *core_config.codec_frames_blocks_per_sdu,
+                        "codec_frames_blocks_per_sdu: {}!={}",
+                        stream_conf->stream_params.sink
+                            .codec_frames_blocks_per_sdu,
+                        *core_config.codec_frames_blocks_per_sdu);
                   }
 
                   log::info(
@@ -1506,6 +1528,7 @@ class UnicastTestNoInit : public Test {
         .WillByDefault(Return(true));
     ON_CALL(controller_, SupportsBleConnectedIsochronousStreamPeripheral)
         .WillByDefault(Return(true));
+    ON_CALL(controller_, SupportsBle2mPhy).WillByDefault(Return(true));
     bluetooth::hci::testing::mock_controller_ = &controller_;
     bluetooth::manager::SetMockBtmInterface(&mock_btm_interface_);
     gatt::SetMockBtaGattInterface(&mock_gatt_interface_);
@@ -1519,6 +1542,9 @@ class UnicastTestNoInit : public Test {
     mock_iso_manager_ = MockIsoManager::GetInstance();
     ON_CALL(*mock_iso_manager_, RegisterCigCallbacks(_))
         .WillByDefault(SaveArg<0>(&cig_callbacks_));
+
+    ON_CALL(mock_btm_interface_, IsLinkKeyKnown(_, _))
+        .WillByDefault(DoAll(Return(true)));
 
     // Required since we call OnAudioDataReady()
     const auto codec_location =
@@ -2869,7 +2895,7 @@ class UnicastTestHandoverMode : public UnicastTest {
 };
 
 RawAddress GetTestAddress(uint8_t index) {
-  CHECK_LT(index, UINT8_MAX);
+  EXPECT_LT(index, UINT8_MAX);
   RawAddress result = {{0xC0, 0xDE, 0xC0, 0xDE, 0x00, index}};
   return result;
 }
@@ -2902,8 +2928,65 @@ TEST_F(UnicastTestNoInit, InitializeNoHal_2_1) {
           base::Bind([](MockFunction<bool()>* foo) { return foo->Call(); },
                      &mock_hal_2_1_verifier),
           framework_encode_preference),
-      ", LE Audio Client requires Bluetooth Audio HAL V2.1 at least. Either "
+      "LE Audio Client requires Bluetooth Audio HAL V2.1 at least. Either "
       "disable LE Audio Profile, or update your HAL");
+}
+
+TEST_F(UnicastTest, ConnectAndSetupPhy) {
+  const RawAddress test_address0 = GetTestAddress(0);
+  uint16_t conn_id = 1;
+  SetSampleDatabaseEarbudsValid(
+      1, test_address0, codec_spec_conf::kLeAudioLocationStereo,
+      codec_spec_conf::kLeAudioLocationStereo, default_channel_cnt,
+      default_channel_cnt, 0x0004,
+      /* source sample freq 16khz */ true, /*add_csis*/
+      true,                                /*add_cas*/
+      true,                                /*add_pacs*/
+      default_ase_cnt /*add_ascs*/);
+
+  EXPECT_CALL(mock_btm_interface_,
+              BleSetPhy(test_address0, PHY_LE_2M, PHY_LE_2M, 0))
+      .Times(1);
+  ConnectLeAudio(test_address0, false);
+  Mock::VerifyAndClearExpectations(&mock_btm_interface_);
+
+  EXPECT_CALL(mock_btm_interface_,
+              BleSetPhy(test_address0, PHY_LE_2M, PHY_LE_2M, 0))
+      .Times(1);
+  InjectPhyChangedEvent(conn_id, 0, 0, GATT_REQ_NOT_SUPPORTED);
+  SyncOnMainLoop();
+  ON_CALL(mock_btm_interface_, BTM_IsEncrypted(test_address0, _))
+      .WillByDefault(DoAll(Return(true)));
+  InjectEncryptionChangedEvent(test_address0);
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_btm_interface_);
+
+  /* Make sure flag `acl_phy_update_done_` is cleared after disconnect.
+   * Just repeat previous steps after reconnection
+   */
+  InjectDisconnectedEvent(conn_id);
+  SyncOnMainLoop();
+
+  EXPECT_CALL(mock_btm_interface_,
+              BleSetPhy(test_address0, PHY_LE_2M, PHY_LE_2M, 0))
+      .Times(1);
+
+  ON_CALL(mock_btm_interface_, BTM_IsEncrypted(test_address0, _))
+      .WillByDefault(DoAll(Return(false)));
+  InjectConnectedEvent(test_address0, 1);
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_btm_interface_);
+
+  EXPECT_CALL(mock_btm_interface_,
+              BleSetPhy(test_address0, PHY_LE_2M, PHY_LE_2M, 0))
+      .Times(1);
+  InjectPhyChangedEvent(conn_id, 0, 0, GATT_REQ_NOT_SUPPORTED);
+  SyncOnMainLoop();
+  ON_CALL(mock_btm_interface_, BTM_IsEncrypted(test_address0, _))
+      .WillByDefault(DoAll(Return(true)));
+  InjectEncryptionChangedEvent(test_address0);
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_btm_interface_);
 }
 
 TEST_F(UnicastTest, ConnectOneEarbudEmpty) {
@@ -4570,6 +4653,82 @@ TEST_F(UnicastTest, HandleResumeWithoutMetadataUpdateOnLocalSink) {
   Mock::VerifyAndClearExpectations(&mock_state_machine_);
 }
 
+TEST_F(UnicastTest, ChangeAvailableContextTypeWhenInCodecConfigured) {
+  const RawAddress test_address0 = GetTestAddress(0);
+  int group_id = bluetooth::groups::kGroupUnknown;
+
+  /**
+   * In this test we want to make sure that Available context change reach Java
+   * when group is in Configured state
+   */
+
+  default_channel_cnt = 1;
+
+  SetSampleDatabaseEarbudsValid(
+      1, test_address0, codec_spec_conf::kLeAudioLocationStereo,
+      codec_spec_conf::kLeAudioLocationStereo, default_channel_cnt,
+      default_channel_cnt, 0x0004,
+      /* source sample freq 16khz */ false /*add_csis*/, true /*add_cas*/,
+      true /*add_pacs*/, default_ase_cnt /*add_ascs_cnt*/, 1 /*set_size*/,
+      0 /*rank*/);
+  EXPECT_CALL(mock_audio_hal_client_callbacks_,
+              OnConnectionState(ConnectionState::CONNECTED, test_address0))
+      .Times(1);
+  EXPECT_CALL(mock_audio_hal_client_callbacks_,
+              OnGroupNodeStatus(test_address0, _, GroupNodeStatus::ADDED))
+      .WillOnce(DoAll(SaveArg<1>(&group_id)));
+
+  ConnectLeAudio(test_address0);
+  ASSERT_NE(group_id, bluetooth::groups::kGroupUnknown);
+
+  // Audio sessions are started only when device gets active
+  EXPECT_CALL(*mock_le_audio_source_hal_client_, Start(_, _, _)).Times(1);
+  EXPECT_CALL(*mock_le_audio_sink_hal_client_, Start(_, _, _)).Times(1);
+  LeAudioClient::Get()->GroupSetActive(group_id);
+  SyncOnMainLoop();
+
+  EXPECT_CALL(mock_state_machine_, StartStream(_, _, _, _)).Times(1);
+
+  UpdateLocalSinkMetadata(AUDIO_SOURCE_MIC);
+  LocalAudioSinkResume();
+
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_audio_hal_client_callbacks_);
+  Mock::VerifyAndClearExpectations(&mock_le_audio_source_hal_client_);
+  Mock::VerifyAndClearExpectations(&mock_state_machine_);
+
+  // Verify Data transfer on local audio sink which is started
+  constexpr uint8_t cis_count_out = 0;
+  constexpr uint8_t cis_count_in = 1;
+  TestAudioDataTransfer(group_id, cis_count_out, cis_count_in, 0, 40);
+
+  // Remember group to set the state after stopping the stream
+  auto group = streaming_groups.at(group_id);
+
+  SyncOnMainLoop();
+  StopStreaming(group_id, true);
+  SyncOnMainLoop();
+
+  // simulate suspend timeout passed, alarm executing
+  fake_osi_alarm_set_on_mloop_.cb(fake_osi_alarm_set_on_mloop_.data);
+  SyncOnMainLoop();
+
+  // Simulate state Configured
+  group->SetState(types::AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED);
+
+  EXPECT_CALL(mock_audio_hal_client_callbacks_, OnAudioConf(_, _, _, _, _));
+
+  /* Check if available context will be sent to Java */
+  auto sink_available_context = types::kLeAudioContextAllRemoteSinkOnly;
+  auto source_available_context = types::kLeAudioContextAllRemoteSource;
+
+  InjectAvailableContextTypes(test_address0, 1, sink_available_context,
+                              source_available_context);
+
+  SyncOnMainLoop();
+  Mock::VerifyAndClearExpectations(&mock_audio_hal_client_callbacks_);
+}
+
 TEST_F(UnicastTest, RemoveNodeWhileStreaming) {
   const RawAddress test_address0 = GetTestAddress(0);
   int group_id = bluetooth::groups::kGroupUnknown;
@@ -4880,6 +5039,45 @@ TEST_F(UnicastTest, RemoveTwoEarbudsCsisGrouped) {
   SyncOnMainLoop();
   Mock::VerifyAndClearExpectations(&mock_btif_storage_);
   Mock::VerifyAndClearExpectations(&mock_btm_interface_);
+}
+
+TEST_F(UnicastTest, ConnectAfterRemove) {
+  const RawAddress test_address0 = GetTestAddress(0);
+  int group_id = bluetooth::groups::kGroupUnknown;
+  uint16_t conn_id = 1;
+
+  SetSampleDatabaseEarbudsValid(
+      conn_id, test_address0, codec_spec_conf::kLeAudioLocationStereo,
+      codec_spec_conf::kLeAudioLocationStereo, default_channel_cnt,
+      default_channel_cnt, 0x0004,
+      /* source sample freq 16khz */ false /*add_csis*/, true /*add_cas*/,
+      true /*add_pacs*/, default_ase_cnt /*add_ascs_cnt*/, 1 /*set_size*/,
+      0 /*rank*/);
+  EXPECT_CALL(mock_audio_hal_client_callbacks_,
+              OnConnectionState(ConnectionState::DISCONNECTED, test_address0))
+      .Times(1);
+
+  /* RemoveDevice */
+  do_in_main_thread(FROM_HERE, base::BindOnce(
+                                   [](LeAudioClient* client,
+                                      const RawAddress& test_address0) {
+                                     client->RemoveDevice(test_address0);
+                                   },
+                                   LeAudioClient::Get(), test_address0));
+  SyncOnMainLoop();
+
+  ON_CALL(mock_btm_interface_, IsLinkKeyKnown(_, _))
+      .WillByDefault(DoAll(Return(false)));
+
+  do_in_main_thread(
+      FROM_HERE,
+      base::BindOnce(&LeAudioClient::Connect,
+                     base::Unretained(LeAudioClient::Get()), test_address0));
+  SyncOnMainLoop();
+
+  Mock::VerifyAndClearExpectations(&mock_btif_storage_);
+  Mock::VerifyAndClearExpectations(&mock_gatt_queue_);
+  Mock::VerifyAndClearExpectations(&mock_gatt_interface_);
 }
 
 TEST_F(UnicastTest, RemoveDeviceWhenConnected) {

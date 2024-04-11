@@ -31,7 +31,6 @@
 #include "bta/include/bta_hh_co.h"
 #include "bta/include/bta_le_audio_api.h"
 #include "device/include/interop.h"
-#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"    // ARRAY_SIZE
 #include "stack/btm/btm_sec.h"  // BTM_
@@ -751,7 +750,7 @@ static void write_proto_mode_cb(uint16_t conn_id, tGATT_STATUS status,
     /* Set protocol finished in CONN state*/
 
     uint16_t cb_evt = p_dev_cb->w4_evt;
-    if (cb_evt == 0) return;
+    if (cb_evt == BTA_HH_EMPTY_EVT) return;
 
     tBTA_HH_CBDATA cback_data;
 
@@ -761,7 +760,7 @@ static void write_proto_mode_cb(uint16_t conn_id, tGATT_STATUS status,
     if (status == GATT_SUCCESS)
       bta_hh_le_register_input_notif(p_dev_cb, p_dev_cb->mode, false);
 
-    p_dev_cb->w4_evt = 0;
+    p_dev_cb->w4_evt = BTA_HH_EMPTY_EVT;
     (*bta_hh_cb.p_cback)(cb_evt, (tBTA_HH*)&cback_data);
   } else if (p_dev_cb->state == BTA_HH_W4_CONN_ST) {
     p_dev_cb->status = (status == GATT_SUCCESS) ? BTA_HH_OK : BTA_HH_ERR_PROTO;
@@ -853,7 +852,7 @@ static void get_protocol_mode_cb(uint16_t conn_id, tGATT_STATUS status,
                (hs_data.rsp_data.proto_mode == BTA_HH_PROTO_RPT_MODE) ? "Report"
                                                                       : "Boot");
 
-  p_dev_cb->w4_evt = 0;
+  p_dev_cb->w4_evt = BTA_HH_EMPTY_EVT;
   (*bta_hh_cb.p_cback)(BTA_HH_GET_PROTO_EVT, (tBTA_HH*)&hs_data);
 }
 
@@ -880,7 +879,7 @@ static void bta_hh_le_get_protocol_mode(tBTA_HH_DEV_CB* p_cb) {
   hs_data.status = BTA_HH_OK;
   hs_data.handle = p_cb->hid_handle;
   hs_data.rsp_data.proto_mode = BTA_HH_PROTO_RPT_MODE;
-  p_cb->w4_evt = 0;
+  p_cb->w4_evt = BTA_HH_EMPTY_EVT;
   (*bta_hh_cb.p_cback)(BTA_HH_GET_PROTO_EVT, (tBTA_HH*)&hs_data);
 }
 
@@ -970,7 +969,7 @@ static void bta_hh_le_pri_service_discovery(tBTA_HH_DEV_CB* p_cb) {
  ******************************************************************************/
 static void bta_hh_le_encrypt_cback(const RawAddress* bd_addr,
                                     tBT_TRANSPORT transport,
-                                    UNUSED_ATTR void* p_ref_data,
+                                    void* /* p_ref_data */,
                                     tBTM_STATUS result) {
   tAclLinkSpec link_spec;
   link_spec.addrt.bda = *bd_addr;
@@ -1002,7 +1001,7 @@ static void bta_hh_le_encrypt_cback(const RawAddress* bd_addr,
  *
  ******************************************************************************/
 void bta_hh_security_cmpl(tBTA_HH_DEV_CB* p_cb,
-                          UNUSED_ATTR const tBTA_HH_DATA* p_buf) {
+                          const tBTA_HH_DATA* /* p_buf */) {
   log::verbose("addr:{}, status:{}", ADDRESS_TO_LOGGABLE_CSTR(p_cb->link_spec),
                p_cb->status);
   if (p_cb->status == BTA_HH_OK) {
@@ -1100,7 +1099,7 @@ static void bta_hh_clear_service_cache(tBTA_HH_DEV_CB* p_cb) {
  *
  ******************************************************************************/
 void bta_hh_start_security(tBTA_HH_DEV_CB* p_cb,
-                           UNUSED_ATTR const tBTA_HH_DATA* p_buf) {
+                           const tBTA_HH_DATA* /* p_buf */) {
   log::verbose("addr:{}", ADDRESS_TO_LOGGABLE_CSTR(p_cb->link_spec.addrt.bda));
   if (BTM_SecIsSecurityPending(p_cb->link_spec.addrt.bda)) {
     /* if security collision happened, wait for encryption done */
@@ -1805,7 +1804,8 @@ static void read_report_cb(uint16_t conn_id, tGATT_STATUS status,
                            void* data) {
   tBTA_HH_DEV_CB* p_dev_cb = (tBTA_HH_DEV_CB*)data;
   if (p_dev_cb->w4_evt != BTA_HH_GET_RPT_EVT) {
-    log::warn("Unexpected Read response, w4_evt={}", p_dev_cb->w4_evt);
+    log::warn("Unexpected Read response, w4_evt={}",
+              bta_hh_event_text(p_dev_cb->w4_evt));
     return;
   }
 
@@ -1857,7 +1857,7 @@ static void read_report_cb(uint16_t conn_id, tGATT_STATUS status,
     }
   }
 
-  p_dev_cb->w4_evt = 0;
+  p_dev_cb->w4_evt = BTA_HH_EMPTY_EVT;
   (*bta_hh_cb.p_cback)(BTA_HH_GET_RPT_EVT, (tBTA_HH*)&hs_data);
   osi_free(hs_data.rsp_data.p_rpt_data);
 }
@@ -1892,10 +1892,9 @@ static void write_report_cb(uint16_t conn_id, tGATT_STATUS status,
   tBTA_HH_CBDATA cback_data;
   tBTA_HH_DEV_CB* p_dev_cb = (tBTA_HH_DEV_CB*)data;
   uint16_t cb_evt = p_dev_cb->w4_evt;
+  if (cb_evt == BTA_HH_EMPTY_EVT) return;
 
-  if (cb_evt == 0) return;
-
-  log::verbose("w4_evt:{}", p_dev_cb->w4_evt);
+  log::verbose("w4_evt:{}", bta_hh_event_text(p_dev_cb->w4_evt));
 
   const gatt::Characteristic* p_char =
       BTA_GATTC_GetCharacteristic(conn_id, handle);
@@ -1912,7 +1911,7 @@ static void write_report_cb(uint16_t conn_id, tGATT_STATUS status,
   /* Set Report finished */
   cback_data.handle = p_dev_cb->hid_handle;
   cback_data.status = (status == GATT_SUCCESS) ? BTA_HH_OK : BTA_HH_ERR;
-  p_dev_cb->w4_evt = 0;
+  p_dev_cb->w4_evt = BTA_HH_EMPTY_EVT;
   (*bta_hh_cb.p_cback)(cb_evt, (tBTA_HH*)&cback_data);
 }
 /*******************************************************************************
@@ -2306,7 +2305,7 @@ static bool bta_hh_le_iso_data_callback(const RawAddress& addr,
                                         uint16_t cis_conn_hdl, uint8_t* data,
                                         uint16_t size, uint32_t timestamp) {
   if (!IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
-    LOG_WARN("DSA not supported");
+    log::warn("DSA not supported");
     return false;
   }
 
@@ -2316,7 +2315,7 @@ static bool bta_hh_le_iso_data_callback(const RawAddress& addr,
 
   tBTA_HH_DEV_CB* p_dev_cb = bta_hh_le_find_dev_cb_by_bda(link_spec);
   if (p_dev_cb == nullptr) {
-    LOG_WARN("Device not connected: %s", ADDRESS_TO_LOGGABLE_CSTR(link_spec));
+    log::warn("Device not connected: {}", ADDRESS_TO_LOGGABLE_CSTR(link_spec));
     return false;
   }
 

@@ -19,11 +19,12 @@
 #include "device/include/esco_parameters.h"
 
 #include <android_bluetooth_flags.h>
+#include <bluetooth/log.h>
 
-#include "base/logging.h"
-#include "check.h"
 #include "hci/controller_interface.h"
 #include "main/shim/entry.h"
+
+using namespace bluetooth;
 
 static const enh_esco_params_t default_esco_parameters[ESCO_NUM_CODECS] = {
     // CVSD D1
@@ -326,9 +327,9 @@ static const enh_esco_params_t default_esco_parameters[ESCO_NUM_CODECS] = {
      .retransmission_effort = ESCO_RETRANSMISSION_QUALITY}};
 
 enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
-  CHECK(codec >= 0) << "codec index " << (int)codec << "< 0";
-  CHECK(codec < ESCO_NUM_CODECS)
-      << "codec index " << (int)codec << " > " << ESCO_NUM_CODECS;
+  log::assert_that((int)codec >= 0, "codec index {}< 0", (int)codec);
+  log::assert_that(codec < ESCO_NUM_CODECS, "codec index {} > {}", (int)codec,
+                   ESCO_NUM_CODECS);
 
   if (codec == ESCO_CODEC_LC3_T1 || codec == ESCO_CODEC_LC3_T2) {
     enh_esco_params_t param = default_esco_parameters[codec];
@@ -343,13 +344,13 @@ enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
   if (IS_FLAG_ENABLED(use_dsp_codec_when_controller_does_not_support)) {
     auto controller = bluetooth::shim::GetController();
     if (controller == nullptr) {
-      LOG_WARN("controller is null");
+      log::warn("controller is null");
     } else {
       codecIds = controller->GetLocalSupportedBrEdrCodecIds();
       if (std::find(codecIds.begin(), codecIds.end(), ESCO_CODING_FORMAT_LC3) ==
           codecIds.end()) {
         if (codec == ESCO_CODEC_LC3_T1 || codec == ESCO_CODEC_LC3_T2) {
-          LOG_INFO("BT controller does not support LC3 codec, use DSP codec");
+          log::info("BT controller does not support LC3 codec, use DSP codec");
           enh_esco_params_t param = default_esco_parameters[codec];
           param.input_coding_format.coding_format = ESCO_CODING_FORMAT_LC3;
           param.output_coding_format.coding_format = ESCO_CODING_FORMAT_LC3;
@@ -369,8 +370,8 @@ enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
     return default_esco_parameters[codec];
   }
 
-  CHECK(codec < ESCO_LEGACY_NUM_CODECS)
-      << "legacy codec index " << (int)codec << " > " << ESCO_LEGACY_NUM_CODECS;
+  log::assert_that(codec < ESCO_LEGACY_NUM_CODECS, "legacy codec index {} > {}",
+                   (int)codec, ESCO_LEGACY_NUM_CODECS);
   enh_esco_params_t param = default_esco_parameters[codec];
   param.input_data_path = param.output_data_path = ESCO_DATA_PATH_HCI;
 

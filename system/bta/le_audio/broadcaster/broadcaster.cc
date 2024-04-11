@@ -16,7 +16,6 @@
  */
 
 #include <base/functional/bind.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 #include <lc3.h>
 
@@ -32,7 +31,6 @@
 #include "bta_le_audio_api.h"
 #include "common/strings.h"
 #include "hci/controller_interface.h"
-#include "include/check.h"
 #include "internal_include/stack_config.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
@@ -98,7 +96,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
         current_phy_(PHY_LE_2M),
         audio_data_path_state_(AudioDataPathState::INACTIVE),
         le_audio_source_hal_client_(nullptr) {
-    LOG_INFO();
+    log::info("");
 
     /* Register State machine callbacks */
     BroadcastStateMachine::Initialize(&state_machine_callbacks_,
@@ -173,11 +171,10 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     /* Prepare the announcement */
     announcement.presentation_delay_us = 40000; /* us */
 
-    ASSERT_LOG(
-        subgroup_configs.size() == metadata_group.size(),
-        "The number of metadata subgroups %zu does not match the number of "
-        "subgroup configurations %zu.",
-        +metadata_group.size(), +subgroup_configs.size());
+    log::assert_that(subgroup_configs.size() == metadata_group.size(),
+                     "The number of metadata subgroups {} does not match the "
+                     "number of subgroup configurations {}.",
+                     metadata_group.size(), subgroup_configs.size());
 
     uint8_t subgroup_idx = 0;
     uint8_t bis_index = 0;
@@ -430,8 +427,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
   /* Choose the dominating audio context when multiple contexts are mixed */
   LeAudioContextType ChooseConfigurationContextType(
       AudioContexts audio_contexts) {
-    LOG_DEBUG("Got contexts=%s",
-              bluetooth::common::ToString(audio_contexts).c_str());
+    log::debug("Got contexts={}", bluetooth::common::ToString(audio_contexts));
 
     /* Prioritize the most common use cases. */
     if (audio_contexts.any()) {
@@ -443,16 +439,15 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       };
       for (auto ct : context_priority_list) {
         if (audio_contexts.test(ct)) {
-          LOG_DEBUG("Selecting configuration context type: %s",
-                    ToString(ct).c_str());
+          log::debug("Selecting configuration context type: {}", ToString(ct));
           return ct;
         }
       }
     }
 
     auto fallback_config = LeAudioContextType::MEDIA;
-    LOG_DEBUG("Selecting configuration context type: %s",
-              ToString(fallback_config).c_str());
+    log::debug("Selecting configuration context type: {}",
+               ToString(fallback_config));
     return fallback_config;
   }
 
@@ -595,7 +590,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
 
     if (public_features & bluetooth::le_audio::kLeAudioQualityHigh &&
         config->GetSamplingFrequencyHzMax() < 48000) {
-      LOG_WARN(
+      log::warn(
           "Preferred quality isn't supported. Fallback to standard audio "
           "quality");
       public_features &= (0xFFFF & ~bluetooth::le_audio::kLeAudioQualityHigh);
@@ -823,14 +818,16 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
   void OnSetupIsoDataPath(uint8_t status, uint16_t conn_handle,
                           uint8_t big_handle) override {
     auto broadcast_id = BroadcastIdFromBigHandle(big_handle);
-    CHECK(broadcasts_.count(broadcast_id) != 0);
+    log::assert_that(broadcasts_.count(broadcast_id) != 0,
+                     "assert failed: broadcasts_.count(broadcast_id) != 0");
     broadcasts_[broadcast_id]->OnSetupIsoDataPath(status, conn_handle);
   }
 
   void OnRemoveIsoDataPath(uint8_t status, uint16_t conn_handle,
                            uint8_t big_handle) override {
     auto broadcast_id = BroadcastIdFromBigHandle(big_handle);
-    CHECK(broadcasts_.count(broadcast_id) != 0);
+    log::assert_that(broadcasts_.count(broadcast_id) != 0,
+                     "assert failed: broadcasts_.count(broadcast_id) != 0");
     broadcasts_[broadcast_id]->OnRemoveIsoDataPath(status, conn_handle);
   }
 
@@ -839,7 +836,8 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       case bluetooth::hci::iso_manager::kIsoEventBigOnCreateCmpl: {
         auto* evt = static_cast<big_create_cmpl_evt*>(data);
         auto broadcast_id = BroadcastIdFromBigHandle(evt->big_id);
-        CHECK(broadcasts_.count(broadcast_id) != 0);
+        log::assert_that(broadcasts_.count(broadcast_id) != 0,
+                         "assert failed: broadcasts_.count(broadcast_id) != 0");
         broadcasts_[broadcast_id]->HandleHciEvent(HCI_BLE_CREATE_BIG_CPL_EVT,
                                                   evt);
 
@@ -847,7 +845,8 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       case bluetooth::hci::iso_manager::kIsoEventBigOnTerminateCmpl: {
         auto* evt = static_cast<big_terminate_cmpl_evt*>(data);
         auto broadcast_id = BroadcastIdFromBigHandle(evt->big_id);
-        CHECK(broadcasts_.count(broadcast_id) != 0);
+        log::assert_that(broadcasts_.count(broadcast_id) != 0,
+                         "assert failed: broadcasts_.count(broadcast_id) != 0");
         broadcasts_[broadcast_id]->HandleHciEvent(HCI_BLE_TERM_BIG_CPL_EVT,
                                                   evt);
         le_audio_source_hal_client_.reset();
@@ -900,8 +899,12 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
           instance->pending_broadcasts_.end(), [broadcast_id](auto& sm) {
             return (sm->GetBroadcastId() == broadcast_id);
           });
-      LOG_ASSERT(pending_broadcast != instance->pending_broadcasts_.end());
-      LOG_ASSERT(instance->broadcasts_.count(broadcast_id) == 0);
+      log::assert_that(pending_broadcast != instance->pending_broadcasts_.end(),
+                       "assert failed: pending_broadcast != "
+                       "instance->pending_broadcasts_.end()");
+      log::assert_that(
+          instance->broadcasts_.count(broadcast_id) == 0,
+          "assert failed: instance->broadcasts_.count(broadcast_id) == 0");
 
       if (initialized) {
         const uint32_t broadcast_id = (*pending_broadcast)->GetBroadcastId();
@@ -1158,7 +1161,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
 
       if (!broadcast_config_.has_value() ||
           (broadcast_config_->subgroups.size() == 0)) {
-        LOG_ERROR("Codec was not configured properly");
+        log::error("Codec was not configured properly");
         return;
       }
 
@@ -1195,14 +1198,14 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     }
 
     virtual void OnAudioSuspend(void) override {
-      LOG_INFO();
+      log::info("");
       /* TODO: Should we suspend all broadcasts - remove BIGs? */
       if (instance)
         instance->audio_data_path_state_ = AudioDataPathState::SUSPENDED;
     }
 
     virtual void OnAudioResume(void) override {
-      LOG_INFO();
+      log::info("");
       if (!instance) return;
 
       /* TODO: Should we resume all broadcasts - recreate BIGs? */
@@ -1219,7 +1222,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     virtual void OnAudioMetadataUpdate(
         const std::vector<struct playback_track_metadata_v7> source_metadata,
         DsaMode dsa_mode) override {
-      LOG_INFO();
+      log::info("");
       if (!instance) return;
 
       /* TODO: Should we take supported contexts from ASCS? */
@@ -1269,7 +1272,7 @@ void LeAudioBroadcaster::Initialize(
     bluetooth::le_audio::LeAudioBroadcasterCallbacks* callbacks,
     base::Callback<bool()> audio_hal_verifier) {
   std::scoped_lock<std::mutex> lock(instance_mutex);
-  LOG_INFO();
+  log::info("");
   if (instance) {
     log::error("Already initialized");
     return;
@@ -1300,13 +1303,13 @@ void LeAudioBroadcaster::Initialize(
 bool LeAudioBroadcaster::IsLeAudioBroadcasterRunning() { return instance; }
 
 LeAudioBroadcaster* LeAudioBroadcaster::Get(void) {
-  LOG_INFO();
-  CHECK(instance);
+  log::info("");
+  log::assert_that(instance != nullptr, "assert failed: instance != nullptr");
   return instance;
 }
 
 void LeAudioBroadcaster::Stop(void) {
-  LOG_INFO();
+  log::info("");
 
   if (instance) {
     instance->Stop();
@@ -1315,7 +1318,7 @@ void LeAudioBroadcaster::Stop(void) {
 
 void LeAudioBroadcaster::Cleanup(void) {
   std::scoped_lock<std::mutex> lock(instance_mutex);
-  LOG_INFO();
+  log::info("");
 
   if (instance == nullptr) return;
 

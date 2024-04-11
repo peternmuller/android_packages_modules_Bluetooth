@@ -60,10 +60,6 @@ using ::testing::Test;
 extern struct fake_osi_alarm_set_on_mloop fake_osi_alarm_set_on_mloop_;
 
 void osi_property_set_bool(const char* key, bool value);
-static const char* test_flags[] = {
-    "INIT_logging_debug_enabled_for_all=true",
-    nullptr,
-};
 
 constexpr uint8_t media_ccid = 0xC0;
 constexpr auto media_context = LeAudioContextType::MEDIA;
@@ -266,7 +262,6 @@ class StateMachineTestBase : public Test {
   bool stop_inject_configured_ase_after_first_ase_configured_;
 
   virtual void SetUp() override {
-    bluetooth::common::InitFlags::Load(test_flags);
     reset_mock_function_count_map();
     bluetooth::manager::SetMockBtmInterface(&btm_interface);
     gatt::SetMockBtaGattInterface(&gatt_interface);
@@ -401,7 +396,7 @@ class StateMachineTestBase : public Test {
         .WillByDefault(
             [this](uint8_t cig_id,
                    bluetooth::hci::iso_manager::cig_create_params p) {
-              DLOG(INFO) << "CreateCig";
+              log::debug("CreateCig");
 
               auto& group = le_audio_device_groups_[cig_id];
               if (group) {
@@ -423,7 +418,7 @@ class StateMachineTestBase : public Test {
 
     ON_CALL(*mock_iso_manager_, RemoveCig)
         .WillByDefault([this](uint8_t cig_id, bool force) {
-          DLOG(INFO) << "CreateRemove";
+          log::debug("CreateRemove");
 
           auto& group = le_audio_device_groups_[cig_id];
           if (group) {
@@ -437,7 +432,7 @@ class StateMachineTestBase : public Test {
         .WillByDefault([this](uint16_t conn_handle,
                               bluetooth::hci::iso_manager::iso_data_path_params
                                   p) {
-          DLOG(INFO) << "SetupIsoDataPath";
+          log::debug("SetupIsoDataPath");
 
           auto dev_it =
               std::find_if(le_audio_devices_.begin(), le_audio_devices_.end(),
@@ -446,7 +441,7 @@ class StateMachineTestBase : public Test {
                              return (ases.sink || ases.source);
                            });
           if (dev_it == le_audio_devices_.end()) {
-            DLOG(ERROR) << "Device not found";
+            log::error("Device not found");
             return;
           }
 
@@ -462,7 +457,7 @@ class StateMachineTestBase : public Test {
 
     ON_CALL(*mock_iso_manager_, RemoveIsoDataPath)
         .WillByDefault([this](uint16_t conn_handle, uint8_t iso_direction) {
-          DLOG(INFO) << "RemoveIsoDataPath";
+          log::debug("RemoveIsoDataPath");
 
           auto dev_it =
               std::find_if(le_audio_devices_.begin(), le_audio_devices_.end(),
@@ -471,7 +466,7 @@ class StateMachineTestBase : public Test {
                              return (ases.sink || ases.source);
                            });
           if (dev_it == le_audio_devices_.end()) {
-            DLOG(ERROR) << "Device not found";
+            log::error("Device not found");
             return;
           }
 
@@ -488,10 +483,10 @@ class StateMachineTestBase : public Test {
     ON_CALL(*mock_iso_manager_, EstablishCis)
         .WillByDefault([this](bluetooth::hci::iso_manager::cis_establish_params
                                   conn_params) {
-          DLOG(INFO) << "EstablishCis";
+          log::debug("EstablishCis");
 
           if (do_not_send_cis_establish_event_) {
-            DLOG(INFO) << "Don't send cis establish event";
+            log::debug("Don't send cis establish event");
             return;
           }
 
@@ -503,7 +498,7 @@ class StateMachineTestBase : public Test {
                   return (ases.sink || ases.source);
                 });
             if (dev_it == le_audio_devices_.end()) {
-              DLOG(ERROR) << "Device not found";
+              log::error("Device not found");
               return;
             }
 
@@ -557,7 +552,7 @@ class StateMachineTestBase : public Test {
 
     ON_CALL(*mock_iso_manager_, DisconnectCis)
         .WillByDefault([this](uint16_t cis_handle, uint8_t reason) {
-          DLOG(INFO) << "DisconnectCis";
+          log::debug("DisconnectCis");
 
           auto dev_it =
               std::find_if(le_audio_devices_.begin(), le_audio_devices_.end(),
@@ -566,7 +561,7 @@ class StateMachineTestBase : public Test {
                              return (ases.sink || ases.source);
                            });
           if (dev_it == le_audio_devices_.end()) {
-            DLOG(ERROR) << "Device not found";
+            log::error("Device not found");
             return;
           }
 
@@ -4404,7 +4399,7 @@ TEST_F(StateMachineTest,
   fake_osi_alarm_set_on_mloop_.cb(fake_osi_alarm_set_on_mloop_.data);
   ASSERT_EQ(1, get_func_call_count("alarm_set_on_mloop"));
 
-  LOG_INFO("OnStateTransitionTimeout");
+  log::info("OnStateTransitionTimeout");
 
   /* Simulate On State timeout */
   group->SetTargetState(types::AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);
@@ -4458,7 +4453,7 @@ TEST_F(StateMachineTest,
   fake_osi_alarm_set_on_mloop_.cb(fake_osi_alarm_set_on_mloop_.data);
   ASSERT_EQ(1, get_func_call_count("alarm_set_on_mloop"));
 
-  LOG_INFO("OnStateTransitionTimeout");
+  log::info("OnStateTransitionTimeout");
 
   /* Simulate On State timeout */
   group->SetTargetState(types::AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);
@@ -4512,7 +4507,7 @@ TEST_F(StateMachineTest, testStateTransitionTimeoutAndDisconnectWhenEnabling) {
   fake_osi_alarm_set_on_mloop_.cb(fake_osi_alarm_set_on_mloop_.data);
   ASSERT_EQ(1, get_func_call_count("alarm_set_on_mloop"));
 
-  LOG_INFO("OnStateTransitionTimeout");
+  log::info("OnStateTransitionTimeout");
 
   /* Simulate On State timeout */
   group->SetTargetState(types::AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);

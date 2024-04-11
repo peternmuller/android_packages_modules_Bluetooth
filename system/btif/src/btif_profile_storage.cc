@@ -21,7 +21,6 @@
 
 #include <alloca.h>
 #include <android_bluetooth_flags.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 #include <stdlib.h>
 #include <string.h>
@@ -148,7 +147,7 @@ bt_status_t btif_storage_add_hid_device_info(
   }
 
   if (link_spec.transport == BT_TRANSPORT_AUTO) {
-    LOG_ERROR("Unexpected transport!");
+    log::error("Unexpected transport!");
     return BT_STATUS_FAIL;
   }
   btif_config_set_int(bdstr, BTIF_STORAGE_KEY_HID_DB_VERSION,
@@ -339,7 +338,7 @@ bt_status_t btif_storage_remove_hid_info(const tAclLinkSpec& link_spec) {
   btif_config_remove(bdstr, BTIF_STORAGE_KEY_HID_RECONNECT_ALLOWED);
 
   if (IS_FLAG_ENABLED(allow_switching_hid_and_hogp)) {
-    int db_version;
+    int db_version = 0;
     btif_config_get_int(bdstr, BTIF_STORAGE_KEY_HID_DB_VERSION, &db_version);
     if (db_version == STORAGE_HID_DB_VERSION) {
       btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_ATTR_MASK);
@@ -350,9 +349,9 @@ bt_status_t btif_storage_remove_hid_info(const tAclLinkSpec& link_spec) {
       btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_VERSION);
       btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_COUNTRY_CODE);
       btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_DESCRIPTOR);
-      btif_config_remove(bdstr, BTIF_STORAGE_KEY_HID_DB_VERSION);
       btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_RECONNECT_ALLOWED);
     }
+    btif_config_remove(bdstr, BTIF_STORAGE_KEY_HID_DB_VERSION);
   }
   return BT_STATUS_SUCCESS;
 }
@@ -990,7 +989,7 @@ void btif_storage_load_bonded_leaudio_has_devices() {
                       Bind(&bluetooth::le_audio::has::HasClient::AddFromStorage,
                            bd_addr, features, is_acceptlisted));
 #else
-    ASSERT_LOG(false, "TODO - Fix LE audio build.");
+    log::fatal("TODO - Fix LE audio build.");
 #endif
   }
 }
@@ -1233,7 +1232,7 @@ bt_status_t btif_storage_set_hid_connection_policy(
     btif_config_set_int(bdstr, BTIF_STORAGE_KEY_HID_RECONNECT_ALLOWED,
                         reconnect_allowed);
   } else {
-    LOG_ERROR("Unexpected!");
+    log::error("Unexpected!");
   }
 
   return BT_STATUS_SUCCESS;
@@ -1258,7 +1257,7 @@ bt_status_t btif_storage_get_hid_connection_policy(
   } else if (link_spec.transport == BT_TRANSPORT_BR_EDR) {
     btif_config_get_int(bdstr, BTIF_STORAGE_KEY_HID_RECONNECT_ALLOWED, &value);
   } else {
-    LOG_ERROR("Un expected!");
+    log::error("Un expected!");
   }
   *reconnect_allowed = value ? true : false;
 

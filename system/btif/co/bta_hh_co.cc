@@ -19,7 +19,6 @@
 #include "bta_hh_co.h"
 
 #include <android_bluetooth_flags.h>
-#include <base/logging.h>
 #include <fcntl.h>
 #include <linux/uhid.h>
 #include <poll.h>
@@ -35,7 +34,6 @@
 #include "btif_hh.h"
 #include "hci/controller_interface.h"
 #include "device/include/interop.h"
-#include "include/check.h"
 #include "main/shim/entry.h"
 #include "osi/include/allocator.h"
 #include "osi/include/compat.h"
@@ -54,7 +52,7 @@ static tBTA_HH_RPT_CACHE_ENTRY sReportCache[BTA_HH_NV_LOAD_MAX];
 #define REPORT_DESC_END_COLLECTION 0xC0
 #define BTA_HH_CACHE_REPORT_VERSION 1
 #define THREAD_NORMAL_PRIORITY 0
-#define BT_HH_THREAD "bt_hh_thread"
+#define BT_HH_THREAD_PREFIX "bt_hh_"
 #define BTA_HH_UHID_POLL_PERIOD_MS 50
 /* Max number of polling interrupt allowed */
 #define BTA_HH_UHID_INTERRUPT_COUNT_MAX 100
@@ -80,13 +78,12 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
   uint8_t* startDescPtr = data;
   uint8_t* desc = data;
 
-  LOG_VERBOSE("remove_digitizer_descriptor");
+  log::verbose("remove_digitizer_descriptor");
   /* Parse until complete report descriptor is parsed */
   while (startDescPtr < data + *length) {
     uint8_t item = *startDescPtr++;
     if (startDescPtr > data + *length) {
-      LOG_ERROR("%s: is having invalid startDescPtr: %p", __func__,
-                       startDescPtr);
+      log::error("is having invalid startDescPtr: {}", fmt::ptr(startDescPtr));
       return;
     }
     uint8_t usage_page;
@@ -120,18 +117,11 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
             traversePtr++;
           }
           remainingBytesToBeCopied = *length - (traversePtr - data);
-          LOG_VERBOSE("starting point of digitizer desc = %d\n",
-                           (startDescPtr - data) - 1);
-          LOG_VERBOSE(
-              "start collection = %d, end collection = "
-              " %d\n",
-              num_of_collections, num_of_end_collections);
-          LOG_VERBOSE("end point of digitizer desc = %d\n",
-                           (traversePtr - data));
-          LOG_VERBOSE("length of digitizer desc = %d\n",
-                           traversePtr - startDescPtr + 2);
-          LOG_VERBOSE("bytes remaining to be copied = %d\n",
-                           remainingBytesToBeCopied);
+          log::verbose("starting point of digitizer desc = {}\n", (startDescPtr - data) - 1);
+          log::verbose("start collection = {}, end collection =  {}\n", num_of_collections, num_of_end_collections);
+          log::verbose("end point of digitizer desc = {}\n", (traversePtr - data));
+          log::verbose("length of digitizer desc = {}\n", traversePtr - startDescPtr + 2);
+          log::verbose("bytes remaining to be copied = {}\n", remainingBytesToBeCopied);
           if (remainingBytesToBeCopied) {
             uint32_t i;
             uint8_t* newDescPtr = traversePtr;
@@ -146,7 +136,7 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
           }
           /* update the length as digitizer descriptor is removed */
           *length = *length - (traversePtr - startDescPtr) - 1;
-          LOG_VERBOSE("new length of report desc = %d\n", *length);
+          log::verbose("new length of report desc = {}\n", *length);
           /* Update the start descriptor again to continue parsing
            * for digitizer records assuming more than 1 digitizer
            * record exists in report descriptor */
@@ -240,7 +230,7 @@ static int uhid_write(int fd, const struct uhid_event* ev) {
 
 /* Internal function to parse the events received from UHID driver*/
 static int uhid_read_event(btif_hh_device_t* p_dev) {
-  CHECK(p_dev);
+  log::assert_that(p_dev != nullptr, "assert failed: p_dev != nullptr");
 
   struct uhid_event ev;
   memset(&ev, 0, sizeof(ev));
@@ -391,6 +381,90 @@ static bool uhid_fd_open(btif_hh_device_t* p_dev) {
   return true;
 }
 
+static int uhid_fd_poll(btif_hh_device_t* p_dev,
+                        std::array<struct pollfd, 1>& pfds) {
+  int ret = 0;
+  int counter = 0;
+
+  do {
+    if (IS_FLAG_ENABLED(break_uhid_polling_early) && !p_dev->hh_keep_polling) {
+      log::debug("Polling stopped");
+      return -1;
+    }
+
+    if (counter++ > BTA_HH_UHID_INTERRUPT_COUNT_MAX) {
+      log::error("Polling interrupted consecutively {} times",
+                 BTA_HH_UHID_INTERRUPT_COUNT_MAX);
+      return -1;
+    }
+
+    ret = poll(pfds.data(), pfds.size(), BTA_HH_UHID_POLL_PERIOD_MS);
+  } while (ret == -1 && errno == EINTR);
+
+  if (!IS_FLAG_ENABLED(break_uhid_polling_early)) {
+    if (ret == 0) {
+      log::debug("Polling timed out, attempt to read (old behavior)");
+      return 1;
+    }
+  }
+
+  return ret;
+}
+
+static void uhid_start_polling(btif_hh_device_t* p_dev) {
+  std::array<struct pollfd, 1> pfds = {};
+  pfds[0].fd = p_dev->fd;
+  pfds[0].events = POLLIN;
+
+  while (p_dev->hh_keep_polling) {
+    int ret = uhid_fd_poll(p_dev, pfds);
+
+    if (ret < 0) {
+      log::error("Cannot poll for fds: {}\n", strerror(errno));
+      break;
+    } else if (ret == 0) {
+      /* Poll timeout, poll again */
+      continue;
+    }
+
+    /* At least one of the fd is ready */
+    if (pfds[0].revents & POLLIN) {
+      log::verbose("POLLIN");
+      int result = uhid_read_event(p_dev);
+      if (result != 0) {
+        log::error("Unhandled UHID event, error: {}", result);
+        break;
+      }
+    }
+  }
+}
+
+static bool uhid_configure_thread(btif_hh_device_t* p_dev) {
+  pid_t pid = gettid();
+  // This thread is created by bt_main_thread with RT priority. Lower the thread
+  // priority here since the tasks in this thread is not timing critical.
+  struct sched_param sched_params;
+  sched_params.sched_priority = THREAD_NORMAL_PRIORITY;
+  if (sched_setscheduler(pid, SCHED_OTHER, &sched_params)) {
+    log::error("Failed to set thread priority to normal: {}", strerror(errno));
+    return false;
+  }
+
+  // Change the name of thread
+  char thread_name[16] = {};
+  sprintf(thread_name, BT_HH_THREAD_PREFIX "%02x:%02x",
+          p_dev->link_spec.addrt.bda.address[4],
+          p_dev->link_spec.addrt.bda.address[5]);
+  pthread_setname_np(pthread_self(), thread_name);
+  log::debug("Host hid polling thread created name:{} pid:{} fd:{}",
+             thread_name, pid, p_dev->fd);
+
+  // Set the uhid fd as non-blocking to ensure we never block the BTU thread
+  uhid_set_non_blocking(p_dev->fd);
+
+  return true;
+}
+
 /*******************************************************************************
  *
  * Function btif_hh_poll_event_thread
@@ -402,55 +476,9 @@ static bool uhid_fd_open(btif_hh_device_t* p_dev) {
  ******************************************************************************/
 static void* btif_hh_poll_event_thread(void* arg) {
   btif_hh_device_t* p_dev = (btif_hh_device_t*)arg;
-  struct pollfd pfds[1];
-  pid_t pid = gettid();
 
-  // This thread is created by bt_main_thread with RT priority. Lower the thread
-  // priority here since the tasks in this thread is not timing critical.
-  struct sched_param sched_params;
-  sched_params.sched_priority = THREAD_NORMAL_PRIORITY;
-  if (sched_setscheduler(pid, SCHED_OTHER, &sched_params)) {
-    log::error("Failed to set thread priority to normal: {}", strerror(errno));
-    p_dev->hh_poll_thread_id = -1;
-    p_dev->hh_keep_polling = 0;
-    uhid_fd_close(p_dev);
-    return 0;
-  }
-
-  pthread_setname_np(pthread_self(), BT_HH_THREAD);
-  log::debug("Host hid polling thread created name:{} pid:{} fd:{}",
-             BT_HH_THREAD, pid, p_dev->fd);
-
-  pfds[0].fd = p_dev->fd;
-  pfds[0].events = POLLIN;
-
-  // Set the uhid fd as non-blocking to ensure we never block the BTU thread
-  uhid_set_non_blocking(p_dev->fd);
-
-  while (p_dev->hh_keep_polling) {
-    int ret;
-    int counter = 0;
-
-    do {
-      if (counter++ > BTA_HH_UHID_INTERRUPT_COUNT_MAX) {
-        log::error("Polling interrupted");
-        break;
-      }
-      ret = poll(pfds, 1, BTA_HH_UHID_POLL_PERIOD_MS);
-    } while (ret == -1 && errno == EINTR);
-
-    if (ret < 0) {
-      log::error("Cannot poll for fds: {}\n", strerror(errno));
-      break;
-    }
-    if (pfds[0].revents & POLLIN) {
-      log::verbose("POLLIN");
-      ret = uhid_read_event(p_dev);
-      if (ret != 0) {
-        log::error("Unhandled UHID event");
-        break;
-      }
-    }
+  if (uhid_configure_thread(p_dev)) {
+    uhid_start_polling(p_dev);
   }
 
   /* Todo: Disconnect if loop exited due to a failure */
@@ -477,26 +505,7 @@ int bta_hh_co_write(int fd, uint8_t* rpt, uint16_t len) {
 
   return uhid_write(fd, &ev);
 }
-static bool hh_co_update_device(btif_hh_device_t* p_dev, uint8_t dev_handle,
-                                uint8_t sub_class, tBTA_HH_ATTR_MASK attr_mask,
-                                uint8_t app_id) {
-  p_dev->fd = -1;
-  p_dev->hh_keep_polling = 0;
 
-  // This is a new device, open the uhid driver now.
-  if (!uhid_fd_open(p_dev)) {
-    return false;
-  }
-
-  p_dev->dev_handle = dev_handle;
-  p_dev->attr_mask = attr_mask;
-  p_dev->sub_class = sub_class;
-  p_dev->app_id = app_id;
-  p_dev->local_vup = false;
-  btif_hh_cb.device_num++;
-
-  return true;
-}
 /*******************************************************************************
  *
  * Function      bta_hh_co_open
@@ -508,66 +517,57 @@ static bool hh_co_update_device(btif_hh_device_t* p_dev, uint8_t dev_handle,
  ******************************************************************************/
 bool bta_hh_co_open(uint8_t dev_handle, uint8_t sub_class,
                     tBTA_HH_ATTR_MASK attr_mask, uint8_t app_id) {
-  uint32_t i;
-  btif_hh_device_t* p_dev = NULL;
+  bool new_device = false;
 
   if (dev_handle == BTA_HH_INVALID_HANDLE) {
     log::warn("dev_handle ({}) is invalid", dev_handle);
     return false;
   }
 
-  for (i = 0; i < BTIF_HH_MAX_HID; i++) {
-    p_dev = &btif_hh_cb.devices[i];
-    if (p_dev->dev_status != BTHH_CONN_STATE_UNKNOWN &&
-        p_dev->dev_handle == dev_handle) {
-      // We found a device with the same handle. Must be a device reconnected.
-      log::info(
-          "Found an existing device with the same handle dev_status={}, "
-          "address={}, attr_mask=0x{:04x}, sub_class=0x{:02x}, app_id={}",
-          p_dev->dev_status, ADDRESS_TO_LOGGABLE_CSTR(p_dev->link_spec),
-          p_dev->attr_mask, p_dev->sub_class, p_dev->app_id);
-
-      if (!uhid_fd_open(p_dev)) {
-        return false;
-      }
-      break;
-    } else if (IS_FLAG_ENABLED(allow_switching_hid_and_hogp) &&
-               p_dev->dev_status == BTHH_CONN_STATE_ACCEPTING &&
-               p_dev->dev_handle == BTA_HH_INVALID_HANDLE) {
-      if (!hh_co_update_device(p_dev, dev_handle, sub_class, attr_mask,
-                               app_id)) {
-        return false;
-      }
-      break;
+  // Reuse existing instance if possible
+  btif_hh_device_t* p_dev = btif_hh_find_dev_by_handle(dev_handle);
+  if (p_dev != nullptr) {
+    log::info(
+        "Found an existing device with the same handle dev_status={}, "
+        "device={}, attr_mask=0x{:04x}, sub_class=0x{:02x}, app_id={}, "
+        "dev_handle={}",
+        p_dev->dev_status, ADDRESS_TO_LOGGABLE_CSTR(p_dev->link_spec),
+        p_dev->attr_mask, p_dev->sub_class, p_dev->app_id, dev_handle);
+  } else {  // Use an empty slot
+    p_dev = btif_hh_find_empty_dev();
+    if (p_dev == nullptr) {
+      log::error("Too many HID devices are connected");
+      return false;
     }
-    p_dev = NULL;
+
+    new_device = true;
+    log::verbose("New HID device added for handle {}", dev_handle);
+
+    p_dev->fd = -1;
+    p_dev->hh_keep_polling = 0;
+    p_dev->attr_mask = attr_mask;
+    p_dev->sub_class = sub_class;
+    p_dev->app_id = app_id;
+    p_dev->local_vup = false;
   }
 
-  if (p_dev == NULL) {
-    // Did not find a device reconnection case. Find an empty slot now.
-    for (i = 0; i < BTIF_HH_MAX_HID; i++) {
-      if (btif_hh_cb.devices[i].dev_status == BTHH_CONN_STATE_UNKNOWN) {
-        p_dev = &btif_hh_cb.devices[i];
-        if (!hh_co_update_device(p_dev, dev_handle, sub_class, attr_mask,
-                                 app_id)) {
-          return false;
-        }
-        break;
-      }
-    }
-  }
-
-  if (p_dev == NULL) {
-    log::error("Too many HID devices are connected");
+  if (!uhid_fd_open(p_dev)) {
     return false;
   }
 
+  if (new_device) {
+    btif_hh_cb.device_num++;
+  }
+
   p_dev->dev_status = BTHH_CONN_STATE_CONNECTED;
+  p_dev->dev_handle = dev_handle;
   p_dev->get_rpt_id_queue = fixed_queue_new(SIZE_MAX);
-  CHECK(p_dev->get_rpt_id_queue);
+  log::assert_that(p_dev->get_rpt_id_queue,
+                   "assert failed: p_dev->get_rpt_id_queue");
 #if ENABLE_UHID_SET_REPORT
   p_dev->set_rpt_id_queue = fixed_queue_new(SIZE_MAX);
-  CHECK(p_dev->set_rpt_id_queue);
+  log::assert_that(p_dev->set_rpt_id_queue,
+                   "assert failed: p_dev->set_rpt_id_queue");
 #endif  // ENABLE_UHID_SET_REPORT
 
   log::debug("Return device status {}", p_dev->dev_status);
@@ -703,9 +703,7 @@ void bta_hh_co_send_hid_info(btif_hh_device_t* p_dev, const char* dev_name,
       interop_match_name(INTEROP_CHANGE_HID_VID_PID, dev_name)) {
     vendor_id = 0x1000;
     product_id = 0x1000;
-    LOG_WARN(
-        "%s: vendor_id = 0x%04x, product_id = 0x%04x, name = [%s]", __func__,
-        vendor_id, product_id, dev_name);
+    log::warn("vendor_id = 0x{:04x}, product_id = 0x{:04x}, name = [{}]", vendor_id, product_id, dev_name);
   }
   // Create and send hid descriptor to kernel
   memset(&ev, 0, sizeof(ev));

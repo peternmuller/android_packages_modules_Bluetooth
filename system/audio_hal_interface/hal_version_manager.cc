@@ -18,14 +18,12 @@
 
 #include <android/binder_manager.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 #include <hidl/ServiceManagement.h>
 
 #include <memory>
 
 #include "aidl/audio_aidl_interfaces.h"
-#include "include/check.h"
 #include "os/log.h"
 
 namespace bluetooth {
@@ -121,8 +119,9 @@ HalVersionManager::GetProvidersFactory_2_1() {
   }
   android::sp<IBluetoothAudioProvidersFactory_2_1> providers_factory =
       IBluetoothAudioProvidersFactory_2_1::getService();
-  CHECK(providers_factory)
-      << "V2_1::IBluetoothAudioProvidersFactory::getService() failed";
+  log::assert_that(
+      providers_factory != nullptr,
+      "V2_1::IBluetoothAudioProvidersFactory::getService() failed");
 
   log::info("V2_1::IBluetoothAudioProvidersFactory::getService() returned {}{}",
             fmt::ptr(providers_factory.get()),
@@ -139,8 +138,9 @@ HalVersionManager::GetProvidersFactory_2_0() {
   }
   android::sp<IBluetoothAudioProvidersFactory_2_0> providers_factory =
       IBluetoothAudioProvidersFactory_2_0::getService();
-  CHECK(providers_factory)
-      << "V2_0::IBluetoothAudioProvidersFactory::getService() failed";
+  log::assert_that(
+      providers_factory != nullptr,
+      "V2_0::IBluetoothAudioProvidersFactory::getService() failed");
 
   log::info("V2_0::IBluetoothAudioProvidersFactory::getService() returned {}{}",
             fmt::ptr(providers_factory.get()),
@@ -153,14 +153,15 @@ HalVersionManager::HalVersionManager() {
   hal_transport_ = BluetoothAudioHalTransport::UNKNOWN;
   if (AServiceManager_checkService(
           kDefaultAudioProviderFactoryInterface.c_str()) != nullptr) {
-    LOG(INFO) << __func__ << ": Going with AIDL: ";
+    log::info( __func__,  ": Going with AIDL: ");
     hal_version_ = GetAidlInterfaceVersion();
     hal_transport_ = BluetoothAudioHalTransport::AIDL;
     return;
   }
 
   auto service_manager = android::hardware::defaultServiceManager1_2();
-  CHECK(service_manager != nullptr);
+  log::assert_that(service_manager != nullptr,
+                   "assert failed: service_manager != nullptr");
   size_t instance_count = 0;
   auto listManifestByInterface_cb =
       [&instance_count](
@@ -176,7 +177,7 @@ HalVersionManager::HalVersionManager() {
   }
 
   if (instance_count > 0) {
-    LOG(INFO) << __func__ << ": Going with AOSP HIDL 2.1 ";
+    log::info(__func__ , ": Going with AOSP HIDL 2.1 ");
     hal_version_ = BluetoothAudioHalVersion::VERSION_2_1;
     hal_transport_ = BluetoothAudioHalTransport::HIDL;
     return;
@@ -191,7 +192,7 @@ HalVersionManager::HalVersionManager() {
   }
 
   if (instance_count > 0) {
-    LOG(INFO) << __func__ << ": Going with AOSP HIDL 2.0 ";
+    log::info(__func__, ": Going with AOSP HIDL 2.0 ");
     hal_version_ = BluetoothAudioHalVersion::VERSION_2_0;
     hal_transport_ = BluetoothAudioHalTransport::HIDL;
     return;
@@ -200,13 +201,13 @@ HalVersionManager::HalVersionManager() {
   hidl_retval = service_manager->listManifestByInterface(
       kFullyQualifiedQTIInterfaceName_2_1, listManifestByInterface_cb);
   if (!hidl_retval.isOk()) {
-    LOG(FATAL) << __func__ << ": IServiceManager::listByInterface failure: "
-               << hidl_retval.description();
+    log::fatal("IServiceManager::listByInterface failure: {}",
+               hidl_retval.description());
     return;
   }
 
   if (instance_count > 0) {
-    LOG(INFO) << __func__ << " QTI HIDL 2.1 version";
+    log::info(__func__ , " QTI HIDL 2.1 version");
     hal_version_ = BluetoothAudioHalVersion::VERSION_QTI_HIDL_2_1;
     hal_transport_ = BluetoothAudioHalTransport::QTI_HIDL;
     return;
@@ -215,13 +216,13 @@ HalVersionManager::HalVersionManager() {
   hidl_retval = service_manager->listManifestByInterface(
       kFullyQualifiedQTIInterfaceName_2_0, listManifestByInterface_cb);
   if (!hidl_retval.isOk()) {
-    LOG(FATAL) << __func__ << ": IServiceManager::listByInterface failure: "
-               << hidl_retval.description();
+    log::fatal("IServiceManager::listByInterface failure: {}",
+              hidl_retval.description());
     return;
   }
 
   if (instance_count > 0) {
-    LOG(INFO) << __func__ << " QTI HIDL 2.0 version";
+    log::info(__func__ , " QTI HIDL 2.0 version");
     hal_version_ = BluetoothAudioHalVersion::VERSION_QTI_HIDL_2_0;
     hal_transport_ = BluetoothAudioHalTransport::QTI_HIDL;
     return;
