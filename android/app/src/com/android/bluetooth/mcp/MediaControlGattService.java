@@ -40,6 +40,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.util.Pair;
 
@@ -152,6 +153,7 @@ public class MediaControlGattService implements MediaControlGattServiceInterface
     private McpService mMcpService;
     private LeAudioService mLeAudioService;
     private AdapterService mAdapterService;
+    private boolean mIgnorePTforBroadcast = false;
 
     private static final int LOG_NB_EVENTS = 200;
     private final BluetoothEventLogger mEventLogger;
@@ -1081,6 +1083,8 @@ public class MediaControlGattService implements MediaControlGattServiceInterface
         mEventLogger =
                 new BluetoothEventLogger(
                         LOG_NB_EVENTS, TAG + " instance (CCID= " + ccid + ") event log");
+        mIgnorePTforBroadcast =
+                SystemProperties.getBoolean("persist.vendor.service.bt.ignorePTforBrodacast", true);
     }
 
     protected boolean init(UUID scvUuid) {
@@ -1155,6 +1159,15 @@ public class MediaControlGattService implements MediaControlGattServiceInterface
             Log.w(TAG, "handleMediaControlPointRequest: " + Request.Opcodes.toString(opcode)
                     + " bad payload length");
             return BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
+        }
+
+        if (mIgnorePTforBroadcast && isBroadcastActive()) {
+            Log.w(TAG, "handleMediaControlPointRequest: Broadcast streaming active, ignore mcp passthrough");
+            mHandler.post(() -> {
+                setMediaControlRequestResult(new Request(opcode, 0),
+                        Request.Results.COMMAND_CANNOT_BE_COMPLETED);
+            });
+            return BluetoothGatt.GATT_SUCCESS;
         }
 
         // Only some requests have payload
@@ -1965,6 +1978,10 @@ public class MediaControlGattService implements MediaControlGattServiceInterface
      * @return {@code true} if is broadcasting audio, {@code false} otherwise
      */
     private boolean isBroadcastActive() {
+        if (mLeAudioService == null) {
+            mLeAudioService = LeAudioService.getLeAudioService();
+        }
+
         if (!Flags.leaudioBroadcastFeatureSupport()) {
             // disable this if feature flag is false
             return false;
