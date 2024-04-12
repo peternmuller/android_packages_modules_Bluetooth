@@ -269,7 +269,7 @@ struct ConnectionDescriptor {
         "peer:%s handle:0x%04x is_locally_initiated:%s"
         " creation_time:%s teardown_time:%s disconnect_reason:%s",
         GetPrivateRemoteAddress().c_str(), handle_,
-        logbool(is_locally_initiated_).c_str(),
+        is_locally_initiated_ ? "true" : "false",
         common::StringFormatTimeWithMilliseconds(
             kConnectionDescriptorTimeFormat, creation_time_)
             .c_str(),
@@ -339,25 +339,27 @@ inline uint8_t LowByte(uint16_t val) { return val & 0xff; }
 inline uint8_t HighByte(uint16_t val) { return val >> 8; }
 
 void ValidateAclInterface(const shim::legacy::acl_interface_t& acl_interface) {
-  ASSERT_LOG(acl_interface.on_send_data_upwards != nullptr,
-             "Must provide to receive data on acl links");
-  ASSERT_LOG(acl_interface.on_packets_completed != nullptr,
-             "Must provide to receive completed packet indication");
+  log::assert_that(acl_interface.on_send_data_upwards != nullptr,
+                   "Must provide to receive data on acl links");
+  log::assert_that(acl_interface.on_packets_completed != nullptr,
+                   "Must provide to receive completed packet indication");
 
-  ASSERT_LOG(acl_interface.connection.classic.on_connected != nullptr,
-             "Must provide to respond to successful classic connections");
-  ASSERT_LOG(acl_interface.connection.classic.on_failed != nullptr,
-             "Must provide to respond when classic connection attempts fail");
-  ASSERT_LOG(
+  log::assert_that(acl_interface.connection.classic.on_connected != nullptr,
+                   "Must provide to respond to successful classic connections");
+  log::assert_that(
+      acl_interface.connection.classic.on_failed != nullptr,
+      "Must provide to respond when classic connection attempts fail");
+  log::assert_that(
       acl_interface.connection.classic.on_disconnected != nullptr,
       "Must provide to respond when active classic connection disconnects");
 
-  ASSERT_LOG(acl_interface.connection.le.on_connected != nullptr,
-             "Must provide to respond to successful le connections");
-  ASSERT_LOG(acl_interface.connection.le.on_failed != nullptr,
-             "Must provide to respond when le connection attempts fail");
-  ASSERT_LOG(acl_interface.connection.le.on_disconnected != nullptr,
-             "Must provide to respond when active le connection disconnects");
+  log::assert_that(acl_interface.connection.le.on_connected != nullptr,
+                   "Must provide to respond to successful le connections");
+  log::assert_that(acl_interface.connection.le.on_failed != nullptr,
+                   "Must provide to respond when le connection attempts fail");
+  log::assert_that(
+      acl_interface.connection.le.on_disconnected != nullptr,
+      "Must provide to respond when active le connection disconnects");
 }
 
 }  // namespace
@@ -395,8 +397,9 @@ class ShimAclConnection {
           "ACL cleaned up with non-empty queue handle:0x{:04x} "
           "stranded_pkts:{}",
           handle_, queue_.size());
-    ASSERT_LOG(is_disconnected_,
-               "Shim Acl was not properly disconnected handle:0x%04x", handle_);
+    log::assert_that(is_disconnected_,
+                     "Shim Acl was not properly disconnected handle:0x{:04x}",
+                     handle_);
   }
 
   void EnqueuePacket(std::unique_ptr<packet::RawBuilder> packet) {
@@ -423,8 +426,9 @@ class ShimAclConnection {
     preamble.push_back(LowByte(length));
     preamble.push_back(HighByte(length));
     BT_HDR* p_buf = MakeLegacyBtHdrPacket(std::move(packet), preamble);
-    ASSERT_LOG(p_buf != nullptr,
-               "Unable to allocate BT_HDR legacy packet handle:%04x", handle_);
+    log::assert_that(p_buf != nullptr,
+                     "Unable to allocate BT_HDR legacy packet handle:{:04x}",
+                     handle_);
     if (send_data_upwards_ == nullptr) {
       log::warn("Dropping ACL data with no callback");
       osi_free(p_buf);
@@ -487,9 +491,9 @@ class ShimAclConnection {
   CreationTime creation_time_;
 
   void RegisterEnqueue() {
-    ASSERT_LOG(!is_disconnected_,
-               "Unable to send data over disconnected channel handle:%04x",
-               handle_);
+    log::assert_that(
+        !is_disconnected_,
+        "Unable to send data over disconnected channel handle:{:04x}", handle_);
     if (is_enqueue_registered_) return;
     is_enqueue_registered_ = true;
     queue_up_end_->RegisterEnqueue(
@@ -696,25 +700,38 @@ class ClassicShimAclConnection
   }
 
   void HoldMode(uint16_t max_interval, uint16_t min_interval) {
-    ASSERT(connection_->HoldMode(max_interval, min_interval));
+    log::assert_that(
+        connection_->HoldMode(max_interval, min_interval),
+        "assert failed: connection_->HoldMode(max_interval, min_interval)");
   }
 
   void SniffMode(uint16_t max_interval, uint16_t min_interval, uint16_t attempt,
                  uint16_t timeout) {
-    ASSERT(
-        connection_->SniffMode(max_interval, min_interval, attempt, timeout));
+    log::assert_that(
+        connection_->SniffMode(max_interval, min_interval, attempt, timeout),
+        "assert failed:  connection_->SniffMode(max_interval, min_interval, "
+        "attempt, timeout)");
   }
 
-  void ExitSniffMode() { ASSERT(connection_->ExitSniffMode()); }
+  void ExitSniffMode() {
+    log::assert_that(connection_->ExitSniffMode(),
+                     "assert failed: connection_->ExitSniffMode()");
+  }
 
   void SniffSubrating(uint16_t maximum_latency, uint16_t minimum_remote_timeout,
                       uint16_t minimum_local_timeout) {
-    ASSERT(connection_->SniffSubrating(maximum_latency, minimum_remote_timeout,
-                                       minimum_local_timeout));
+    log::assert_that(
+        connection_->SniffSubrating(maximum_latency, minimum_remote_timeout,
+                                    minimum_local_timeout),
+        "assert failed: connection_->SniffSubrating(maximum_latency, "
+        "minimum_remote_timeout, minimum_local_timeout)");
   }
 
   void SetConnectionEncryption(hci::Enable is_encryption_enabled) {
-    ASSERT(connection_->SetConnectionEncryption(is_encryption_enabled));
+    log::assert_that(
+        connection_->SetConnectionEncryption(is_encryption_enabled),
+        "assert failed: "
+        "connection_->SetConnectionEncryption(is_encryption_enabled)");
   }
 
   bool IsLocallyInitiated() const override {
@@ -853,6 +870,13 @@ class LeShimAclConnection
     return connection_->IsInFilterAcceptList();
   }
 
+  void UpdateConnectionParameters(uint16_t conn_int_min, uint16_t conn_int_max,
+                                  uint16_t conn_latency, uint16_t conn_timeout,
+                                  uint16_t min_ce_len, uint16_t max_ce_len) {
+    connection_->LeConnectionUpdate(conn_int_min, conn_int_max, conn_latency,
+                                    conn_timeout, min_ce_len, max_ce_len);
+  }
+
  private:
   OnDisconnect on_disconnect_;
   const shim::legacy::acl_le_link_interface_t interface_;
@@ -886,8 +910,8 @@ struct shim::legacy::Acl::impl {
 
   void EnqueueClassicPacket(HciHandle handle,
                             std::unique_ptr<packet::RawBuilder> packet) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->EnqueuePacket(std::move(packet));
   }
 
@@ -895,7 +919,7 @@ struct shim::legacy::Acl::impl {
     if (IsClassicAcl(handle)) {
       handle_to_classic_connection_map_[handle]->Flush();
     } else {
-      LOG_ERROR("handle %d is not a classic connection", handle);
+      log::error("handle {} is not a classic connection", handle);
     }
   }
 
@@ -906,7 +930,8 @@ struct shim::legacy::Acl::impl {
 
   void EnqueueLePacket(HciHandle handle,
                        std::unique_ptr<packet::RawBuilder> packet) {
-    ASSERT_LOG(IsLeAcl(handle), "handle %d is not a LE connection", handle);
+    log::assert_that(IsLeAcl(handle), "handle {} is not a LE connection",
+                     handle);
     handle_to_le_connection_map_[handle]->EnqueuePacket(std::move(packet));
   }
 
@@ -1000,22 +1025,22 @@ struct shim::legacy::Acl::impl {
 
   void HoldMode(HciHandle handle, uint16_t max_interval,
                 uint16_t min_interval) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->HoldMode(max_interval,
                                                         min_interval);
   }
 
   void ExitSniffMode(HciHandle handle) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->ExitSniffMode();
   }
 
   void SniffMode(HciHandle handle, uint16_t max_interval, uint16_t min_interval,
                  uint16_t attempt, uint16_t timeout) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->SniffMode(
         max_interval, min_interval, attempt, timeout);
   }
@@ -1023,8 +1048,8 @@ struct shim::legacy::Acl::impl {
   void SniffSubrating(HciHandle handle, uint16_t maximum_latency,
                       uint16_t minimum_remote_timeout,
                       uint16_t minimum_local_timeout) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->SniffSubrating(
         maximum_latency, minimum_remote_timeout, minimum_local_timeout);
   }
@@ -1039,14 +1064,15 @@ struct shim::legacy::Acl::impl {
   void LeSubrateRequest(HciHandle handle, uint16_t subrate_min,
                         uint16_t subrate_max, uint16_t max_latency,
                         uint16_t cont_num, uint16_t sup_tout) {
-    ASSERT_LOG(IsLeAcl(handle), "handle %d is not a LE connection", handle);
+    log::assert_that(IsLeAcl(handle), "handle {} is not a LE connection",
+                     handle);
     handle_to_le_connection_map_[handle]->LeSubrateRequest(
         subrate_min, subrate_max, max_latency, cont_num, sup_tout);
   }
 
   void SetConnectionEncryption(HciHandle handle, hci::Enable enable) {
-    ASSERT_LOG(IsClassicAcl(handle), "handle %d is not a classic connection",
-               handle);
+    log::assert_that(IsClassicAcl(handle),
+                     "handle {} is not a classic connection", handle);
     handle_to_classic_connection_map_[handle]->SetConnectionEncryption(enable);
   }
 
@@ -1095,6 +1121,21 @@ struct shim::legacy::Acl::impl {
       log::warn("Unable to disconnect unknown le connection handle:0x{:04x}",
                 handle);
     }
+  }
+
+  void update_connection_parameters(uint16_t handle, uint16_t conn_int_min,
+                                    uint16_t conn_int_max,
+                                    uint16_t conn_latency,
+                                    uint16_t conn_timeout, uint16_t min_ce_len,
+                                    uint16_t max_ce_len) {
+    auto connection = handle_to_le_connection_map_.find(handle);
+    if (connection == handle_to_le_connection_map_.end()) {
+      log::warn("Unknown le connection handle:0x{:04x}", handle);
+      return;
+    }
+    connection->second->UpdateConnectionParameters(conn_int_min, conn_int_max,
+                                                   conn_latency, conn_timeout,
+                                                   min_ce_len, max_ce_len);
   }
 
   void accept_le_connection_from(const hci::AddressWithType& address_with_type,
@@ -1370,7 +1411,7 @@ shim::legacy::Acl::Acl(os::Handler* handler,
                        uint8_t max_acceptlist_size,
                        uint8_t max_address_resolution_size)
     : handler_(handler), acl_interface_(acl_interface) {
-  ASSERT(handler_ != nullptr);
+  log::assert_that(handler_ != nullptr, "assert failed: handler_ != nullptr");
   ValidateAclInterface(acl_interface_);
   pimpl_ = std::make_unique<Acl::impl>(max_acceptlist_size,
                                        max_address_resolution_size);
@@ -1590,7 +1631,8 @@ void shim::legacy::Acl::OnLeLinkDisconnected(HciHandle handle,
 
 void shim::legacy::Acl::OnConnectSuccess(
     std::unique_ptr<hci::acl_manager::ClassicAclConnection> connection) {
-  ASSERT(connection != nullptr);
+  log::assert_that(connection != nullptr,
+                   "assert failed: connection != nullptr");
   auto handle = connection->GetHandle();
   bool locally_initiated = connection->locally_initiated_;
   const hci::Address remote_address = connection->GetAddress();
@@ -1650,7 +1692,8 @@ void shim::legacy::Acl::OnConnectFail(hci::Address address,
 void shim::legacy::Acl::OnLeConnectSuccess(
     hci::AddressWithType address_with_type,
     std::unique_ptr<hci::acl_manager::LeAclConnection> connection) {
-  ASSERT(connection != nullptr);
+  log::assert_that(connection != nullptr,
+                   "assert failed: connection != nullptr");
   auto handle = connection->GetHandle();
 
   // Save the peer address, if any
@@ -1769,34 +1812,13 @@ void shim::legacy::Acl::DisconnectLe(uint16_t handle, tHCI_STATUS reason,
                    comment);
 }
 
-bool shim::legacy::Acl::HoldMode(uint16_t hci_handle, uint16_t max_interval,
-                                 uint16_t min_interval) {
-  handler_->CallOn(pimpl_.get(), &Acl::impl::HoldMode, hci_handle, max_interval,
-                   min_interval);
-  return false;  // TODO void
-}
-
-bool shim::legacy::Acl::SniffMode(uint16_t hci_handle, uint16_t max_interval,
-                                  uint16_t min_interval, uint16_t attempt,
-                                  uint16_t timeout) {
-  handler_->CallOn(pimpl_.get(), &Acl::impl::SniffMode, hci_handle,
-                   max_interval, min_interval, attempt, timeout);
-  return false;
-}
-
-bool shim::legacy::Acl::ExitSniffMode(uint16_t hci_handle) {
-  handler_->CallOn(pimpl_.get(), &Acl::impl::ExitSniffMode, hci_handle);
-  return false;
-}
-
-bool shim::legacy::Acl::SniffSubrating(uint16_t hci_handle,
-                                       uint16_t maximum_latency,
-                                       uint16_t minimum_remote_timeout,
-                                       uint16_t minimum_local_timeout) {
-  handler_->CallOn(pimpl_.get(), &Acl::impl::SniffSubrating, hci_handle,
-                   maximum_latency, minimum_remote_timeout,
-                   minimum_local_timeout);
-  return false;
+void shim::legacy::Acl::UpdateConnectionParameters(
+    uint16_t handle, uint16_t conn_int_min, uint16_t conn_int_max,
+    uint16_t conn_latency, uint16_t conn_timeout, uint16_t min_ce_len,
+    uint16_t max_ce_len) {
+  handler_->CallOn(pimpl_.get(), &Acl::impl::update_connection_parameters,
+                   handle, conn_int_min, conn_int_max, conn_latency,
+                   conn_timeout, min_ce_len, max_ce_len);
 }
 
 void shim::legacy::Acl::LeSetDefaultSubrate(uint16_t subrate_min,

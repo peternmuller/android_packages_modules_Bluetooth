@@ -47,7 +47,6 @@ import android.view.Display;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.BluetoothAdapterProxy;
-import com.android.bluetooth.flags.Flags;
 import com.android.bluetooth.gatt.FilterParams;
 import com.android.bluetooth.gatt.GattObjectsFactory;
 import com.android.bluetooth.gatt.GattServiceConfig;
@@ -114,7 +113,7 @@ public class ScanManager {
 
     private int mLastConfiguredScanSetting = Integer.MIN_VALUE;
     // Scan parameters for batch scan.
-    private BatchScanParams mBatchScanParms;
+    private BatchScanParams mBatchScanParams;
 
     private final Object mCurUsedTrackableAdvertisementsLock = new Object();
     @GuardedBy("mCurUsedTrackableAdvertisementsLock")
@@ -385,7 +384,7 @@ public class ScanManager {
                     handleProfileConnectionStateChanged(msg);
                 default:
                     // Shouldn't happen.
-                    Log.e(TAG, "received an unkown message : " + msg.what);
+                    Log.e(TAG, "received an unknown message : " + msg.what);
             }
         }
 
@@ -448,9 +447,7 @@ public class ScanManager {
                         Message msg = obtainMessage(MSG_SCAN_TIMEOUT);
                         msg.obj = client;
                         // Only one timeout message should exist at any time
-                        if (Flags.scanTimeoutReset()) {
-                            removeMessages(MSG_SCAN_TIMEOUT, client);
-                        }
+                        removeMessages(MSG_SCAN_TIMEOUT, client);
                         sendMessageDelayed(msg, mAdapterService.getScanTimeoutMillis());
                         Log.d(TAG,
                                 "apply scan timeout (" + mAdapterService.getScanTimeoutMillis()
@@ -1041,19 +1038,33 @@ public class ScanManager {
                     // convert scanWindow and scanInterval from ms to LE scan units(0.625ms)
                     int scanWindow = Utils.millsToUnit(scanWindowMs);
                     int scanInterval = Utils.millsToUnit(scanIntervalMs);
-                    int scanPhy = getScanPhy(client.settings);
+                    int scanPhyMask = getScanPhyMask(client.settings);
                     mNativeInterface.gattClientScan(false);
                     if (!AppScanStats.recordScanRadioStop()) {
                         Log.w(TAG, "There is no scan radio to stop");
                     }
-                    Log.d(TAG, "Start gattClientScanNative with"
-                            + " old scanMode " + mLastConfiguredScanSetting
-                            + " new scanMode " + curScanSetting
-                            + " ( in MS: " + scanIntervalMs + " / " + scanWindowMs
-                            + ", in scan unit: " + scanInterval + " / " + scanWindow + " )"
-                            + client);
+                    Log.d(
+                            TAG,
+                            "Start gattClientScanNative with"
+                                    + " old scanMode "
+                                    + mLastConfiguredScanSetting
+                                    + " new scanMode "
+                                    + curScanSetting
+                                    + " ( in MS: "
+                                    + scanIntervalMs
+                                    + " / "
+                                    + scanWindowMs
+                                    + ", in scan unit: "
+                                    + scanInterval
+                                    + " / "
+                                    + scanWindow
+                                    + ", "
+                                    + "scanPhyMask: "
+                                    + scanPhyMask
+                                    + " )"
+                                    + client);
                     mNativeInterface.gattSetScanParameters(
-                            client.scannerId, scanInterval, scanWindow, scanPhy);
+                            client.scannerId, scanInterval, scanWindow, scanPhyMask);
                     mNativeInterface.gattClientScan(true);
                     if (!AppScanStats.recordScanRadioStart(curScanSetting)) {
                         Log.w(TAG, "Scan radio already started");
@@ -1163,7 +1174,7 @@ public class ScanManager {
             int scannerId = client.scannerId;
             BatchScanParams batchScanParams = getBatchScanParams();
             // Stop batch if batch scan params changed and previous params is not null.
-            if (mBatchScanParms != null && (!mBatchScanParms.equals(batchScanParams))) {
+            if (mBatchScanParams != null && (!mBatchScanParams.equals(batchScanParams))) {
                 Log.d(TAG, "stopping BLe Batch");
                 resetCountDownLatch();
                 mNativeInterface.gattClientStopBatchScan(scannerId);
@@ -1173,7 +1184,7 @@ public class ScanManager {
                 flushBatchResults(scannerId);
             }
             // Start batch if batchScanParams changed and current params is not null.
-            if (batchScanParams != null && (!batchScanParams.equals(mBatchScanParms))) {
+            if (batchScanParams != null && (!batchScanParams.equals(mBatchScanParams))) {
                 int notifyThreshold = 95;
                 Log.d(TAG, "Starting BLE batch scan");
                 int resultType = getResultType(batchScanParams);
@@ -1192,7 +1203,7 @@ public class ScanManager {
                         scanWindow, 0, DISCARD_OLDEST_WHEN_BUFFER_FULL);
                 waitForCallback();
             }
-            mBatchScanParms = batchScanParams;
+            mBatchScanParams = batchScanParams;
             setBatchAlarm();
         }
 
@@ -1231,7 +1242,7 @@ public class ScanManager {
         }
 
         // Batched scan doesn't require high duty cycle scan because scan result is reported
-        // infrequently anyway. To avoid redefining paramete sets, map to the low duty cycle
+        // infrequently anyway. To avoid redefining parameter sets, map to the low duty cycle
         // parameter set as follows.
         private int getBatchScanWindowMillis(int scanMode) {
             ContentResolver resolver = mContext.getContentResolver();
@@ -1398,16 +1409,16 @@ public class ScanManager {
 
         void flushBatchResults(int scannerId) {
             Log.d(TAG, "flushPendingBatchResults - scannerId = " + scannerId);
-            if (mBatchScanParms.fullScanscannerId != -1) {
+            if (mBatchScanParams.fullScanscannerId != -1) {
                 resetCountDownLatch();
-                mNativeInterface.gattClientReadScanReports(mBatchScanParms.fullScanscannerId,
-                        SCAN_RESULT_TYPE_FULL);
+                mNativeInterface.gattClientReadScanReports(
+                        mBatchScanParams.fullScanscannerId, SCAN_RESULT_TYPE_FULL);
                 waitForCallback();
             }
-            if (mBatchScanParms.truncatedScanscannerId != -1) {
+            if (mBatchScanParams.truncatedScanscannerId != -1) {
                 resetCountDownLatch();
-                mNativeInterface.gattClientReadScanReports(mBatchScanParms.truncatedScanscannerId,
-                        SCAN_RESULT_TYPE_TRUNCATED);
+                mNativeInterface.gattClientReadScanReports(
+                        mBatchScanParams.truncatedScanscannerId, SCAN_RESULT_TYPE_TRUNCATED);
                 waitForCallback();
             }
             setBatchAlarm();
@@ -1729,9 +1740,9 @@ public class ScanManager {
                         SCAN_MODE_BALANCED_INTERVAL_MS);
                 case ScanSettings.SCAN_MODE_LOW_POWER:
                     return Settings.Global.getInt(
-                        resolver,
-                        Settings.Global.BLE_SCAN_LOW_POWER_INTERVAL_MS,
-                        SCAN_MODE_LOW_POWER_INTERVAL_MS);
+                            resolver,
+                            Settings.Global.BLE_SCAN_LOW_POWER_INTERVAL_MS,
+                            SCAN_MODE_LOW_POWER_INTERVAL_MS);
                 case ScanSettings.SCAN_MODE_SCREEN_OFF:
                     return mAdapterService.getScreenOffLowPowerIntervalMillis();
                 case ScanSettings.SCAN_MODE_SCREEN_OFF_BALANCED:
@@ -1749,6 +1760,25 @@ public class ScanManager {
                 return BluetoothDevice.PHY_LE_1M;
             }
             return settings.getPhy();
+        }
+
+        private int getScanPhyMask(ScanSettings settings) {
+            int phy = getScanPhy(settings);
+
+            switch (phy) {
+                case BluetoothDevice.PHY_LE_1M:
+                    return BluetoothDevice.PHY_LE_1M_MASK;
+                case BluetoothDevice.PHY_LE_CODED:
+                    return BluetoothDevice.PHY_LE_CODED_MASK;
+                case ScanSettings.PHY_LE_ALL_SUPPORTED:
+                    if (mAdapterService.isLeCodedPhySupported()) {
+                        return BluetoothDevice.PHY_LE_1M_MASK | BluetoothDevice.PHY_LE_CODED_MASK;
+                    } else {
+                        return BluetoothDevice.PHY_LE_1M_MASK;
+                    }
+                default:
+                    return BluetoothDevice.PHY_LE_1M_MASK;
+            }
         }
 
         private int getOnFoundOnLostTimeoutMillis(ScanSettings settings, boolean onFound) {
@@ -1847,7 +1877,7 @@ public class ScanManager {
 
     @VisibleForTesting
     BatchScanParams getBatchScanParams() {
-        return mBatchScanParms;
+        return mBatchScanParams;
     }
 
     private boolean isScreenOn() {

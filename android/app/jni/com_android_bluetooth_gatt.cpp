@@ -53,7 +53,6 @@
 
 #include <base/functional/bind.h>
 #include <base/functional/callback.h>
-#include <cutils/log.h>
 #include <string.h>
 
 #include <array>
@@ -67,7 +66,6 @@
 #include "rust/cxx.h"
 #include "rust/src/gatt/ffi/gatt_shim.h"
 #include "src/gatt/ffi.rs.h"
-#include "utils/Log.h"
 
 using bluetooth::Uuid;
 
@@ -631,7 +629,7 @@ void btgattc_subrate_change_cb(int conn_id, uint16_t subrate_factor,
   CallbackEnv sCallbackEnv(__func__);
   if (!sCallbackEnv.valid()) return;
   if (!mCallbacksObj) {
-    ALOGE("mCallbacksObj is NULL. Return.");
+    log::error("mCallbacksObj is NULL. Return.");
     return;
   }
 
@@ -890,7 +888,7 @@ void btgatts_subrate_change_cb(int conn_id, uint16_t subrate_factor,
   CallbackEnv sCallbackEnv(__func__);
   if (!sCallbackEnv.valid()) return;
   if (!mCallbacksObj) {
-    ALOGE("mCallbacksObj is NULL. Return.");
+    log::error("mCallbacksObj is NULL. Return.");
     return;
   }
 
@@ -1592,7 +1590,7 @@ static void gattSetScanParametersNative(JNIEnv* /* env */, jobject /* object */,
                                         jint scan_window_unit, jint scan_phy) {
   if (!sGattIf) return;
 
-  ALOGW("gattSetScanParametersNative");
+  log::warn("gattSetScanParametersNative");
   sGattIf->scanner->SetScanParameters(
       client_if, /* use active scan */ 0x01, scan_interval_unit,
       scan_window_unit, scan_phy,
@@ -1982,11 +1980,12 @@ static void gattServerUnregisterAppNative(JNIEnv* /* env */,
 
 static void gattServerConnectNative(JNIEnv* env, jobject /* object */,
                                     jint server_if, jstring address,
-                                    jboolean is_direct, jint transport) {
+                                    jint addr_type, jboolean is_direct,
+                                    jint transport) {
   if (!sGattIf) return;
 
   RawAddress bd_addr = str2addr(env, address);
-  sGattIf->server->connect(server_if, bd_addr, is_direct, transport);
+  sGattIf->server->connect(server_if, bd_addr, addr_type, is_direct, transport);
 }
 
 static void gattServerDisconnectNative(JNIEnv* env, jobject /* object */,
@@ -2878,7 +2877,7 @@ static int register_com_android_bluetooth_gatt_(JNIEnv* env) {
        (void*)gattServerRegisterAppNative},
       {"gattServerUnregisterAppNative", "(I)V",
        (void*)gattServerUnregisterAppNative},
-      {"gattServerConnectNative", "(ILjava/lang/String;ZI)V",
+      {"gattServerConnectNative", "(ILjava/lang/String;IZI)V",
        (void*)gattServerConnectNative},
       {"gattServerDisconnectNative", "(ILjava/lang/String;I)V",
        (void*)gattServerDisconnectNative},

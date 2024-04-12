@@ -81,7 +81,6 @@ static tA2DP_APTX_ADAPTIVE_ENCODER_CB a2dp_aptx_adaptive_encoder_cb;
 
 bool A2DP_VendorLoadEncoderAptxAdaptive(void) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return true;
   }
 
@@ -90,7 +89,6 @@ bool A2DP_VendorLoadEncoderAptxAdaptive(void) {
 
 void A2DP_VendorUnloadEncoderAptxAdaptive(void) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return;
   }
 }
@@ -101,7 +99,6 @@ void a2dp_vendor_aptx_adaptive_encoder_init(
     a2dp_source_read_callback_t read_callback,
     a2dp_source_enqueue_callback_t enqueue_callback) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"aptX-Adaptive is running in offload mode");
     return;
   }
 }
@@ -150,8 +147,6 @@ void a2dp_vendor_aptx_adaptive_encoder_init(
 
 void a2dp_vendor_aptx_adaptive_feeding_reset(void) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
-                                  "aptX-Adaptive is running in offload mode");
     return;
   }
 }
@@ -159,8 +154,6 @@ void a2dp_vendor_aptx_adaptive_feeding_reset(void) {
 
 void a2dp_vendor_aptx_adaptive_feeding_flush(void) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
-                                  "aptX-Adaptive is running in offload mode");
     return;
   }
 }
@@ -175,8 +168,6 @@ int a2dp_vendor_aptx_adaptive_get_effective_frame_size() {
 
 void a2dp_vendor_aptx_adaptive_send_frames(uint64_t timestamp_us) {
   if (true/*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    LOG_INFO(LOG_TAG,"a2dp_vendor_aptx_adaptive_send_frames"
-        "aptX-Adaptive is running in offload mode");
     return;
   }
 }

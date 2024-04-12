@@ -63,10 +63,7 @@ static void blacklist_adjust_sniff_subrate(RawAddress peer_dev,
   RawAddress remote_bdaddr = peer_dev;
   if (interop_match_addr_get_max_lat(INTEROP_UPDATE_HID_SSR_MAX_LAT,
                                      &remote_bdaddr, ssr_max_lat)) {
-    LOG_WARN(
-        "%s: Device in blacklist for ssr, max latency changed "
-        "from %d to %d",
-        __func__, old_ssr_max_lat, *ssr_max_lat);
+    log::warn("Device in blacklist for ssr, max latency changed from {} to {}", old_ssr_max_lat, *ssr_max_lat);
   }
 }
 

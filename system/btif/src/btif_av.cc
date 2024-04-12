@@ -51,7 +51,6 @@
 #include "common/state_machine.h"
 #include "device/include/device_iot_config.h"
 #include "hardware/bt_av.h"
-#include "include/check.h"
 #include "include/hardware/bt_rc.h"
 #include "internal_include/bt_trace.h"
 #include "os/system_properties.h"
@@ -524,9 +523,7 @@ class BtifAvSource {
     if(!peer_address.IsEmpty() &&
       (peer->IsSink() && AllowedToConnect(peer_address)) &&
       peer->CheckFlags(BtifAvPeer::kFlagPendingStart)) {
-      LOG(ERROR) << __func__ << ": Pending Start Response on  "
-                 << ADDRESS_TO_LOGGABLE_STR(peer_address)
-                 << ", Return Fail";
+      log::error("Pending Start Response on  {}, Return Fail", ADDRESS_TO_LOGGABLE_STR(peer_address));
       return false;
     }
 
@@ -1049,7 +1046,8 @@ void BtifAvEvent::DeepCopy(uint32_t event, const void* p_data,
 
   switch (event) {
     case BTA_AV_META_MSG_EVT: {
-      CHECK(data_length >= sizeof(tBTA_AV));
+      log::assert_that(data_length >= sizeof(tBTA_AV),
+                       "assert failed: data_length >= sizeof(tBTA_AV)");
       const tBTA_AV* av_src = (const tBTA_AV*)p_data;
       tBTA_AV* av_dest = (tBTA_AV*)data_;
       if (av_src->meta_msg.p_data && av_src->meta_msg.len) {
@@ -1800,7 +1798,7 @@ bool BtifAvStateMachine::StateIdle::ProcessEvent(uint32_t event, void* p_data) {
   log::verbose("Peer {} : event={} flags={} active_peer={}",
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
                BtifAvEvent::EventName(event), peer_.FlagsToString(),
-               logbool(peer_.IsActivePeer()));
+               peer_.IsActivePeer());
 
   switch (event) {
     case BTA_AV_ENABLE_EVT:
@@ -2003,7 +2001,9 @@ bool BtifAvStateMachine::StateIdle::ProcessEvent(uint32_t event, void* p_data) {
           }
           btif_rc_check_pending_cmd(p_bta_data->open.bd_addr);
         }
-        CHECK(peer_.PeerSep() == p_bta_data->open.sep);
+        log::assert_that(
+            peer_.PeerSep() == p_bta_data->open.sep,
+            "assert failed: peer_.PeerSep() == p_bta_data->open.sep");
 
         can_connect = peer_.IsSink()
                           ? btif_av_source.AllowedToConnect(peer_.PeerAddress())
@@ -2114,7 +2114,7 @@ bool BtifAvStateMachine::StateOpening::ProcessEvent(uint32_t event,
   log::verbose("Peer {} : event={} flags={} active_peer={}",
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
                BtifAvEvent::EventName(event), peer_.FlagsToString(),
-               logbool(peer_.IsActivePeer()));
+               peer_.IsActivePeer());
 
   switch (event) {
     case BTIF_AV_STOP_STREAM_REQ_EVT:
@@ -2211,7 +2211,9 @@ bool BtifAvStateMachine::StateOpening::ProcessEvent(uint32_t event,
           }
           btif_rc_check_pending_cmd(p_bta_data->open.bd_addr);
         }
-        CHECK(peer_.PeerSep() == p_bta_data->open.sep);
+        log::assert_that(
+            peer_.PeerSep() == p_bta_data->open.sep,
+            "assert failed: peer_.PeerSep() == p_bta_data->open.sep");
         /** normally it can be checked in IDLE PENDING/CONNECT_REQ, in case:
          * 1 speacker connected to DUT and phone connect DUT, because
          * default
@@ -2419,7 +2421,7 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
   log::verbose("Peer {} : event={} flags={} active_peer={}",
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
                BtifAvEvent::EventName(event), peer_.FlagsToString(),
-               logbool(peer_.IsActivePeer()));
+               peer_.IsActivePeer());
 
   if ((event == BTA_AV_REMOTE_CMD_EVT) &&
       peer_.CheckFlags(BtifAvPeer::kFlagRemoteSuspend) &&
@@ -2626,11 +2628,7 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
     case BTIF_AV_SET_CODEC_MODE_EVT: {
       const btif_av_codec_mode_change_t* p_codec_mode_change =
           static_cast<const btif_av_codec_mode_change_t*>(p_data);
-      LOG_INFO("Peer %s : event=%s flags=%s enc_mode=%d",
-               ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
-               BtifAvEvent::EventName(event).c_str(),
-               peer_.FlagsToString().c_str(),
-               p_codec_mode_change->enc_mode);
+      log::info("Peer {} : event={} flags={} enc_mode={}", ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()), BtifAvEvent::EventName(event), peer_.FlagsToString(), p_codec_mode_change->enc_mode);
 
       BTA_AvSetCodecMode(peer_.BtaHandle(), p_codec_mode_change->enc_mode);
     } break;
@@ -2670,7 +2668,7 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
   log::verbose("Peer {} : event={} flags={} active_peer={}",
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
                BtifAvEvent::EventName(event), peer_.FlagsToString(),
-               logbool(peer_.IsActivePeer()));
+               peer_.IsActivePeer());
 
   switch (event) {
     case BTIF_AV_ACL_DISCONNECTED:
@@ -2878,11 +2876,7 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
     case BTIF_AV_SET_CODEC_MODE_EVT: {
       const btif_av_codec_mode_change_t* p_codec_mode_change =
           static_cast<const btif_av_codec_mode_change_t*>(p_data);
-      LOG_INFO("Peer %s : event=%s flags=%s enc_mode=%d",
-               ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
-               BtifAvEvent::EventName(event).c_str(),
-               peer_.FlagsToString().c_str(),
-               p_codec_mode_change->enc_mode);
+      log::info("Peer {} : event={} flags={} enc_mode={}", ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()), BtifAvEvent::EventName(event), peer_.FlagsToString(), p_codec_mode_change->enc_mode);
 
       BTA_AvSetCodecMode(peer_.BtaHandle(), p_codec_mode_change->enc_mode);
     } break;
@@ -2922,7 +2916,7 @@ bool BtifAvStateMachine::StateClosing::ProcessEvent(uint32_t event,
   log::verbose("Peer {} : event={} flags={} active_peer={}",
                ADDRESS_TO_LOGGABLE_CSTR(peer_.PeerAddress()),
                BtifAvEvent::EventName(event), peer_.FlagsToString(),
-               logbool(peer_.IsActivePeer()));
+               peer_.IsActivePeer());
 
   switch (event) {
     case BTIF_AV_SUSPEND_STREAM_REQ_EVT:
@@ -3887,8 +3881,7 @@ static bt_status_t codec_config_src(
 }
 
 static void set_stream_mode(bool isGamingEnabled, bool isLowLatency) {
-  LOG(INFO) << __func__ << "isGamingEnabled: " << isGamingEnabled
-                        << "isLowLatency: " << isLowLatency;
+  log::info("isGamingEnabled: {}isLowLatency: {}", isGamingEnabled, isLowLatency);
 
   if (isGamingEnabled || isLowLatency) {
     btif_av_update_codec_mode(true);
@@ -4407,7 +4400,7 @@ bool btif_av_is_dual_mode_enabled() {
 }
 
 void btif_av_metadata_update(uint16_t context) {
-  LOG_INFO("context: %d", context);
+  log::info("context: {}", context);
   bool is_src = true;
 
   if (btif_av_source.Enabled()) {
@@ -4519,17 +4512,15 @@ void btif_av_update_codec_mode(bool is_gaming_latency) {
     codec_config = current_codec->getCodecConfig();
     if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
       if (is_gaming_latency) {
-        LOG_INFO(" Is game/low latency, going for Low Latency Mode");
+        log::info("Is game/low latency, going for Low Latency Mode");
         codec_mode_change.enc_mode = APTX_LL;
       } else {
-        LOG_INFO(" Isn't game/low latency, going for High Quality Mode");
+        log::info("Isn't game/low latency, going for High Quality Mode");
         codec_mode_change.enc_mode = APTX_HQ;
       }
       BtifAvEvent btif_av_event(BTIF_AV_SET_CODEC_MODE_EVT, &codec_mode_change,
                                 sizeof(codec_mode_change));
-      LOG_INFO("peer_address=%s event=%s",
-                ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()),
-                btif_av_event.ToString().c_str());
+      log::info("peer_address={} event={}", ADDRESS_TO_LOGGABLE_CSTR(btif_av_source_active_peer()), btif_av_event.ToString());
       do_in_main_thread(FROM_HERE, base::Bind(&btif_av_handle_event,
                                               AVDT_TSEP_SNK,  // peer_sep
                                               btif_av_source_active_peer(),
@@ -4539,13 +4530,13 @@ void btif_av_update_codec_mode(bool is_gaming_latency) {
 }
 
 void btif_av_update_source_metadata(bool is_Gaming_Enabled) {
-  LOG_INFO("btif_av_update_source_metadata");
+  log::info("btif_av_update_source_metadata");
 
   btif_av_update_codec_mode(is_Gaming_Enabled);
 }
 
 void btif_av_set_low_latency_spatial_audio(bool is_low_latency) {
-  LOG_INFO("is_low_latency: %s", is_low_latency ? "true" : "false");
+  log::info("is_low_latency: {}", is_low_latency ? "true" : "false");
 
   btif_av_update_codec_mode(is_low_latency);
 }

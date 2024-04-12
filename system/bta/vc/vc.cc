@@ -16,7 +16,6 @@
  */
 
 #include <base/functional/bind.h>
-#include <base/logging.h>
 #include <base/strings/string_number_conversions.h>
 #include <base/strings/string_util.h>
 #include <bluetooth/log.h>
@@ -33,7 +32,6 @@
 #include "bta_gatt_queue.h"
 #include "bta_vc_api.h"
 #include "devices.h"
-#include "include/check.h"
 #include "internal_include/bt_trace.h"
 #include "os/log.h"
 #include "osi/include/osi.h"
@@ -117,6 +115,12 @@ class VolumeControlImpl : public VolumeControl {
 
     auto device = volume_control_devices_.FindByAddress(address);
     if (!device) {
+      if (!BTM_IsLinkKeyKnown(address, BT_TRANSPORT_LE)) {
+        log::error("Connecting  {} when not bonded",
+                   ADDRESS_TO_LOGGABLE_CSTR(address));
+        callbacks_->OnConnectionState(ConnectionState::DISCONNECTED, address);
+        return;
+      }
       volume_control_devices_.Add(address, true);
     } else {
       device->connecting_actively = true;
@@ -374,9 +378,9 @@ class VolumeControlImpl : public VolumeControl {
 
   void HandleAutonomusVolumeChange(VolumeControlDevice* device,
                                    bool is_volume_change, bool is_mute_change) {
-    DLOG(INFO) << __func__ << ADDRESS_TO_LOGGABLE_STR(device->address)
-               << " is volume change: " << is_volume_change
-               << " is mute change: " << is_mute_change;
+    log::debug("{}, is volume change: {}, is mute change: {}",
+               ADDRESS_TO_LOGGABLE_CSTR(device->address), is_volume_change,
+               is_mute_change);
 
     if (!is_volume_change && !is_mute_change) {
       log::error("Autonomous change but volume and mute did not changed.");
@@ -385,7 +389,7 @@ class VolumeControlImpl : public VolumeControl {
 
     auto csis_api = CsisClient::Get();
     if (!csis_api) {
-      DLOG(INFO) << __func__ << " Csis is not available";
+      log::warn("Csis module is not available");
       callbacks_->OnVolumeStateChanged(device->address, device->volume,
                                        device->mute, true);
       return;
@@ -394,8 +398,8 @@ class VolumeControlImpl : public VolumeControl {
     auto group_id =
         csis_api->GetGroupId(device->address, le_audio::uuid::kCapServiceUuid);
     if (group_id == bluetooth::groups::kGroupUnknown) {
-      DLOG(INFO) << __func__ << " No group for device "
-                 << ADDRESS_TO_LOGGABLE_STR(device->address);
+      log::warn("No group for device {}",
+                ADDRESS_TO_LOGGABLE_CSTR(device->address));
       callbacks_->OnVolumeStateChanged(device->address, device->volume,
                                        device->mute, true);
       return;
@@ -479,22 +483,18 @@ class VolumeControlImpl : public VolumeControl {
                         return it != operation.devices_.end();
                       });
     if (op == ongoing_operations_.end()) {
-      DLOG(INFO) << __func__ << " Could not find operation id for device: "
-                 << ADDRESS_TO_LOGGABLE_STR(device->address)
-                 << ". Autonomus change";
+      log::debug("Could not find operation id for device: {}. Autonomus change",
+                 ADDRESS_TO_LOGGABLE_CSTR(device->address));
       HandleAutonomusVolumeChange(device, is_volume_change, is_mute_change);
       return;
     }
-
-    DLOG(INFO) << __func__ << " operation found: " << op->operation_id_
-               << " for group id: " << op->group_id_;
 
     /* Received notification from the device we do expect */
     auto it = find(op->devices_.begin(), op->devices_.end(), device->address);
     op->devices_.erase(it);
     if (!op->devices_.empty()) {
-      DLOG(INFO) << __func__ << " wait for more responses for operation_id: "
-                 << op->operation_id_;
+      log::debug("wait for more responses for operation_id: {}",
+                 op->operation_id_);
       return;
     }
 
@@ -675,6 +675,7 @@ class VolumeControlImpl : public VolumeControl {
     BTA_GATTC_CancelOpen(gatt_if_, address, false);
 
     Disconnect(address);
+    volume_control_devices_.Remove(address);
   }
 
   void OnGattDisconnected(uint16_t connection_id, tGATT_IF /*client_if*/,
@@ -704,6 +705,26 @@ class VolumeControlImpl : public VolumeControl {
     }
   }
 
+  void RemoveDeviceFromOperationList(const RawAddress& addr) {
+    if (ongoing_operations_.empty()) {
+      return;
+    }
+
+    for (auto& op : ongoing_operations_) {
+      auto it = find(op.devices_.begin(), op.devices_.end(), addr);
+      if (it == op.devices_.end()) {
+        continue;
+      }
+      op.devices_.erase(it);
+    }
+
+    // Remove operations with no devices
+    ongoing_operations_.erase(
+        std::remove_if(ongoing_operations_.begin(), ongoing_operations_.end(),
+                       [](auto& op) { return op.devices_.empty(); }),
+        ongoing_operations_.end());
+  }
+
   void RemoveDeviceFromOperationList(const RawAddress& addr, int operation_id) {
     auto op = find_if(ongoing_operations_.begin(), ongoing_operations_.end(),
                       [operation_id](auto& operation) {
@@ -728,6 +749,7 @@ class VolumeControlImpl : public VolumeControl {
 
   void RemovePendingVolumeControlOperations(std::vector<RawAddress>& devices,
                                             int group_id) {
+    log::debug("");
     for (auto op = ongoing_operations_.begin();
          op != ongoing_operations_.end();) {
       // We only remove operations that don't affect the mute field.
@@ -740,17 +762,21 @@ class VolumeControlImpl : public VolumeControl {
       }
       if (group_id != bluetooth::groups::kGroupUnknown &&
           op->group_id_ == group_id) {
+        log::debug("Removing operation {}", op->operation_id_);
         op = ongoing_operations_.erase(op);
         continue;
       }
       for (auto const& addr : devices) {
         auto it = find(op->devices_.begin(), op->devices_.end(), addr);
         if (it != op->devices_.end()) {
+          log::debug("Removing {} from operation",
+                     ADDRESS_TO_LOGGABLE_CSTR(*it));
           op->devices_.erase(it);
         }
       }
       if (op->devices_.empty()) {
         op = ongoing_operations_.erase(op);
+        log::debug("Removing operation {}", op->operation_id_);
       } else {
         op++;
       }
@@ -782,8 +808,30 @@ class VolumeControlImpl : public VolumeControl {
     }
   }
 
-  static void operation_callback(void* data) {
-    instance->CancelVolumeOperation(PTR_TO_INT(data));
+  static void operation_timeout_callback(void* data) {
+    if (!instance) {
+      log::warn(" There is no instance.");
+      return;
+    }
+    instance->OperationMonitorTimeoutFired(PTR_TO_INT(data));
+  }
+
+  void OperationMonitorTimeoutFired(int operation_id) {
+    auto op = find_if(
+        ongoing_operations_.begin(), ongoing_operations_.end(),
+        [operation_id](auto& it) { return it.operation_id_ == operation_id; });
+
+    if (op == ongoing_operations_.end()) {
+      log::error("Could not find operation_id: {}", operation_id);
+      return;
+    }
+
+    log::warn("Operation {} is taking too long for devices:", operation_id);
+    for (const auto& addr : op->devices_) {
+      log::warn("  {},", ADDRESS_TO_LOGGABLE_CSTR(addr));
+    }
+    alarm_set_on_mloop(op->operation_timeout_, kOperationMonitorTimeoutMs,
+                       operation_timeout_callback, INT_TO_PTR(operation_id));
   }
 
   void StartQueueOperation(void) {
@@ -794,37 +842,23 @@ class VolumeControlImpl : public VolumeControl {
 
     auto op = &ongoing_operations_.front();
 
-    log::info("operation_id: {}", op->operation_id_);
+    log::info(" Current operation_id: {}", op->operation_id_);
 
     if (op->IsStarted()) {
-      log::info("wait until operation {} is complete", op->operation_id_);
+      log::info("Operation {} is started, wait until it is complete",
+                op->operation_id_);
       return;
     }
 
     op->Start();
 
-    alarm_set_on_mloop(op->operation_timeout_, 3000, operation_callback,
+    alarm_set_on_mloop(op->operation_timeout_, kOperationMonitorTimeoutMs,
+                       operation_timeout_callback,
                        INT_TO_PTR(op->operation_id_));
     devices_control_point_helper(
         op->devices_, op->opcode_,
-        op->arguments_.size() == 0 ? nullptr : &(op->arguments_));
-  }
-
-  void CancelVolumeOperation(int operation_id) {
-    log::info("canceling operation_id: {}", operation_id);
-
-    auto op = find_if(
-        ongoing_operations_.begin(), ongoing_operations_.end(),
-        [operation_id](auto& it) { return it.operation_id_ == operation_id; });
-
-    if (op == ongoing_operations_.end()) {
-      log::error("Could not find operation_id: {}", operation_id);
-      return;
-    }
-
-    /* Possibly close GATT operations */
-    ongoing_operations_.erase(op);
-    StartQueueOperation();
+        op->arguments_.size() == 0 ? nullptr : &(op->arguments_),
+        op->operation_id_);
   }
 
   void PrepareVolumeControlOperation(std::vector<RawAddress> devices,
@@ -930,19 +964,17 @@ class VolumeControlImpl : public VolumeControl {
   }
 
   void Mute(std::variant<RawAddress, int> addr_or_group_id) override {
-    LOG_DEBUG();
+    log::debug("");
     MuteUnmute(addr_or_group_id, true /* mute */);
   }
 
   void UnMute(std::variant<RawAddress, int> addr_or_group_id) override {
-    LOG_DEBUG();
+    log::debug("");
     MuteUnmute(addr_or_group_id, false /* mute */);
   }
 
   void SetVolume(std::variant<RawAddress, int> addr_or_group_id,
                  uint8_t volume) override {
-    DLOG(INFO) << __func__ << " vol: " << +volume;
-
     std::vector<uint8_t> arg({volume});
     uint8_t opcode = kControlPointOpcodeSetAbsoluteVolume;
 
@@ -966,7 +998,7 @@ class VolumeControlImpl : public VolumeControl {
     } else {
       /* Handle group change */
       auto group_id = std::get<int>(addr_or_group_id);
-      DLOG(INFO) << __func__ << " group: " << group_id;
+      log::debug("group_id: {}, vol: {}", group_id, volume);
       auto csis_api = CsisClient::Get();
       if (!csis_api) {
         log::error("Csis is not there");
@@ -1107,6 +1139,8 @@ class VolumeControlImpl : public VolumeControl {
   std::list<VolumeOperation> ongoing_operations_;
   int latest_operation_id_;
 
+  static constexpr uint64_t kOperationMonitorTimeoutMs = 3000;
+
   void verify_device_ready(VolumeControlDevice* device, uint16_t handle) {
     if (device->IsReady()) return;
 
@@ -1136,6 +1170,9 @@ class VolumeControlImpl : public VolumeControl {
 
   void device_cleanup_helper(VolumeControlDevice* device, bool notify) {
     device->Disconnect(gatt_if_);
+
+    RemoveDeviceFromOperationList(device->address);
+
     if (notify)
       callbacks_->OnConnectionState(ConnectionState::DISCONNECTED,
                                     device->address);
@@ -1261,7 +1298,7 @@ void VolumeControl::Initialize(bluetooth::vc::VolumeControlCallbacks* callbacks,
 bool VolumeControl::IsVolumeControlRunning() { return instance; }
 
 VolumeControl* VolumeControl::Get(void) {
-  CHECK(instance);
+  log::assert_that(instance != nullptr, "assert failed: instance != nullptr");
   return instance;
 };
 
