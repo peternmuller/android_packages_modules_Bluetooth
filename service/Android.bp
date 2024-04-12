@@ -78,6 +78,7 @@ java_library {
         "framework-bluetooth-pre-jarjar",
         "framework-configinfrastructure",
         "framework-statsd.stubs.module_lib",
+        "service-bluetooth-binder-aidl",
         "service-bluetooth.change-ids",
     ],
 

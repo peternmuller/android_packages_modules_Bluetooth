@@ -702,6 +702,17 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
               ToString(group->cig.GetState()),
               static_cast<int>(conn_handles.size()));
 
+    if (group->GetTargetState() != AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+      /* Group is not going to stream. It happen while CIG was creating.
+       * Remove CIG in such a case
+       */
+      log::warn("group_id {} is not going to stream anymore. Remove CIG.",
+                group->group_id_);
+      group->PrintDebugState();
+      RemoveCigForGroup(group);
+      return;
+    }
+
     /* Assign all connection handles to CIS ids of the CIG */
     group->cig.AssignCisConnHandles(conn_handles);
 
@@ -711,60 +722,52 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     /* Last node configured, process group to codec configured state */
     group->SetState(AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED);
 
-    if (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
-      /* As streaming is about to start send HCI configure data path
-       * based on codec selected before CIS creation ensuring order
-       * Connected_Iso_Group_Create -> HCI_Configure Data path ->
-       * Create CIS -> SetUp ISO Datapath
-       * (need to ensure HCI Datapath is configure just after group creation
-       * and before CIS/ISO Data path creation so that vendor offload path
-       *  is configured properly between ADSP and BT Controller
-       */
-      bool config_host_to_controller_sent = false;
-      bool config_controller_to_host_sent = false;
-      /* Above flags to ensure HCI Config data path sent only once for Tx only
-       * OR Rx only OR Tx/Rx both based on cis type direction
-       */
-      for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
-        if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_BIDIRECTIONAL) {
-          if (!config_host_to_controller_sent) {
-            std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
-                group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
-            GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
-                                  kIsoDataPathPlatformDefault, vendor_config_sink);
-            config_host_to_controller_sent = true;
-          }
-          if (!config_controller_to_host_sent) {
-            std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
-                group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
-            GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
-                                  kIsoDataPathPlatformDefault, vendor_config_source);
-            config_controller_to_host_sent = true;
-          }
-        } else if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_UNIDIRECTIONAL_SINK) {
-          if (config_host_to_controller_sent) continue;
+    /* As streaming is about to start send HCI configure data path
+      * based on codec selected before CIS creation ensuring order
+      * Connected_Iso_Group_Create -> HCI_Configure Data path ->
+      * Create CIS -> SetUp ISO Datapath
+      * (need to ensure HCI Datapath is configure just after group creation
+      * and before CIS/ISO Data path creation so that vendor offload path
+      *  is configured properly between ADSP and BT Controller
+      */
+    bool config_host_to_controller_sent = false;
+    bool config_controller_to_host_sent = false;
+    /* Above flags to ensure HCI Config data path sent only once for Tx only
+      * OR Rx only OR Tx/Rx both based on cis type direction
+      */
+    for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
+      if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_BIDIRECTIONAL) {
+        if (!config_host_to_controller_sent) {
           std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
               group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
           GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
                                 kIsoDataPathPlatformDefault, vendor_config_sink);
           config_host_to_controller_sent = true;
-        } else {
-          if (config_controller_to_host_sent) continue;
+        }
+        if (!config_controller_to_host_sent) {
           std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
               group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
           GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
                                 kIsoDataPathPlatformDefault, vendor_config_source);
-          config_controller_to_host_sent = false;
+          config_controller_to_host_sent = true;
         }
+      } else if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_UNIDIRECTIONAL_SINK) {
+        if (config_host_to_controller_sent) continue;
+        std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
+            group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
+        GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
+                              kIsoDataPathPlatformDefault, vendor_config_sink);
+        config_host_to_controller_sent = true;
+      } else {
+        if (config_controller_to_host_sent) continue;
+        std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
+            group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
+        GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
+                              kIsoDataPathPlatformDefault, vendor_config_source);
+        config_controller_to_host_sent = false;
       }
-      PrepareAndSendQoSToTheGroup(group);
-    } else {
-      log::error(", invalid state transition, from: {} , to: {}",
-                 ToString(group->GetState()),
-                 ToString(group->GetTargetState()));
-      StopStream(group);
-      return;
     }
+    PrepareAndSendQoSToTheGroup(group);
   }
 
   void FreeLinkQualityReports(LeAudioDevice* leAudioDevice) {
