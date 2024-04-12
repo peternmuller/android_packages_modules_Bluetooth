@@ -317,6 +317,44 @@ public class BassClientStateMachine extends StateMachine {
         return null;
     }
 
+    BluetoothLeBroadcastMetadata getBroadcastMetadataFromReceiveState(int sourceId) {
+        BluetoothLeBroadcastReceiveState recvState = getBroadcastReceiveStateForSourceId(sourceId);
+        BluetoothLeBroadcastMetadata.Builder metaData =
+                new BluetoothLeBroadcastMetadata.Builder();
+
+        if (recvState == null) {
+            Log.w(TAG, "getBroadcastMetadataFromReceiveState: recvState is null");
+            return null;
+        }
+
+        List<BluetoothLeAudioContentMetadata> subgroupMetadata =
+                recvState.getSubgroupMetadata();
+        for (int i = 0; i < recvState.getNumSubgroups(); i++) {
+            BluetoothLeBroadcastSubgroup.Builder subGroup =
+                    new BluetoothLeBroadcastSubgroup.Builder();
+            BluetoothLeBroadcastChannel.Builder channel =
+                    new BluetoothLeBroadcastChannel.Builder();
+            channel.setChannelIndex(0);
+            channel.setCodecMetadata(
+                    BluetoothLeAudioCodecConfigMetadata.fromRawBytes(new byte[0]));
+            subGroup.addChannel(channel.build());
+            subGroup.setCodecSpecificConfig(
+                    BluetoothLeAudioCodecConfigMetadata.fromRawBytes(new byte[0]));
+            subGroup.setContentMetadata(subgroupMetadata.get(i));
+            metaData.addSubgroup(subGroup.build());
+        }
+
+        boolean encrypted = recvState.getBigEncryptionState()
+                == BluetoothLeBroadcastReceiveState.BIG_ENCRYPTION_STATE_NOT_ENCRYPTED ? false : true;
+        log("getBroadcastMetadataFromReceiveState: encrypted " + encrypted);
+        metaData.setSourceDevice(recvState.getSourceDevice(), recvState.getSourceAddressType());
+        metaData.setBroadcastId(recvState.getBroadcastId());
+        metaData.setSourceAdvertisingSid(recvState.getSourceAdvertisingSid());
+        metaData.setEncrypted(encrypted);
+
+        return metaData.build();
+    }
+
     boolean isSyncedToTheSource(int sourceId) {
         BluetoothLeBroadcastReceiveState recvState = getBroadcastReceiveStateForSourceId(sourceId);
 
