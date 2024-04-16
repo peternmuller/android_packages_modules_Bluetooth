@@ -271,12 +271,11 @@ struct AudioSetConfigurationProviderJson {
       QosConfigSetting qos, bool& dual_dev_one_chan_stereo_swb,
       bool& single_dev_one_chan_stereo_swb,
       std::vector<AseConfiguration>& subconfigs,
-      types::CodecLocation location) {
+      types::CodecLocation location, CodecMetadataSetting metadata) {
     auto config = AseConfiguration(
         CodecConfigSettingFromFlat(flat_subconfig->codec_id(),
                      flat_subconfig->max_sdu(), flat_subconfig->iso_interval(),
-                             flat_subconfig->codec_configuration()),
-        qos);
+                     flat_subconfig->codec_configuration()), qos, metadata);
 
     // Note that these parameters are set here since for now, we are using the
     // common configuration source for all the codec locations.
@@ -481,10 +480,14 @@ struct AudioSetConfigurationProviderJson {
                 : types::LeAudioConfigurationStrategy::RFU;
         device_cnt.get(direction) = subconfig->device_cnt();
 
+        CodecMetadataSetting codec_metadata =
+            (direction == le_audio::types::kLeAudioDirectionSink) ?
+            metadata_sink : metadata_source;
+
         processSubconfig(*subconfig, qos.get(direction),
                          dual_dev_one_chan_stereo_swb.get(direction),
                          single_dev_one_chan_stereo_swb.get(direction),
-                         subconfigs.get(direction), location);
+                         subconfigs.get(direction), location, codec_metadata);
       }
     } else {
       if (codec_cfg == nullptr) {
@@ -522,10 +525,10 @@ struct AudioSetConfigurationProviderJson {
       const QosConfigSetting& qos_setting, bool& dual_dev_one_chan_stereo_swb,
       bool& single_dev_one_chan_stereo_swb,
       std::vector<AseConfiguration>& subconfigs,
-      types::CodecLocation location) {
+      types::CodecLocation location, CodecMetadataSetting metadata) {
     SetConfigurationFromFlatSubconfig(
         &subconfig, qos_setting, dual_dev_one_chan_stereo_swb,
-        single_dev_one_chan_stereo_swb, subconfigs, location);
+        single_dev_one_chan_stereo_swb, subconfigs, location, metadata);
   }
 
   bool LoadConfigurationsFromFiles(const char* schema_file,

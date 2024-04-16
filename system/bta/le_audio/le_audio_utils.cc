@@ -436,7 +436,9 @@ GetRemoteBtLeAudioCodecConfigFromPac(
 }
 
 bool IsCodecUsingLtvFormat(const types::LeAudioCodecId& codec_id) {
-  if (codec_id == set_configurations::LeAudioCodecIdLc3) {
+  if (codec_id == set_configurations::LeAudioCodecIdLc3 ||
+      codec_id == set_configurations::LeAudioCodecIdAptxLe ||
+      codec_id == set_configurations::LeAudioCodecIdAptxLeX) {
     return true;
   }
   return false;

@@ -1048,6 +1048,9 @@ class LeAudioClientImpl : public LeAudioClient {
       group->DisableLeXCodec(true);
       LOG_DEBUG("Disabling LeX Codec");
       group->UpdateAudioSetConfigurationCache(group->GetConfigurationContextType());
+    } else {
+      LOG_DEBUG("Disallow param changes for LC3 triggered by ALS");
+      return;
     }
 
     // set configuration and check if streaming
@@ -3309,9 +3312,9 @@ class LeAudioClientImpl : public LeAudioClient {
     callbacks_->OnAudioGroupSelectableCodecConf(
         group->group_id_,
         bluetooth::le_audio::utils::GetRemoteBtLeAudioCodecConfigFromPac(
-            leAudioDevice->snk_pacs_),
+            leAudioDevice->src_pacs_),
         bluetooth::le_audio::utils::GetRemoteBtLeAudioCodecConfigFromPac(
-            leAudioDevice->src_pacs_));
+            leAudioDevice->snk_pacs_));
   }
 
   void SendAudioGroupCurrentCodecConfigChanged(LeAudioDeviceGroup* group) {
