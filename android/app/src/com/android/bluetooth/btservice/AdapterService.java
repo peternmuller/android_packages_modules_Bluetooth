@@ -487,16 +487,18 @@ public class AdapterService extends Service {
 
                     synchronized (mCsipGroupsPendingAudioProfileChanges) {
                         removeFromPendingAudioProfileChanges(groupId);
-                        PendingAudioProfilePreferenceRequest request =
-                                mCsipGroupsPendingAudioProfileChanges.remove(groupId);
-                        Log.e(
-                                TAG,
-                                "Preferred audio profiles change audio framework timeout for "
-                                        + ("device " + request.mDeviceRequested));
-                        sendPreferredAudioProfilesCallbackToApps(
-                                request.mDeviceRequested,
-                                request.mRequestedPreferences,
-                                BluetoothStatusCodes.ERROR_TIMEOUT);
+                        if (mCsipGroupsPendingAudioProfileChanges.containsKey(groupId)) {
+                           PendingAudioProfilePreferenceRequest request =
+                                   mCsipGroupsPendingAudioProfileChanges.remove(groupId);
+                           Log.e(
+                                   TAG,
+                                   "Preferred audio profiles change audio framework timeout for "
+                                           + ("device " + request.mDeviceRequested));
+                           sendPreferredAudioProfilesCallbackToApps(
+                                   request.mDeviceRequested,
+                                   request.mRequestedPreferences,
+                                   BluetoothStatusCodes.ERROR_TIMEOUT);
+                        }
                     }
                     break;
             }

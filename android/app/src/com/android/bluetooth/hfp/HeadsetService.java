@@ -51,6 +51,7 @@ import android.os.UserHandle;
 import android.sysprop.BluetoothProperties;
 import android.telecom.PhoneAccount;
 import android.util.Log;
+import android.os.Bundle;
 
 import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.BluetoothStatsLog;
@@ -69,6 +70,9 @@ import com.android.bluetooth.hfpclient.HeadsetClientStateMachine;
 import com.android.bluetooth.le_audio.LeAudioService;
 import com.android.bluetooth.telephony.BluetoothInCallService;
 import com.android.internal.annotations.VisibleForTesting;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,6 +158,12 @@ public class HeadsetService extends ProfileService {
     @VisibleForTesting static int sStartVrTimeoutMs = 5000;
     private ArrayList<StateMachineTask> mPendingClccResponses = new ArrayList<>();
     private boolean mStarted;
+    private static final int LE_GROUP_STREAM_STATUS_STREAMING = 1;
+    private static final int LE_GROUP_STREAM_STATUS_IDLE = 0;
+    private int mLeGroupStreamStatus = 0;
+    private boolean mSendIndicatorsAfterSuspend;
+    private final Lock lock = new ReentrantLock();
+    private final Condition leStreamStatusSuspend = lock.newCondition();
     private static HeadsetService sHeadsetService;
 
     @VisibleForTesting boolean mIsAptXSwbEnabled = false;
@@ -1620,6 +1630,25 @@ public class HeadsetService extends ProfileService {
     }
 
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    public void updateLeStreamStatus(BluetoothDevice device, int streamStatus) {
+        Log.i(TAG, "updateLeStreamStatus: received ");
+        lock.lock();
+        if (streamStatus == LE_GROUP_STREAM_STATUS_STREAMING) {
+           Log.i(TAG, "LE Status Moved to streaming State");
+           mLeGroupStreamStatus = LE_GROUP_STREAM_STATUS_STREAMING;
+        } else if (streamStatus == LE_GROUP_STREAM_STATUS_IDLE) {
+           Log.i(TAG, "LE Status Moved to Suspended State");
+           mLeGroupStreamStatus = LE_GROUP_STREAM_STATUS_IDLE;
+           if (mSendIndicatorsAfterSuspend == true) {
+             Log.i(TAG, "LE stream status is suspended");
+             leStreamStatusSuspend.signal();
+             mSendIndicatorsAfterSuspend = false;
+           }
+        }
+        lock.unlock();
+    }
+
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     boolean stopScoUsingVirtualVoiceCall() {
         Log.i(TAG, "stopScoUsingVirtualVoiceCall: " + Utils.getUidPidString());
         synchronized (mStateMachines) {
@@ -1629,6 +1658,7 @@ public class HeadsetService extends ProfileService {
                 return false;
             }
             mVirtualCallStarted = false;
+            mSendIndicatorsAfterSuspend = false;
             // 2. Send virtual phone state changed to close SCO
             phoneStateChanged(0, 0, HeadsetHalConstants.CALL_STATE_IDLE, "", 0, "", true);
         }
@@ -1894,10 +1924,43 @@ public class HeadsetService extends ProfileService {
             if (mActiveDevice != null && callState != HeadsetHalConstants.CALL_STATE_DISCONNECTED
                 && !mSystemInterface.isCallIdle() && isCallIdleBefore
                 && !Utils.isScoManagedByAudioEnabled()) {
+                Log.i(TAG, "Before A2dp suspension");
                 mSystemInterface.getAudioManager().setA2dpSuspended(true);
-                if (isAtLeastU()) {
-                    mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                Log.i(TAG, "After A2dp suspension");
+                if (Utils.isDualModeAudioEnabled()) {
+                   Bundle preferredAudioProfiles =
+                        mAdapterService.getPreferredAudioProfiles(mActiveDevice);
+                   if (preferredAudioProfiles != null && !preferredAudioProfiles.isEmpty()
+                      && preferredAudioProfiles.getInt("audio_mode_duplex") !=
+                                                       BluetoothProfile.LE_AUDIO) {
+                      Log.i(TAG, "Setting LE suspension only for HFP preference case");
+                      if (isAtLeastU()) {
+                          mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                      }
+                   } else {
+                     Log.i(TAG, "Not setting LE suspension. LE is the pref duplex profile");
+                   }
+                } else {
+                  if (isAtLeastU()) {
+                      mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                  }
                 }
+                //Adding the wait mechanism Logic.
+                lock.lock();
+                if (mLeGroupStreamStatus == LE_GROUP_STREAM_STATUS_STREAMING) {
+                    Log.d(TAG, "streaming in progress. Need to wait");
+                    try {
+                         mSendIndicatorsAfterSuspend = true;
+                         Log.d(TAG, "Phonestatechange: Acquired lock wait for phonestate change");
+                         leStreamStatusSuspend.await();
+                    } catch (InterruptedException e) {
+                         Log.d(TAG, "LEstreamSuspendlock:: Unblocked because of exception: " + e);
+                    } finally {
+                         Log.d(TAG, "LEstreamSuspendlock:: unlock");
+                         mSendIndicatorsAfterSuspend = false;
+                    }
+                }
+                lock.unlock();
             }
         });
         doForEachConnectedStateMachine(
