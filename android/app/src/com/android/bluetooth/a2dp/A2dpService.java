@@ -88,6 +88,8 @@ public class A2dpService extends ProfileService {
 
     // TODO(b/240635097): remove in U
     private static final int SOURCE_CODEC_TYPE_OPUS = 6;
+    private static final int SOURCE_CODEC_TYPE_MAX = 7;
+    private static final int SOURCE_CODEC_TYPE_APTX_ADAPTIVE = SOURCE_CODEC_TYPE_MAX;
 
     private static A2dpService sA2dpService;
 
@@ -1339,15 +1341,19 @@ public class A2dpService extends ProfileService {
             BluetoothCodecStatus codecStatus = sm.getCodecStatus();
             boolean lowLatencyAudioAllow = false;
             BluetoothCodecConfig lowLatencyCodec = new BluetoothCodecConfig.Builder()
-                    .setCodecType(SOURCE_CODEC_TYPE_OPUS) // remove in U
+                    .setCodecType(SOURCE_CODEC_TYPE_APTX_ADAPTIVE) // remove in U
                     .build();
 
+            Log.i(TAG, "updateLowLatencyAudioSupport: " + codecStatus.
+                                                isCodecConfigSelectable(lowLatencyCodec));
             if (codecStatus != null
                     && codecStatus.isCodecConfigSelectable(lowLatencyCodec)
                     && getOptionalCodecsEnabled(device)
                             == BluetoothA2dp.OPTIONAL_CODECS_PREF_ENABLED) {
                 lowLatencyAudioAllow = true;
             }
+            Log.i(TAG, "updateLowLatencyAudioSupport: lowLatencyAudioAllow: " +
+                                                                    lowLatencyAudioAllow);
             mAdapterService.allowLowLatencyAudio(lowLatencyAudioAllow, device);
         }
     }
