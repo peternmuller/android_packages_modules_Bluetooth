@@ -895,12 +895,17 @@ void set_remote_delay(uint16_t delay_report) {
 
 // Set low latency buffer mode allowed or disallowed
 void set_low_latency_mode_allowed(bool allowed) {
+  LOG(INFO) << __func__;
   is_low_latency_mode_allowed = allowed;
   if (!is_hal_enabled()) {
     log::error("BluetoothAudio HAL is not enabled");
     return;
   }
   std::vector<LatencyMode> latency_modes = {LatencyMode::FREE};
+  for (auto latency_mode : latency_modes) {
+    LOG(INFO) << __func__ << ": LatencyMode: "
+              << ::aidl::android::hardware::bluetooth::audio::toString(latency_mode);
+  }
   if (is_low_latency_mode_allowed) {
     latency_modes.push_back(LatencyMode::LOW_LATENCY);
   }
