@@ -403,7 +403,7 @@ class BroadcastStateMachineImpl : public BroadcastStateMachine {
         .max_transport_latency = sm_config_.config.qos.getMaxTransportLatency(),
         .rtn = sm_config_.config.qos.getRetransmissionNumber(),
         .phy = sm_config_.streaming_phy,
-        .packing = 0x00, /* Sequencial */
+        .packing = 0x01, /* Interleaved */
         .framing = 0x00, /* Unframed */
         .enc = static_cast<uint8_t>(sm_config_.broadcast_code ? 1 : 0),
         .enc_code = sm_config_.broadcast_code ? *sm_config_.broadcast_code

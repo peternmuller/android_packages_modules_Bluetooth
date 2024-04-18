@@ -263,6 +263,7 @@ class LeAudioClientImpl : public LeAudioClient {
         current_source_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
         current_sink_codec_config({{0, 0, 0}, 0, 0, 0, 0, 0}),
         defer_notify_inactive_until_stop_(false),
+        defer_notify_active_until_stop_(false),
         defer_sink_suspend_ack_until_stop_(false),
         defer_source_suspend_ack_until_stop_(false),
         le_audio_source_hal_client_(nullptr),
@@ -976,12 +977,33 @@ class LeAudioClientImpl : public LeAudioClient {
     groupStateMachine_->SuspendStream(group);
   }
 
-  void ProcessPendingGroupNotifyInactive(const int group_id) {
-    log::info("defer_notify_inactive_until_stop_: {}, group_id: {}", defer_notify_inactive_until_stop_, group_id);
+  void CheckAndNotifyGroupActive(const int group_id) {
+    log::info("group id: {}", group_id);
+    LeAudioDeviceGroup* group = aseGroups_.FindById(group_id);
+    if (!group) {
+      log::error("unknown group id: {}", group_id);
+      return;
+    }
+
+    /* Reset sink listener notified status */
+    sink_monitor_notified_status_ = std::nullopt;
+    if (IS_FLAG_ENABLED(leaudio_codec_config_callback_order_fix)) {
+      SendAudioGroupSelectableCodecConfigChanged(group);
+      callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
+    } else {
+      callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
+      SendAudioGroupSelectableCodecConfigChanged(group);
+    }
+  }
+
+  void CheckAndNotifyGroupInactive(const int group_id) {
+    log::info("defer_notify_inactive_until_stop_: {}, defer_notify_active_until_stop_: {}, group_id: {}",
+                    defer_notify_inactive_until_stop_, defer_notify_active_until_stop_, group_id);
     if (defer_notify_inactive_until_stop_) {
-      defer_notify_inactive_until_stop_ = false;
-      active_group_id_ = bluetooth::groups::kGroupUnknown;
-      ClientAudioInterfaceRelease();
+      if (!defer_notify_active_until_stop_) {
+        active_group_id_ = bluetooth::groups::kGroupUnknown;
+        ClientAudioInterfaceRelease();
+      }
       callbacks_->OnGroupStatus(group_id, GroupStatus::INACTIVE);
     }
   }
@@ -1442,18 +1464,24 @@ class LeAudioClientImpl : public LeAudioClient {
        * the new group so the group change is correctly handled in OnStateMachineStatusReportCb
        */
       active_group_id_ = group_id;
-      GroupStop(previous_active_group);
-      callbacks_->OnGroupStatus(previous_active_group, GroupStatus::INACTIVE);
+      LeAudioDeviceGroup* prev_group = aseGroups_.FindById(previous_active_group);
+      log::info("switch group A to group B");
+      if (prev_group && prev_group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
+        log::info("Previous group current state {}", ToString(prev_group->GetState()));
+        defer_notify_inactive_until_stop_ = true;
+        defer_notify_active_until_stop_ = true;
+        GroupStop(previous_active_group);
+      } else {
+        log::info(" Previous group not streaming");
+        GroupStop(previous_active_group);
+        callbacks_->OnGroupStatus(previous_active_group, GroupStatus::INACTIVE);
+      }
     }
 
-    /* Reset sink listener notified status */
-    sink_monitor_notified_status_ = std::nullopt;
-    if (IS_FLAG_ENABLED(leaudio_codec_config_callback_order_fix)) {
-      SendAudioGroupSelectableCodecConfigChanged(group);
-      callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
-    } else {
-      callbacks_->OnGroupStatus(active_group_id_, GroupStatus::ACTIVE);
-      SendAudioGroupSelectableCodecConfigChanged(group);
+    log::info("defer_notify_active_until_stop_: {}", defer_notify_active_until_stop_);
+
+    if (!defer_notify_active_until_stop_) {
+      CheckAndNotifyGroupActive(active_group_id_);
     }
   }
 
@@ -4301,11 +4329,16 @@ class LeAudioClientImpl : public LeAudioClient {
         audio_sender_state_ = AudioState::READY_TO_RELEASE;
         break;
       case AudioState::RELEASING:
+        log::info("calling source ConfirmSuspendRequest in audio_sender_state_ releasing");
+        le_audio_source_hal_client_->ConfirmSuspendRequest();
         return;
       case AudioState::IDLE:
         if (audio_receiver_state_ == AudioState::READY_TO_RELEASE) {
           defer_source_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
+        } else {
+          log::info("calling source ConfirmSuspendRequest in audio_sender_state_ idle");
+          le_audio_source_hal_client_->ConfirmSuspendRequest();
         }
         return;
       case AudioState::READY_TO_RELEASE:
@@ -4551,11 +4584,16 @@ class LeAudioClientImpl : public LeAudioClient {
         audio_receiver_state_ = AudioState::READY_TO_RELEASE;
         break;
       case AudioState::RELEASING:
+        log::info("calling sink ConfirmSuspendRequest in audio_receiver_state_ releasing");
+        le_audio_sink_hal_client_->ConfirmSuspendRequest();
         return;
       case AudioState::IDLE:
         if (audio_sender_state_ == AudioState::READY_TO_RELEASE) {
           defer_sink_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
+        } else {
+          log::info("calling sink ConfirmSuspendRequest in audio_receiver_state_ IDLE");
+          le_audio_sink_hal_client_->ConfirmSuspendRequest();
         }
         return;
       case AudioState::READY_TO_RELEASE:
@@ -5979,7 +6017,11 @@ class LeAudioClientImpl : public LeAudioClient {
                       group->group_id_);
             group->ClearPendingConfiguration();
           } else {
-            log::info("sink_monitor_mode_: {}, defer_notify_inactive_until_stop_: {}, defer_source_suspend_ack_until_stop_: {}, defer_sink_suspend_ack_until_stop_: {}", sink_monitor_mode_, defer_notify_inactive_until_stop_, defer_source_suspend_ack_until_stop_, defer_sink_suspend_ack_until_stop_);
+            log::info("sink_monitor_mode_: {}, defer_notify_inactive_until_stop_: {}, "
+                      "defer_notify_active_until_stop_: {}, defer_source_suspend_ack_until_stop_: {}, "
+                      "defer_sink_suspend_ack_until_stop_: {}", sink_monitor_mode_,
+                      defer_notify_inactive_until_stop_, defer_notify_active_until_stop_,
+                      defer_source_suspend_ack_until_stop_, defer_sink_suspend_ack_until_stop_);
             if (sink_monitor_mode_) {
               notifyAudioLocalSink(
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
@@ -6008,7 +6050,15 @@ class LeAudioClientImpl : public LeAudioClient {
             }
 
             log::info("active_group_id_: {}", active_group_id_);
-            ProcessPendingGroupNotifyInactive(active_group_id_);
+            if (defer_notify_active_until_stop_ && defer_notify_inactive_until_stop_) {
+              CheckAndNotifyGroupInactive(group_id);
+              CheckAndNotifyGroupActive(active_group_id_);
+              defer_notify_active_until_stop_ = false;
+              defer_notify_inactive_until_stop_ = false;
+            } else if (defer_notify_inactive_until_stop_) {
+              CheckAndNotifyGroupInactive(group_id);
+              defer_notify_inactive_until_stop_ = false;
+            }
           }
         }
 
@@ -6092,6 +6142,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
   /*To track set inactive progress */
   bool defer_notify_inactive_until_stop_;
+  /*To track set active progress */
+  bool defer_notify_active_until_stop_;
   /*To track MM issued suspend progress */
   bool defer_sink_suspend_ack_until_stop_;
   bool defer_source_suspend_ack_until_stop_;
