@@ -2329,17 +2329,26 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       out_qos.preferred_pres_delay_min = rsp.preferred_pres_delay_min;
       out_qos.preferred_pres_delay_max = rsp.preferred_pres_delay_max;
 
+      log::debug(
+            "Max Transport Latency: {}, "
+            "rsp_mtl: {}, Retransmission Number: {}, Phy: {}, preferred_phy: {}",
+            out_cfg.max_transport_latency, rsp.max_transport_latency,
+            out_cfg.retrans_nb, out_cfg.phy, rsp.preferred_phy);
+
       /* Validate and update QoS to be consistent */
       if ((!out_cfg.max_transport_latency ||
            out_cfg.max_transport_latency > rsp.max_transport_latency) ||
-          !out_cfg.retrans_nb || !out_cfg.phy) {
+          !out_cfg.retrans_nb) {
         out_cfg.max_transport_latency = rsp.max_transport_latency;
         out_cfg.retrans_nb = rsp.preferred_retrans_nb;
-        out_cfg.phy = leAudioDevice->GetPreferredPhyBitmask(rsp.preferred_phy);
         log::info(
             "Using server preferred QoS settings. Max Transport Latency: {}, "
             "Retransmission Number: {}, Phy: {}",
             out_cfg.max_transport_latency, out_cfg.retrans_nb, out_cfg.phy);
+      }
+      if (!out_cfg.phy) {
+        out_cfg.phy = leAudioDevice->GetPreferredPhyBitmask(rsp.preferred_phy);
+        log::debug( "Using server preferred Phy: {}", out_cfg.phy);
       }
     };
 
