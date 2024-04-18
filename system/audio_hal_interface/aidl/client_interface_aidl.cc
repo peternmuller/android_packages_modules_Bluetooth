@@ -338,6 +338,7 @@ bool BluetoothAudioClientInterface::UpdateAudioConfig(
 
 bool BluetoothAudioClientInterface::SetAllowedLatencyModes(
     std::vector<LatencyMode> latency_modes) {
+  LOG(INFO) << __func__;
   if (provider_ == nullptr) {
     log::info("BluetoothAudioHal nullptr");
     return false;
