@@ -121,6 +121,7 @@ enum {
   BTA_AV_API_STOP_EVT,
   BTA_AV_API_SET_LATENCY_EVT,
   BTA_AV_SET_CODEC_MODE_EVT,
+  BTA_AV_UPDATE_APTX_DATA_EVT,
 };
 
 /* events for AV control block state machine */
@@ -132,16 +133,18 @@ enum {
 
 /* events that do not go through state machine */
 #define BTA_AV_FIRST_NSM_EVT BTA_AV_API_ENABLE_EVT
-#define BTA_AV_LAST_NSM_EVT BTA_AV_SET_CODEC_MODE_EVT
+#define BTA_AV_LAST_NSM_EVT BTA_AV_UPDATE_APTX_DATA_EVT
 
 /* API events passed to both SSMs (by bta_av_api_to_ssm) */
 #define BTA_AV_FIRST_A2S_API_EVT BTA_AV_API_START_EVT
 #define BTA_AV_FIRST_A2S_SSM_EVT BTA_AV_AP_START_EVT
 
-#define BTA_AV_LAST_EVT BTA_AV_SET_CODEC_MODE_EVT
+#define BTA_AV_LAST_EVT BTA_AV_UPDATE_APTX_DATA_EVT
 
 /* Info ID from updating aptX Adaptive Encoder mode */
 #define BTA_AV_ENCODER_MODE_CHANGE_ID 5
+
+#define BTA_AV_ENCODER_DATA_ID 0x0E
 
 /* maximum number of SEPS in stream discovery results */
 #define BTA_AV_NUM_SEPS 32
@@ -285,6 +288,12 @@ typedef struct {
   BT_HDR_RIGID hdr;
   uint16_t enc_mode;
 } tBTA_AV_SET_CODEC_MODE;
+
+typedef struct {
+  BT_HDR_RIGID hdr;
+  uint16_t type;
+  uint16_t data;
+} tBTA_AV_APTX_DATA;
 
 /* data type for BTA_AV_API_START_EVT and bta_av_do_start */
 typedef struct {
@@ -465,6 +474,7 @@ union tBTA_AV_DATA {
   tBTA_AV_API_OPEN api_open;
   tBTA_AV_API_SET_LATENCY api_set_latency;
   tBTA_AV_SET_CODEC_MODE set_codec_mode;
+  tBTA_AV_APTX_DATA aptx_data;
   tBTA_AV_DO_START do_start;
   tBTA_AV_API_STOP api_stop;
   tBTA_AV_API_DISCNT api_discnt;
@@ -800,6 +810,7 @@ void bta_av_api_disconnect(tBTA_AV_DATA* p_data);
 void bta_av_set_use_latency_mode(tBTA_AV_SCB* p_scb, bool use_latency_mode);
 void bta_av_api_set_latency(tBTA_AV_DATA* p_data);
 void bta_av_set_codec_mode(tBTA_AV_DATA* p_data);
+void bta_av_update_aptx_data(tBTA_AV_DATA* p_data);
 void bta_av_sig_chg(tBTA_AV_DATA* p_data);
 void bta_av_signalling_timer(tBTA_AV_DATA* p_data);
 void bta_av_rc_disc_done(tBTA_AV_DATA* p_data);
