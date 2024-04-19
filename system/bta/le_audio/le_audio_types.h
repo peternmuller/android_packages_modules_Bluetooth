@@ -1270,8 +1270,9 @@ struct AseConfiguration {
   AseConfiguration(CodecConfigSetting codec,
                    QosConfigSetting qos = {.target_latency = 0,
                                            .retransmission_number = 0,
-                                           .max_transport_latency = 0})
-      : codec(codec), qos(qos) {}
+                                           .max_transport_latency = 0},
+                   CodecMetadataSetting metadata = {})
+      : codec(codec), qos(qos), vendor_metadata(metadata) {}
   /* Whether the codec location is transparent to the controller */
   bool is_codec_in_controller = false;
   /* Datapath ID used to configure an ISO channel for these ASEs */

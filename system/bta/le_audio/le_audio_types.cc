@@ -120,8 +120,12 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
       if (is_bidirectional) {
         if ((avail_group_ase_snk_cnt > 0) && (avail_group_ase_src_count) > 0) {
           /* Prepare CIG to enable all microphones per device */
-          out_cis_count_bidir = expected_device_cnt;
-          out_cis_count_unidir_sink = expected_device_cnt;
+          if(context_type == LeAudioContextType::CONVERSATIONAL) {
+            out_cis_count_bidir = 2*expected_device_cnt;
+          } else {
+            out_cis_count_bidir = expected_device_cnt;
+            out_cis_count_unidir_sink = expected_device_cnt;
+          }
         } else {
           if (avail_group_ase_snk_cnt > 0) {
             out_cis_count_unidir_sink = 2 * expected_device_cnt;
@@ -332,7 +336,7 @@ static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
     }
 
     uint8_t pac_metadata_len = pac_vendor_metadata.value()[2];
-    uint8_t req_metadata_len = vendor_metadata.value().vs_metadata.size() + 1 /*type*/;
+    uint8_t req_metadata_len = vendor_metadata.value().vs_metadata.size() + 1; //1 for metadata type;
     if (pac_metadata_len != req_metadata_len) {
       log::debug("Vendor Metadata length mismatch, as per pac record {} != requested {}", pac_metadata_len, req_metadata_len);
       return false;
@@ -372,6 +376,7 @@ static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
     }
   }
 
+  log::debug("Cfg Match found against PAC capabilities");
   return true;
 }
 
@@ -731,8 +736,37 @@ bool IsCodecConfigSettingSupported(types::LeAudioContextType context_type,
   log::debug(": Settings for format: 0x{:02x}", codec_id.coding_format);
 
   if (utils::IsCodecUsingLtvFormat(codec_id)) {
-    return IsCodecConfigCoreSupported(context_type, pac.codec_spec_caps, pac.metadata,
-                    codec_config_setting.params, vendor_metadata);
+    switch (codec_id.coding_format) {
+      case kLeAudioCodingFormatLC3:
+        return IsCodecConfigCoreSupported(context_type, pac.codec_spec_caps, pac.metadata,
+            codec_config_setting.params, vendor_metadata);
+      case types::kLeAudioCodingFormatVendorSpecific:
+        if (!bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
+          log::debug(" Multicodec support disabled, disallow vendor codecs for negotiation");
+          return false;
+        }
+        if (codec_id.vendor_company_id != pac.codec_id.vendor_company_id)
+          return false;
+        if (codec_id != pac.codec_id)
+          return false;
+        switch (codec_id.vendor_company_id) {
+          case types::kLeAudioVendorCompanyIdQualcomm:
+            switch (codec_id.vendor_codec_id) {
+              case types::kLeAudioCodingFormatAptxLe:
+                return cm->IsAptxAdaptiveLeSupported() && IsCodecConfigurationSupportedVendorAptxLe(
+                    context_type, pac.codec_spec_caps, pac.metadata, codec_config_setting.params, vendor_metadata);
+              case types::kLeAudioCodingFormatAptxLeX:
+                return cm->IsAptxAdaptiveLeXSupported() && IsCodecConfigurationSupportedVendorAptxLeX(
+                    context_type, pac.codec_spec_caps, pac.metadata, codec_config_setting.params, vendor_metadata);
+              default:
+                return false;
+            }
+          default:
+            return false;
+        }
+      default:
+        return false;
+    }
   }
 
   log::error("Codec {}, seems to be not supported here.",

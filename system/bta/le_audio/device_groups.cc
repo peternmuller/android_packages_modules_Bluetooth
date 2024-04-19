@@ -1363,13 +1363,6 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
       return false;
     }
 
-    // if (((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) ||
-    //     (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe)) &&
-    //     lex_codec_disabled.first) {
-    //   LOG_INFO("Skipping LeX config as Lex is disabled");
-    //   return false;
-    // }
-
     for (auto* device = GetFirstDevice();
         device != nullptr && required_device_cnt > 0;
         device = GetNextDevice(device)) {
@@ -1379,67 +1372,7 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
         continue;
       }
 
-      // auto pac = device->GetCodecConfigurationSupportedPac(context_type, ent.direction,
-      //     ent.codec, ent.vendor_metadata);
-      // if (pac == nullptr) continue;
-
-      // LOG(INFO) << "Matching PAC \n\tCoding format: " << loghex(pac->codec_id.coding_format)
-      //   << "\n\tVendor codec company ID: "
-      //   << loghex(pac->codec_id.vendor_company_id)
-      //   << "\n\tVendor codec ID: " << loghex(pac->codec_id.vendor_codec_id)
-      //   << "\n\tCodec spec caps:\n"
-      //   << pac->codec_spec_caps.ToString("", types::CodecCapabilitiesLtvFormat)
-      //   << "\n\tMetadata: "
-      //   << base::HexEncode(pac->metadata.data(),pac->metadata.size());
-
-      // /* Vendor codec metadata passing logic start */
-      // if (bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
-      //   bool parsed_ok = false;
-      //   auto pac_metadata =
-      //       types::LeAudioLtvMap::Parse(pac->metadata.data(), pac->metadata.size(), parsed_ok);
-      //   auto vndr_metadata = pac_metadata.Find(types::kLeAudioVendorSpecific);
-      //   if (vndr_metadata != std::nullopt && parsed_ok && !ent.vendor_metadata->vs_metadata.empty()) {
-      //     vendor_metadata = vndr_metadata.value();
-      //     vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioVendorSpecific);
-      //     vendor_metadata.insert(vendor_metadata.begin(), vendor_metadata.size() + 1);
-      //     if (ent.codec.id.coding_format == types::kLeAudioCodingFormatLC3) {
-      //       auto encoder_version_dut = ent.vendor_metadata->vs_metadata[0];
-      //       auto decoder_version_dut = ent.vendor_metadata->vs_metadata[1];
-      //       auto encoder_version_peer = vendor_metadata[6];
-      //       auto decoder_version_peer = vendor_metadata[7];
-      //       auto negotiated_encoder_version = 0, negotiated_decoder_version = 0;
-      //       negotiated_encoder_version = std::min(encoder_version_dut, decoder_version_peer);
-      //       negotiated_decoder_version = std::min(decoder_version_dut, encoder_version_peer);
-      //       vendor_metadata[6] = negotiated_encoder_version;
-      //       vendor_metadata[7] = negotiated_decoder_version;
-      //     } else if (ent.codec.id.coding_format == types::kLeAudioVendorSpecific) {
-      //       if ((ent.codec.id.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm) &&
-      //           ((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
-      //            (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {
-      //         auto codec_version_dut = ent.vendor_metadata->vs_metadata[1];
-      //         auto codec_version_peer = vendor_metadata[7];
-      //         auto negotiated_codec_version = 0;
-      //         negotiated_codec_version = std::min(codec_version_dut, codec_version_peer);
-      //         vendor_metadata[7] = negotiated_codec_version;
-      //       }
-      //     }
-      //   }
-
-      //   if (ent.direction == types::kLeAudioDirectionSink)
-      //     sink_context_to_vendor_metadata_map[context_type] = vendor_metadata;
-      //   else
-      //     source_context_to_vendor_metadata_map[context_type] = vendor_metadata;
-
-      //   if (vendor_metadata.empty()) {
-      //     LOG_INFO("Vendor Metadata empty ");
-      //   } else {
-      //     LOG_INFO("Negotiated Vendor Metadata configuration values: ");
-      //     for (auto& metadata_value : vendor_metadata)
-      //       LOG_INFO("%d ", metadata_value);
-      //   }
-      //   /* Vendor codec metadata passing logic end */
-      // }
-
+      bool is_vendor_metadata_populated_by_direction = false;
       int needed_ase_per_dev =
           std::min(static_cast<int>(max_required_ase_per_dev),
                    static_cast<int>(ase_cnt - active_ase_cnt));
@@ -1449,14 +1382,11 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
        * if it allows us to do this.
        */
 
-      types::AudioLocations audio_locations = 0;
-      /* Check direction and if audio location allows to create more cise */
-      if (direction == types::kLeAudioDirectionSink)
-        audio_locations = device->snk_audio_locations_;
-      else
-        audio_locations = device->src_audio_locations_;
       for (auto const& ent : ase_confs) {
-        if (!device->GetCodecConfigurationSupportedPac(configuration_context_type_, direction, ent.codec, ent.vendor_metadata)) {
+        auto pac = device->GetCodecConfigurationSupportedPac(context_type,
+                                                             direction, ent.codec,
+                                                             ent.vendor_metadata);
+        if (pac == nullptr) {
           log::debug("Insufficient PAC");
           continue;
         }
@@ -1465,6 +1395,22 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
           log::debug("Strategy not supported");
           continue;
         }
+
+        if (bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
+          if (((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) ||
+              (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe)) &&
+              lex_codec_disabled.first) {
+            log::info("Skipping LeX config as Lex is disabled");
+            continue;
+          }
+
+          if (!is_vendor_metadata_populated_by_direction) {
+            log::debug("Populate Vendor Metadata by direction {}", direction);
+            PopulateVendorMetadatabyDirection(context_type, direction, pac->metadata, ent);
+            is_vendor_metadata_populated_by_direction = true;
+          }
+        }
+
         for (auto& ase : device->ases_) {
           if (ase.direction != direction) continue;
 
@@ -2223,6 +2169,55 @@ void LeAudioDeviceGroup::Dump(int fd, int active_group_id) const {
     device->DumpPacsDebugState(stream_pacs);
   }
   dprintf(fd, "%s", stream_pacs.str().c_str());
+}
+
+void LeAudioDeviceGroup::PopulateVendorMetadatabyDirection(LeAudioContextType context_type,
+                                       uint8_t direction, std::vector<uint8_t> pac_metadata,
+                                       const set_configurations::AseConfiguration& conf) const {
+  std::vector<uint8_t> vendor_metadata;
+  bool parsed_ok = false;
+  auto pacs_metadata =
+      types::LeAudioLtvMap::Parse(pac_metadata.data(), pac_metadata.size(), parsed_ok);
+  auto vndr_metadata = pacs_metadata.Find(types::kLeAudioVendorSpecific);
+  if (vndr_metadata != std::nullopt && parsed_ok && !conf.vendor_metadata->vs_metadata.empty()) {
+    vendor_metadata = vndr_metadata.value();
+    vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioVendorSpecific);
+    vendor_metadata.insert(vendor_metadata.begin(), vendor_metadata.size() + 1);
+    if (conf.codec.id.coding_format == types::kLeAudioCodingFormatLC3) {
+      auto encoder_version_dut = conf.vendor_metadata->vs_metadata[0];
+      auto decoder_version_dut = conf.vendor_metadata->vs_metadata[1];
+      auto encoder_version_peer = vendor_metadata[6];
+      auto decoder_version_peer = vendor_metadata[7];
+      auto negotiated_encoder_version = 0, negotiated_decoder_version = 0;
+      negotiated_encoder_version = std::min(encoder_version_dut, decoder_version_peer);
+      negotiated_decoder_version = std::min(decoder_version_dut, encoder_version_peer);
+      vendor_metadata[6] = negotiated_encoder_version;
+      vendor_metadata[7] = negotiated_decoder_version;
+    } else if (conf.codec.id.coding_format == types::kLeAudioVendorSpecific) {
+      if ((conf.codec.id.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm) &&
+          ((conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
+          (conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {
+        auto codec_version_dut = conf.vendor_metadata->vs_metadata[1];
+        auto codec_version_peer = vendor_metadata[7];
+        auto negotiated_codec_version = 0;
+        negotiated_codec_version = std::min(codec_version_dut, codec_version_peer);
+        vendor_metadata[7] = negotiated_codec_version;
+      }
+    }
+  }
+
+  if (direction == types::kLeAudioDirectionSink)
+    sink_context_to_vendor_metadata_map[context_type] = vendor_metadata;
+  else
+    source_context_to_vendor_metadata_map[context_type] = vendor_metadata;
+
+  if (vendor_metadata.empty()) {
+    log::info("Vendor Metadata empty ");
+  } else {
+    log::info("Negotiated Vendor Metadata configuration values: ");
+    for (auto& metadata_value : vendor_metadata)
+      log::info("{} ", metadata_value);
+  }
 }
 
 LeAudioDeviceGroup* LeAudioDeviceGroups::Add(int group_id) {

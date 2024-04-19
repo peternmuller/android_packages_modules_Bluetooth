@@ -146,9 +146,9 @@ struct codec_manager_impl {
                                      is_apx_lossless_le_supported_local;
     is_aptx_adaptive_lex_supported_ = /*(IsAptxLeXSuppoerted(check sysprop, QLL feat)*/ true;
 
-    log::debug("FT Changes allowed %d, BN Variation allowed %d, Aptx LE Lossless enabled %d",
+    log::debug("FT Changes allowed {}, BN Variation allowed {}, Aptx LE Lossless enabled {}",
         is_dynamic_ft_change_supported, is_dynamic_bn_over_qhs, is_apx_lossless_le_supported);
-    log::debug("Aptx LE supported %d, Aptx LEX Supported %d",
+    log::debug("Aptx LE supported {}, Aptx LEX Supported {}",
         is_aptx_adaptive_le_supported_, is_aptx_adaptive_lex_supported_);
 
     log::info("LeAudioCodecManagerImpl: configure_data_path for encode");
