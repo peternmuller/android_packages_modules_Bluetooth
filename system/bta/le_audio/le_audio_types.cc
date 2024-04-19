@@ -799,10 +799,10 @@ uint32_t CodecConfigSetting::GetSamplingFrequencyHz() const {
   }
 };
 
-uint16_t CodecConfigSetting::GetOctetsPerFrame() const {
+uint16_t CodecConfigSetting::GetOctectsPerFrame() const {
   switch (id.coding_format) {
     case kLeAudioCodingFormatLC3:
-      return params.GetAsCoreCodecConfig().octets_per_codec_frame.value_or(0);
+      return params.GetAsCoreCodecConfig().GetOctectsPerFrame();
     case types::kLeAudioCodingFormatVendorSpecific:
       switch (id.vendor_company_id) {
         case types::kLeAudioVendorCompanyIdQualcomm:

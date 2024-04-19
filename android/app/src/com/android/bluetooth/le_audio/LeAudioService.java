@@ -100,6 +100,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -1415,7 +1416,7 @@ public class LeAudioService extends ProfileService {
             for (Map.Entry<Integer, LeAudioGroupDescriptor> entry :
                     mGroupDescriptorsView.entrySet()) {
                 LeAudioGroupDescriptor descriptor = entry.getValue();
-                if (descriptor.isActive()) {
+                if (!descriptor.isInactive()) {
                     return false;
                 }
             }
@@ -3908,14 +3909,42 @@ public class LeAudioService extends ProfileService {
         Log.d(TAG, "SetVolume " + volume);
 
         int currentlyActiveGroupId = getActiveGroupId();
+        List<BluetoothDevice> activeBroadcastSinks = new ArrayList<>();
+
         if (currentlyActiveGroupId == LE_AUDIO_GROUP_ID_INVALID) {
-            Log.e(TAG, "There is no active group ");
-            return;
+            if (!Flags.leaudioBroadcastVolumeControlWithSetVolume()) {
+                Log.e(TAG, "There is no active group ");
+                return;
+            }
+
+            BassClientService bassClientService = getBassClientService();
+            if (bassClientService != null) {
+                activeBroadcastSinks = bassClientService.getActiveBroadcastSinks();
+            }
+
+            if (activeBroadcastSinks.isEmpty()) {
+                Log.e(TAG, "There is no active streaming group or broadcast sinks");
+                return;
+            }
         }
 
         VolumeControlService volumeControlService = getVolumeControlService();
         if (volumeControlService != null) {
-            volumeControlService.setGroupVolume(currentlyActiveGroupId, volume);
+            if (Flags.leaudioBroadcastVolumeControlWithSetVolume()
+                    && currentlyActiveGroupId == LE_AUDIO_GROUP_ID_INVALID
+                    && !activeBroadcastSinks.isEmpty()) {
+                Set<Integer> broadcastGroups =
+                        activeBroadcastSinks.stream()
+                                .map(dev -> getGroupId(dev))
+                                .filter(id -> id != IBluetoothLeAudio.LE_AUDIO_GROUP_ID_INVALID)
+                                .collect(Collectors.toSet());
+
+                Log.d(TAG, "Setting volume for broadcast sink groups: " + broadcastGroups);
+                broadcastGroups.forEach(
+                        groupId -> volumeControlService.setGroupVolume(groupId, volume));
+            } else {
+                volumeControlService.setGroupVolume(currentlyActiveGroupId, volume);
+            }
         }
     }
 
