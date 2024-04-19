@@ -81,8 +81,10 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
 
   bool is_bidirectional = types::kLeAudioContextAllBidir.test(context_type);
 
-  if(!(group_contexts.sink.test(context_type) && group_contexts.source.test(context_type))) {
-    log::warn("Remote does not support (context:{}) for both directions", bluetooth::common::ToString(context_type));
+  if((strategy == types::LeAudioConfigurationStrategy::STEREO_TWO_CISES_PER_DEVICE) &&
+    !(group_contexts.sink.test(context_type) && group_contexts.source.test(context_type))) {
+    log::warn("Remote does not support (context:{}) for both directions",
+              bluetooth::common::ToString(context_type));
     is_bidirectional = false;
   }
 
