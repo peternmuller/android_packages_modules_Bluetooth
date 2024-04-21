@@ -600,6 +600,7 @@ struct AudioSetConfigurationProviderJson {
 
     log::debug(": Updating {} config entries.", flat_configs->size());
     for (auto const& flat_cfg : *flat_configs) {
+      log::debug(": flat_cfg name: {} ", flat_cfg->name()->str());
       auto configuration = AudioSetConfigurationFromFlat(flat_cfg, &codec_cfgs,
                                                          &qos_cfgs, location,
                                                          &metadata_cfgs);
@@ -618,8 +619,10 @@ struct AudioSetConfigurationProviderJson {
     if (!flat_scenario->configurations()) return items;
 
     for (auto config_name : *flat_scenario->configurations()) {
+      log::debug("config_name {} :", config_name->str());
       if (configurations_.count(config_name->str()) == 0) continue;
 
+      log::debug("pushing config {} :", config_name->str());
       auto& cfg = configurations_.at(config_name->str());
       items.push_back(&cfg);
     }
@@ -663,6 +666,7 @@ struct AudioSetConfigurationProviderJson {
     for (auto const& scenario : *flat_scenarios) {
       log::debug("Scenario {} configs:", scenario->name()->c_str());
       auto configs = AudioSetConfigurationsFromFlatScenario(scenario);
+      log::debug("configs size {} :", configs.size());
       for (auto& config : configs) {
         log::debug("\t\t Audio set config: {}", config->name);
       }
