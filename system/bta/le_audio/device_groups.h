@@ -38,7 +38,9 @@
 #include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
 
+#include "common/strings.h"
 #include "devices.h"
+#include "le_audio_log_history.h"
 #include "le_audio_types.h"
 
 namespace bluetooth::le_audio {
@@ -73,6 +75,12 @@ class LeAudioDeviceGroup {
     LeAudioDeviceGroup* group_;
     types::CigState state_;
   } cig;
+
+  bool IsGroupConfiguredTo(
+      const set_configurations::AudioSetConfiguration& cfg) {
+    if (!stream_conf.conf) return false;
+    return cfg == *stream_conf.conf;
+  }
 
   /* Current configuration strategy - recalculated on demand */
   mutable std::optional<types::LeAudioConfigurationStrategy> strategy_ =
@@ -209,14 +217,15 @@ class LeAudioDeviceGroup {
   bool GetPresentationDelay(uint32_t* delay, uint8_t direction) const;
   uint16_t GetRemoteDelay(uint8_t direction) const;
   bool UpdateAudioContextAvailability(void);
-  bool UpdateAudioSetConfigurationCache(types::LeAudioContextType ctx_type);
+  bool UpdateAudioSetConfigurationCache(
+      types::LeAudioContextType ctx_type) const;
   bool ReloadAudioLocations(void);
   bool ReloadAudioDirections(void);
   std::shared_ptr<const set_configurations::AudioSetConfiguration>
   GetActiveConfiguration(void) const;
   bool IsPendingConfiguration(void) const;
   std::shared_ptr<const set_configurations::AudioSetConfiguration>
-  GetConfiguration(types::LeAudioContextType ctx_type);
+  GetConfiguration(types::LeAudioContextType ctx_type) const;
   std::shared_ptr<const set_configurations::AudioSetConfiguration>
   GetCachedConfiguration(types::LeAudioContextType ctx_type) const;
   void InvalidateCachedConfigurations(void);
@@ -230,10 +239,9 @@ class LeAudioDeviceGroup {
   bool IsAudioSetConfigurationSupported(
       LeAudioDevice* leAudioDevice,
       const set_configurations::AudioSetConfiguration* audio_set_conf) const;
-  std::optional<LeAudioCodecConfiguration> GetCodecConfigurationByDirection(
-      types::LeAudioContextType group_context_type, uint8_t direction);
-  std::optional<LeAudioCodecConfiguration>
-  GetCachedCodecConfigurationByDirection(
+  LeAudioCodecConfiguration GetAudioSessionCodecConfigForDirection(
+      types::LeAudioContextType group_context_type, uint8_t direction) const;
+  bool HasCodecConfigurationForDirection(
       types::LeAudioContextType group_context_type, uint8_t direction) const;
   bool IsAudioSetConfigurationAvailable(
       types::LeAudioContextType group_context_type);
@@ -402,7 +410,7 @@ class LeAudioDeviceGroup {
    */
   const set_configurations::AudioSetConfiguration*
   FindFirstSupportedConfiguration(
-      types::LeAudioContextType context_type,
+      const CodecManager::UnicastConfigurationRequirements& requirements,
       const set_configurations::AudioSetConfigurations* confs) const;
 
  private:
@@ -419,7 +427,7 @@ class LeAudioDeviceGroup {
       const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists);
   bool IsAudioSetConfigurationSupported(
       const set_configurations::AudioSetConfiguration* audio_set_configuration,
-      types::LeAudioContextType context_type,
+      const CodecManager::UnicastConfigurationRequirements& requirements,
       types::LeAudioConfigurationStrategy required_snk_strategy) const;
   uint32_t GetTransportLatencyUs(uint8_t direction) const;
   bool IsCisPartOfCurrentStream(uint16_t cis_conn_hdl) const;
@@ -453,9 +461,10 @@ class LeAudioDeviceGroup {
    * change. Stored as a pair of (is_valid_cache, configuration*). `pair.first`
    * being `false` means that the cached value should be refreshed.
    */
-  std::map<types::LeAudioContextType,
-           std::pair<bool, const std::shared_ptr<
-                               set_configurations::AudioSetConfiguration>>>
+  mutable std::map<
+      types::LeAudioContextType,
+      std::pair<bool, const std::shared_ptr<
+                          set_configurations::AudioSetConfiguration>>>
       context_to_configuration_cache_map;
 
   types::AseState target_state_;

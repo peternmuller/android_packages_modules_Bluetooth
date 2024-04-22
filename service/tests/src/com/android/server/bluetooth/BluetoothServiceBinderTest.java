@@ -154,7 +154,7 @@ public class BluetoothServiceBinderTest {
     }
 
     @Test
-    @EnableCompatChanges({BluetoothManagerService.RESTRICT_ENABLE_DISABLE})
+    @EnableCompatChanges({ChangeIds.RESTRICT_ENABLE_DISABLE})
     public void enableWithRestrictEnable() {
         assertThrows(NullPointerException.class, () -> mBinder.enable(null));
 
@@ -185,7 +185,7 @@ public class BluetoothServiceBinderTest {
     }
 
     @Test
-    @DisableCompatChanges({BluetoothManagerService.RESTRICT_ENABLE_DISABLE})
+    @DisableCompatChanges({ChangeIds.RESTRICT_ENABLE_DISABLE})
     public void disableNoRestrictEnable() {
         assertThrows(NullPointerException.class, () -> mBinder.disable(null, true));
 
@@ -201,7 +201,7 @@ public class BluetoothServiceBinderTest {
     }
 
     @Test
-    @EnableCompatChanges({BluetoothManagerService.RESTRICT_ENABLE_DISABLE})
+    @EnableCompatChanges({ChangeIds.RESTRICT_ENABLE_DISABLE})
     public void disableWithRestrictEnable() {
         assertThrows(NullPointerException.class, () -> mBinder.disable(null, true));
 
