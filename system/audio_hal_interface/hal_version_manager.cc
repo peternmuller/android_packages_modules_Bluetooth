@@ -168,37 +168,8 @@ HalVersionManager::HalVersionManager() {
           const hidl_vec<android::hardware::hidl_string>& instanceNames) {
         instance_count = instanceNames.size();
       };
+
   auto hidl_retval = service_manager->listManifestByInterface(
-      kFullyQualifiedInterfaceName_2_1, listManifestByInterface_cb);
-  if (!hidl_retval.isOk()) {
-    log::fatal("IServiceManager::listByInterface failure: {}",
-               hidl_retval.description());
-    return;
-  }
-
-  if (instance_count > 0) {
-    log::info(__func__ , ": Going with AOSP HIDL 2.1 ");
-    hal_version_ = BluetoothAudioHalVersion::VERSION_2_1;
-    hal_transport_ = BluetoothAudioHalTransport::HIDL;
-    return;
-  }
-
-  hidl_retval = service_manager->listManifestByInterface(
-      kFullyQualifiedInterfaceName_2_0, listManifestByInterface_cb);
-  if (!hidl_retval.isOk()) {
-    log::fatal("IServiceManager::listByInterface failure: {}",
-               hidl_retval.description());
-    return;
-  }
-
-  if (instance_count > 0) {
-    log::info(__func__, ": Going with AOSP HIDL 2.0 ");
-    hal_version_ = BluetoothAudioHalVersion::VERSION_2_0;
-    hal_transport_ = BluetoothAudioHalTransport::HIDL;
-    return;
-  }
-
-  hidl_retval = service_manager->listManifestByInterface(
       kFullyQualifiedQTIInterfaceName_2_1, listManifestByInterface_cb);
   if (!hidl_retval.isOk()) {
     log::fatal("IServiceManager::listByInterface failure: {}",
@@ -225,6 +196,36 @@ HalVersionManager::HalVersionManager() {
     log::info(__func__ , " QTI HIDL 2.0 version");
     hal_version_ = BluetoothAudioHalVersion::VERSION_QTI_HIDL_2_0;
     hal_transport_ = BluetoothAudioHalTransport::QTI_HIDL;
+    return;
+  }
+
+  hidl_retval = service_manager->listManifestByInterface(
+      kFullyQualifiedInterfaceName_2_1, listManifestByInterface_cb);
+  if (!hidl_retval.isOk()) {
+    log::fatal("IServiceManager::listByInterface failure: {}",
+               hidl_retval.description());
+    return;
+  }
+
+  if (instance_count > 0) {
+    log::info(__func__ , ": Going with AOSP HIDL 2.1 ");
+    hal_version_ = BluetoothAudioHalVersion::VERSION_2_1;
+    hal_transport_ = BluetoothAudioHalTransport::HIDL;
+    return;
+  }
+
+  hidl_retval = service_manager->listManifestByInterface(
+      kFullyQualifiedInterfaceName_2_0, listManifestByInterface_cb);
+  if (!hidl_retval.isOk()) {
+    log::fatal("IServiceManager::listByInterface failure: {}",
+               hidl_retval.description());
+    return;
+  }
+
+  if (instance_count > 0) {
+    log::info(__func__, ": Going with AOSP HIDL 2.0 ");
+    hal_version_ = BluetoothAudioHalVersion::VERSION_2_0;
+    hal_transport_ = BluetoothAudioHalTransport::HIDL;
     return;
   }
 
