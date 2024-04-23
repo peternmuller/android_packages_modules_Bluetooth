@@ -2581,6 +2581,12 @@ void btif_dm_start_discovery(void) {
     return;
   }
 
+  /* We should not go for inquiry in BONDING STATE. */
+  if (is_bonding_or_sdp()) {
+    log::info("skipping start discovery because bonding in progress");
+    return;
+  }
+
   /* Will be enabled to true once inquiry busy level has been received */
   btif_dm_inquiry_in_progress = false;
   /* find nearby devices */
