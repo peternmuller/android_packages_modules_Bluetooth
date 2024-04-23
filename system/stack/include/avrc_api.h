@@ -141,7 +141,7 @@
 #endif
 
 #ifndef AVRC_DEFAULT_VERSION
-#define AVRC_DEFAULT_VERSION AVRC_1_5_STRING
+#define AVRC_DEFAULT_VERSION AVRC_1_6_STRING
 #endif
 
 /* Configurable dynamic avrcp version enable key*/
