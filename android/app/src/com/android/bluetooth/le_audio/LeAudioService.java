@@ -3703,6 +3703,38 @@ public class LeAudioService extends ProfileService {
         }
     }
 
+    public void setInactiveForBroadcast() {
+        Log.d(TAG, "setInactiveForBroadcast");
+        if (!isBroadcastActive()) {
+            Log.d(TAG, "setInactiveForBroadcast: broadcast is inactive");
+            return;
+        }
+        Optional<Integer> broadcastId = getFirstNotStoppedBroadcastId();
+        LeAudioBroadcastDescriptor descriptor = mBroadcastDescriptors.get(broadcastId.get());
+        if (!broadcastId.isEmpty() && (descriptor != null)) {
+            Log.d(TAG, "setInactiveForBroadcast: stop broadcast now");
+            updateFallbackUnicastGroupIdForBroadcast(LE_AUDIO_GROUP_ID_INVALID);
+            stopBroadcast(broadcastId.get());
+            Log.d(TAG, "Wait for broadcast to stop");
+            int waitCount = 4;
+            for (int c = 0; c < waitCount; c++) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "Sleep thread is interrupted", e);
+                }
+                if (descriptor.mState.equals(LeAudioStackEvent.BROADCAST_STATE_STOPPED)) {
+                    break;
+                }
+            }
+            if (descriptor.mState.equals(LeAudioStackEvent.BROADCAST_STATE_STOPPED)) {
+                Log.d(TAG, "Broadcast is stopped");
+            } else {
+                Log.d(TAG, "Broadcast state is: " + descriptor.mState);
+            }
+        }
+    }
+
     /**
      * Set connection policy of the profile and connects it if connectionPolicy is
      * {@link BluetoothProfile#CONNECTION_POLICY_ALLOWED} or disconnects if connectionPolicy is

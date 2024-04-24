@@ -69,7 +69,7 @@ class BaseData {
         public byte[] codecId = new byte[5];
         public byte codecConfigLength;
         public byte[] codecConfigInfo;
-        public byte metaDataLength;
+        public int metaDataLength;
         public byte[] metaData;
         public byte numSubGroups;
         public byte[] bisIndices;
@@ -257,7 +257,7 @@ class BaseData {
                     0, (int) node.codecConfigLength);
             offset += node.codecConfigLength;
         }
-        node.metaDataLength = serviceData[offset++];
+        node.metaDataLength = serviceData[offset++] & 0xff;
         if (node.metaDataLength != 0) {
             node.metaData = new byte[(int) node.metaDataLength];
             System.arraycopy(serviceData, offset,
@@ -302,9 +302,9 @@ class BaseData {
                 for (String codecInfo : Csfs) {
                     byte[] ltvEntries = codecInfo.getBytes();
                     int k = 0;
-                    byte length = ltvEntries[k++];
+                    int length = ltvEntries[k++] & 0xff;
                     byte[] ltv = new byte[length + 1];
-                    ltv[0] = length;
+                    ltv[0] = (byte) (length & 0xff);
                     System.arraycopy(ltvEntries, k, ltv, 1, length);
                     int type = (int) ltv[1];
                     String s = uniqueCcis.get(type);
@@ -322,9 +322,9 @@ class BaseData {
                 for (String metadata : Mds) {
                     byte[] ltvEntries = metadata.getBytes();
                     int k = 0;
-                    byte length = ltvEntries[k++];
+                    int length = ltvEntries[k++] & 0xff;
                     byte[] ltv = new byte[length + 1];
-                    ltv[0] = length;
+                    ltv[0] = (byte) (length & 0xff);
                     System.arraycopy(ltvEntries, k, ltv, 1, length);
                     int type = (int) ltv[1];
                     String s = uniqueCcis.get(type);
