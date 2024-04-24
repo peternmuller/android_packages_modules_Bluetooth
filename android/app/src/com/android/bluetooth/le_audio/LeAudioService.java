@@ -1204,6 +1204,7 @@ public class LeAudioService extends ProfileService {
                 settingsList.stream()
                         .map(s -> s.getContentMetadata().getRawMetadata())
                         .toArray(byte[][]::new));
+        notifyBroadcastUpdated(broadcastId, BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
     }
 
     /**
@@ -2124,7 +2125,7 @@ public class LeAudioService extends ProfileService {
             return false;
         }
 
-        if (!Flags.audioRoutingCentralization()) {
+        /* if (!Flags.audioRoutingCentralization()) {
             // If AUDIO_ROUTING_CENTRALIZATION, this will be checked inside AudioRoutingManager.
             if (Utils.isDualModeAudioEnabled()) {
                 if (!mAdapterService.isAllSupportedClassicAudioProfilesActive(device)) {
@@ -2137,7 +2138,7 @@ public class LeAudioService extends ProfileService {
                     return false;
                 }
             }
-        }
+        } */
         return setActiveGroupWithDevice(device, false);
     }
 
@@ -3201,6 +3202,12 @@ public class LeAudioService extends ProfileService {
             handleUnicastStreamStatusChange(stackEvent.valueInt1, stackEvent.valueInt2);
         } else if (stackEvent.type == LeAudioStackEvent.EVENT_TYPE_GROUP_STREAM_STATUS_CHANGED) {
             notifyGroupStreamStatusChanged(stackEvent.valueInt1, stackEvent.valueInt2);
+            if (Utils.isDualModeAudioEnabled()) {
+               HeadsetService headsetService = mServiceFactory.getHeadsetService();
+               if (headsetService != null) {
+                  headsetService.updateLeStreamStatus(device, stackEvent.valueInt2);
+               }
+            }
         }
     }
 
@@ -3693,6 +3700,38 @@ public class LeAudioService extends ProfileService {
             mLeAudioDeviceInactivatedForHfpHandover = null;
         } else {
             Log.d(TAG, "nothing to hand over back");
+        }
+    }
+
+    public void setInactiveForBroadcast() {
+        Log.d(TAG, "setInactiveForBroadcast");
+        if (!isBroadcastActive()) {
+            Log.d(TAG, "setInactiveForBroadcast: broadcast is inactive");
+            return;
+        }
+        Optional<Integer> broadcastId = getFirstNotStoppedBroadcastId();
+        LeAudioBroadcastDescriptor descriptor = mBroadcastDescriptors.get(broadcastId.get());
+        if (!broadcastId.isEmpty() && (descriptor != null)) {
+            Log.d(TAG, "setInactiveForBroadcast: stop broadcast now");
+            updateFallbackUnicastGroupIdForBroadcast(LE_AUDIO_GROUP_ID_INVALID);
+            stopBroadcast(broadcastId.get());
+            Log.d(TAG, "Wait for broadcast to stop");
+            int waitCount = 4;
+            for (int c = 0; c < waitCount; c++) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "Sleep thread is interrupted", e);
+                }
+                if (descriptor.mState.equals(LeAudioStackEvent.BROADCAST_STATE_STOPPED)) {
+                    break;
+                }
+            }
+            if (descriptor.mState.equals(LeAudioStackEvent.BROADCAST_STATE_STOPPED)) {
+                Log.d(TAG, "Broadcast is stopped");
+            } else {
+                Log.d(TAG, "Broadcast state is: " + descriptor.mState);
+            }
         }
     }
 
@@ -4320,6 +4359,20 @@ public class LeAudioService extends ProfileService {
             for (int i = 0; i < n; i++) {
                 try {
                     mBroadcastCallbacks.getBroadcastItem(i).onPlaybackStopped(reason, broadcastId);
+                } catch (RemoteException e) {
+                    continue;
+                }
+            }
+            mBroadcastCallbacks.finishBroadcast();
+        }
+    }
+
+    private void notifyBroadcastUpdated(int broadcastId, int reason) {
+        if (mBroadcastCallbacks != null) {
+            int n = mBroadcastCallbacks.beginBroadcast();
+            for (int i = 0; i < n; i++) {
+                try {
+                    mBroadcastCallbacks.getBroadcastItem(i).onBroadcastUpdated(reason, broadcastId);
                 } catch (RemoteException e) {
                     continue;
                 }

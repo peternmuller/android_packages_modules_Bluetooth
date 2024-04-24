@@ -422,6 +422,12 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
 
     broadcasts_[broadcast_id]->UpdateBroadcastAnnouncement(
         std::move(announcement));
+    auto meta = GetBroadcastMetadataOpt(broadcast_id);
+    if (meta) {
+        log::info("OnBroadcastMetadataChanged: boradcast_id = {}", broadcast_id);
+        callbacks_->OnBroadcastMetadataChanged(broadcast_id,
+            std::move(meta.value()));
+    }
   }
 
   /* Choose the dominating audio context when multiple contexts are mixed */

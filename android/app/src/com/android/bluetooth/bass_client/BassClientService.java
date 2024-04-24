@@ -1359,10 +1359,10 @@ public class BassClientService extends ProfileService {
                     if (broadcastId != BassConstants.INVALID_BROADCAST_ID
                             && mCachedBroadcasts.get(broadcastId) == null) {
                         log("selectBroadcastSource: broadcastId " + broadcastId);
-                        mCachedBroadcasts.put(broadcastId, result);
                         synchronized (mStateMachines) {
                             for (BassClientStateMachine sm : mStateMachines.values()) {
                                 if (sm.isConnected()) {
+                                    mCachedBroadcasts.put(broadcastId, result);
                                     selectSource(sm.getDevice(), result, false);
                                 }
                             }
@@ -1443,6 +1443,14 @@ public class BassClientService extends ProfileService {
             mSearchScanCallback = null;
             sEventLogger.logd(TAG, "stopSearchingForSources");
             mCallbacks.notifySearchStopped(BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
+        }
+        synchronized (mStateMachines) {
+            for (BassClientStateMachine sm : mStateMachines.values()) {
+                if (sm.isConnected()) {
+                    Message message = sm.obtainMessage(BassClientStateMachine.STOP_PENDING_PA_SYNC);
+                    sm.sendMessage(message);
+                }
+            }
         }
     }
 
