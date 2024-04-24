@@ -90,7 +90,7 @@ typedef uint8_t tBTA_SERVICE_ID;
 #define BTA_ALL_SERVICE_MASK 0x7FFFFFFF  /* All services supported by BTA. */
 #define BTA_USER_SERVICE_MASK 0x80000000 /* Message Notification Profile */
 
-typedef uint32_t tBTA_SERVICE_MASK;
+typedef uint64_t tBTA_SERVICE_MASK;
 
 #define BTA_APP_ID_PAN_MULTI 0xFE /* app id for pan multiple connection */
 #define BTA_ALL_APP_ID 0xFF
