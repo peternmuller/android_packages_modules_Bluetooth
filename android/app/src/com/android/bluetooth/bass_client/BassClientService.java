@@ -2014,6 +2014,12 @@ public class BassClientService extends ProfileService {
             return;
         }
 
+        if (!DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH,
+                "persist.vendor.service.bt.stopBroadcastIfNoReceivers", false)) {
+            Log.w(TAG, "handleDeviceDisconnection: skip stopping broadcast if not receivers");
+            return;
+        }
+
         for (Map.Entry<Integer, HashSet<BluetoothDevice>> entry :
                 mLocalBroadcastReceivers.entrySet()) {
             Integer broadcastId = entry.getKey();
