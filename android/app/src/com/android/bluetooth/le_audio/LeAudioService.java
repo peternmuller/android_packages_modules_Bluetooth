@@ -2124,7 +2124,7 @@ public class LeAudioService extends ProfileService {
             return false;
         }
 
-        if (!Flags.audioRoutingCentralization()) {
+        /* if (!Flags.audioRoutingCentralization()) {
             // If AUDIO_ROUTING_CENTRALIZATION, this will be checked inside AudioRoutingManager.
             if (Utils.isDualModeAudioEnabled()) {
                 if (!mAdapterService.isAllSupportedClassicAudioProfilesActive(device)) {
@@ -2137,7 +2137,7 @@ public class LeAudioService extends ProfileService {
                     return false;
                 }
             }
-        }
+        } */
         return setActiveGroupWithDevice(device, false);
     }
 
@@ -3201,6 +3201,12 @@ public class LeAudioService extends ProfileService {
             handleUnicastStreamStatusChange(stackEvent.valueInt1, stackEvent.valueInt2);
         } else if (stackEvent.type == LeAudioStackEvent.EVENT_TYPE_GROUP_STREAM_STATUS_CHANGED) {
             notifyGroupStreamStatusChanged(stackEvent.valueInt1, stackEvent.valueInt2);
+            if (Utils.isDualModeAudioEnabled()) {
+               HeadsetService headsetService = mServiceFactory.getHeadsetService();
+               if (headsetService != null) {
+                  headsetService.updateLeStreamStatus(device, stackEvent.valueInt2);
+               }
+            }
         }
     }
 
