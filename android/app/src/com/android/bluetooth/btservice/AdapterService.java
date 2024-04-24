@@ -8081,6 +8081,7 @@ public class AdapterService extends Service {
      * @return boolean true if audio low latency is successfully allowed or disallowed
      */
     public boolean allowLowLatencyAudio(boolean allowed, BluetoothDevice device) {
+        Log.i(TAG, "allowLowLatencyAudio");
         return mNativeInterface.allowLowLatencyAudio(allowed, Utils.getByteAddress(device));
     }
 
