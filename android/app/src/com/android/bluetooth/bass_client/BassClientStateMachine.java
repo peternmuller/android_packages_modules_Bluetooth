@@ -104,6 +104,7 @@ public class BassClientStateMachine extends StateMachine {
     static final int CONNECT_TIMEOUT = 15;
     static final int REACHED_MAX_SOURCE_LIMIT = 16;
     static final int SWITCH_BCAST_SOURCE = 17;
+    static final int STOP_PENDING_PA_SYNC = 18;
 
     // NOTE: the value is not "final" - it is modified in the unit tests
     @VisibleForTesting
@@ -259,6 +260,25 @@ public class BassClientStateMachine extends StateMachine {
         mPendingRemove.clear();
         mPeriodicAdvCallbacksMap.clear();
         mSourceSyncRequestsQueue.clear();
+    }
+
+    private void stopPendingSync() {
+        log("stopPendingSync");
+        List<Integer> syncHandles = new ArrayList();
+        for (Map.Entry<Integer, PeriodicAdvertisingCallback> entry:
+                mPeriodicAdvCallbacksMap.entrySet()) {
+            int syncHandle = entry.getKey();
+            if (syncHandle != BassConstants.INVALID_SYNC_HANDLE) {
+                syncHandles.add(syncHandle);
+            }
+        }
+        for (Integer syncHandle: syncHandles) {
+            log("stopPendingSync: syncHandle = " + syncHandle);
+            cancelActiveSync(syncHandle);
+        }
+        mPeriodicAdvCallbacksMap.clear();
+        mSourceSyncRequestsQueue.clear();
+        removeMessages(SELECT_BCAST_SOURCE);
     }
 
     Boolean hasPendingSourceOperation() {
@@ -768,6 +788,28 @@ public class BassClientStateMachine extends StateMachine {
             sendMessage(m);
             mSetBroadcastCodePending = false;
             mSetBroadcastPINMetadata = null;
+        } else if (recvState.getBigEncryptionState()
+                == BluetoothLeBroadcastReceiveState.BIG_ENCRYPTION_STATE_BAD_CODE ||
+                recvState.getPaSyncState()
+                        == BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_FAILED_TO_SYNCHRONIZE) {
+            log("Bad code, remove this source...");
+            int sourceId = recvState.getSourceId();
+            if (recvState.getPaSyncState()
+                    == BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_SYNCHRONIZED) {
+                BluetoothLeBroadcastMetadata metaDataToUpdate =
+                        getCurrentBroadcastMetadata(sourceId);
+                if (metaDataToUpdate != null) {
+                    log("Force source to lost PA sync");
+                    Message msg = obtainMessage(UPDATE_BCAST_SOURCE);
+                    msg.arg1 = sourceId;
+                    msg.arg2 = BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_IDLE;
+                    msg.obj = metaDataToUpdate;
+                    sendMessage(msg);
+                }
+            }
+            Message m = obtainMessage(BassClientStateMachine.REMOVE_BCAST_SOURCE);
+            m.arg1 = recvState.getSourceId();
+            sendMessageDelayed(m, BassConstants.REMOVE_SOURCE_TIMEOUT_MS);
         }
     }
 
@@ -1807,8 +1849,11 @@ public class BassClientStateMachine extends StateMachine {
                         log(
                                 "SELECT_BCAST_SOURCE queued due to waiting for a previous sync"
                                         + " response");
-                        mSourceSyncRequestsQueue.add(
-                                new Pair<ScanResult, Integer>(scanRes, message.arg1));
+                        Pair<ScanResult, Integer> pair =
+                                new Pair<ScanResult, Integer>(scanRes, message.arg1);
+                        if (!mSourceSyncRequestsQueue.contains(pair)) {
+                            mSourceSyncRequestsQueue.add(pair);
+                        }
                     } else {
                         selectSource(scanRes, auto);
                     }
@@ -1985,6 +2030,9 @@ public class BassClientStateMachine extends StateMachine {
                 case PSYNC_ACTIVE_TIMEOUT:
                     cancelActiveSync(null);
                     break;
+                case STOP_PENDING_PA_SYNC:
+                    stopPendingSync();
+                    break;
                 default:
                     log("CONNECTED: not handled message:" + message.what);
                     return NOT_HANDLED;
@@ -2159,6 +2207,7 @@ public class BassClientStateMachine extends StateMachine {
                 case REACHED_MAX_SOURCE_LIMIT:
                 case SWITCH_BCAST_SOURCE:
                 case PSYNC_ACTIVE_TIMEOUT:
+                case STOP_PENDING_PA_SYNC:
                     log("defer the message: "
                             + messageWhatToString(message.what)
                             + ", so that it will be processed later");
@@ -2256,6 +2305,8 @@ public class BassClientStateMachine extends StateMachine {
                 return "PSYNC_ACTIVE_TIMEOUT";
             case CONNECT_TIMEOUT:
                 return "CONNECT_TIMEOUT";
+            case STOP_PENDING_PA_SYNC:
+                return "STOP_PENDING_PA_SYNC";
             default:
                 break;
         }
