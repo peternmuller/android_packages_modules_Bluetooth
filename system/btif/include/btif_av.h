@@ -316,6 +316,16 @@ bool btif_av_is_dual_mode_enabled();
  */
 void btif_av_metadata_update(uint16_t context);
 
+/*
+ * Returns the AptX Mode
+ */
+uint16_t btif_av_get_aptx_mode_info();
+
+/*
+ * Updates the AptX Mode
+ */
+void btif_av_update_aptx_mode_info(bool is_ll_enabled);
+
 /**
  * Check whether A2DP Source is enabled.
  */
