@@ -177,7 +177,11 @@ bool sdp_dynamic_change_hfp_version(const tSDP_ATTRIBUTE* p_attr,
       !(osi_property_get_bool("vendor.bt.pts.certification", false))) {
     return false;
   }
-  if (hfp_hal_interface::get_swb_supported() && is_allowlisted_1_9) {
+  if (hfp_hal_interface::get_swb_supported() &&
+        (is_allowlisted_1_9 ||
+          osi_property_get_bool("vendor.bt.pts.certification", false))) {
+
+    log::warn("PTS prop is set or remote is 1.9, set AG's HFP version to 1.9");
     p_attr->value_ptr[PROFILE_VERSION_POSITION] = HFP_PROFILE_MINOR_VERSION_9;
   } else {
     p_attr->value_ptr[PROFILE_VERSION_POSITION] = HFP_PROFILE_MINOR_VERSION_7;
