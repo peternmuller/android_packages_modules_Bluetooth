@@ -2558,6 +2558,12 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
+        if (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
+          log::info("Cancel watchdog");
+          cancel_watchdog_if_needed(group->group_id_);
+          return;
+        }
+
         log::info("Autonomous change, from: {} to {}",
                   ToString(group->GetState()),
                   ToString(group->GetTargetState()));
