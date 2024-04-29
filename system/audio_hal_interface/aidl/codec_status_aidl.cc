@@ -30,6 +30,7 @@
 #include "a2dp_vendor_ldac_constants.h"
 #include"a2dp_vendor_aptx_adaptive.h"
 #include "bta/av/bta_av_int.h"
+#include "btif/include/btif_av.h"
 #include "client_interface_aidl.h"
 
 namespace bluetooth {
@@ -489,7 +490,8 @@ bool A2dpAptxAdaptiveToHalConfig(CodecConfiguration* codec_config,
   LOG(ERROR) << __func__
                << ": Aptx Adaptive bitspersample = " << current_codec.bits_per_sample;
 
-  aptx_adaptive_config.aptxMode = static_cast<AptxMode>(0x1000);
+  aptx_adaptive_config.aptxMode = static_cast<AptxMode>
+                                      (btif_av_get_aptx_mode_info());
 
   aptx_adaptive_config.sinkBufferingMs = { 20, 50, 20, 50, 20, 50 };
 

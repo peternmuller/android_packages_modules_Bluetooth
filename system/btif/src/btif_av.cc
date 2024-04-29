@@ -824,6 +824,7 @@ class BtifAvSink {
  *****************************************************************************/
 static BtifAvSource btif_av_source;
 static BtifAvSink btif_av_sink;
+uint16_t aptx_mode;
 
 /* Helper macro to avoid code duplication in the state machine handlers */
 #define CHECK_RC_EVENT(e, d)       \
@@ -4544,14 +4545,30 @@ void btif_av_update_codec_mode(bool is_gaming_latency) {
   }
 }
 
+uint16_t btif_av_get_aptx_mode_info() {
+  log::info("btif_av_get_aptx_mode_info: {}", aptx_mode);
+  return aptx_mode;
+}
+
+void btif_av_update_aptx_mode_info(bool is_ll_enabled){
+  log::info("btif_av_update_aptx_mode_info: {}", is_ll_enabled ? "true" : "false");
+  if (is_ll_enabled) {
+    aptx_mode = APTX_LL;
+  } else {
+    aptx_mode = APTX_HQ;
+  }
+}
+
 void btif_av_update_source_metadata(bool is_Gaming_Enabled) {
   log::info("btif_av_update_source_metadata");
 
   btif_av_update_codec_mode(is_Gaming_Enabled);
+  btif_av_update_aptx_mode_info(is_Gaming_Enabled);
 }
 
 void btif_av_set_low_latency_spatial_audio(bool is_low_latency) {
   log::info("is_low_latency: {}", is_low_latency ? "true" : "false");
 
   btif_av_update_codec_mode(is_low_latency);
+  btif_av_update_aptx_mode_info(is_low_latency);
 }
