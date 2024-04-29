@@ -639,7 +639,7 @@ public class VolumeControlService extends ProfileService {
             Log.w(TAG, "Mute state mismatch, stream mute: " + isStreamMute
                     + ", device group mute: " + isGroupMute
                     + ", new volume: " + volume);
-            if (isStreamMute) {
+            if (isStreamMute && (volume == 0)) {
                 Log.i(TAG, "Mute the group " + groupId);
                 muteGroup(groupId);
             }
