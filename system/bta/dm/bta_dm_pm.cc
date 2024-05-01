@@ -33,14 +33,17 @@
 #include "bta/dm/bta_dm_int.h"
 #include "bta/include/bta_api.h"
 #include "bta/include/bta_dm_api.h"
+//#include "bta/ag/bta_ag_int.h"
 #include "bta/sys/bta_sys.h"
 #include "btif/include/core_callbacks.h"
 #include "btif/include/stack_manager_t.h"
 #include "hci/controller_interface.h"
+#include "btif/include/btif_storage.h"
 #include "main/shim/dumpsys.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/properties.h"
+#include "device/include/interop.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/btm_client_interface.h"
 #include "stack/include/main_thread.h"
@@ -567,6 +570,35 @@ static void bta_dm_pm_cback(tBTA_SYS_CONN_STATUS status, const tBTA_SYS_ID id,
       }
     }
   }
+
+    /* If SCO up/down event is received, then
+       1. Enable/disable SSR on active HID link
+       2. Disable sniff mode for some HFP devices when SCO is active*/
+    if (status == BTA_SYS_SCO_OPEN || status == BTA_SYS_SCO_CLOSE) {
+       const bool bScoActive = (status == BTA_SYS_SCO_OPEN);
+       log::debug("bta_dm_pm_hid_check with bScoActive = {}", bScoActive);
+       uint16_t manufacturer = 0;
+       uint16_t lmp_sub_version = 0;
+       uint8_t  lmp_version = 0;
+       if (BTM_ReadRemoteVersion(peer_addr, &lmp_version, &manufacturer, &lmp_sub_version)) {
+          bool is_blacklisted =
+             (interop_match_addr_or_name(INTEROP_DISABLE_SNIFF_LINK_DURING_SCO, &peer_addr, &btif_storage_get_remote_device_property) ||
+              interop_match_manufacturer(INTEROP_DISABLE_SNIFF_LINK_DURING_SCO, manufacturer));
+          bool is_blacklisted_for_call =
+             interop_match_addr_or_name(INTEROP_DISABLE_SNIFF_DURING_CALL, &peer_addr, &btif_storage_get_remote_device_property);
+          /*if ((id == BTA_ID_AG) && is_blacklisted &&
+               !(is_blacklisted_for_call && bta_ag_is_call_present(&peer_addr))) {
+             log::verbose("The device {} is blacklisted to disable sniff mode during SCO",
+                             peer_addr.ToString().c_str());
+             if (status == BTA_SYS_SCO_OPEN) {
+                 bta_dm_pm_active(peer_addr);
+                 BTM_block_sniff_mode_for(peer_addr);
+             } else if (status == BTA_SYS_SCO_CLOSE) {
+                 BTM_unblock_sniff_mode_for(peer_addr);
+             }
+          }*/
+       }
+    }
 
   bta_dm_pm_set_mode(peer_addr, BTA_DM_PM_NO_ACTION, pm_req);
 }

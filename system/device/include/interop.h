@@ -356,6 +356,8 @@ typedef enum {
   // Som A2DP sink devices don't respond SDP request during A2DP reconnection
   INTEROP_A2DP_SKIP_SDP_DURING_RECONNECTION,
 
+  INTEROP_HFP_SEND_OK_FOR_CLCC_AFTER_VOIP_CALL_END,
+
   END_OF_INTEROP_LIST
 } interop_feature_t;
 
