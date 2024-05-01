@@ -35,6 +35,7 @@
 
 #include <cstdint>
 #include <string>
+#include "device/include/interop.h"
 
 #include "bta/include/bta_ag_api.h"
 #include "bta/include/utl.h"
@@ -43,6 +44,7 @@
 #include "btif/include/btif_metrics_logging.h"
 #include "btif/include/btif_profile_queue.h"
 #include "btif/include/btif_util.h"
+#include "btif_storage.h"
 #include "common/metrics.h"
 #include "device/include/device_iot_config.h"
 #include "include/hardware/bluetooth_headset_callbacks.h"
@@ -83,6 +85,8 @@ static uint32_t get_hf_features();
 static uint32_t btif_hf_features = get_hf_features();
 
 #define BTIF_HF_INVALID_IDX (-1)
+
+#define BTA_AG_CALL_INDEX 1
 
 /* Max HF clients supported from App */
 static int btif_max_hf_clients = 1;
@@ -1205,6 +1209,12 @@ bt_status_t HeadsetInterface::ClccResponse(
   if (index == 0) {
     ag_res.ok_flag = BTA_AG_OK_DONE;
   } else {
+      bool is_ind_blacklisted = interop_match_addr_or_name(INTEROP_SKIP_INCOMING_STATE, bd_addr, &btif_storage_get_remote_device_property);
+      if (is_ind_blacklisted && index > BTA_AG_CALL_INDEX && state == BTHF_CALL_STATE_INCOMING) {
+        log::error("device is blacklisted for incoming state {}", idx);
+        state = BTHF_CALL_STATE_WAITING;
+      }
+
     std::string cell_number(number ? number : "");
     log::verbose(
         "clcc_response: [{}] dir {} state {} mode {} number = {} type = {}",
