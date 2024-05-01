@@ -1104,14 +1104,20 @@ class LeAudioClientImpl : public LeAudioClient {
     in_call_ = in_call;
   }
 
-  bool IsInCall() override { return in_call_; }
+  bool IsInCall() override {
+    log::debug("in_call_: {}", in_call_);
+    return in_call_;
+  }
 
   void SetInVoipCall(bool in_call) override {
     log::debug("in_voip_call: {}", in_call);
     in_voip_call_ = in_call;
   }
 
-  bool IsInVoipCall() override { return in_voip_call_; }
+  bool IsInVoipCall() override {
+    log::debug("in_voip_call_: {}", in_voip_call_);
+    return in_voip_call_;
+  }
 
   bool IsInStreaming() override {
     return audio_sender_state_ == AudioState::STARTED ||
@@ -1137,11 +1143,11 @@ class LeAudioClientImpl : public LeAudioClient {
         le_audio_sink_hal_client_.reset();
       }
 
-      log::debug("enable: {}", enable);
+      log::debug("sink_monitor_mode_ enable: {}", enable);
       sink_monitor_mode_ = enable;
     } else if (direction ==
                bluetooth::le_audio::types::kLeAudioDirectionSource) {
-      log::debug("enable: {}", enable);
+      log::debug("source_monitor_mode_ enable: {}", enable);
       source_monitor_mode_ = enable;
 
       if (!enable) {
@@ -1248,6 +1254,7 @@ class LeAudioClientImpl : public LeAudioClient {
      * This is why we don't have to check if session is started already.
      * Just check if it is acquired.
      */
+    log::debug("");
     log::assert_that(active_group_id_ == bluetooth::groups::kGroupUnknown,
                      "Active group is not set.");
     log::assert_that(le_audio_source_hal_client_ != nullptr,
@@ -1435,6 +1442,9 @@ class LeAudioClientImpl : public LeAudioClient {
      * If reconfiguration is not needed it means, context type is not supported.
      * If most recent scenario is not supported, try to find first supported.
      */
+
+    log::debug("configuration_context_type_ = {}", ToString(configuration_context_type_));
+
     LeAudioContextType default_context_type = configuration_context_type_;
     if (!group->IsAudioSetConfigurationAvailable(default_context_type)) {
       if (group->IsAudioSetConfigurationAvailable(
@@ -4817,7 +4827,7 @@ class LeAudioClientImpl : public LeAudioClient {
       };
       for (auto ct : context_priority_list) {
         if (available_remote_contexts.test(ct)) {
-          log::debug("Selecting configuration context type: {}", ToString(ct));
+          log::debug("Selecting configuration context_type: {}", ToString(ct));
           return ct;
         }
       }
@@ -4874,6 +4884,21 @@ class LeAudioClientImpl : public LeAudioClient {
   void OnLocalAudioSourceMetadataUpdate(
       const std::vector<struct playback_track_metadata_v7>& source_metadata,
       DsaMode dsa_mode) {
+
+    /* Set the remote sink metadata context from the playback tracks metadata */
+    local_metadata_context_types_.source =
+        GetAudioContextsFromSourceMetadata(source_metadata);
+
+    log::debug("local_metadata_context_types_.source= {}",
+               ToString(local_metadata_context_types_.source));
+    log::debug("local_metadata_context_types_.sink= {}",
+               ToString(local_metadata_context_types_.sink));
+
+    local_metadata_context_types_.sink =
+        ChooseMetadataContextType(local_metadata_context_types_.sink);
+    local_metadata_context_types_.source =
+        ChooseMetadataContextType(local_metadata_context_types_.source);
+
     if (active_group_id_ == bluetooth::groups::kGroupUnknown) {
       log::warn(", cannot start streaming if no active group set");
       return;
@@ -4898,15 +4923,6 @@ class LeAudioClientImpl : public LeAudioClient {
         ToString(audio_sender_state_), static_cast<int>(dsa_mode));
 
     group->dsa_.mode = dsa_mode;
-
-    /* Set the remote sink metadata context from the playback tracks metadata */
-    local_metadata_context_types_.source =
-        GetAudioContextsFromSourceMetadata(source_metadata);
-
-    local_metadata_context_types_.sink =
-        ChooseMetadataContextType(local_metadata_context_types_.sink);
-    local_metadata_context_types_.source =
-        ChooseMetadataContextType(local_metadata_context_types_.source);
 
     ReconfigureOrUpdateRemote(
         group, bluetooth::le_audio::types::kLeAudioDirectionSink);
@@ -5027,6 +5043,21 @@ class LeAudioClientImpl : public LeAudioClient {
 
   void OnLocalAudioSinkMetadataUpdate(
       const std::vector<record_track_metadata_v7>& sink_metadata) {
+
+        /* Set remote source metadata context from the recording tracks metadata */
+    local_metadata_context_types_.sink =
+        GetAudioContextsFromSinkMetadata(sink_metadata);
+
+    log::debug("local_metadata_context_types_.source= {}",
+               ToString(local_metadata_context_types_.source));
+    log::debug("local_metadata_context_types_.sink= {}",
+               ToString(local_metadata_context_types_.sink));
+
+    local_metadata_context_types_.sink =
+        ChooseMetadataContextType(local_metadata_context_types_.sink);
+    local_metadata_context_types_.source =
+        ChooseMetadataContextType(local_metadata_context_types_.source);
+
     if (active_group_id_ == bluetooth::groups::kGroupUnknown) {
       log::warn(", cannot start streaming if no active group set");
       return;
@@ -5044,15 +5075,6 @@ class LeAudioClientImpl : public LeAudioClient {
         group->group_id_, ToString(group->GetState()),
         ToString(group->GetTargetState()), ToString(audio_receiver_state_),
         ToString(audio_sender_state_));
-
-    /* Set remote source metadata context from the recording tracks metadata */
-    local_metadata_context_types_.sink =
-        GetAudioContextsFromSinkMetadata(sink_metadata);
-
-    local_metadata_context_types_.sink =
-        ChooseMetadataContextType(local_metadata_context_types_.sink);
-    local_metadata_context_types_.source =
-        ChooseMetadataContextType(local_metadata_context_types_.source);
 
     /* Reconfigure or update only if the stream is already started
      * otherwise wait for the local sink to resume.
@@ -5098,6 +5120,7 @@ class LeAudioClientImpl : public LeAudioClient {
        * no incoming call to accept or reject on TBS could confuse the remote
        * device and interrupt the stream establish procedure.
        */
+      log::debug("Set VoIP call if no call exist");
       if (!IsInCall()) {
         SetInVoipCall(true);
       }
@@ -5334,6 +5357,8 @@ class LeAudioClientImpl : public LeAudioClient {
         group, ChooseConfigurationContextType(config_context_candids));
     log::debug("config_context_candids= {}, new_config_context= {}",
                ToString(config_context_candids), ToString(new_config_context));
+    log::debug("configuration_context_type_ = {}",
+                             ToString(configuration_context_type_));
 
     /* For the following contexts we don't actually need HQ audio:
      * LeAudioContextType::NOTIFICATIONS
@@ -5373,6 +5398,7 @@ class LeAudioClientImpl : public LeAudioClient {
           IsDirectionAvailableForCurrentConfiguration(
               group, bluetooth::le_audio::types::kLeAudioDirectionSource) &&
           (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING);
+      log::debug("has_audio_source_configured= {}", has_audio_source_configured);
       if (has_audio_source_configured) {
         log::info(
             "Audio source is already available in the current configuration "
@@ -6005,6 +6031,7 @@ class LeAudioClientImpl : public LeAudioClient {
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
             }
 
+            log::info("source_monitor_mode_: {}", source_monitor_mode_);
             if (source_monitor_mode_) {
               callbacks_->OnUnicastMonitorModeStatus(
                   bluetooth::le_audio::types::kLeAudioDirectionSource,
