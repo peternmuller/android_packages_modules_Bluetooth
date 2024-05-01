@@ -786,6 +786,7 @@ bool LeAudioDeviceGroup::UpdateAudioSetConfigurationCache(
     auto& [is_valid, existing_conf] =
         context_to_configuration_cache_map.at(ctx_type);
     update_config = (new_conf.get() != existing_conf.get());
+    log::info(" update_config: {}", update_config);
     /* Just mark it as still valid */
     if (!update_config && !is_valid) {
       context_to_configuration_cache_map.at(ctx_type).first = true;
@@ -1482,6 +1483,7 @@ bool LeAudioDeviceGroup::ConfigureAses(
   if (num_of_connected == 0) {
     num_of_connected = NumOfConnected();
   }
+  log::info("num_of_connected: {}", num_of_connected);
   if (!set_configurations::check_if_may_cover_scenario(audio_set_conf,
                                                        num_of_connected)) {
     return false;
@@ -1489,6 +1491,7 @@ bool LeAudioDeviceGroup::ConfigureAses(
 
   bool reuse_cis_id =
       GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED;
+  log::info("reuse_cis_id: {}", reuse_cis_id);
 
   /* TODO For now: set ase if matching with first pac.
    * 1) We assume as well that devices will match requirements in order
@@ -1613,6 +1616,8 @@ LeAudioDeviceGroup::GetConfiguration(LeAudioContextType context_type) const {
     is_valid = valid_config_pair.first;
     conf = valid_config_pair.second.get();
   }
+
+  log::info(" is_valid: {}", is_valid);
   if (!is_valid || (conf == nullptr)) {
     UpdateAudioSetConfigurationCache(context_type);
   }
@@ -1756,6 +1761,7 @@ void LeAudioDeviceGroup::RemoveCisFromStreamIfNeeded(
 }
 
 bool LeAudioDeviceGroup::IsPendingConfiguration(void) const {
+  log::info(" pending_config: {}", stream_conf.pending_configuration);
   return stream_conf.pending_configuration;
 }
 
