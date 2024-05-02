@@ -953,11 +953,21 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
     case BTA_AG_AT_A_EVT:
     case BTA_AG_SPK_EVT:
     case BTA_AG_MIC_EVT:
-    case BTA_AG_AT_CHUP_EVT:
     case BTA_AG_AT_CBC_EVT:
       /* send OK */
       bta_ag_send_ok(p_scb);
       break;
+
+    case BTA_AG_AT_CHUP_EVT:
+      if (!bta_ag_sco_is_active_device(p_scb->peer_addr)) {
+        log::verbose("AT+CHUP rejected as {} is not the active "\
+                            "device", p_scb->peer_addr.ToStringForLogging().c_str());
+        log::verbose("Avoid sending AT+CHUP update to application.");
+        event = BTA_AG_ENABLE_EVT;
+      }
+      bta_ag_send_ok(p_scb);
+      break;
+
     case BTA_AG_AT_BLDN_EVT:
       /* Do not send OK, App will send error or OK depending on
       ** last dial number enabled or not */
