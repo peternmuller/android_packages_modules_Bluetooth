@@ -347,8 +347,14 @@ typedef enum {
   // collision.
   INTEROP_DELAY_AUTH,
 
+  //Add remote device into INTEROP_A2DP_DELAY_DISCONNECT blacklist
+  INTEROP_A2DP_DELAY_DISCONNECT,
+
   // Some LE HID devices contain more than one HOGP service.
   INTEROP_MULTIPLE_HOGP_SERVICE_CHOOSE_THIRD,
+
+  // Som A2DP sink devices don't respond SDP request during A2DP reconnection
+  INTEROP_A2DP_SKIP_SDP_DURING_RECONNECTION,
 
   END_OF_INTEROP_LIST
 } interop_feature_t;

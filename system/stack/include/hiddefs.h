@@ -26,6 +26,7 @@
 #define HIDDEFS_H
 
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include "internal_include/bt_target.h"
 #include "macros.h"

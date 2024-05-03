@@ -24,6 +24,8 @@
 #ifndef BTA_GATTC_INT_H
 #define BTA_GATTC_INT_H
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 #include <deque>
 

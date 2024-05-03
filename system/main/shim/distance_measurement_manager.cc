@@ -16,6 +16,7 @@
 
 #include "distance_measurement_manager.h"
 
+#include "bta/include/bta_ras_api.h"
 #include "btif/include/btif_common.h"
 #include "hci/distance_measurement_manager.h"
 #include "main/shim/entry.h"
@@ -26,7 +27,8 @@ using bluetooth::hci::DistanceMeasurementMethod;
 
 class DistanceMeasurementInterfaceImpl
     : public DistanceMeasurementInterface,
-      public bluetooth::hci::DistanceMeasurementCallbacks {
+      public bluetooth::hci::DistanceMeasurementCallbacks,
+      public bluetooth::ras::RasClientCallbacks {
  public:
   ~DistanceMeasurementInterfaceImpl() override{};
 
@@ -34,6 +36,7 @@ class DistanceMeasurementInterfaceImpl
     // Register callback
     bluetooth::shim::GetDistanceMeasurementManager()
         ->RegisterDistanceMeasurementCallbacks(this);
+    bluetooth::ras::GetRasClient()->RegisterCallbacks(this);
   }
 
   void RegisterDistanceMeasurementCallbacks(
@@ -43,6 +46,7 @@ class DistanceMeasurementInterfaceImpl
 
   void StartDistanceMeasurement(RawAddress raw_address, uint16_t interval,
                                 uint8_t method) {
+    bluetooth::ras::GetRasClient()->Connect(raw_address);
     bluetooth::shim::GetDistanceMeasurementManager()->StartDistanceMeasurement(
         bluetooth::ToGdAddress(raw_address), interval,
         static_cast<DistanceMeasurementMethod>(method));
@@ -102,6 +106,18 @@ class DistanceMeasurementInterfaceImpl
             bluetooth::ToRawAddress(address), centimeter, error_centimeter,
             azimuth_angle, error_azimuth_angle, altitude_angle,
             error_altitude_angle, static_cast<uint8_t>(method)));
+  }
+
+  void OnRasFragmentReady(bluetooth::hci::Address address,
+                          uint16_t procedure_counter, bool is_last,
+                          std::vector<uint8_t> raw_data) {
+    bluetooth::ras::GetRasServer()->PushProcedureData(
+        bluetooth::ToRawAddress(address), procedure_counter, is_last, raw_data);
+  }
+
+  void OnRemoteData(RawAddress address, std::vector<uint8_t> data) {
+    bluetooth::shim::GetDistanceMeasurementManager()->HandleRemoteData(
+        bluetooth::ToGdAddress(address), data);
   }
 
  private:

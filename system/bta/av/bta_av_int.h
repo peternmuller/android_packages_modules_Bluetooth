@@ -24,6 +24,8 @@
 #ifndef BTA_AV_INT_H
 #define BTA_AV_INT_H
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 #include <string>
 
@@ -119,6 +121,7 @@ enum {
   BTA_AV_API_STOP_EVT,
   BTA_AV_API_SET_LATENCY_EVT,
   BTA_AV_SET_CODEC_MODE_EVT,
+  BTA_AV_UPDATE_APTX_DATA_EVT,
 };
 
 /* events for AV control block state machine */
@@ -130,16 +133,18 @@ enum {
 
 /* events that do not go through state machine */
 #define BTA_AV_FIRST_NSM_EVT BTA_AV_API_ENABLE_EVT
-#define BTA_AV_LAST_NSM_EVT BTA_AV_SET_CODEC_MODE_EVT
+#define BTA_AV_LAST_NSM_EVT BTA_AV_UPDATE_APTX_DATA_EVT
 
 /* API events passed to both SSMs (by bta_av_api_to_ssm) */
 #define BTA_AV_FIRST_A2S_API_EVT BTA_AV_API_START_EVT
 #define BTA_AV_FIRST_A2S_SSM_EVT BTA_AV_AP_START_EVT
 
-#define BTA_AV_LAST_EVT BTA_AV_SET_CODEC_MODE_EVT
+#define BTA_AV_LAST_EVT BTA_AV_UPDATE_APTX_DATA_EVT
 
 /* Info ID from updating aptX Adaptive Encoder mode */
 #define BTA_AV_ENCODER_MODE_CHANGE_ID 5
+
+#define BTA_AV_ENCODER_DATA_ID 0x0E
 
 /* maximum number of SEPS in stream discovery results */
 #define BTA_AV_NUM_SEPS 32
@@ -283,6 +288,12 @@ typedef struct {
   BT_HDR_RIGID hdr;
   uint16_t enc_mode;
 } tBTA_AV_SET_CODEC_MODE;
+
+typedef struct {
+  BT_HDR_RIGID hdr;
+  uint16_t type;
+  uint16_t data;
+} tBTA_AV_APTX_DATA;
 
 /* data type for BTA_AV_API_START_EVT and bta_av_do_start */
 typedef struct {
@@ -463,6 +474,7 @@ union tBTA_AV_DATA {
   tBTA_AV_API_OPEN api_open;
   tBTA_AV_API_SET_LATENCY api_set_latency;
   tBTA_AV_SET_CODEC_MODE set_codec_mode;
+  tBTA_AV_APTX_DATA aptx_data;
   tBTA_AV_DO_START do_start;
   tBTA_AV_API_STOP api_stop;
   tBTA_AV_API_DISCNT api_discnt;
@@ -778,8 +790,6 @@ void bta_av_stream_chg(tBTA_AV_SCB* p_scb, bool started);
 bool bta_av_is_scb_opening(tBTA_AV_SCB* p_scb);
 bool bta_av_is_scb_incoming(tBTA_AV_SCB* p_scb);
 void bta_av_set_scb_sst_init(tBTA_AV_SCB* p_scb);
-bool bta_av_is_scb_init(tBTA_AV_SCB* p_scb);
-void bta_av_set_scb_sst_incoming(tBTA_AV_SCB* p_scb);
 tBTA_AV_LCB* bta_av_find_lcb(const RawAddress& addr, uint8_t op);
 const char* bta_av_sst_code(uint8_t state);
 void bta_av_free_scb(tBTA_AV_SCB* p_scb);
@@ -800,6 +810,7 @@ void bta_av_api_disconnect(tBTA_AV_DATA* p_data);
 void bta_av_set_use_latency_mode(tBTA_AV_SCB* p_scb, bool use_latency_mode);
 void bta_av_api_set_latency(tBTA_AV_DATA* p_data);
 void bta_av_set_codec_mode(tBTA_AV_DATA* p_data);
+void bta_av_update_aptx_data(tBTA_AV_DATA* p_data);
 void bta_av_sig_chg(tBTA_AV_DATA* p_data);
 void bta_av_signalling_timer(tBTA_AV_DATA* p_data);
 void bta_av_rc_disc_done(tBTA_AV_DATA* p_data);
@@ -869,7 +880,6 @@ void bta_av_rcfg_cfm(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_rcfg_open(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_security_rej(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_open_rc(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
-void bta_av_chk_2nd_start(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_save_caps(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_rej_conn(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_rej_conn(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
@@ -884,5 +894,10 @@ void bta_av_offload_rsp(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_vendor_offload_stop(void);
 void bta_av_st_rc_timer(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data);
 void bta_av_api_set_peer_sep(tBTA_AV_DATA* p_data);
+
+namespace fmt {
+template <>
+struct formatter<tBTA_AV_RS_RES> : enum_formatter<tBTA_AV_RS_RES> {};
+}  // namespace fmt
 
 #endif /* BTA_AV_INT_H */

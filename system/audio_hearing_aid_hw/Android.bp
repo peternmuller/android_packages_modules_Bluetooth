@@ -33,6 +33,7 @@ cc_library {
         "com.android.btservices",
     ],
     shared_libs: [
+        "libbase",
         "liblog",
     ],
     static_libs: [
@@ -53,6 +54,7 @@ cc_test {
         "test/audio_hearing_aid_hw_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "liblog",
     ],
     static_libs: [

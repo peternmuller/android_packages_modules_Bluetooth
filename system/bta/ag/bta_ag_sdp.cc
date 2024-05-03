@@ -25,7 +25,7 @@
 
 #include <base/functional/bind.h>
 #include <base/location.h>
-#include <base/logging.h>
+#include <bluetooth/log.h>
 
 #include "bta/ag/bta_ag_int.h"
 #include "bta/include/bta_hfp_api.h"
@@ -35,9 +35,8 @@
 #include "device/include/interop.h"
 #include "device/include/interop_config.h"
 #include "internal_include/bt_target.h"
-#include "os/log.h"
+#include "os/logging/log_adapter.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/btm/btm_sco_hfp_hal.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
@@ -47,6 +46,7 @@
 #include "types/bluetooth/uuid.h"
 
 using namespace bluetooth::legacy::stack::sdp;
+using namespace bluetooth;
 using bluetooth::Uuid;
 
 /* Number of protocol elements in protocol element list. */
@@ -85,7 +85,7 @@ const tBTA_AG_SDP_CBACK bta_ag_sdp_cback_tbl[] = {
  *
  ******************************************************************************/
 static void bta_ag_sdp_cback(uint16_t status, uint8_t idx) {
-  LOG_VERBOSE("%s status:0x%x", __func__, status);
+  log::verbose("status:0x{:x}", status);
   tBTA_AG_SCB* p_scb = bta_ag_scb_by_idx(idx);
   if (p_scb) {
     uint16_t event;
@@ -113,28 +113,22 @@ static void bta_ag_sdp_cback(uint16_t status, uint8_t idx) {
  * Returns          void
  *
  ******************************************************************************/
-void bta_ag_sdp_cback_1(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_1(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 1);
 }
-void bta_ag_sdp_cback_2(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_2(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 2);
 }
-void bta_ag_sdp_cback_3(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_3(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 3);
 }
-void bta_ag_sdp_cback_4(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_4(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 4);
 }
-void bta_ag_sdp_cback_5(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_5(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 5);
 }
-void bta_ag_sdp_cback_6(UNUSED_ATTR const RawAddress& bd_addr,
-                        tSDP_STATUS status) {
+void bta_ag_sdp_cback_6(const RawAddress& /* bd_addr */, tSDP_STATUS status) {
   bta_ag_sdp_cback(status, 6);
 }
 
@@ -164,8 +158,8 @@ bool bta_ag_add_record(uint16_t service_uuid, const char* p_service_name,
   bool codec_supported = false;
   uint8_t buf[2];
 
-  LOG_VERBOSE("%s uuid: %x", __func__, service_uuid);
-  LOG_INFO("features: %d", features);
+  log::verbose("uuid: {:x}", service_uuid);
+  log::info("features: {}", features);
 
   for (auto& proto_element : proto_elem_list) {
     proto_element = {};
@@ -304,7 +298,7 @@ void bta_ag_del_records(tBTA_AG_SCB* p_scb) {
     /* if service registered for this scb and not registered for any other scb
      */
     if (((services & 1) == 1) && ((others & 1) == 0)) {
-      LOG_VERBOSE("bta_ag_del_records %d", i);
+      log::verbose("bta_ag_del_records {}", i);
       if (bta_ag_cb.profile[i].sdp_handle != 0) {
         get_legacy_stack_sdp_api()->handle.SDP_DeleteRecord(
             bta_ag_cb.profile[i].sdp_handle);
@@ -381,8 +375,8 @@ bool bta_ag_sdp_find_attr(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
     uint16_t peer_version = HFP_HSP_VERSION_UNKNOWN;
     if (!get_legacy_stack_sdp_api()->record.SDP_FindProfileVersionInRec(
             p_rec, uuid, &peer_version)) {
-      LOG_WARN("%s: Get peer_version failed, using default 0x%04x", __func__,
-               p_scb->peer_version);
+      log::warn("Get peer_version failed, using default 0x{:04x}",
+                p_scb->peer_version);
       peer_version = p_scb->peer_version;
     }
 
@@ -394,8 +388,8 @@ bool bta_ag_sdp_find_attr(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
                 p_scb->peer_addr.ToString(), BTIF_STORAGE_KEY_HFP_VERSION,
                 (const uint8_t*)&peer_version, sizeof(peer_version))) {
         } else {
-          LOG_WARN("%s: Failed to store peer HFP version for %s", __func__,
-                   ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
+          log::warn("Failed to store peer HFP version for {}",
+                    ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
         }
       }
       /* get features if HFP */
@@ -425,8 +419,8 @@ bool bta_ag_sdp_find_attr(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
                                   (const uint8_t*)&sdp_features,
                                   sizeof(sdp_features))) {
           } else {
-            LOG_WARN("%s: Failed to store peer HFP SDP Features for %s",
-                     __func__, ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
+            log::warn("Failed to store peer HFP SDP Features for {}",
+                      ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
           }
         }
         if (p_scb->peer_features == 0) {
@@ -533,7 +527,7 @@ void bta_ag_do_disc(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
   }
 
   if (p_scb->p_disc_db != nullptr) {
-    LOG_ERROR("Discovery already in progress... returning.");
+    log::error("Discovery already in progress... returning.");
     return;
   }
 
@@ -548,12 +542,12 @@ void bta_ag_do_disc(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
             bta_ag_sdp_cback_tbl[bta_ag_scb_to_idx(p_scb) - 1])) {
       return;
     } else {
-      LOG(ERROR) << __func__ << ": failed to start SDP discovery for "
-                 << p_scb->peer_addr;
+      log::error("failed to start SDP discovery for {}",
+                 ADDRESS_TO_LOGGABLE_STR(p_scb->peer_addr));
     }
   } else {
-    LOG(ERROR) << __func__ << ": failed to init SDP discovery database for "
-               << p_scb->peer_addr;
+    log::error("failed to init SDP discovery database for {}",
+               ADDRESS_TO_LOGGABLE_STR(p_scb->peer_addr));
   }
   // Failure actions
   bta_ag_free_db(p_scb, tBTA_AG_DATA::kEmpty);

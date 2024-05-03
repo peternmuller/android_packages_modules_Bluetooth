@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include <base/logging.h>
 #include <bluetooth/log.h>
 
 #include <map>
@@ -167,12 +166,13 @@ struct eatt_impl {
     if (!eatt_dev->eatt_tcb_) {
       eatt_dev->eatt_tcb_ =
           gatt_find_tcb_by_addr(eatt_dev->bda_, BT_TRANSPORT_LE);
-      CHECK(eatt_dev->eatt_tcb_);
+      log::assert_that(eatt_dev->eatt_tcb_ != nullptr,
+                       "assert failed: eatt_dev->eatt_tcb_ != nullptr");
     }
 
     for (uint16_t cid : lcids) {
       EattChannel* channel = find_eatt_channel_by_cid(bda, cid);
-      CHECK(!channel);
+      log::assert_that(channel == nullptr, "assert failed: channel == nullptr");
 
       auto chan = std::make_shared<EattChannel>(eatt_dev->bda_, cid, peer_mtu,
                                                 eatt_dev->rx_mtu_);
@@ -410,8 +410,10 @@ struct eatt_impl {
     channel->EattChannelSetState(EattChannelState::EATT_CHANNEL_OPENED);
     channel->EattChannelSetTxMTU(peer_mtu);
 
-    CHECK(eatt_dev->eatt_tcb_);
-    CHECK(eatt_dev->bda_ == channel->bda_);
+    log::assert_that(eatt_dev->eatt_tcb_ != nullptr,
+                     "assert failed: eatt_dev->eatt_tcb_ != nullptr");
+    log::assert_that(eatt_dev->bda_ == channel->bda_,
+                     "assert failed: eatt_dev->bda_ == channel->bda_");
     eatt_dev->eatt_tcb_->eatt++;
 
     log::info("Channel connected CID 0x{:04x}", lcid);
@@ -468,30 +470,28 @@ struct eatt_impl {
   }
 
   void eatt_l2cap_error_cb(uint16_t lcid, uint16_t reason) {
-    log::info("cid: {} reason {}", loghex(lcid), loghex(reason));
-
-    /*TODO: provide address in the L2CAP callback */
-
     EattChannel* channel = find_channel_by_cid(lcid);
     if (!channel) {
-      log::error("Unknown lcid");
+      log::error("Unknown cid: {}, reason: {}", loghex(lcid), loghex(reason));
       return;
     }
 
     eatt_device* eatt_dev = find_device_by_address(channel->bda_);
-
     switch (channel->state_) {
       case EattChannelState::EATT_CHANNEL_PENDING:
-        log::error("Connecting failed");
+        log::warn("Channel for cid: {} is not extablished, reason: {}",
+                  loghex(lcid), loghex(reason));
         remove_channel_by_cid(eatt_dev, lcid);
         break;
       case EattChannelState::EATT_CHANNEL_RECONFIGURING:
         /* Just go back to open state */
-        log::error("Reconfig failed");
+        log::error("Reconfig failed fo cid: {}, reason: {}", loghex(lcid),
+                   loghex(reason));
         channel->EattChannelSetState(EattChannelState::EATT_CHANNEL_OPENED);
         break;
       default:
-        log::error("Invalid state: {}", static_cast<uint8_t>(channel->state_));
+        log::error("cid: {}, reason: {}, invalid state: {}", loghex(lcid),
+                   loghex(reason), static_cast<uint8_t>(channel->state_));
         break;
     }
 
@@ -606,7 +606,8 @@ struct eatt_impl {
 
     eatt_dev->eatt_tcb_ =
         gatt_find_tcb_by_addr(eatt_dev->bda_, BT_TRANSPORT_LE);
-    CHECK(eatt_dev->eatt_tcb_);
+    log::assert_that(eatt_dev->eatt_tcb_ != nullptr,
+                     "assert failed: eatt_dev->eatt_tcb_ != nullptr");
   }
 
   EattChannel* find_eatt_channel_by_cid(const RawAddress& bd_addr,
@@ -903,7 +904,8 @@ struct eatt_impl {
     }
 
     if (!eatt_dev->eatt_tcb_) {
-      LOG_ASSERT(eatt_dev->eatt_channels.size() == 0);
+      log::assert_that(eatt_dev->eatt_channels.size() == 0,
+                       "assert failed: eatt_dev->eatt_channels.size() == 0");
       log::warn("no eatt channels found");
       return;
     }

@@ -167,7 +167,9 @@ class AclManagerNoCallbacksTest : public ::testing::Test {
   }
 
   void sync_client_handler() {
-    ASSERT(thread_.GetReactor()->WaitForIdle(std::chrono::seconds(2)));
+    log::assert_that(
+        thread_.GetReactor()->WaitForIdle(std::chrono::seconds(2)),
+        "assert failed: thread_.GetReactor()->WaitForIdle(std::chrono::seconds(2))");
   }
 
   TestModuleRegistry fake_registry_;
@@ -181,13 +183,13 @@ class AclManagerNoCallbacksTest : public ::testing::Test {
   const bool use_accept_list_ = true;  // gd currently only supports connect list
 
   std::future<void> GetConnectionFuture() {
-    ASSERT_LOG(connection_promise_ == nullptr, "Promises promises ... Only one at a time");
+    log::assert_that(connection_promise_ == nullptr, "Promises promises ... Only one at a time");
     connection_promise_ = std::make_unique<std::promise<void>>();
     return connection_promise_->get_future();
   }
 
   std::future<void> GetLeConnectionFuture() {
-    ASSERT_LOG(le_connection_promise_ == nullptr, "Promises promises ... Only one at a time");
+    log::assert_that(le_connection_promise_ == nullptr, "Promises promises ... Only one at a time");
     le_connection_promise_ = std::make_unique<std::promise<void>>();
     return le_connection_promise_->get_future();
   }
@@ -861,7 +863,7 @@ TEST_F(AclManagerWithConnectionTest, send_read_clock_offset) {
   auto command_view = ReadClockOffsetView::Create(packet);
   ASSERT_TRUE(command_view.IsValid());
 
-  EXPECT_CALL(mock_connection_management_callbacks_, OnReadClockOffsetComplete(0x0123));
+  EXPECT_CALL(mock_connection_management_callbacks_, OnReadClockOffsetComplete(0x0123, 0x0123));
   test_hci_layer_->IncomingEvent(
       ReadClockOffsetCompleteBuilder::Create(ErrorCode::SUCCESS, handle_, 0x0123));
   sync_client_handler();

@@ -16,6 +16,7 @@
  */
 
 #include <base/functional/bind.h>
+#include <bluetooth/log.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -77,7 +78,7 @@ extern "C" const char* __asan_default_options() {
 }
 
 RawAddress GetTestAddress(int index) {
-  CHECK_LT(index, UINT8_MAX);
+  EXPECT_LT(index, UINT8_MAX);
   RawAddress result = {
       {0xC0, 0xDE, 0xC0, 0xDE, 0x00, static_cast<uint8_t>(index)}};
   return result;
@@ -413,7 +414,7 @@ class CsisClientTest : public ::testing::Test {
               value.assign(1, rank_2);
               break;
             default:
-              LOG(ERROR) << " Unknown handle? " << +handle;
+              log::error("Unknown handle? {}", handle);
               ASSERT_TRUE(false);
               return;
           }
@@ -432,6 +433,9 @@ class CsisClientTest : public ::testing::Test {
     gatt::SetMockBtaGattQueue(&gatt_queue);
     SetMockCsisLockCallback(&csis_lock_cb);
     callbacks.reset(new MockCsisCallbacks());
+
+    ON_CALL(btm_interface, IsLinkKeyKnown(_, _))
+        .WillByDefault(DoAll(Return(true)));
 
     ON_CALL(btm_interface, BTM_IsEncrypted(_, _))
         .WillByDefault(DoAll(Return(true)));
@@ -779,6 +783,21 @@ TEST_F(CsisClientTest, test_disconnected) {
   EXPECT_CALL(*callbacks,
               OnConnectionState(test_address, ConnectionState::DISCONNECTED));
   InjectDisconnectedEvent(test_address, 1);
+
+  TestAppUnregister();
+}
+
+TEST_F(CsisClientTest, test_connect_after_remove) {
+  TestAppRegister();
+  TestConnect(test_address);
+  InjectConnectedEvent(test_address, 1);
+  CsisClient::Get()->RemoveDevice(test_address);
+
+  EXPECT_CALL(*callbacks,
+              OnConnectionState(test_address, ConnectionState::DISCONNECTED));
+  ON_CALL(btm_interface, IsLinkKeyKnown(_, _)).WillByDefault(Return(false));
+  CsisClient::Get()->Connect(test_address);
+  Mock::VerifyAndClearExpectations(callbacks.get());
 
   TestAppUnregister();
 }
@@ -1205,9 +1224,9 @@ TEST_F(CsisClientTest, test_csis_member_not_found) {
   ASSERT_NE(p_results_cb, nullptr);
 
   tBTA_DM_SEARCH result;
-  result.inq_cmpl.num_resps = 80;
+  result.observe_cmpl.num_resps = 80;
 
-  p_results_cb(BTA_DM_INQ_CMPL_EVT, &result);
+  p_results_cb(BTA_DM_OBSERVE_CMPL_EVT, &result);
 
   /* Verify that scanner has been called to stop filtering  */
   ASSERT_EQ(2, get_func_call_count("set_empty_filter"));

@@ -17,29 +17,16 @@
 
 #pragma once
 
-#include <base/logging.h>
-
-#include <map>
 #include <memory>
-#include <optional>
-#include <tuple>
 #include <utility>  // for std::pair
 #include <vector>
 
-#ifdef __ANDROID__
-#include <android/sysprop/BluetoothProperties.sysprop.h>
-#endif
-
 #include "audio_hal_client/audio_hal_client.h"
 #include "bta_groups.h"
-#include "btm_iso_api_types.h"
-#include "common/strings.h"
 #include "gatt_api.h"
-#include "le_audio_log_history.h"
 #include "le_audio_types.h"
 #include "os/log.h"
 #include "osi/include/alarm.h"
-#include "osi/include/properties.h"
 #include "raw_address.h"
 
 namespace bluetooth::le_audio {
@@ -120,6 +107,7 @@ class LeAudioDevice {
   std::string model_name_;
   bool allowlist_flag_;
   bool acl_asymmetric_;
+  bool acl_phy_update_done_;
 
   alarm_t* link_quality_timer;
   uint16_t link_quality_timer_data;
@@ -142,6 +130,7 @@ class LeAudioDevice {
         model_name_(""),
         allowlist_flag_(false),
         acl_asymmetric_(false),
+        acl_phy_update_done_(false),
         link_quality_timer(nullptr),
         dsa_({{DsaMode::DISABLED},
               types::DataPathState::IDLE,
@@ -204,8 +193,8 @@ class LeAudioDevice {
 
   inline types::AudioContexts GetSupportedContexts(
       int direction = types::kLeAudioDirectionBoth) const {
-    ASSERT_LOG(direction <= (types::kLeAudioDirectionBoth),
-               "Invalid direction used.");
+    log::assert_that(direction <= (types::kLeAudioDirectionBoth),
+                     "Invalid direction used.");
 
     if (direction < types::kLeAudioDirectionBoth)
       return supp_contexts_.get(direction);
@@ -219,8 +208,8 @@ class LeAudioDevice {
 
   inline types::AudioContexts GetAvailableContexts(
       int direction = types::kLeAudioDirectionBoth) const {
-    ASSERT_LOG(direction <= (types::kLeAudioDirectionBoth),
-               "Invalid direction used.");
+    log::assert_that(direction <= (types::kLeAudioDirectionBoth),
+                     "Invalid direction used.");
 
     if (direction < types::kLeAudioDirectionBoth)
       return avail_contexts_.get(direction);

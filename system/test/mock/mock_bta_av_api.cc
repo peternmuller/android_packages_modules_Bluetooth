@@ -45,7 +45,6 @@ struct BTA_AvEnable BTA_AvEnable;
 struct BTA_AvMetaCmd BTA_AvMetaCmd;
 struct BTA_AvMetaRsp BTA_AvMetaRsp;
 struct BTA_AvOffloadStart BTA_AvOffloadStart;
-struct BTA_AvOffloadStartRsp BTA_AvOffloadStartRsp;
 struct BTA_AvOpen BTA_AvOpen;
 struct BTA_AvOpenRc BTA_AvOpenRc;
 struct BTA_AvProtectReq BTA_AvProtectReq;
@@ -61,6 +60,7 @@ struct BTA_AvStop BTA_AvStop;
 struct BTA_AvVendorCmd BTA_AvVendorCmd;
 struct BTA_AvVendorRsp BTA_AvVendorRsp;
 struct BTA_AvSetCodecMode BTA_AvSetCodecMode;
+struct BTA_AvUpdateAptxData BTA_AvUpdateAptxData;
 
 }  // namespace bta_av_api
 }  // namespace mock
@@ -111,10 +111,6 @@ void BTA_AvMetaRsp(uint8_t rc_handle, uint8_t label, tBTA_AV_CODE rsp_code,
 void BTA_AvOffloadStart(tBTA_AV_HNDL hndl) {
   inc_func_call_count(__func__);
   test::mock::bta_av_api::BTA_AvOffloadStart(hndl);
-}
-void BTA_AvOffloadStartRsp(tBTA_AV_HNDL hndl, tBTA_AV_STATUS status) {
-  inc_func_call_count(__func__);
-  test::mock::bta_av_api::BTA_AvOffloadStartRsp(hndl, status);
 }
 void BTA_AvOpen(const RawAddress& bd_addr, tBTA_AV_HNDL handle, bool use_rc,
                 uint16_t uuid) {
@@ -192,6 +188,11 @@ void BTA_AvVendorRsp(uint8_t rc_handle, uint8_t label, tBTA_AV_CODE rsp_code,
 void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode) {
   inc_func_call_count(__func__);
   test::mock::bta_av_api::BTA_AvSetCodecMode(handle, enc_mode);
+}
+
+void BTA_AvUpdateAptxData(uint32_t data) {
+  inc_func_call_count(__func__);
+  test::mock::bta_av_api::BTA_AvUpdateAptxData(data);
 }
 
 // Mocked functions complete

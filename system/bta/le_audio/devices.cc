@@ -24,11 +24,14 @@
 #include "acl_api.h"
 #include "bta_gatt_queue.h"
 #include "btif/include/btif_storage.h"
+#include "common/strings.h"
 #include "hci/controller_interface.h"
 #include "internal_include/bt_trace.h"
+#include "le_audio_log_history.h"
 #include "le_audio_utils.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
+#include "osi/include/properties.h"
 
 using bluetooth::hci::kIsoCigPhy1M;
 using bluetooth::hci::kIsoCigPhy2M;
@@ -232,7 +235,7 @@ bool LeAudioDevice::ConfigureAses(
     return false;
   }
 
-  ASSERT_LOG(
+  log::assert_that(
       audio_set_conf->topology_info.has_value(),
       "No topology info, which is required to properly configure the ASEs");
   auto device_cnt = audio_set_conf->topology_info->device_count.get(direction);
@@ -376,7 +379,7 @@ void LeAudioDevice::RegisterPACs(
     std::vector<struct types::acs_ac_record>* pac_recs) {
   /* Clear PAC database for characteristic in case if re-read, indicated */
   if (!pac_db->empty()) {
-    DLOG(INFO) << __func__ << ", upgrade PACs for characteristic";
+    log::debug("upgrade PACs for characteristic");
     pac_db->clear();
   }
 
@@ -734,12 +737,13 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
       if (!utils::IsCodecUsingLtvFormat(pac.codec_id) &&
           pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLe &&
           pac.codec_id.vendor_codec_id != types::kLeAudioCodingFormatAptxLeX) {
-        LOG_WARN("Unknown codec PAC record for codec: %s",
-                 bluetooth::common::ToString(pac.codec_id).c_str());
+        log::warn("Unknown codec PAC record for codec: {}",
+                  bluetooth::common::ToString(pac.codec_id));
         continue;
       }
-      ASSERT_LOG(!pac.codec_spec_caps.IsEmpty(),
-                 "Codec specific capabilities are not parsed approprietly.");
+      log::assert_that(
+          !pac.codec_spec_caps.IsEmpty(),
+          "Codec specific capabilities are not parsed approprietly.");
 
       if (pac.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
           (pac.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
@@ -861,10 +865,11 @@ uint8_t LeAudioDevice::GetPreferredPhyBitmask(uint8_t preferred_phy) const {
   // Take the preferences if possible
   if (preferred_phy && (phy_bitmask & preferred_phy)) {
     phy_bitmask &= preferred_phy;
-    LOG_DEBUG("Using ASE preferred phy 0x%02x", static_cast<int>(phy_bitmask));
+    log::debug("Using ASE preferred phy 0x{:02x}",
+               static_cast<int>(phy_bitmask));
   } else {
-    LOG_WARN(
-        "ASE preferred 0x%02x has nothing common with phy_bitfield  0x%02x ",
+    log::warn(
+        "ASE preferred 0x{:02x} has nothing common with phy_bitfield  0x{:02x}",
         static_cast<int>(preferred_phy), static_cast<int>(phy_bitmask));
   }
   return phy_bitmask;
@@ -908,32 +913,37 @@ void LeAudioDevice::DumpPacsDebugState(std::stringstream& stream) {
   DumpPacsDebugState(stream, src_pacs_);
 }
 
+static std::string locationToString(uint32_t location) {
+  std::string result_str = "unknown location";
+
+  if (location & codec_spec_conf::kLeAudioLocationAnyLeft &&
+      location & codec_spec_conf::kLeAudioLocationAnyRight) {
+    std::string location_left_right = "left/right";
+    result_str.swap(location_left_right);
+  } else if (location & codec_spec_conf::kLeAudioLocationAnyLeft) {
+    std::string location_left = "left";
+    result_str.swap(location_left);
+  } else if (location & codec_spec_conf::kLeAudioLocationAnyRight) {
+    std::string location_right = "right";
+    result_str.swap(location_right);
+  }
+
+  return result_str;
+}
+
 void LeAudioDevice::Dump(int fd) {
   uint16_t acl_handle = BTM_GetHCIConnHandle(address_, BT_TRANSPORT_LE);
-  std::string location = "unknown location";
-
-  if (snk_audio_locations_.to_ulong() &
-          codec_spec_conf::kLeAudioLocationAnyLeft &&
-      snk_audio_locations_.to_ulong() &
-          codec_spec_conf::kLeAudioLocationAnyRight) {
-    std::string location_left_right = "left/right";
-    location.swap(location_left_right);
-  } else if (snk_audio_locations_.to_ulong() &
-             codec_spec_conf::kLeAudioLocationAnyLeft) {
-    std::string location_left = "left";
-    location.swap(location_left);
-  } else if (snk_audio_locations_.to_ulong() &
-             codec_spec_conf::kLeAudioLocationAnyRight) {
-    std::string location_right = "right";
-    location.swap(location_right);
-  }
+  std::string snk_location = locationToString(snk_audio_locations_.to_ulong());
+  std::string src_location = locationToString(src_audio_locations_.to_ulong());
 
   std::stringstream stream;
   stream << "\n\taddress: " << ADDRESS_TO_LOGGABLE_STR(address_) << ": "
          << connection_state_ << ": "
          << (conn_id_ == GATT_INVALID_CONN_ID ? "" : std::to_string(conn_id_))
-         << ", acl_handle: " << std::to_string(acl_handle) << ", " << location
-         << ",\t" << (encrypted_ ? "Encrypted" : "Unecrypted")
+         << ", acl_handle: " << std::to_string(acl_handle)
+         << ", snk_location: " << snk_location
+         << ", src_location: " << src_location << ",\t"
+         << (encrypted_ ? "Encrypted" : "Unecrypted")
          << ",mtu: " << std::to_string(mtu_)
          << "\n\tnumber of ases_: " << static_cast<int>(ases_.size());
 

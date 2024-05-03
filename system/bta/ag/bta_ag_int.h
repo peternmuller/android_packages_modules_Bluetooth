@@ -24,6 +24,8 @@
 #ifndef BTA_AG_INT_H
 #define BTA_AG_INT_H
 
+#include <bluetooth/log.h>
+
 #include <cstdint>
 
 #include "bta/ag/bta_ag_at.h"
@@ -32,6 +34,7 @@
 #include "bta/sys/bta_sys.h"
 #include "internal_include/bt_target.h"
 #include "stack/include/bt_hdr.h"
+#include "stack/include/btm_api_types.h"
 #include "stack/sdp/sdp_discovery_db.h"
 #include "types/raw_address.h"
 
@@ -90,6 +93,17 @@ enum {
   BTA_AG_SVC_TIMEOUT_EVT,
   BTA_AG_COLLISION_EVT,
   BTA_AG_MAX_EVT,
+};
+
+/* Local events which will not trigger a higher layer callback */
+enum {
+  BTA_AG_LOCAL_EVT_FIRST = 0x100,
+  BTA_AG_LOCAL_EVT_CCWA,
+  BTA_AG_LOCAL_EVT_CLIP,
+  BTA_AG_LOCAL_EVT_CMER,
+  BTA_AG_LOCAL_EVT_BRSF,
+  BTA_AG_LOCAL_EVT_CMEE,
+  BTA_AG_LOCAL_EVT_BCC,
 };
 
 /* Actions to perform after a SCO event */
@@ -450,5 +464,13 @@ void bta_ag_send_qcs(tBTA_AG_SCB* p_scb, tBTA_AG_DATA* p_data);
  * @return true if SCO managed by Audio is enabled, false otherwise
  */
 bool bta_ag_is_sco_managed_by_audio();
+
+namespace fmt {
+template <>
+struct formatter<tBTA_AG_SCO_APTX_SWB_SETTINGS>
+    : enum_formatter<tBTA_AG_SCO_APTX_SWB_SETTINGS> {};
+template <>
+struct formatter<tBTA_AG_SCO> : enum_formatter<tBTA_AG_SCO> {};
+}  // namespace fmt
 
 #endif /* BTA_AG_INT_H */

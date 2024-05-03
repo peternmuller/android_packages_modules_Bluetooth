@@ -16,8 +16,8 @@
 
 #include "asrc_resampler.h"
 
-#include <base/logging.h>
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include <algorithm>
 #include <cmath>
@@ -159,14 +159,11 @@ class SourceAudioHalAsrc::ClockRecovery
       output_stats = output_stats_;
     }
 
-    LOG(INFO) << base::StringPrintf("Deviation: %6d us (%3.0f ppm)",
-                                    state.stream_time - state.local_time,
-                                    state.butter_drift)
-              << " | "
-              << base::StringPrintf("Output Fs: %5.2f Hz  drift: %2d us",
-                                    output_stats.sample_rate,
-                                    output_stats.drift_us)
-              << std::endl;
+    log::info(
+        "Deviation: {:6} us ({:3.0f} ppm) | Output Fs: {:5.2f} Hz  drift: {:2} "
+        "us",
+        state.stream_time - state.local_time, state.butter_drift,
+        output_stats.sample_rate, output_stats.drift_us);
   }
 
  public:
@@ -439,11 +436,11 @@ SourceAudioHalAsrc::SourceAudioHalAsrc(int channels, int sample_rate,
       !check_bounds(interval_us, 1 * 1000, 100 * 1000) ||
       !check_bounds(num_burst_buffers, 0, 10) ||
       !check_bounds(burst_delay_ms, 0, 1000)) {
-    LOG(ERROR) << "Bad parameters:"
-               << " channels: " << channels << " sample_rate: " << sample_rate
-               << " bit_depth: " << bit_depth << " interval_us: " << interval_us
-               << " num_burst_buffers: " << num_burst_buffers
-               << " burst_delay_ms: " << burst_delay_ms << std::endl;
+    log::error(
+        "Bad parameters: channels: {} sample_rate: {} bit_depth: {} "
+        "interval_us: {} num_burst_buffers: {} burst_delay_ms: {}",
+        channels, sample_rate, bit_depth, interval_us, num_burst_buffers,
+        burst_delay_ms);
 
     return;
   }
@@ -561,8 +558,8 @@ SourceAudioHalAsrc::Run(const std::vector<uint8_t>& in) {
   std::vector<const std::vector<uint8_t>*> out;
 
   if (in.size() != buffers_size_) {
-    LOG(ERROR) << "Inconsistent input buffer size: " << in.size() << " ("
-               << buffers_size_ << " expected)" << std::endl;
+    log::error("Inconsistent input buffer size: {} ({} expected)", in.size(),
+               buffers_size_);
     return out;
   }
 
@@ -611,11 +608,9 @@ SourceAudioHalAsrc::Run(const std::vector<uint8_t>& in) {
                                      int(output_us - local_us));
 
   if (0)
-    LOG(INFO) << base::StringPrintf(
-                     "[%6u.%06u]  Fs: %.2f Hz  drift: %d us",
-                     output_us / (1000 * 1000), output_us % (1000 * 1000),
-                     ratio * sample_rate_, int(output_us - local_us))
-              << std::endl;
+    log::info("[{:6}.{:06}]  Fs: {:.2f} Hz  drift: {} us",
+              output_us / (1000 * 1000), output_us % (1000 * 1000),
+              ratio * sample_rate_, int(output_us - local_us));
 
   return out;
 }

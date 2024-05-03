@@ -42,10 +42,8 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.TestUtils;
-import com.android.bluetooth.a2dpsink.A2dpSinkNativeInterface;
 import com.android.bluetooth.a2dpsink.A2dpSinkService;
 import com.android.bluetooth.btservice.AdapterService;
-import com.android.bluetooth.btservice.storage.DatabaseManager;
 
 import org.hamcrest.core.IsInstanceOf;
 import org.junit.After;
@@ -73,21 +71,22 @@ public class AvrcpControllerStateMachineTest {
 
     private BluetoothAdapter mAdapter;
 
-    @Rule public final ServiceTestRule mAvrcpServiceRule = new ServiceTestRule();
-    @Rule public final ServiceTestRule mA2dpServiceRule = new ServiceTestRule();
     @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
 
-    @Mock private AdapterService mA2dpAdapterService;
-    @Mock private AdapterService mAvrcpAdapterService;
+    @Mock private AdapterService mAdapterService;
+
     @Mock private A2dpSinkService mA2dpSinkService;
-    @Mock private DatabaseManager mDatabaseManager;
-    @Mock private AudioManager mAudioManager;
     @Mock private Resources mMockResources;
-    private ArgumentCaptor<Intent> mIntentArgument = ArgumentCaptor.forClass(Intent.class);
+
     @Mock private AvrcpControllerService mAvrcpControllerService;
     @Mock private AvrcpControllerNativeInterface mNativeInterface;
-    @Mock private A2dpSinkNativeInterface mA2dpSinkNativeInterface;
     @Mock private AvrcpCoverArtManager mCoverArtManager;
+    @Mock private AudioManager mAudioManager;
+
+    @Rule
+    public final ServiceTestRule mBluetoothBrowserMediaServiceTestRule = new ServiceTestRule();
+
+    private ArgumentCaptor<Intent> mIntentArgument = ArgumentCaptor.forClass(Intent.class);
 
     private byte[] mTestAddress = new byte[]{01, 01, 01, 01, 01, 01};
     private BluetoothDevice mTestDevice = null;
@@ -100,17 +99,11 @@ public class AvrcpControllerStateMachineTest {
         }
         Assert.assertNotNull(Looper.myLooper());
 
+        // Set a mock Adapter Service for profile state change notifications
+        TestUtils.setAdapterService(mAdapterService);
 
-        // Start a real A2dpSinkService so we can replace the static instance with our mock
-        doReturn(mDatabaseManager).when(mA2dpAdapterService).getDatabase();
-        TestUtils.setAdapterService(mA2dpAdapterService);
-        A2dpSinkNativeInterface.setInstance(mA2dpSinkNativeInterface);
+        // Set a mock A2dpSinkService for audio focus calls
         A2dpSinkService.setA2dpSinkService(mA2dpSinkService);
-        TestUtils.clearAdapterService(mA2dpAdapterService);
-
-        // Start an AvrcpControllerService to get a real BluetoothMediaBrowserService up
-        TestUtils.setAdapterService(mAvrcpAdapterService);
-        AvrcpControllerNativeInterface.setInstance(mNativeInterface);
 
         // Mock an AvrcpControllerService to give to all state machines
         doReturn(BluetoothProfile.STATE_DISCONNECTED).when(mCoverArtManager).getState(any());
@@ -126,6 +119,12 @@ public class AvrcpControllerStateMachineTest {
                 .getSystemServiceName(AudioManager.class);
         doReturn(mCoverArtManager).when(mAvrcpControllerService).getCoverArtManager();
         mAvrcpControllerService.sBrowseTree = new BrowseTree(null);
+        AvrcpControllerService.setAvrcpControllerService(mAvrcpControllerService);
+
+        // Start the Bluetooth Media Browser Service
+        final Intent bluetoothBrowserMediaServiceStartIntent =
+                TestUtils.prepareIntentToStartBluetoothBrowserMediaService();
+        mBluetoothBrowserMediaServiceTestRule.startService(bluetoothBrowserMediaServiceStartIntent);
 
         // Ensure our MediaBrowserService starts with a blank state
         BluetoothMediaBrowserService.reset();
@@ -142,9 +141,9 @@ public class AvrcpControllerStateMachineTest {
     @After
     public void tearDown() throws Exception {
         destroyStateMachine(mAvrcpStateMachine);
-        TestUtils.clearAdapterService(mAvrcpAdapterService);
-        A2dpSinkNativeInterface.setInstance(null);
-        AvrcpControllerNativeInterface.setInstance(null);
+        A2dpSinkService.setA2dpSinkService(null);
+        AvrcpControllerService.setAvrcpControllerService(null);
+        TestUtils.clearAdapterService(mAdapterService);
     }
 
     /**
@@ -152,7 +151,8 @@ public class AvrcpControllerStateMachineTest {
      */
     private AvrcpControllerStateMachine makeStateMachine(BluetoothDevice device) {
         AvrcpControllerStateMachine sm =
-                new AvrcpControllerStateMachine(device, mAvrcpControllerService, mNativeInterface);
+                new AvrcpControllerStateMachine(
+                        device, mAvrcpControllerService, mNativeInterface, false);
         sm.start();
         return sm;
     }
@@ -1117,6 +1117,55 @@ public class AvrcpControllerStateMachineTest {
                 AvrcpControllerStateMachine.MESSAGE_PROCESS_REGISTER_ABS_VOL_NOTIFICATION, label);
         verify(mNativeInterface, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
                 .sendRegisterAbsVolRsp(any(), anyByte(), eq(127), eq((int) label));
+    }
+
+    /** Test that set absolute volume is working */
+    @Test
+    public void testSetAbsoluteVolume_volumeIsFixed_setsAbsVolumeBase() {
+        byte label = 42;
+        setUpConnectedState(true, true);
+        mAvrcpStateMachine.sendMessage(
+                AvrcpControllerStateMachine.MESSAGE_PROCESS_SET_ABS_VOL_CMD, 20, label);
+        verify(mNativeInterface, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
+                .sendAbsVolRsp(any(), eq(127), eq((int) label));
+    }
+
+    /** Test that set absolute volume is working */
+    @Test
+    public void testSetAbsoluteVolume_volumeIsNotFixed_setsAbsVolumeBase() {
+        doReturn(false).when(mAudioManager).isVolumeFixed();
+        mAvrcpStateMachine =
+                new AvrcpControllerStateMachine(
+                        mTestDevice, mAvrcpControllerService, mNativeInterface, false);
+        mAvrcpStateMachine.start();
+        byte label = 42;
+        setUpConnectedState(true, true);
+        doReturn(100).when(mAudioManager).getStreamMaxVolume(eq(AudioManager.STREAM_MUSIC));
+        doReturn(25).when(mAudioManager).getStreamVolume(eq(AudioManager.STREAM_MUSIC));
+        mAvrcpStateMachine.sendMessage(
+                AvrcpControllerStateMachine.MESSAGE_PROCESS_SET_ABS_VOL_CMD, 20, label);
+        verify(mNativeInterface, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
+                .sendAbsVolRsp(any(), eq(20), eq((int) label));
+        verify(mAudioManager, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
+                .setStreamVolume(
+                        eq(AudioManager.STREAM_MUSIC), eq(15), eq(AudioManager.FLAG_SHOW_UI));
+    }
+
+    /** Test that set absolute volume is working */
+    @Test
+    public void
+            testSetAbsoluteVolume_volumeIsNotFixedSinkAbsoluteVolumeEnabled_setsAbsVolumeBase() {
+        doReturn(false).when(mAudioManager).isVolumeFixed();
+        mAvrcpStateMachine =
+                new AvrcpControllerStateMachine(
+                        mTestDevice, mAvrcpControllerService, mNativeInterface, true);
+        mAvrcpStateMachine.start();
+        byte label = 42;
+        setUpConnectedState(true, true);
+        mAvrcpStateMachine.sendMessage(
+                AvrcpControllerStateMachine.MESSAGE_PROCESS_SET_ABS_VOL_CMD, 20, label);
+        verify(mNativeInterface, timeout(ASYNC_CALL_TIMEOUT_MILLIS))
+                .sendAbsVolRsp(any(), eq(127), eq((int) label));
     }
 
     /**

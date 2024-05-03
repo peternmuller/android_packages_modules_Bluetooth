@@ -20,6 +20,7 @@
 
 #include <android_bluetooth_flags.h>
 #include <android_bluetooth_sysprop.h>
+#include <bluetooth/log.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -100,15 +101,15 @@ void bta_ag_swb_handle_vs_at_events(tBTA_AG_SCB* p_scb, uint16_t cmd,
         p_scb->sco_codec = UUID_CODEC_MSBC;
       }
       bta_ag_send_qac(p_scb, NULL);
-      LOG_VERBOSE("Received AT+QAC, updating sco codec to SWB: %d",
-                  p_scb->sco_codec);
+      log::verbose("Received AT+QAC, updating sco codec to SWB: {}",
+                   p_scb->sco_codec);
       val->num = p_scb->peer_codecs;
       break;
     case BTA_AG_AT_QCS_EVT: {
       tBTA_AG_PEER_CODEC codec_type, codec_sent;
       alarm_cancel(p_scb->codec_negotiation_timer);
 
-      LOG_VERBOSE("BTA_AG_AT_QCS_EVT int_arg=%d", int_arg);
+      log::verbose("BTA_AG_AT_QCS_EVT int_arg={}", int_arg);
       switch (int_arg) {
         case BTA_AG_SCO_APTX_SWB_SETTINGS_Q0:
           codec_type = BTA_AG_SCO_APTX_SWB_SETTINGS_Q0;
@@ -123,7 +124,7 @@ void bta_ag_swb_handle_vs_at_events(tBTA_AG_SCB* p_scb, uint16_t cmd,
           codec_type = BTA_AG_SCO_APTX_SWB_SETTINGS_Q3;
           break;
         default:
-          LOG_ERROR("Unknown codec_uuid %d", int_arg);
+          log::error("Unknown codec_uuid {}", int_arg);
           p_scb->is_aptx_swb_codec = false;
           codec_type = BTM_SCO_CODEC_MSBC;
           p_scb->codec_fallback = true;
@@ -171,7 +172,7 @@ tBTA_AG_PEER_CODEC bta_ag_parse_qac(char* p_s) {
         retval |= BTA_AG_SCO_APTX_SWB_SETTINGS_Q3_MASK;
         break;
       default:
-        LOG_VERBOSE("Unknown Codec UUID(%d) received\n", codec_mode);
+        log::verbose("Unknown Codec UUID({}) received", codec_mode);
         break;
     }
   }

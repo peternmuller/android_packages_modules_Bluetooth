@@ -147,18 +147,6 @@ struct BTA_AvOffloadStart {
 };
 extern struct BTA_AvOffloadStart BTA_AvOffloadStart;
 
-// Name: BTA_AvOffloadStartRsp
-// Params: tBTA_AV_HNDL hndl, tBTA_AV_STATUS status
-// Return: void
-struct BTA_AvOffloadStartRsp {
-  std::function<void(tBTA_AV_HNDL hndl, tBTA_AV_STATUS status)> body{
-      [](tBTA_AV_HNDL /* hndl */, tBTA_AV_STATUS /* status */) {}};
-  void operator()(tBTA_AV_HNDL hndl, tBTA_AV_STATUS status) {
-    body(hndl, status);
-  };
-};
-extern struct BTA_AvOffloadStartRsp BTA_AvOffloadStartRsp;
-
 // Name: BTA_AvOpen
 // Params: const RawAddress& bd_addr, tBTA_AV_HNDL handle, bool use_rc, uint16_t
 // uuid Return: void
@@ -368,6 +356,16 @@ struct BTA_AvSetCodecMode {
   void operator()(tBTA_AV_HNDL handle, uint16_t enc_mode) { body(handle, enc_mode); };
 };
 extern struct BTA_AvSetCodecMode BTA_AvSetCodecMode;
+
+// Name: BTA_AvUpdateAptxData
+// Params: uint32_t data
+// Return: void
+struct BTA_AvUpdateAptxData {
+  std::function<void(uint32_t data)> body{
+      [](uint32_t /* data */) {}};
+  void operator()(uint32_t data) { body(data); };
+};
+extern struct BTA_AvUpdateAptxData BTA_AvUpdateAptxData;
 
 }  // namespace bta_av_api
 }  // namespace mock

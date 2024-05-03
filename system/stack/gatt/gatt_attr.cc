@@ -23,7 +23,6 @@
  *
  ******************************************************************************/
 
-#include <base/logging.h>
 #include <bluetooth/log.h>
 
 #include <deque>
@@ -826,7 +825,7 @@ static bool read_sr_sirk_req(
 
   param.service.uuid = bluetooth::Uuid::From16Bit(GATT_UUID_CSIS_SIRK);
 
-  if (GATTC_Read(conn_id, GATT_READ_BY_TYPE, &param) != GATT_SUCCESS) {
+  if (GATTC_Read(conn_id, GATT_READ_CHAR_VALUE, &param) != GATT_SUCCESS) {
     log::error("Read GATT Support features GATT_Read Failed, conn_id: {}",
                static_cast<int>(conn_id));
     return false;

@@ -187,7 +187,7 @@ class TestConnectionManagementCallbacks : public hci::acl_manager::ConnectionMan
   void OnAuthenticationComplete(hci::ErrorCode /* hci_status */) override {}
   void OnEncryptionChange(hci::EncryptionEnabled /* enabled */) override {}
   void OnChangeConnectionLinkKeyComplete() override {}
-  void OnReadClockOffsetComplete(uint16_t /* clock_offset */) override {}
+  void OnReadClockOffsetComplete(uint16_t /* handle */, uint16_t /* clock_offset */) override {}
   void OnModeChange(
       hci::ErrorCode /* status */, hci::Mode /* current_mode */, uint16_t /* interval */) override {
   }
@@ -260,8 +260,10 @@ class ClassicAclConnectionTest : public ::testing::Test {
   }
 
   void sync_handler() {
-    ASSERT(thread_ != nullptr);
-    ASSERT(thread_->GetReactor()->WaitForIdle(2s));
+    log::assert_that(thread_ != nullptr, "assert failed: thread_ != nullptr");
+    log::assert_that(
+        thread_->GetReactor()->WaitForIdle(2s),
+        "assert failed: thread_->GetReactor()->WaitForIdle(2s)");
   }
 
   Address address_;

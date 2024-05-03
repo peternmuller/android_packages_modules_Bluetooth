@@ -80,6 +80,7 @@
 #include <base/bind.h>
 #include <base/callback.h>
 #include <base/location.h>
+#include <bluetooth/log.h>
 #include <cutils/properties.h>
 #include "btif_api.h"
 #include "btif_common.h"
@@ -89,6 +90,8 @@
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
 #include "stack/include/btm_client_interface.h"
+
+using namespace bluetooth;
 
 extern bool interface_ready(void);
 
@@ -109,7 +112,7 @@ btvendor_callbacks_t* bt_vendor_callbacks = NULL;
 *******************************************************************************/
 static bt_status_t init(btvendor_callbacks_t* callbacks) {
   bt_vendor_callbacks = callbacks;
-  LOG_INFO("init done");
+  log::info("init done");
   return BT_STATUS_SUCCESS;
 }
 
@@ -149,19 +152,19 @@ void btif_vendor_update_add_on_features() {
   do_in_jni_thread(base::BindOnce(btif_vendor_update_add_on_features_to_jni));
 }
 static void set_wifi_state(bool status) {
-  LOG_INFO("setWifiState :%d", status);
+  log::info("setWifiState :{}", status);
   // todo
   // BTA_DmSetWifiState(status);
 }
 
 static void set_Power_back_off_state(bool status) {
-  LOG_INFO("setPowerBackOffState :%d ", status);
+  log::info("setPowerBackOffState :{}", status);
   // do_in_main_thread(base::BindOnce(get_btm_client_interface().vendor.BTM_GetHostAddOnFeatures)
   get_btm_client_interface().vendor.BTM_SetPowerBackOffState(status);
 }
 
 static void cleanup(void) {
-  LOG_INFO("cleanup");
+  log::info("cleanup");
   if (bt_vendor_callbacks) bt_vendor_callbacks = NULL;
 }
 
@@ -184,6 +187,6 @@ static const btvendor_interface_t btvendorInterface = {
 **
 *******************************************************************************/
 const btvendor_interface_t* btif_vendor_get_interface() {
-  LOG_INFO("%s", __FUNCTION__);
+  log::info("");
   return &btvendorInterface;
 }

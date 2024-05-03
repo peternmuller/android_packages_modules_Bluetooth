@@ -61,7 +61,7 @@ struct AclScheduler::impl {
       if (entry != nullptr && entry->address == address) {
         // If so, clear the current entry and advance the queue
         outgoing_entry_.reset();
-        handle_outgoing_connection.InvokeIfNotEmpty();
+        handle_outgoing_connection.Invoke();
         try_dequeue_next_operation();
         return;
       }
@@ -70,9 +70,9 @@ struct AclScheduler::impl {
     // Otherwise check if it's an incoming request and advance the queue if so
     if (incoming_connecting_address_set_.find(address) != incoming_connecting_address_set_.end()) {
       incoming_connecting_address_set_.erase(address);
-      handle_incoming_connection.InvokeIfNotEmpty();
+      handle_incoming_connection.Invoke();
     } else {
-      handle_unknown_connection.InvokeIfNotEmpty(set_of_incoming_connecting_addresses());
+      handle_unknown_connection.Invoke(set_of_incoming_connecting_addresses());
     }
     try_dequeue_next_operation();
   }
@@ -113,9 +113,23 @@ struct AclScheduler::impl {
       Address address,
       common::ContextualOnceCallback<void()> start_request,
       common::ContextualOnceCallback<void()> cancel_request_completed) {
-    pending_outgoing_operations_.push_back(
-        RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
-    try_dequeue_next_operation();
+
+    if ((incoming_connecting_address_set_.find(address) != incoming_connecting_address_set_.end()) &&
+       !outgoing_entry_.has_value()) {
+
+      log::warn("send RemoteNameRequest when incoming acl accepted already");
+         pending_outgoing_operations_.push_front(
+          RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
+      auto entry = std::move(pending_outgoing_operations_.front());
+      pending_outgoing_operations_.pop_front();
+      std::visit([](auto&& variant) { variant.callback.Invoke(); }, entry);
+      outgoing_entry_ = std::move(entry);
+
+    } else {
+      pending_outgoing_operations_.push_back(
+          RemoteNameRequestQueueEntry{address, std::move(start_request), std::move(cancel_request_completed)});
+      try_dequeue_next_operation();
+    }
   }
 
   void ReportRemoteNameRequestCompletion(Address /* address */) {

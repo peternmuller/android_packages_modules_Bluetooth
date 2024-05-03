@@ -31,7 +31,6 @@
 #include "devices.h"
 #include "hci/hci_packets.h"
 #include "hcimsgs.h"
-#include "include/check.h"
 #include "internal_include/bt_trace.h"
 #include "le_audio_health_status.h"
 #include "le_audio_log_history.h"
@@ -92,6 +91,178 @@
  * - - not supported
  */
 // clang-format on
+
+constexpr uint16_t  HCI_VS_QBCE_OCF                     = 0xFC51;
+
+constexpr uint8_t  LTV_TYPE_VS_METADATA                 = 0xFF;
+constexpr uint8_t  LTV_TYPE_VS_METADATA_FE              = 0xFE;
+
+constexpr uint8_t  LTV_TYPE_MIN_FT                      = 0X00;
+constexpr uint8_t  LTV_TYPE_MIN_BIT_RATE                = 0X01;
+constexpr uint8_t  LTV_TYPE_MIN_MAX_ERROR_RESILIENCE    = 0X02;
+constexpr uint8_t  LTV_TYPE_LATENCY_MODE                = 0X03;
+constexpr uint8_t  LTV_TYPE_MAX_FT                      = 0X04;
+
+constexpr uint8_t  LTV_LEN_MIN_FT                       = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_BIT_RATE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_MAX_ERROR_RESILIENCE     = 0X01;
+constexpr uint8_t  LTV_LEN_LATENCY_MODE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MAX_FT                       = 0X01;
+
+constexpr uint8_t  ENCODER_LIMITS_SUB_OP                = 0x24;
+
+typedef struct {
+  uint8_t cig_id;
+  uint8_t cis_id;
+  std::vector<uint8_t> encoder_params;
+  uint8_t encoder_mode;
+} tBTM_BLE_SET_ENCODER_LIMITS_PARAM;
+
+bool isRecordReadable(uint8_t total_len, uint8_t processed_len,
+                      uint8_t req_len) {
+  LOG(WARNING) << __func__ << ": total_len: " << loghex(total_len)
+                           << ", processed_len: " << loghex(processed_len)
+                           << ", req_len: " << loghex(req_len);
+  if((total_len > processed_len) &&
+     ((total_len - processed_len) >= req_len)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+uint8_t* PrepareSetEncoderLimitsPayload(tBTM_BLE_SET_ENCODER_LIMITS_PARAM *params,
+                                        uint8_t *length, uint8_t *p) {
+  uint8_t param_len = 0;
+  uint8_t size = params->encoder_params.size();
+  uint8_t num_limits = (size == 0) ? 1 : size;
+  LOG(INFO) <<__func__  << "num_limits = "<<loghex(num_limits);
+  LOG(INFO) <<__func__  << "params->cig_id = "<<loghex(params->cig_id);
+  LOG(INFO) <<__func__  << "params->cis_id = "<<loghex(params->cis_id);
+  UINT8_TO_STREAM(p, ENCODER_LIMITS_SUB_OP); //sub-opcode
+  param_len++;
+  UINT8_TO_STREAM(p, params->cig_id);
+  param_len++;
+  UINT8_TO_STREAM(p, params->cis_id);
+  param_len++;
+  UINT8_TO_STREAM(p, num_limits); //numlimits
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[0]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[2]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[3]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[4]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[1]);
+  param_len++;
+  *length = param_len;
+  LOG(INFO) <<__func__  << "param_len = "<<loghex(param_len);
+  return p;
+}
+
+void UpdateEncoderParams(uint8_t cig_id, uint8_t cis_id,
+                                 std::vector<uint8_t> encoder_limit_params,
+                                 uint8_t encoder_mode) {
+  tBTM_BLE_SET_ENCODER_LIMITS_PARAM encoder_params = {
+                                       .cig_id = cig_id,
+                                       .cis_id = cis_id,
+                                       .encoder_params = encoder_limit_params,
+                                       .encoder_mode = encoder_mode};
+    uint8_t length = 0;
+    uint8_t size = 1;
+    if (encoder_params.encoder_params.size())
+      size = encoder_params.encoder_params.size();
+    uint16_t len = 4 + size * 3;
+    LOG(INFO) <<__func__  << "len = "<<loghex(len);
+    uint8_t param_arr[len];
+    uint8_t *param = param_arr;
+    PrepareSetEncoderLimitsPayload(&encoder_params, &length, param);
+    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF, length, param, NULL);
+}
+
+void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
+                     uint8_t cig_id, uint8_t cis_id) {
+  LOG(INFO) << __func__ ;
+  uint8_t* p = metadata.data();
+  uint8_t ltv_len, ltv_type;
+  uint8_t processed_len = 0;
+  std::vector<uint8_t> vs_meta_data;
+  uint8_t meta_data_len = total_len;
+
+  while(meta_data_len > 0) {
+    STREAM_TO_UINT8(ltv_len, p);
+    processed_len++;
+
+    if(!ltv_len || !isRecordReadable(total_len, processed_len, ltv_len)) {
+      LOG(INFO) << __func__ << ": Data is not readable ";
+      break;
+    }
+
+    STREAM_TO_UINT8(ltv_type, p);
+    processed_len++;
+
+    if(ltv_type == LTV_TYPE_VS_METADATA) {
+      uint16_t company_id;
+      uint8_t vs_meta_data_len, vs_meta_data_type;
+      STREAM_TO_UINT16(company_id, p);
+      LOG(INFO) << ": company_id = " << loghex(company_id);
+      processed_len += 2;
+      ltv_len -= 3; //company id and ltv_type
+      while(ltv_len) {
+        STREAM_TO_UINT8(vs_meta_data_len, p);
+        LOG(INFO) << __func__ << ": vs_meta_data_len = " << loghex(vs_meta_data_len);
+        processed_len++;
+
+        if(!vs_meta_data_len || !isRecordReadable(total_len, processed_len, vs_meta_data_len)) {
+          LOG(INFO) << __func__ << ": Data is not readable ";
+          break;
+        }
+
+        STREAM_TO_UINT8(vs_meta_data_type, p);
+        LOG(INFO) << __func__ << ": vs_meta_data_type = " << loghex(vs_meta_data_type);
+        processed_len++;
+        if(vs_meta_data_type == LTV_TYPE_VS_METADATA_FE) {
+          vs_meta_data.resize(vs_meta_data_len - 1);
+          STREAM_TO_ARRAY(vs_meta_data.data(), p, vs_meta_data_len - 1); // "ltv_len - 1" because 1B for type
+          LOG(INFO) << __func__ << ": STREAM_TO_ARRAY done ";
+          processed_len += static_cast<int> (sizeof(vs_meta_data));
+          LOG(INFO) << __func__ << ": straight away call UpdateEncoderParams ";
+          UpdateEncoderParams(cig_id, cis_id, vs_meta_data, 0xFF);
+          vs_meta_data.clear();
+        } else {
+          (p) += (vs_meta_data_len - 1); //just ignore and increase pointer
+          processed_len += (vs_meta_data_len - 1);
+        }
+        ltv_len -= (vs_meta_data_len + 1);
+      }
+    } else {
+      (p) += (ltv_len - 1);
+    }
+    meta_data_len -= (ltv_len + 1);
+  }
+}
 
 using bluetooth::common::ToString;
 using bluetooth::hci::IsoManager;
@@ -460,7 +631,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         AseStateMachineProcessQosConfigured(arh, ase, group, leAudioDevice);
         break;
       case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
-        AseStateMachineProcessEnabling(arh, ase, group, leAudioDevice);
+        AseStateMachineProcessEnabling(
+            arh, ase, value + le_audio::client_parser::ascs::kAseRspHdrMinLen,
+            len - le_audio::client_parser::ascs::kAseRspHdrMinLen, group,
+            leAudioDevice);
         break;
       case AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING:
         AseStateMachineProcessStreaming(
@@ -518,15 +692,26 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    ASSERT_LOG(group->cig.GetState() == CigState::CREATING,
-               "Unexpected CIG creation group id: %d, cig state: %s",
-               group->group_id_, ToString(group->cig.GetState()).c_str());
+    log::assert_that(group->cig.GetState() == CigState::CREATING,
+                     "Unexpected CIG creation group id: {}, cig state: {}",
+                     group->group_id_, ToString(group->cig.GetState()));
 
     group->cig.SetState(CigState::CREATED);
     log::info("Group: {}, id: {} cig state: {}, number of cis handles: {}",
               fmt::ptr(group), group->group_id_,
               ToString(group->cig.GetState()),
               static_cast<int>(conn_handles.size()));
+
+    if (group->GetTargetState() != AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+      /* Group is not going to stream. It happen while CIG was creating.
+       * Remove CIG in such a case
+       */
+      log::warn("group_id {} is not going to stream anymore. Remove CIG.",
+                group->group_id_);
+      group->PrintDebugState();
+      RemoveCigForGroup(group);
+      return;
+    }
 
     /* Assign all connection handles to CIS ids of the CIG */
     group->cig.AssignCisConnHandles(conn_handles);
@@ -537,60 +722,52 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     /* Last node configured, process group to codec configured state */
     group->SetState(AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED);
 
-    if (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
-      /* As streaming is about to start send HCI configure data path
-       * based on codec selected before CIS creation ensuring order
-       * Connected_Iso_Group_Create -> HCI_Configure Data path ->
-       * Create CIS -> SetUp ISO Datapath
-       * (need to ensure HCI Datapath is configure just after group creation
-       * and before CIS/ISO Data path creation so that vendor offload path
-       *  is configured properly between ADSP and BT Controller
-       */
-      bool config_host_to_controller_sent = false;
-      bool config_controller_to_host_sent = false;
-      /* Above flags to ensure HCI Config data path sent only once for Tx only
-       * OR Rx only OR Tx/Rx both based on cis type direction
-       */
-      for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
-        if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_BIDIRECTIONAL) {
-          if (!config_host_to_controller_sent) {
-            std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
-                group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
-            GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
-                                  kIsoDataPathPlatformDefault, vendor_config_sink);
-            config_host_to_controller_sent = true;
-          }
-          if (!config_controller_to_host_sent) {
-            std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
-                group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
-            GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
-                                  kIsoDataPathPlatformDefault, vendor_config_source);
-            config_controller_to_host_sent = true;
-          }
-        } else if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_UNIDIRECTIONAL_SINK) {
-          if (config_host_to_controller_sent) continue;
+    /* As streaming is about to start send HCI configure data path
+      * based on codec selected before CIS creation ensuring order
+      * Connected_Iso_Group_Create -> HCI_Configure Data path ->
+      * Create CIS -> SetUp ISO Datapath
+      * (need to ensure HCI Datapath is configure just after group creation
+      * and before CIS/ISO Data path creation so that vendor offload path
+      *  is configured properly between ADSP and BT Controller
+      */
+    bool config_host_to_controller_sent = false;
+    bool config_controller_to_host_sent = false;
+    /* Above flags to ensure HCI Config data path sent only once for Tx only
+      * OR Rx only OR Tx/Rx both based on cis type direction
+      */
+    for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
+      if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_BIDIRECTIONAL) {
+        if (!config_host_to_controller_sent) {
           std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
               group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
           GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
                                 kIsoDataPathPlatformDefault, vendor_config_sink);
           config_host_to_controller_sent = true;
-        } else {
-          if (config_controller_to_host_sent) continue;
+        }
+        if (!config_controller_to_host_sent) {
           std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
               group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
           GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
                                 kIsoDataPathPlatformDefault, vendor_config_source);
-          config_controller_to_host_sent = false;
+          config_controller_to_host_sent = true;
         }
+      } else if (cis.type == bluetooth::le_audio::types::CisType::CIS_TYPE_UNIDIRECTIONAL_SINK) {
+        if (config_host_to_controller_sent) continue;
+        std::vector<uint8_t> vendor_config_sink = PrepareVendorConfigPayloadData(
+            group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSink);
+        GetInterface().ConfigureDataPath(hci_data_direction_t::HOST_TO_CONTROLLER,
+                              kIsoDataPathPlatformDefault, vendor_config_sink);
+        config_host_to_controller_sent = true;
+      } else {
+        if (config_controller_to_host_sent) continue;
+        std::vector<uint8_t> vendor_config_source = PrepareVendorConfigPayloadData(
+            group, conn_handles, bluetooth::le_audio::types::kLeAudioDirectionSource);
+        GetInterface().ConfigureDataPath(hci_data_direction_t::CONTROLLER_TO_HOST,
+                              kIsoDataPathPlatformDefault, vendor_config_source);
+        config_controller_to_host_sent = false;
       }
-      PrepareAndSendQoSToTheGroup(group);
-    } else {
-      log::error(", invalid state transition, from: {} , to: {}",
-                 ToString(group->GetState()),
-                 ToString(group->GetTargetState()));
-      StopStream(group);
-      return;
     }
+    PrepareAndSendQoSToTheGroup(group);
   }
 
   void FreeLinkQualityReports(LeAudioDevice* leAudioDevice) {
@@ -642,9 +819,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    ASSERT_LOG(group->cig.GetState() == CigState::REMOVING,
-               "Unexpected CIG remove group id: %d, cig state %s",
-               group->group_id_, ToString(group->cig.GetState()).c_str());
+    log::assert_that(group->cig.GetState() == CigState::REMOVING,
+                     "Unexpected CIG remove group id: {}, cig state {}",
+                     group->group_id_, ToString(group->cig.GetState()));
 
     group->cig.SetState(CigState::NONE);
 
@@ -1040,6 +1217,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           group->asymmetric_phy_for_unidirectional_cis_supported == true &&
           group->GetSduInterval(
               bluetooth::le_audio::types::kLeAudioDirectionSource) == 0) {
+        log::info(
+            "Remote device may not support asymmetric phy for CIS, retry "
+            "symmetric setting again");
         group->asymmetric_phy_for_unidirectional_cis_supported = false;
       }
 
@@ -1113,11 +1293,11 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
      * to streaming state.
      */
     struct ase* ase = leAudioDevice->GetFirstActiveAse();
-    ASSERT_LOG(ase != nullptr,
-               "shouldn't be called without an active ASE, device %s, group "
-               "id: %d, cis handle 0x%04x",
-               ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), event->cig_id,
-               event->cis_conn_hdl);
+    log::assert_that(ase != nullptr,
+                     "shouldn't be called without an active ASE, device {}, "
+                     "group id: {}, cis handle 0x{:04x}",
+                     ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_),
+                     event->cig_id, event->cis_conn_hdl);
 
     PrepareAndSendReceiverStartReady(leAudioDevice, ase);
   }
@@ -1341,7 +1521,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       ase = leAudioDevice->GetFirstActiveAse();
     }
 
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     if (ase->data_path_state == DataPathState::CONFIGURED) {
       RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
     }
@@ -1405,8 +1585,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     auto iter = std::find_if(
         params.stream_locations.begin(), params.stream_locations.end(),
         [cis_conn_hdl](auto& pair) { return cis_conn_hdl == pair.first; });
-    ASSERT_LOG(iter == params.stream_locations.end(),
-               "Stream is already there 0x%04x", cis_conn_hdl);
+    log::assert_that(iter == params.stream_locations.end(),
+                     "Stream is already there 0x{:04x}", cis_conn_hdl);
 
     auto core_config = ase->codec_config.GetAsCoreCodecConfig();
 
@@ -1425,18 +1605,18 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     if (params.sample_frequency_hz == 0) {
       params.sample_frequency_hz = core_config.GetSamplingFrequencyHz();
     } else {
-      ASSERT_LOG(
+      log::assert_that(
           params.sample_frequency_hz == core_config.GetSamplingFrequencyHz(),
-          "sample freq mismatch: %d!=%d", params.sample_frequency_hz,
+          "sample freq mismatch: {}!={}", params.sample_frequency_hz,
           core_config.GetSamplingFrequencyHz());
     }
 
     if (params.octets_per_codec_frame == 0) {
       params.octets_per_codec_frame = *core_config.octets_per_codec_frame;
     } else {
-      ASSERT_LOG(
+      log::assert_that(
           params.octets_per_codec_frame == *core_config.octets_per_codec_frame,
-          "octets per frame mismatch: %d!=%d", params.octets_per_codec_frame,
+          "octets per frame mismatch: {}!={}", params.octets_per_codec_frame,
           *core_config.octets_per_codec_frame);
     }
 
@@ -1444,19 +1624,20 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       params.codec_frames_blocks_per_sdu =
           *core_config.codec_frames_blocks_per_sdu;
     } else {
-      ASSERT_LOG(params.codec_frames_blocks_per_sdu ==
-                     *core_config.codec_frames_blocks_per_sdu,
-                 "codec_frames_blocks_per_sdu: %d!=%d",
-                 params.codec_frames_blocks_per_sdu,
-                 *core_config.codec_frames_blocks_per_sdu);
+      log::assert_that(params.codec_frames_blocks_per_sdu ==
+                           *core_config.codec_frames_blocks_per_sdu,
+                       "codec_frames_blocks_per_sdu: {}!={}",
+                       params.codec_frames_blocks_per_sdu,
+                       *core_config.codec_frames_blocks_per_sdu);
     }
 
     if (params.frame_duration_us == 0) {
       params.frame_duration_us = core_config.GetFrameDurationUs();
     } else {
-      ASSERT_LOG(params.frame_duration_us == core_config.GetFrameDurationUs(),
-                 "frame_duration_us: %d!=%d", params.frame_duration_us,
-                 core_config.GetFrameDurationUs());
+      log::assert_that(
+          params.frame_duration_us == core_config.GetFrameDurationUs(),
+          "frame_duration_us: {}!={}", params.frame_duration_us,
+          core_config.GetFrameDurationUs());
     }
 
     params.codec_spec_metadata = group->GetCodecVendorMetadata(ase->direction, context_type);
@@ -1736,8 +1917,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     struct ase* ase;
     std::vector<EXT_CIS_CREATE_CFG> conn_pairs;
 
-    LOG_ASSERT(leAudioDevice)
-        << __func__ << " Shouldn't be called without an active device.";
+    log::assert_that(leAudioDevice,
+                     "Shouldn't be called without an active device.");
 
     /* Make sure CIG is there */
     if (group->cig.GetState() != CigState::CREATED) {
@@ -1748,8 +1929,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     do {
       ase = leAudioDevice->GetFirstActiveAse();
-      LOG_ASSERT(ase) << __func__
-                      << " shouldn't be called without an active ASE";
+      log::assert_that(ase, "shouldn't be called without an active ASE");
       do {
         /* First is ase pair is Sink, second Source */
         auto ases_pair = leAudioDevice->GetAsesByCisConnHdl(ase->cis_conn_hdl);
@@ -1765,8 +1945,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
             BTM_GetHCIConnHandle(leAudioDevice->address_, BT_TRANSPORT_LE);
         conn_pairs.push_back({.cis_conn_handle = ase->cis_conn_hdl,
                               .acl_conn_handle = acl_handle});
-        DLOG(INFO) << __func__ << " cis handle: " << +ase->cis_conn_hdl
-                   << " acl handle : " << loghex(+acl_handle);
+        log::debug("cis handle: {} acl handle : {}", ase->cis_conn_hdl,
+                   loghex(+acl_handle));
 
       } while ((ase = leAudioDevice->GetNextActiveAse(ase)));
     } while ((leAudioDevice = group->GetNextActiveDevice(leAudioDevice)));
@@ -1810,13 +1990,12 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   static void ReleaseDataPath(LeAudioDeviceGroup* group) {
     LeAudioDevice* leAudioDevice = group->GetFirstActiveDevice();
-    LOG_ASSERT(leAudioDevice)
-        << __func__ << " Shouldn't be called without an active device.";
+    log::assert_that(leAudioDevice,
+                     "Shouldn't be called without an active device.");
 
     auto ase = leAudioDevice->GetFirstActiveAseByCisAndDataPathState(
         CisState::CONNECTED, DataPathState::CONFIGURED);
-    LOG_ASSERT(ase) << __func__
-                    << " Shouldn't be called without an active ASE.";
+    log::assert_that(ase, "Shouldn't be called without an active ASE.");
     RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
   }
 
@@ -2085,7 +2264,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     msg_stream << kLogAseConfigOp;
 
     ase = leAudioDevice->GetFirstActiveAse();
-    ASSERT_LOG(ase, "shouldn't be called without an active ASE");
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     for (; ase != nullptr; ase = leAudioDevice->GetNextActiveAse(ase)) {
       log::debug("device: {}, ase_id: {}, cis_id: {}, ase state: {}",
                  ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), ase->id,
@@ -2150,17 +2329,26 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       out_qos.preferred_pres_delay_min = rsp.preferred_pres_delay_min;
       out_qos.preferred_pres_delay_max = rsp.preferred_pres_delay_max;
 
+      log::debug(
+            "Max Transport Latency: {}, "
+            "rsp_mtl: {}, Retransmission Number: {}, Phy: {}, preferred_phy: {}",
+            out_cfg.max_transport_latency, rsp.max_transport_latency,
+            out_cfg.retrans_nb, out_cfg.phy, rsp.preferred_phy);
+
       /* Validate and update QoS to be consistent */
       if ((!out_cfg.max_transport_latency ||
            out_cfg.max_transport_latency > rsp.max_transport_latency) ||
-          !out_cfg.retrans_nb || !out_cfg.phy) {
+          !out_cfg.retrans_nb) {
         out_cfg.max_transport_latency = rsp.max_transport_latency;
         out_cfg.retrans_nb = rsp.preferred_retrans_nb;
+        log::info(
+            "Using server preferred QoS settings. Max Transport Latency: {}, "
+            "Retransmission Number: {}, Phy: {}",
+            out_cfg.max_transport_latency, out_cfg.retrans_nb, out_cfg.phy);
+      }
+      if (!out_cfg.phy) {
         out_cfg.phy = leAudioDevice->GetPreferredPhyBitmask(rsp.preferred_phy);
-        LOG_INFO(
-            "Using server preferred QoS settings. Max Transport Latency: %d, "
-            "Retransmission Number: %d, Phy: %d",
-            +out_cfg.max_transport_latency, out_cfg.retrans_nb, +out_cfg.phy);
+        log::debug( "Using server preferred Phy: {}", out_cfg.phy);
       }
     };
 
@@ -2634,7 +2822,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     msg_stream << kLogAseEnableOp;
 
     ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
     do {
       log::debug("device: {}, ase_id: {}, cis_id: {}, ase state: {}",
                  ADDRESS_TO_LOGGABLE_CSTR(leAudioDevice->address_), ase->id,
@@ -2682,7 +2870,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void PrepareAndSendDisable(LeAudioDevice* leAudioDevice) {
     ase* ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
 
     std::stringstream msg_stream;
     msg_stream << kLogAseDisableOp;
@@ -2728,7 +2916,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void PrepareAndSendRelease(LeAudioDevice* leAudioDevice) {
     ase* ase = leAudioDevice->GetFirstActiveAse();
-    LOG_ASSERT(ase) << __func__ << " shouldn't be called without an active ASE";
+    log::assert_that(ase, "shouldn't be called without an active ASE");
 
     std::vector<uint8_t> ids;
     std::stringstream stream;
@@ -2962,7 +3150,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void AseStateMachineProcessEnabling(
       struct bluetooth::le_audio::client_parser::ascs::ase_rsp_hdr& arh,
-      struct ase* ase, LeAudioDeviceGroup* group,
+      struct ase* ase, uint8_t* data, uint16_t len, LeAudioDeviceGroup* group,
       LeAudioDevice* leAudioDevice) {
     if (!group) {
       log::error("leAudioDevice doesn't belong to any group");
@@ -2999,9 +3187,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
            * to streaming state.
            */
           struct ase* ase = leAudioDevice->GetFirstActiveAse();
-          ASSERT_LOG(ase != nullptr,
-                     "shouldn't be called without an active ASE, device %s",
-                     leAudioDevice->address_.ToString().c_str());
+          log::assert_that(
+              ase != nullptr,
+              "shouldn't be called without an active ASE, device {}",
+              leAudioDevice->address_.ToString());
           PrepareAndSendReceiverStartReady(leAudioDevice, ase);
 
           return;
@@ -3012,7 +3201,16 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         break;
 
-      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
+      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING: {
+        struct le_audio::client_parser::ascs::ase_transient_state_params rsp;
+
+        if (ParseAseStatusTransientStateParams(rsp, len, data)) {
+          parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
+        }
+
+        /* Enable/Switch Content */
+        break;
+      }
         /* Enable/Switch Content */
         break;
       default:
@@ -3104,6 +3302,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
+        parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
         /* Cache current set up metadata values for for further possible
          * reconfiguration
          */
@@ -3293,8 +3492,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                    ase->data_path_state == DataPathState::IDLE) {
           DisconnectCisIfNeeded(group, leAudioDevice, ase);
         } else {
-          DLOG(INFO) << __func__ << ", Nothing to do ase data path state: "
-                     << static_cast<int>(ase->data_path_state);
+          log::debug("Nothing to do ase data path state: {}",
+                     static_cast<int>(ase->data_path_state));
         }
         break;
       }
@@ -3417,7 +3616,7 @@ void LeAudioGroupStateMachine::Cleanup() {
 }
 
 LeAudioGroupStateMachine* LeAudioGroupStateMachine::Get() {
-  CHECK(instance);
+  log::assert_that(instance != nullptr, "assert failed: instance != nullptr");
   return instance;
 }
 }  // namespace bluetooth::le_audio

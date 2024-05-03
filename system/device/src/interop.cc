@@ -22,7 +22,7 @@
 #include "device/include/interop.h"
 
 #include <assert.h>
-#include <base/logging.h>
+#include <bluetooth/log.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <hardware/bluetooth.h>
@@ -39,7 +39,6 @@
 
 #include "btcore/include/module.h"
 #include "btif/include/btif_storage.h"
-#include "check.h"
 #include "device/include/interop_config.h"
 #include "device/include/interop_database.h"
 #include "os/log.h"
@@ -49,6 +48,8 @@
 #include "osi/include/list.h"
 #include "osi/include/osi.h"
 #include "types/raw_address.h"
+
+using namespace bluetooth;
 
 #ifdef __ANDROID__
 static const char* INTEROP_DYNAMIC_FILE_PATH =
@@ -186,6 +187,11 @@ typedef struct {
 
 } interop_db_entry_t;
 
+namespace fmt {
+template <>
+struct formatter<interop_bl_type> : enum_formatter<interop_bl_type> {};
+}  // namespace fmt
+
 static const char* interop_feature_string_(const interop_feature_t feature);
 static void interop_free_entry_(void* data);
 static void interop_lazy_init_(void);
@@ -211,12 +217,12 @@ static bool interop_config_remove(const std::string& section,
 
 bool interop_match_addr(const interop_feature_t feature,
                         const RawAddress* addr) {
-  CHECK(addr);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
   return (interop_database_match_addr(feature, addr));
 }
 
 bool interop_match_name(const interop_feature_t feature, const char* name) {
-  CHECK(name);
+  log::assert_that(name != nullptr, "assert failed: name != nullptr");
   return (interop_database_match_name(feature, name));
 }
 
@@ -224,8 +230,9 @@ bool interop_match_addr_or_name(const interop_feature_t feature,
                                 const RawAddress* addr,
                                 bt_status_t (*get_remote_device_property)(
                                     const RawAddress*, bt_property_t*)) {
-  CHECK(addr);
-  CHECK(get_remote_device_property);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
+  log::assert_that(get_remote_device_property != nullptr,
+                   "assert failed: get_remote_device_property != nullptr");
 
   bt_bdname_t bdname;
   bt_property_t prop_name;
@@ -259,15 +266,16 @@ bool interop_match_addr_get_max_lat(const interop_feature_t feature,
 
 void interop_database_add(const uint16_t feature, const RawAddress* addr,
                           size_t length) {
-  CHECK(addr);
-  CHECK(length > 0);
-  CHECK(length < sizeof(RawAddress));
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
+  log::assert_that(length > 0, "assert failed: length > 0");
+  log::assert_that(length < sizeof(RawAddress),
+                   "assert failed: length < sizeof(RawAddress)");
   interop_database_add_addr(feature, addr, length);
 }
 
 void interop_database_clear() {
-  LOG_DEBUG("interop_is_initialized: %d interop_list: %p",
-            interop_is_initialized, interop_list);
+  log::debug("interop_is_initialized: {} interop_list: {}",
+             interop_is_initialized, fmt::ptr(interop_list));
 
   if (interop_is_initialized && interop_list) {
     for (int feature = BEGINNING_OF_INTEROP_LIST;
@@ -278,7 +286,7 @@ void interop_database_clear() {
 }
 
 static void interop_init_feature_name_id_map() {
-  LOG_DEBUG("");
+  log::debug("");
 
   feature_name_id_map.clear();
 
@@ -395,7 +403,9 @@ static const char* interop_feature_string_(const interop_feature_t feature) {
     CASE_RETURN_STR(INTEROP_SUSPEND_ATT_TRAFFIC_DURING_PAIRING);
     CASE_RETURN_STR(INTEROP_INSERT_CALL_WHEN_SCO_START);
     CASE_RETURN_STR(INTEROP_DELAY_AUTH);
+    CASE_RETURN_STR(INTEROP_A2DP_DELAY_DISCONNECT);
     CASE_RETURN_STR(INTEROP_MULTIPLE_HOGP_SERVICE_CHOOSE_THIRD);
+    CASE_RETURN_STR(INTEROP_A2DP_SKIP_SDP_DURING_RECONNECTION);
   }
   return UNKNOWN_INTEROP_FEATURE;
 }
@@ -422,8 +432,8 @@ static int interop_config_init(void) {
 
   if (!stat(INTEROP_STATIC_FILE_PATH, &sts) && sts.st_size) {
     if (!(config_static = config_new(INTEROP_STATIC_FILE_PATH))) {
-      LOG_WARN("unable to load static config file for : %s",
-               INTEROP_STATIC_FILE_PATH);
+      log::warn("unable to load static config file for : {}",
+                INTEROP_STATIC_FILE_PATH);
     }
   }
   if (!config_static && !(config_static = config_new_empty())) {
@@ -432,8 +442,8 @@ static int interop_config_init(void) {
 
   if (!stat(INTEROP_DYNAMIC_FILE_PATH, &sts) && sts.st_size) {
     if (!(config_dynamic = config_new(INTEROP_DYNAMIC_FILE_PATH))) {
-      LOG_WARN("unable to load dynamic config file for : %s",
-               INTEROP_DYNAMIC_FILE_PATH);
+      log::warn("unable to load dynamic config file for : {}",
+                INTEROP_DYNAMIC_FILE_PATH);
     }
   }
   if (!config_dynamic && !(config_dynamic = config_new_empty())) {
@@ -450,7 +460,8 @@ error:
 }
 
 static void interop_config_flush(void) {
-  CHECK(config_dynamic.get() != NULL);
+  log::assert_that(config_dynamic.get() != NULL,
+                   "assert failed: config_dynamic.get() != NULL");
 
   pthread_mutex_lock(&file_lock);
   config_save(*config_dynamic, INTEROP_DYNAMIC_FILE_PATH);
@@ -459,7 +470,8 @@ static void interop_config_flush(void) {
 
 static bool interop_config_remove(const std::string& section,
                                   const std::string& key) {
-  CHECK(config_dynamic.get() != NULL);
+  log::assert_that(config_dynamic.get() != NULL,
+                   "assert failed: config_dynamic.get() != NULL");
 
   pthread_mutex_lock(&file_lock);
   bool ret = config_remove_key(config_dynamic.get(), section, key);
@@ -469,7 +481,8 @@ static bool interop_config_remove(const std::string& section,
 }
 
 static bool interop_config_remove_section(const std::string& section) {
-  CHECK(config_dynamic.get() != NULL);
+  log::assert_that(config_dynamic.get() != NULL,
+                   "assert failed: config_dynamic.get() != NULL");
 
   pthread_mutex_lock(&file_lock);
   bool ret = config_remove_section(config_dynamic.get(), section);
@@ -481,7 +494,8 @@ static bool interop_config_remove_section(const std::string& section) {
 static bool interop_config_set_str(const std::string& section,
                                    const std::string& key,
                                    const std::string& value) {
-  CHECK(config_dynamic.get() != NULL);
+  log::assert_that(config_dynamic.get() != NULL,
+                   "assert failed: config_dynamic.get() != NULL");
 
   pthread_mutex_lock(&file_lock);
   config_set_string(config_dynamic.get(), section, key, value);
@@ -497,7 +511,7 @@ int interop_feature_name_to_feature_id(const char* feature_name) {
 
   auto it = feature_name_id_map.find(std::string(feature_name));
   if (it == feature_name_id_map.end()) {
-    LOG_WARN("feature does not exist: %s", feature_name);
+    log::warn("feature does not exist: {}", feature_name);
     return -1;
   }
 
@@ -601,7 +615,7 @@ static bool interop_config_add_or_remove(interop_db_entry_t* db_entry,
       break;
     }
     default:
-      LOG_ERROR("bl_type: %d not handled", db_entry->bl_type);
+      log::error("bl_type: {} not handled", db_entry->bl_type);
       status = false;
       break;
   }
@@ -627,7 +641,7 @@ static void interop_database_add_(interop_db_entry_t* db_entry, bool persist) {
 
   if (match_found) {
     // return as the entry is already present
-    LOG_DEBUG("Entry is already present in the list");
+    log::debug("Entry is already present in the list");
     return;
   }
 
@@ -650,7 +664,7 @@ static void interop_database_add_(interop_db_entry_t* db_entry, bool persist) {
 static bool interop_database_match(interop_db_entry_t* entry,
                                    interop_db_entry_t** ret_entry,
                                    interop_entry_type entry_type) {
-  CHECK(entry);
+  log::assert_that(entry != nullptr, "assert failed: entry != nullptr");
   bool found = false;
   pthread_mutex_lock(&interop_list_lock);
   if (interop_list == NULL || list_length(interop_list) == 0) {
@@ -662,7 +676,7 @@ static bool interop_database_match(interop_db_entry_t* entry,
 
   while (node != list_end(interop_list)) {
     interop_db_entry_t* db_entry = (interop_db_entry_t*)list_node(node);
-    CHECK(db_entry);
+    log::assert_that(db_entry != nullptr, "assert failed: db_entry != nullptr");
 
     if (entry->bl_type != db_entry->bl_type) {
       node = list_next(node);
@@ -766,7 +780,7 @@ static bool interop_database_match(interop_db_entry_t* entry,
         break;
       }
       default:
-        LOG_ERROR("bl_type: %d not handled", db_entry->bl_type);
+        log::error("bl_type: {} not handled", db_entry->bl_type);
         break;
     }
 
@@ -786,7 +800,7 @@ static bool interop_database_remove_(interop_db_entry_t* entry) {
   if (!interop_database_match(
           entry, &ret_entry,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_ERROR("Entry not found in the list");
+    log::error("Entry not found in the list");
     return false;
   }
 
@@ -916,7 +930,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
 
     len = (strlen(key) + 1) / 3;
     if (len < 3 || len > 4) {
-      LOG_WARN("Ignoring as invalid entry for Address %s", key);
+      log::warn("Ignoring as invalid entry for Address {}", key);
       return false;
     }
 
@@ -925,8 +939,8 @@ static bool load_to_database(int feature, const char* key, const char* value,
     for (int i = 6; i > len; i--) bdstr.append(append_str);
 
     if (!RawAddress::FromString(bdstr, addr)) {
-      LOG_WARN(
-          "key %s or Bluetooth Address %s is invalid, not added to interop "
+      log::warn(
+          "key {} or Bluetooth Address {} is invalid, not added to interop "
           "list",
           key, ADDRESS_TO_LOGGABLE_CSTR(addr));
       return false;
@@ -943,7 +957,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
 
   } else if (!strncasecmp(value, NAME_BASED, strlen(NAME_BASED))) {
     if (strlen(key) > KEY_MAX_LENGTH - 1) {
-      LOG_WARN("ignoring %s due to invalid length", key);
+      log::warn("ignoring {} due to invalid length", key);
       return false;
     }
     interop_db_entry_t* entry =
@@ -960,8 +974,8 @@ static bool load_to_database(int feature, const char* key, const char* value,
     uint16_t manufacturer;
 
     if (strlen(key) != VALID_MNFR_STR_LEN) {
-      LOG_WARN("ignoring %s due to invalid Manufacturer id in config file",
-               key);
+      log::warn("ignoring {} due to invalid Manufacturer id in config file",
+                key);
       return false;
     }
 
@@ -981,14 +995,14 @@ static bool load_to_database(int feature, const char* key, const char* value,
     char tmp_key[VALID_VNDR_PRDT_LEN + 1] = {'\0'};
 
     if (strlen(key) != VALID_VNDR_PRDT_LEN) {
-      LOG_WARN("ignoring %s due to invalid vendor/product id in config file",
-               key);
+      log::warn("ignoring {} due to invalid vendor/product id in config file",
+                key);
       return false;
     }
 
     strlcpy(tmp_key, key, VALID_VNDR_PRDT_LEN + 1);
     if (!get_vendor_product_id(tmp_key, &vendor_id, &product_id)) {
-      LOG_WARN("Error in parsing vendor/product id %s", key);
+      log::warn("Error in parsing vendor/product id {}", key);
       return false;
     }
 
@@ -1007,14 +1021,14 @@ static bool load_to_database(int feature, const char* key, const char* value,
     char bdaddr_str[KEY_MAX_LENGTH] = {'\0'};
 
     if (strlen(key) != VALID_SSR_LAT_LEN) {
-      LOG_WARN("ignoring %s due to invalid key for ssr max lat in config file",
-               key);
+      log::warn("ignoring {} due to invalid key for ssr max lat in config file",
+                key);
       return false;
     }
 
     strlcpy(tmp_key, key, KEY_MAX_LENGTH);
     if (!get_addr_maxlat(tmp_key, bdaddr_str, &max_lat)) {
-      LOG_WARN("Error in parsing address and max_lat %s", key);
+      log::warn("Error in parsing address and max_lat {}", key);
       return false;
     }
 
@@ -1022,7 +1036,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
 
     len = (strlen(bdaddr_str) + 1) / 3;
     if (len != 3) {
-      LOG_WARN("Ignoring as invalid entry for Address %s", bdaddr_str);
+      log::warn("Ignoring as invalid entry for Address {}", bdaddr_str);
       return false;
     }
 
@@ -1033,8 +1047,8 @@ static bool load_to_database(int feature, const char* key, const char* value,
     bdstr.append(append_str);
 
     if (!RawAddress::FromString(bdstr, addr)) {
-      LOG_WARN(
-          "key %s or Bluetooth Address %s is invalid, not added to interop "
+      log::warn(
+          "key {} or Bluetooth Address {} is invalid, not added to interop "
           "list",
           key, ADDRESS_TO_LOGGABLE_CSTR(addr));
       return false;
@@ -1052,7 +1066,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
     uint16_t version;
 
     if (strlen(key) != VALID_VERSION_LEN) {
-      LOG_WARN("ignoring %s due to invalid version in config file", key);
+      log::warn("ignoring {} due to invalid version in config file", key);
       return false;
     }
 
@@ -1073,14 +1087,14 @@ static bool load_to_database(int feature, const char* key, const char* value,
     char bdaddr_str[KEY_MAX_LENGTH] = {'\0'};
 
     if (strlen(key) != VALID_LMP_VERSION_LEN) {
-      LOG_WARN("ignoring %s due to invalid key for lmp ver in config file",
-               key);
+      log::warn("ignoring {} due to invalid key for lmp ver in config file",
+                key);
       return false;
     }
 
     strlcpy(tmp_key, key, KEY_MAX_LENGTH);
     if (!get_addr_lmp_ver(tmp_key, bdaddr_str, &lmp_ver, &lmp_sub_ver)) {
-      LOG_WARN("Error in parsing address and lmp_ver %s", key);
+      log::warn("Error in parsing address and lmp_ver {}", key);
       return false;
     }
 
@@ -1088,7 +1102,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
 
     len = (strlen(bdaddr_str) + 1) / 3;
     if (len != 3) {
-      LOG_WARN("Ignoring as invalid entry for Address %s", bdaddr_str);
+      log::warn("Ignoring as invalid entry for Address {}", bdaddr_str);
       return false;
     }
 
@@ -1099,8 +1113,8 @@ static bool load_to_database(int feature, const char* key, const char* value,
     bdstr.append(append_str);
 
     if (!RawAddress::FromString(bdstr, addr)) {
-      LOG_WARN(
-          "key %s or Bluetooth Address %s is invalid, not added to interop "
+      log::warn(
+          "key {} or Bluetooth Address {} is invalid, not added to interop "
           "list",
           key, ADDRESS_TO_LOGGABLE_CSTR(addr));
       return false;
@@ -1121,15 +1135,16 @@ static bool load_to_database(int feature, const char* key, const char* value,
     char tmp_key[KEY_MAX_LENGTH] = {'\0'};
 
     if (strlen(key) != VALID_ADDR_RANGE_LEN) {
-      LOG_WARN("Ignoring as invalid entry for Address range %s", key);
+      log::warn("Ignoring as invalid entry for Address range {}", key);
       return false;
     }
 
     strlcpy(tmp_key, key, VALID_ADDR_RANGE_LEN + 1);
     if (!get_addr_range(tmp_key, &addr_start, &addr_end)) {
-      LOG_WARN("key: %s addr_start %s or addr end  %s is added to interop list",
-               key, ADDRESS_TO_LOGGABLE_CSTR(addr_start),
-               ADDRESS_TO_LOGGABLE_CSTR(addr_end));
+      log::warn(
+          "key: {} addr_start {} or addr end  {} is added to interop list", key,
+          ADDRESS_TO_LOGGABLE_CSTR(addr_start),
+          ADDRESS_TO_LOGGABLE_CSTR(addr_end));
 
       return false;
     }
@@ -1144,7 +1159,7 @@ static bool load_to_database(int feature, const char* key, const char* value,
     interop_database_add_(entry, false);
   }
 
-  LOG_VERBOSE("feature:: %d, key :: %s, value :: %s", feature, key, value);
+  log::verbose("feature:: {}, key :: {}, value :: {}", feature, key, value);
   return true;
 }
 
@@ -1152,7 +1167,7 @@ static void load_config() {
   int init_status = interop_config_init();
 
   if (init_status == -1) {
-    LOG_ERROR("Error in initializing interop static config file");
+    log::error("Error in initializing interop static config file");
     return;
   }
 
@@ -1196,9 +1211,10 @@ static void interop_config_cleanup(void) {
 
 void interop_database_add_addr(const uint16_t feature, const RawAddress* addr,
                                size_t length) {
-  CHECK(addr);
-  CHECK(length > 0);
-  CHECK(length < sizeof(RawAddress));
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
+  log::assert_that(length > 0, "assert failed: length > 0");
+  log::assert_that(length < sizeof(RawAddress),
+                   "assert failed: length < sizeof(RawAddress)");
 
   interop_db_entry_t* entry =
       (interop_db_entry_t*)osi_calloc(sizeof(interop_db_entry_t));
@@ -1211,9 +1227,10 @@ void interop_database_add_addr(const uint16_t feature, const RawAddress* addr,
 }
 
 void interop_database_add_name(const uint16_t feature, const char* name) {
-  CHECK(name);
+  log::assert_that(name != nullptr, "assert failed: name != nullptr");
   const size_t name_length = strlen(name);
-  CHECK(name_length < KEY_MAX_LENGTH);
+  log::assert_that(name_length < KEY_MAX_LENGTH,
+                   "assert failed: name_length < KEY_MAX_LENGTH");
 
   interop_db_entry_t* entry =
       (interop_db_entry_t*)osi_calloc(sizeof(interop_db_entry_t));
@@ -1252,7 +1269,7 @@ void interop_database_add_vndr_prdt(const interop_feature_t feature,
 void interop_database_add_addr_max_lat(const interop_feature_t feature,
                                        const RawAddress* addr,
                                        uint16_t max_lat) {
-  CHECK(addr);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
 
   interop_db_entry_t* entry =
       (interop_db_entry_t*)osi_calloc(sizeof(interop_db_entry_t));
@@ -1279,7 +1296,7 @@ void interop_database_add_addr_lmp_version(const interop_feature_t feature,
                                            const RawAddress* addr,
                                            uint8_t lmp_ver,
                                            uint16_t lmp_sub_ver) {
-  CHECK(addr);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
 
   interop_db_entry_t* entry =
       (interop_db_entry_t*)osi_calloc(sizeof(interop_db_entry_t));
@@ -1304,8 +1321,8 @@ bool interop_database_match_manufacturer(const interop_feature_t feature,
           &entry, NULL,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN(
-        "Device with manufacturer id: %d is a match for interop workaround %s",
+    log::warn(
+        "Device with manufacturer id: {} is a match for interop workaround {}",
         manufacturer, interop_feature_string_(feature));
     return true;
   }
@@ -1316,7 +1333,7 @@ bool interop_database_match_manufacturer(const interop_feature_t feature,
 bool interop_database_match_name(const interop_feature_t feature,
                                  const char* name) {
   char trim_name[KEY_MAX_LENGTH] = {'\0'};
-  CHECK(name);
+  log::assert_that(name != nullptr, "assert failed: name != nullptr");
 
   strlcpy(trim_name, name, KEY_MAX_LENGTH);
   interop_db_entry_t entry;
@@ -1330,8 +1347,8 @@ bool interop_database_match_name(const interop_feature_t feature,
           &entry, NULL,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN("Device with name: %s is a match for interop workaround %s", name,
-             interop_feature_string_(feature));
+    log::warn("Device with name: {} is a match for interop workaround {}", name,
+              interop_feature_string_(feature));
     return true;
   }
 
@@ -1340,7 +1357,7 @@ bool interop_database_match_name(const interop_feature_t feature,
 
 bool interop_database_match_addr(const interop_feature_t feature,
                                  const RawAddress* addr) {
-  CHECK(addr);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
 
   interop_db_entry_t entry;
 
@@ -1353,8 +1370,9 @@ bool interop_database_match_addr(const interop_feature_t feature,
           &entry, NULL,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN("Device %s is a match for interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a match for interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     return true;
   }
 
@@ -1365,8 +1383,9 @@ bool interop_database_match_addr(const interop_feature_t feature,
 
   if (interop_database_match(&entry, NULL,
                              (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC))) {
-    LOG_WARN("Device %s is a match for interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a match for interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     return true;
   }
 
@@ -1386,9 +1405,9 @@ bool interop_database_match_vndr_prdt(const interop_feature_t feature,
           &entry, NULL,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN(
-        "Device with vendor_id: %d product_id: %d is a match for interop "
-        "workaround %s",
+    log::warn(
+        "Device with vendor_id: {} product_id: {} is a match for interop "
+        "workaround {}",
         vendor_id, product_id, interop_feature_string_(feature));
     return true;
   }
@@ -1411,8 +1430,9 @@ bool interop_database_match_addr_get_max_lat(const interop_feature_t feature,
           &entry, &ret_entry,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN("Device %s is a match for interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a match for interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     *max_lat = ret_entry->entry_type.ssr_max_lat_entry.max_lat;
     return true;
   }
@@ -1432,8 +1452,9 @@ bool interop_database_match_version(const interop_feature_t feature,
           &entry, NULL,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN("Device with version: 0x%04x is a match for interop workaround %s",
-             version, interop_feature_string_(feature));
+    log::warn(
+        "Device with version: 0x{:04x} is a match for interop workaround {}",
+        version, interop_feature_string_(feature));
     return true;
   }
 
@@ -1456,8 +1477,9 @@ bool interop_database_match_addr_get_lmp_ver(const interop_feature_t feature,
           &entry, &ret_entry,
           (interop_entry_type)(INTEROP_ENTRY_TYPE_STATIC |
                                INTEROP_ENTRY_TYPE_DYNAMIC))) {
-    LOG_WARN("Device %s is a match for interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a match for interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     *lmp_ver = ret_entry->entry_type.lmp_version_entry.lmp_ver;
     *lmp_sub_ver = ret_entry->entry_type.lmp_version_entry.lmp_sub_ver;
     return true;
@@ -1468,7 +1490,7 @@ bool interop_database_match_addr_get_lmp_ver(const interop_feature_t feature,
 
 bool interop_database_remove_name(const interop_feature_t feature,
                                   const char* name) {
-  CHECK(name);
+  log::assert_that(name != nullptr, "assert failed: name != nullptr");
 
   interop_db_entry_t entry;
 
@@ -1478,8 +1500,8 @@ bool interop_database_remove_name(const interop_feature_t feature,
   entry.entry_type.name_entry.feature = (interop_feature_t)feature;
   entry.entry_type.name_entry.length = strlen(entry.entry_type.name_entry.name);
   if (interop_database_remove_(&entry)) {
-    LOG_WARN("Device with name: %s is removed from interop workaround %s", name,
-             interop_feature_string_(feature));
+    log::warn("Device with name: {} is removed from interop workaround {}",
+              name, interop_feature_string_(feature));
     return true;
   }
 
@@ -1495,8 +1517,8 @@ bool interop_database_remove_manufacturer(const interop_feature_t feature,
   entry.entry_type.mnfr_entry.feature = feature;
   entry.entry_type.mnfr_entry.manufacturer = manufacturer;
   if (interop_database_remove_(&entry)) {
-    LOG_WARN(
-        "Device with manufacturer id: %d is removed from interop workaround %s",
+    log::warn(
+        "Device with manufacturer id: {} is removed from interop workaround {}",
         manufacturer, interop_feature_string_(feature));
     return true;
   }
@@ -1506,7 +1528,7 @@ bool interop_database_remove_manufacturer(const interop_feature_t feature,
 
 bool interop_database_remove_addr(const interop_feature_t feature,
                                   const RawAddress* addr) {
-  CHECK(addr);
+  log::assert_that(addr != nullptr, "assert failed: addr != nullptr");
 
   interop_db_entry_t entry;
 
@@ -1516,8 +1538,9 @@ bool interop_database_remove_addr(const interop_feature_t feature,
   entry.entry_type.addr_entry.feature = (interop_feature_t)feature;
   entry.entry_type.addr_entry.length = sizeof(RawAddress);
   if (interop_database_remove_(&entry)) {
-    LOG_WARN("Device %s is a removed from interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a removed from interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     return true;
   }
 
@@ -1531,7 +1554,7 @@ bool interop_database_remove_feature(const interop_feature_t feature) {
   while (node != list_end(interop_list)) {
     interop_db_entry_t* entry =
         static_cast<interop_db_entry_t*>(list_node(node));
-    CHECK(entry);
+    log::assert_that(entry != nullptr, "assert failed: entry != nullptr");
 
     bool entry_match = false;
     if (entry->bl_entry_type == INTEROP_ENTRY_TYPE_DYNAMIC) {
@@ -1587,7 +1610,7 @@ bool interop_database_remove_feature(const interop_feature_t feature) {
 
   for (const section_t& sec : config_dynamic.get()->sections) {
     if (feature == interop_feature_name_to_feature_id(sec.name.c_str())) {
-      LOG_WARN("found feature - %s", interop_feature_string_(feature));
+      log::warn("found feature - {}", interop_feature_string_(feature));
       interop_config_remove_section(sec.name);
       return true;
     }
@@ -1609,9 +1632,9 @@ bool interop_database_remove_vndr_prdt(const interop_feature_t feature,
   entry.entry_type.vnr_pdt_entry.product_id = product_id;
 
   if (interop_database_remove_(&entry)) {
-    LOG_WARN(
-        "Device with vendor_id: %d product_id: %d is removed from interop "
-        "workaround %s",
+    log::warn(
+        "Device with vendor_id: {} product_id: {} is removed from interop "
+        "workaround {}",
         vendor_id, product_id, interop_feature_string_(feature));
     return true;
   }
@@ -1631,8 +1654,9 @@ bool interop_database_remove_addr_max_lat(const interop_feature_t feature,
   entry.entry_type.ssr_max_lat_entry.max_lat = max_lat;
 
   if (interop_database_remove_(&entry)) {
-    LOG_WARN("Device %s is a removed from interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a removed from interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     return true;
   }
   return false;
@@ -1649,8 +1673,8 @@ bool interop_database_remove_version(const interop_feature_t feature,
   entry.entry_type.version_entry.version = version;
 
   if (interop_database_remove_(&entry)) {
-    LOG_WARN(
-        "Device with version: 0x%04x is removed from interop workaround %s",
+    log::warn(
+        "Device with version: 0x{:04x} is removed from interop workaround {}",
         version, interop_feature_string_(feature));
     return true;
   }
@@ -1672,8 +1696,9 @@ bool interop_database_remove_addr_lmp_version(const interop_feature_t feature,
   entry.entry_type.lmp_version_entry.lmp_sub_ver = lmp_sub_ver;
 
   if (interop_database_remove_(&entry)) {
-    LOG_WARN("Device %s is a removed from interop workaround %s.",
-             ADDRESS_TO_LOGGABLE_CSTR(*addr), interop_feature_string_(feature));
+    log::warn("Device {} is a removed from interop workaround {}.",
+              ADDRESS_TO_LOGGABLE_CSTR(*addr),
+              interop_feature_string_(feature));
     return true;
   }
   return false;
@@ -1690,7 +1715,7 @@ static void interop_database_save_allowlisted_media_players_list(
   for (const section_t& sec : config->sections) {
     if (INTEROP_BROWSE_PLAYER_ALLOW_LIST ==
         interop_feature_name_to_feature_id(sec.name.c_str())) {
-      LOG_WARN("found feature - %s", sec.name.c_str());
+      log::warn("found feature - {}", sec.name);
       for (const entry_t& entry : sec.entries) {
         list_append(media_player_list, (void*)(new std::string(entry.key)));
       }

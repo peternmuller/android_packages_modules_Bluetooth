@@ -28,7 +28,6 @@
 #define LOG_TAG "bt_btif"
 
 #include <android_bluetooth_flags.h>
-#include <base/logging.h>
 #include <bluetooth/log.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bluetooth_headset_interface.h>
@@ -94,7 +93,6 @@
 #include "device/include/esco_parameters.h"
 #include "device/include/interop.h"
 #include "device/include/interop_config.h"
-#include "include/check.h"
 #include "internal_include/bt_target.h"
 #include "main/shim/dumpsys.h"
 #include "os/log.h"
@@ -405,8 +403,8 @@ static bool interface_ready(void) { return bt_hal_cbacks != NULL; }
 void set_hal_cbacks(bt_callbacks_t* callbacks) { bt_hal_cbacks = callbacks; }
 
 static bool is_profile(const char* p1, const char* p2) {
-  CHECK(p1);
-  CHECK(p2);
+  log::assert_that(p1 != nullptr, "assert failed: p1 != nullptr");
+  log::assert_that(p2 != nullptr, "assert failed: p2 != nullptr");
   return strlen(p1) == strlen(p2) && strncmp(p1, p2, strlen(p2)) == 0;
 }
 
@@ -827,7 +825,6 @@ static void dump(int fd, const char** arguments) {
   stack_debug_avdtp_api_dump(fd);
   btif_sock_dump(fd);
   bluetooth::avrcp::AvrcpService::DebugDump(fd);
-  btif_debug_config_dump(fd);
   gatt_tcb_dump(fd);
   bta_gatt_client_dump(fd);
   device_debug_iot_config_dump(fd);
@@ -1253,7 +1250,7 @@ bt_property_t* property_deep_copy_array(int num_properties,
 
     copy = (bt_property_t*)osi_calloc((sizeof(bt_property_t) * num_properties) +
                                       content_len);
-    ASSERT(copy != nullptr);
+    log::assert_that(copy != nullptr, "assert failed: copy != nullptr");
     uint8_t* content = (uint8_t*)(copy + num_properties);
 
     for (int i = 0; i < num_properties; i++) {

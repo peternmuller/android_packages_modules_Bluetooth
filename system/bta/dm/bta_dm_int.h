@@ -25,6 +25,7 @@
 #define BTA_DM_INT_H
 
 #include <base/strings/stringprintf.h>
+#include <bluetooth/log.h>
 
 #include <string>
 #include <vector>
@@ -44,7 +45,12 @@
 
 #define BTA_DM_MSG_LEN 50
 
-#define BTA_DM_NUM_PEER_DEVICE 7
+#define BTA_DM_NUM_PEER_DEVICE MAX_L2CAP_LINKS
+
+/* bond retrial interval (in milliseconds) */
+#ifndef BTA_DM_BOND_TIMER_RETRIAL_MS
+#define BTA_DM_BOND_TIMER_RETRIAL_MS 100
+#endif
 
 typedef enum : uint8_t {
   BTA_DM_NOT_CONNECTED = 0,
@@ -159,9 +165,10 @@ typedef struct {
 
   std::string ToString() const {
     return base::StringPrintf(
-        "peer:%s sys_name:%s app_id:%hhu state:%s new:request:%s",
+        "peer:%s sys_name:%s app_id:%hhu state:%s new_request:%s",
         ADDRESS_TO_LOGGABLE_CSTR(peer_bdaddr), BtaIdSysText(id).c_str(), app_id,
-        bta_sys_conn_status_text(state).c_str(), logbool(new_request).c_str());
+        bta_sys_conn_status_text(state).c_str(),
+        new_request ? "true" : "false");
   }
 
 } tBTA_DM_SRVCS;
@@ -209,19 +216,16 @@ typedef struct {
   tBTA_BLE_ENERGY_INFO_CBACK* p_energy_info_cback;
   bool disabling;
   alarm_t* disable_timer;
+  alarm_t* bond_retrail_timer;
   uint8_t pm_id;
   tBTA_PM_TIMER pm_timer[BTA_DM_NUM_PM_TIMER];
   uint8_t cur_av_count;   /* current AV connecions */
 
-#if (BTA_EIR_CANNED_UUID_LIST != TRUE)
   /* store UUID list for EIR */
   uint32_t eir_uuid[BTM_EIR_SERVICE_ARRAY_SIZE];
 #if (BTA_EIR_SERVER_NUM_CUSTOM_UUID > 0)
   tBTA_CUSTOM_UUID bta_custom_uuid[BTA_EIR_SERVER_NUM_CUSTOM_UUID];
 #endif
-
-#endif
-
   alarm_t* switch_delay_timer;
 } tBTA_DM_CB;
 
@@ -284,6 +288,15 @@ typedef struct {
   uint8_t lmp_version;
 } tBTA_DM_LMP_VER_INFO;
 
+/* data type for tBTA_DM_API_BOND */
+typedef struct {
+  BT_HDR_RIGID hdr;
+  RawAddress bd_addr;
+  tBLE_ADDR_TYPE addr_type;
+  tBT_DEVICE_TYPE device_type;
+  tBT_TRANSPORT transport;
+} tBTA_DM_API_BOND;
+
 extern const uint16_t bta_service_id_to_uuid_lkup_tbl[];
 
 /* For Insight, PM cfg lookup tables are runtime configurable (to allow tweaking
@@ -315,7 +328,6 @@ extern tBTA_DM_DI_CB bta_dm_di_cb;
 void bta_dm_enable(tBTA_DM_SEC_CBACK*, tBTA_DM_ACL_CBACK*);
 void bta_dm_disable();
 void bta_dm_set_dev_name(const std::vector<uint8_t>&);
-void bta_dm_close_acl(const RawAddress&, bool, tBT_TRANSPORT);
 
 void bta_dm_ble_set_conn_params(const RawAddress&, uint16_t, uint16_t, uint16_t,
                                 uint16_t);
@@ -354,5 +366,10 @@ void bta_dm_eir_update_cust_uuid(const tBTA_CUSTOM_UUID &curr, bool adding);
 void bta_dm_ble_subrate_request(const RawAddress& bd_addr, uint16_t subrate_min,
                                 uint16_t subrate_max, uint16_t max_latency,
                                 uint16_t cont_num, uint16_t timeout);
+
+namespace fmt {
+template <>
+struct formatter<tBTA_DM_CONN_STATE> : enum_formatter<tBTA_DM_CONN_STATE> {};
+}  // namespace fmt
 
 #endif /* BTA_DM_INT_H */

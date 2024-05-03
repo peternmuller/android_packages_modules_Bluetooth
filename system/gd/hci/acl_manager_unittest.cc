@@ -344,7 +344,7 @@ class AclManagerWithConnectionTest : public AclManagerWithCallbacksTest {
     MOCK_METHOD1(OnAuthenticationComplete, void(hci::ErrorCode hci_status));
     MOCK_METHOD1(OnEncryptionChange, void(EncryptionEnabled enabled));
     MOCK_METHOD0(OnChangeConnectionLinkKeyComplete, void());
-    MOCK_METHOD1(OnReadClockOffsetComplete, void(uint16_t clock_offse));
+    MOCK_METHOD2(OnReadClockOffsetComplete, void(uint16_t handle, uint16_t clock_offse));
     MOCK_METHOD3(OnModeChange, void(ErrorCode status, Mode current_mode, uint16_t interval));
     MOCK_METHOD5(
         OnSniffSubrating,

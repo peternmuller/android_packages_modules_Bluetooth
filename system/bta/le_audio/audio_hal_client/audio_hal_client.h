@@ -29,9 +29,8 @@ struct LeAudioCodecId {
 };
 
 namespace bluetooth::le_audio {
-/* Represents configuration of audio codec, as exchanged between le audio and
- * phone.
- * It can also be passed to the audio source to configure its parameters.
+/* Represents configuration used to configure the local audio sessions and
+ * the software codecs in case of a software coding sessions.
  */
 
 struct LeAudioCodecConfiguration {
@@ -75,13 +74,13 @@ struct LeAudioCodecConfiguration {
   LeAudioCodecId codec;
 
   /** number of channels */
-  uint8_t num_channels;
+  uint8_t num_channels = 0;
 
   /** sampling rate that the codec expects to receive from audio framework */
-  uint32_t sample_rate;
+  uint32_t sample_rate = 0;
 
   /** bits per sample that codec expects to receive from audio framework */
-  uint8_t bits_per_sample;
+  uint8_t bits_per_sample = 0;
 
   /** Data interval determines how often we send samples to the remote. This
    * should match how often we grab data from audio source, optionally we can
@@ -89,7 +88,7 @@ struct LeAudioCodecConfiguration {
    *
    * Value is provided in us.
    */
-  uint32_t data_interval_us;
+  uint32_t data_interval_us = 0;
 
   /** octets per frame that codec expects to receive from audio framework */
   uint16_t  octets_per_codec_frame;

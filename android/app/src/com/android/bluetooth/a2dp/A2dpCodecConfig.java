@@ -104,9 +104,20 @@ class A2dpCodecConfig {
         // Check whether the codecConfig would change current codec config.
         int prioritizedCodecType = getPrioitizedCodecType(newCodecConfig, selectableCodecs);
         BluetoothCodecConfig currentCodecConfig = codecStatus.getCodecConfig();
+        Log.w(TAG, " setCodecConfigPreference: prioritizedCodecType: " + prioritizedCodecType +
+                " currentCodecConfig.getCodecType(): " + currentCodecConfig.getCodecType() +
+                " newCodecConfig.getCodecType(): " + newCodecConfig.getCodecType() +
+                " newCodecConfig.getSampleRate(): " + newCodecConfig.getSampleRate() +
+                " currentCodecConfig.getSampleRate(): " + currentCodecConfig.getSampleRate() +
+                " newCodecConfig.getCodecSpecific1(): " + newCodecConfig.getCodecSpecific1() +
+                " currentCodecConfig.getCodecSpecific1(): " + currentCodecConfig.
+                                                                        getCodecSpecific1() +
+                " newCodecConfig.getCodecSpecific4(): " + newCodecConfig.getCodecSpecific4() +
+                " currentCodecConfig.getCodecSpecific4(): " + currentCodecConfig.
+                                                                        getCodecSpecific4());
         if (prioritizedCodecType == currentCodecConfig.getCodecType()
-                && (prioritizedCodecType != newCodecConfig.getCodecType()
-                || (currentCodecConfig.similarCodecFeedingParameters(newCodecConfig)
+                && (prioritizedCodecType == newCodecConfig.getCodecType()
+                && (currentCodecConfig.similarCodecFeedingParameters(newCodecConfig)
                 && currentCodecConfig.sameCodecSpecificParameters(newCodecConfig)))) {
             // Same codec with same parameters, no need to send this request to native.
             Log.w(TAG, "setCodecConfigPreference: codec not changed.");

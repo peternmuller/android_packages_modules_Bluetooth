@@ -24,14 +24,15 @@
 #include "common/init_flags.h"
 #include "hci/acl_manager/acl_scheduler.h"
 #include "hci/acl_manager/assembler.h"
+#include "hci/acl_manager/connection_callbacks.h"
+#include "hci/acl_manager/connection_management_callbacks.h"
 #include "hci/acl_manager/round_robin_scheduler.h"
 #include "hci/class_of_device.h"
 #include "hci/controller.h"
 #include "hci/event_checkers.h"
+#include "hci/hci_layer.h"
 #include "hci/remote_name_request.h"
 #include "os/metrics.h"
-#include "security/security_manager_listener.h"
-#include "security/security_module.h"
 
 namespace bluetooth {
 namespace hci {
@@ -49,7 +50,7 @@ struct acl_connection {
   ConnectionManagementCallbacks* connection_management_callbacks_ = nullptr;
 };
 
-struct classic_impl : public security::ISecurityManagerListener {
+struct classic_impl {
   classic_impl(
       HciLayer* hci_layer,
       Controller* controller,
@@ -78,7 +79,6 @@ struct classic_impl : public security::ISecurityManagerListener {
   ~classic_impl() {
     hci_layer_->PutAclConnectionInterface();
     connections.reset();
-    security_manager_.reset();
   }
 
   void on_classic_event(EventView event_packet) {
@@ -184,7 +184,8 @@ struct classic_impl : public security::ISecurityManagerListener {
       if (callbacks != nullptr)
         execute(callbacks);
       else
-        ASSERT_LOG(!crash_on_unknown_handle_, "Received command for unknown handle:0x%x", handle);
+        log::assert_that(
+            !crash_on_unknown_handle_, "Received command for unknown handle:0x{:x}", handle);
       if (remove_afterwards) remove(handle);
     }
     void execute(const Address& address, std::function<void(ConnectionManagementCallbacks* callbacks)> execute) {
@@ -209,7 +210,9 @@ struct classic_impl : public security::ISecurityManagerListener {
           std::piecewise_construct,
           std::forward_as_tuple(handle),
           std::forward_as_tuple(remote_address, queue_end, handler));
-      ASSERT(emplace_pair.second);  // Make sure the connection is unique
+      log::assert_that(
+          emplace_pair.second,
+          "assert failed: emplace_pair.second");  // Make sure the connection is unique
       emplace_pair.first->second.connection_management_callbacks_ = connection_management_callbacks;
     }
     uint16_t HACK_get_handle(const Address& address) const {
@@ -280,7 +283,7 @@ struct classic_impl : public security::ISecurityManagerListener {
     uint16_t clock_offset = 0;
     ClockOffsetValid clock_offset_valid = ClockOffsetValid::INVALID;
     CreateConnectionRoleSwitch allow_role_switch = CreateConnectionRoleSwitch::ALLOW_ROLE_SWITCH;
-    ASSERT(client_callbacks_ != nullptr);
+    log::assert_that(client_callbacks_ != nullptr, "assert failed: client_callbacks_ != nullptr");
     std::unique_ptr<CreateConnectionBuilder> packet = CreateConnectionBuilder::Create(
         address, packet_type, page_scan_repetition_mode, clock_offset, clock_offset_valid, allow_role_switch);
 
@@ -299,12 +302,14 @@ struct classic_impl : public security::ISecurityManagerListener {
   }
 
   void on_create_connection_status(Address address, CommandStatusView status) {
-    ASSERT(status.IsValid());
-    ASSERT(status.GetCommandOpCode() == OpCode::CREATE_CONNECTION);
+    log::assert_that(status.IsValid(), "assert failed: status.IsValid()");
+    log::assert_that(
+        status.GetCommandOpCode() == OpCode::CREATE_CONNECTION,
+        "assert failed: status.GetCommandOpCode() == OpCode::CREATE_CONNECTION");
     if (status.GetStatus() != hci::ErrorCode::SUCCESS /* = pending */) {
       // something went wrong, but unblock queue and report to caller
       log::error("Failed to create connection, reporting failure and continuing");
-      ASSERT(client_callbacks_ != nullptr);
+      log::assert_that(client_callbacks_ != nullptr, "assert failed: client_callbacks_ != nullptr");
       client_handler_->Post(common::BindOnce(
           &ConnectionCallbacks::OnConnectFail,
           common::Unretained(client_callbacks_),
@@ -353,7 +358,7 @@ struct classic_impl : public security::ISecurityManagerListener {
         queue_down_end,
         handler_,
         connection->GetEventCallbacks([this](uint16_t handle) { this->connections.invalidate(handle); }));
-    connections.execute(address, [=](ConnectionManagementCallbacks* callbacks) {
+    connections.execute(address, [=, this](ConnectionManagementCallbacks* callbacks) {
       if (delayed_role_change_ == nullptr) {
         callbacks->OnRoleChange(hci::ErrorCode::SUCCESS, current_role);
       } else if (delayed_role_change_->GetBdAddr() == address) {
@@ -370,7 +375,7 @@ struct classic_impl : public security::ISecurityManagerListener {
 
   void on_connection_complete(EventView packet) {
     ConnectionCompleteView connection_complete = ConnectionCompleteView::Create(packet);
-    ASSERT(connection_complete.IsValid());
+    log::assert_that(connection_complete.IsValid(), "assert failed: connection_complete.IsValid()");
     auto status = connection_complete.GetStatus();
     auto address = connection_complete.GetBdAddr();
 
@@ -393,11 +398,11 @@ struct classic_impl : public security::ISecurityManagerListener {
                 Address address,
                 ErrorCode status,
                 std::string valid_incoming_addresses) {
-              ASSERT_LOG(
+              log::assert_that(
                   status == ErrorCode::UNKNOWN_CONNECTION,
-                  "No prior connection request for %s expecting:%s",
+                  "No prior connection request for {} expecting:{}",
                   ADDRESS_TO_LOGGABLE_CSTR(address),
-                  valid_incoming_addresses.c_str());
+                  valid_incoming_addresses);
               log::warn(
                   "No matching connection to {} ({})",
                   ADDRESS_TO_LOGGABLE_CSTR(address),
@@ -436,7 +441,7 @@ struct classic_impl : public security::ISecurityManagerListener {
     connections.crash_on_unknown_handle_ = false;
     connections.execute(
         handle,
-        [=](ConnectionManagementCallbacks* callbacks) {
+        [=, this](ConnectionManagementCallbacks* callbacks) {
           round_robin_scheduler_->Unregister(handle);
           callbacks->OnDisconnection(reason);
         },
@@ -521,7 +526,7 @@ struct classic_impl : public security::ISecurityManagerListener {
     uint16_t handle = complete_view.GetConnectionHandle();
     connections.execute(handle, [=](ConnectionManagementCallbacks* callbacks) {
       uint16_t clock_offset = complete_view.GetClockOffset();
-      callbacks->OnReadClockOffsetComplete(clock_offset);
+      callbacks->OnReadClockOffsetComplete(handle, clock_offset);
     });
   }
 
@@ -614,7 +619,7 @@ struct classic_impl : public security::ISecurityManagerListener {
   void on_enhanced_flush_complete(EventView packet) {
     auto flush_complete = EnhancedFlushCompleteView::Create(packet);
     if (!flush_complete.IsValid()) {
-      LOG_ERROR("Received an invalid packet");
+      log::error("Received an invalid packet");
       return;
     }
     uint16_t handle = flush_complete.GetConnectionHandle();
@@ -631,7 +636,7 @@ struct classic_impl : public security::ISecurityManagerListener {
 
   void on_read_remote_supported_features_complete(EventView packet) {
     auto view = ReadRemoteSupportedFeaturesCompleteView::Create(packet);
-    ASSERT_LOG(view.IsValid(), "Read remote supported features packet invalid");
+    log::assert_that(view.IsValid(), "Read remote supported features packet invalid");
     uint16_t handle = view.GetConnectionHandle();
     bluetooth::os::LogMetricBluetoothRemoteSupportedFeatures(
         connections.get_address(handle), 0, view.GetLmpFeatures(), handle);
@@ -642,30 +647,13 @@ struct classic_impl : public security::ISecurityManagerListener {
 
   void on_read_remote_extended_features_complete(EventView packet) {
     auto view = ReadRemoteExtendedFeaturesCompleteView::Create(packet);
-    ASSERT_LOG(view.IsValid(), "Read remote extended features packet invalid");
+    log::assert_that(view.IsValid(), "Read remote extended features packet invalid");
     uint16_t handle = view.GetConnectionHandle();
     bluetooth::os::LogMetricBluetoothRemoteSupportedFeatures(
         connections.get_address(handle), view.GetPageNumber(), view.GetExtendedLmpFeatures(), handle);
     connections.execute(handle, [=](ConnectionManagementCallbacks* callbacks) {
       callbacks->OnReadRemoteExtendedFeaturesComplete(
           view.GetPageNumber(), view.GetMaximumPageNumber(), view.GetExtendedLmpFeatures());
-    });
-  }
-
-  void OnEncryptionStateChanged(EncryptionChangeView encryption_change_view) override {
-    if (!encryption_change_view.IsValid()) {
-      log::error("Invalid packet");
-      return;
-    } else if (encryption_change_view.GetStatus() != ErrorCode::SUCCESS) {
-      auto status = encryption_change_view.GetStatus();
-      std::string error_code = ErrorCodeText(status);
-      log::error("error_code {}", error_code);
-      return;
-    }
-    uint16_t handle = encryption_change_view.GetConnectionHandle();
-    connections.execute(handle, [=](ConnectionManagementCallbacks* callbacks) {
-      EncryptionEnabled enabled = encryption_change_view.GetEncryptionEnabled();
-      callbacks->OnEncryptionChange(enabled);
     });
   }
 
@@ -701,13 +689,13 @@ struct classic_impl : public security::ISecurityManagerListener {
 
   void on_link_supervision_timeout_changed(EventView packet) {
     auto view = LinkSupervisionTimeoutChangedView::Create(packet);
-    ASSERT_LOG(view.IsValid(), "Link supervision timeout changed packet invalid");
+    log::assert_that(view.IsValid(), "Link supervision timeout changed packet invalid");
     log::info("UNIMPLEMENTED called");
   }
 
   void on_accept_connection_status(Address address, CommandStatusView status) {
     auto accept_status = AcceptConnectionRequestStatusView::Create(status);
-    ASSERT(accept_status.IsValid());
+    log::assert_that(accept_status.IsValid(), "assert failed: accept_status.IsValid()");
     if (status.GetStatus() != ErrorCode::SUCCESS) {
       cancel_connect(address);
     }
@@ -745,30 +733,21 @@ struct classic_impl : public security::ISecurityManagerListener {
         std::move(builder), handler_->BindOnce(check_status<RejectConnectionRequestStatusView>));
   }
 
-  void OnDeviceBonded(bluetooth::hci::AddressWithType /* device */) override {}
-  void OnDeviceUnbonded(bluetooth::hci::AddressWithType /* device */) override {}
-  void OnDeviceBondFailed(
-      bluetooth::hci::AddressWithType /* device */,
-      security::PairingFailure /* status */) override {}
-
-  void set_security_module(security::SecurityModule* security_module) {
-    security_manager_ = security_module->GetSecurityManager();
-    security_manager_->RegisterCallbackListener(this, handler_);
-  }
-
   uint16_t HACK_get_handle(Address address) {
     return connections.HACK_get_handle(address);
   }
 
   void handle_register_callbacks(ConnectionCallbacks* callbacks, os::Handler* handler) {
-    ASSERT(client_callbacks_ == nullptr);
-    ASSERT(client_handler_ == nullptr);
+    log::assert_that(client_callbacks_ == nullptr, "assert failed: client_callbacks_ == nullptr");
+    log::assert_that(client_handler_ == nullptr, "assert failed: client_handler_ == nullptr");
     client_callbacks_ = callbacks;
     client_handler_ = handler;
   }
 
   void handle_unregister_callbacks(ConnectionCallbacks* callbacks, std::promise<void> promise) {
-    ASSERT_LOG(client_callbacks_ == callbacks, "Registered callback entity is different then unregister request");
+    log::assert_that(
+        client_callbacks_ == callbacks,
+        "Registered callback entity is different then unregister request");
     client_callbacks_ = nullptr;
     client_handler_ = nullptr;
     promise.set_value();
@@ -786,8 +765,6 @@ struct classic_impl : public security::ISecurityManagerListener {
 
   common::Callback<bool(Address, ClassOfDevice)> should_accept_connection_;
   std::unique_ptr<RoleChangeView> delayed_role_change_ = nullptr;
-
-  std::unique_ptr<security::SecurityManager> security_manager_;
 };
 
 }  // namespace acl_manager

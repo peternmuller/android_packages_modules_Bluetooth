@@ -123,6 +123,7 @@ cc_library_static {
         "pan/bta_pan_api.cc",
         "pan/bta_pan_ci.cc",
         "pan/bta_pan_main.cc",
+        "ras/ras_client.cc",
         "ras/ras_server.cc",
         "ras/ras_utils.cc",
         "vc/device.cc",
@@ -188,7 +189,6 @@ cc_library_static {
         "gatt/database_builder.cc",
         "jv/bta_jv_act.cc",
         "jv/bta_jv_api.cc",
-        "jv/bta_jv_cfg.cc",
         "rfcomm/bta_rfcomm_scn.cc",
         "sdp/bta_sdp.cc",
         "sdp/bta_sdp_act.cc",
@@ -367,6 +367,7 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
         "server_configurable_flags",
@@ -410,6 +411,7 @@ cc_test {
         "test/bta_hf_client_security_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "libcutils",
         "liblog",
@@ -589,6 +591,7 @@ cc_test {
         "groups/groups_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
@@ -603,6 +606,7 @@ cc_test {
         "libchrome",
         "libgmock",
         "libosi",
+        "libbase",
     ],
     sanitize: {
         cfi: true,
@@ -635,7 +639,7 @@ cc_test {
     ],
     srcs: [
         ":TestCommonMockFunctions",
-        ":TestMockOsi",
+        ":TestStubOsi",
         "gatt/database.cc",
         "gatt/database_builder.cc",
         "test/common/bta_gatt_api_mock.cc",
@@ -648,6 +652,7 @@ cc_test {
         "vc/vc_test.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
@@ -1230,6 +1235,7 @@ cc_test {
         "test/common/mock_csis_client.cc",
     ],
     shared_libs: [
+        "libbase",
         "libcrypto",
         "liblog",
     ],
@@ -1243,6 +1249,7 @@ cc_test {
         "libbt_shim_ffi",
         "libchrome",
         "libgmock",
+        "libbase",
     ],
     sanitize: {
         cfi: true,

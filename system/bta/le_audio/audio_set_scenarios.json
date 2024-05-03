@@ -37,6 +37,7 @@
                 "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_16_2_1",
                 "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_16_1_Low_Latency",
                 "SingleDev_TwoChanStereoSnk_OneChanMonoSrc_16_1_1",
+                "VND_SingleDev_OneChanStereoSnk_OneChanStereoSrc_32khz_80octs_R8_L30",
                 "SingleDev_OneChanStereoSnk_OneChanStereoSrc_32_2_2",
                 "SingleDev_OneChanStereoSnk_OneChanMonoSrc_32_2_1",
                 "SingleDev_OneChanStereoSnk_OneChanMonoSrc_32_2_Low_Latency",

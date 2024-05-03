@@ -707,6 +707,20 @@ void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode);
 
 /*******************************************************************************
  *
+ * Function          BTA_AvUpdateAptxData
+ *
+ * Description      Update extended Aptx Data to Soc via
+ *                          Vendor Specific Command.
+ *                          Sends Battery level, scan mode and
+ *                          ULL mode info to SoC
+ *
+ * Returns            void
+ *
+ ******************************************************************************/
+void BTA_AvUpdateAptxData(uint32_t data);
+
+/*******************************************************************************
+ *
  * Function         BTA_AvOffloadStart
  *
  * Description      Request Starting of A2DP Offload.
@@ -717,18 +731,6 @@ void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode);
  *
  ******************************************************************************/
 void BTA_AvOffloadStart(tBTA_AV_HNDL hndl);
-
-/*******************************************************************************
- *
- * Function         BTA_AvOffloadStartRsp
- *
- * Description      Response from vendor library indicating response for
- *                  OffloadStart.
- *
- * Returns          void
- *
- ******************************************************************************/
-void BTA_AvOffloadStartRsp(tBTA_AV_HNDL hndl, tBTA_AV_STATUS status);
 
 /**
  * Obtain the Channel Index for a peer.

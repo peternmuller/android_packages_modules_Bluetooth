@@ -21,7 +21,6 @@
 
 #include "client_parser.h"
 
-#include <base/logging.h>
 #include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
 #include <endian.h>
@@ -338,7 +337,7 @@ bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
             }
             return cur_len + conf.codec_config.size();
           }
-          LOG_ERROR("Error parsing codec configuration LTV data.");
+          log::error("Error parsing codec configuration LTV data.");
         }
 
         conf_ents_str << "\t"
