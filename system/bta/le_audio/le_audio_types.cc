@@ -44,28 +44,6 @@ using types::kLeAudioDirectionSink;
 using types::kLeAudioDirectionSource;
 using types::LeAudioCoreCodecConfig;
 
-static uint8_t min_req_devices_cnt(
-    const AudioSetConfiguration* audio_set_conf) {
-  log::assert_that(
-      audio_set_conf->topology_info.has_value(),
-      "No topology info, which is required to properly configure the ASEs");
-  return std::max(audio_set_conf->topology_info->device_count.sink,
-                  audio_set_conf->topology_info->device_count.source);
-}
-
-static uint8_t min_req_devices_cnt(
-    const AudioSetConfigurations* audio_set_confs) {
-  uint8_t curr_min_req_devices_cnt = 0xff;
-
-  for (auto ent : *audio_set_confs) {
-    uint8_t req_devices_cnt = min_req_devices_cnt(ent);
-    if (req_devices_cnt < curr_min_req_devices_cnt)
-      curr_min_req_devices_cnt = req_devices_cnt;
-  }
-
-  return curr_min_req_devices_cnt;
-}
-
 void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
                    types::LeAudioConfigurationStrategy strategy,
                    int avail_group_ase_snk_cnt, int avail_group_ase_src_count,
@@ -128,6 +106,9 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
             out_cis_count_bidir = expected_device_cnt;
             out_cis_count_unidir_sink = expected_device_cnt;
           }
+          /* TODO: Support TWS style device with two source ASEs - two
+           * bidirectional CISes
+           */
         } else {
           if (avail_group_ase_snk_cnt > 0) {
             out_cis_count_unidir_sink = 2 * expected_device_cnt;
@@ -153,31 +134,6 @@ void get_cis_count(LeAudioContextType context_type, int expected_device_cnt,
       "Uni-Directional Source: {}",
       out_cis_count_bidir, out_cis_count_unidir_sink,
       out_cis_count_unidir_source);
-}
-
-bool check_if_may_cover_scenario(const AudioSetConfigurations* audio_set_confs,
-                                 uint8_t group_size) {
-  if (!audio_set_confs) {
-    log::error("no audio requirements for group");
-    return false;
-  }
-
-  return group_size >= min_req_devices_cnt(audio_set_confs);
-}
-
-bool check_if_may_cover_scenario(const AudioSetConfiguration* audio_set_conf,
-                                 uint8_t group_size) {
-  if (!audio_set_conf) {
-    log::error("no audio requirement for group");
-    return false;
-  }
-
-  return group_size >= min_req_devices_cnt(audio_set_conf);
-}
-
-uint8_t get_num_of_devices_in_configuration(
-    const AudioSetConfiguration* audio_set_conf) {
-  return min_req_devices_cnt(audio_set_conf);
 }
 
 uint8_t ConvertLeToLeXContext(const LeAudioContextType& context_type) {
@@ -215,171 +171,6 @@ uint8_t ConvertLeToLeXContext(const LeAudioContextType& context_type) {
       break;
   }
   return lex_context_type;
-}
-
-static bool IsCodecConfigCoreSupported(types::LeAudioContextType context_type,
-                                       const types::LeAudioLtvMap& pacs,
-                                       const std::vector<uint8_t>& pacs_metadata_,
-                                       const types::LeAudioLtvMap& reqs,
-            std::optional<set_configurations::CodecMetadataSetting> vendor_metadata) {
-  auto caps = pacs.GetAsCoreCodecCapabilities();
-  auto config = reqs.GetAsCoreCodecConfig();
-  uint16_t u16_pac_val;
-
-  bool parsed_ok = false;
-  types::LeAudioLtvMap pacs_metadata =
-      types::LeAudioLtvMap::Parse(pacs_metadata_.data(), pacs_metadata_.size(), parsed_ok);
-
-  /* Sampling frequency */
-  if (!caps.HasSupportedSamplingFrequencies() || !config.sampling_frequency) {
-    log::debug("Missing supported sampling frequencies capability");
-    return false;
-  }
-  if (!caps.IsSamplingFrequencyConfigSupported(
-          config.sampling_frequency.value())) {
-    log::debug("Cfg: SamplingFrequency= 0x{:04x}",
-               config.sampling_frequency.value());
-    log::debug("Cap: SupportedSamplingFrequencies= 0x{:04x}",
-               caps.supported_sampling_frequencies.value());
-    log::debug("Sampling frequency not supported");
-    return false;
-  }
-
-  /* Channel counts */
-  if (!caps.IsAudioChannelCountsSupported(
-          config.GetChannelCountPerIsoStream())) {
-    log::debug("Cfg: Allocated channel count= 0x{:04x}",
-               config.GetChannelCountPerIsoStream());
-    log::debug("Cap: Supported channel counts= 0x{:04x}",
-               caps.supported_audio_channel_counts.value_or(1));
-    log::debug("Channel count not supported");
-    return false;
-  }
-
-  /* Frame duration */
-  if (!caps.HasSupportedFrameDurations() || !config.frame_duration) {
-    log::debug("Missing supported frame durations capability");
-    return false;
-  }
-  if (!caps.IsFrameDurationConfigSupported(config.frame_duration.value())) {
-    log::debug("Cfg: FrameDuration= 0x{:04x}", config.frame_duration.value());
-    log::debug("Cap: SupportedFrameDurations= 0x{:04x}",
-               caps.supported_frame_durations.value());
-    log::debug("Frame duration not supported");
-    return false;
-  }
-
-  /* Octets per frame */
-  if (!caps.HasSupportedOctetsPerCodecFrame() ||
-      !config.octets_per_codec_frame) {
-    log::debug("Missing supported octets per codec frame");
-    return false;
-  }
-  if (!caps.IsOctetsPerCodecFrameConfigSupported(
-          config.octets_per_codec_frame.value())) {
-    log::debug("Cfg: Octets per frame={}",
-               config.octets_per_codec_frame.value());
-    log::debug("Cap: Min octets per frame={}",
-               caps.supported_min_octets_per_codec_frame.value());
-    log::debug("Cap: Max octets per frame={}",
-               caps.supported_max_octets_per_codec_frame.value());
-    log::debug("Octets per codec frame outside the capabilities");
-    return false;
-  }
-
-  if (!bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
-    if (vendor_metadata.value().vs_metadata.empty()) {
-      log::debug("Multicodec support disabled, LC3 codec config matched");
-      return true;
-    } else {
-      log::debug("Multicodec support disabled, disallow LC3Q codec config match");
-      return false;
-    }
-  }
-
-  /* below logic is for LC3Q match */
-  auto pac_vendor_metadata = pacs_metadata.Find(types::kLeAudioVendorSpecific);
-  std::vector<uint8_t> pac_vndr_metadata;
-  pac_vndr_metadata = pac_vendor_metadata.value_or(std::vector<uint8_t>(0x00));
-  if (pac_vendor_metadata.has_value()) {
-    uint16_t pac_company_id = VEC_UINT8_TO_UINT16(pac_vndr_metadata);
-    uint8_t pac_metadata_type = pac_vendor_metadata.value()[3];
-    if (pac_metadata_type == types::qcom_codec_metadata::kLeAudioCodecLC3QSupportedFeaturesMetadataType
-        && pac_company_id == types::kLeAudioVendorCompanyIdQualcomm) {
-      log::debug("Context checks for LC3Q codecs types only");
-      auto pac_preferred_audio_context =
-          pacs_metadata.Find(types::kLeAudioMetadataTypePreferredAudioContext);
-      u16_pac_val = VEC_UINT8_TO_UINT16(pac_preferred_audio_context.value());
-      types::AudioContexts pac_preferred_context = types::AudioContexts(u16_pac_val);
-
-      log::debug("Preferred Audio context: {}", pac_preferred_context.to_string());
-      log::debug("Requested context: {}", ToHexString(context_type));
-
-      if (context_type != LeAudioContextType::UNSPECIFIED &&
-          !pac_preferred_context.test(context_type)) {
-        log::debug("Current requested context {} not part of Preferred Audio context: {}", ToHexString(context_type), pac_preferred_context.to_string());
-        return false;
-      }
-    }
-  }
-
-  /* codec metadata negotiated against PACS Vendor metadata and local Codec metadata cfg in JSON*/
-  if (!vendor_metadata.value().vs_metadata.empty() && pac_vendor_metadata.has_value()) {
-    std::vector<uint8_t> pac_vndr_metadata;
-    pac_vndr_metadata = pac_vendor_metadata.value_or(std::vector<uint8_t>(0x00));
-    std::vector<uint8_t> req_metadata;
-    req_metadata.assign(vendor_metadata.value().vs_metadata.begin(),
-                        vendor_metadata.value().vs_metadata.end());
-    uint16_t pac_company_id = VEC_UINT8_TO_UINT16(pac_vndr_metadata);
-    uint16_t req_company_id = vendor_metadata.value().vendor_company_id;
-    if (pac_company_id != req_company_id) {
-      log::debug("Company ID mismatch, as per pac record {} != requested {}", pac_company_id, req_company_id);
-      return false;
-    }
-
-    uint8_t pac_metadata_len = pac_vendor_metadata.value()[2];
-    uint8_t req_metadata_len = vendor_metadata.value().vs_metadata.size() + 1; //1 for metadata type;
-    if (pac_metadata_len != req_metadata_len) {
-      log::debug("Vendor Metadata length mismatch, as per pac record {} != requested {}", pac_metadata_len, req_metadata_len);
-      return false;
-    }
-
-    if (pac_company_id == types::kLeAudioVendorCompanyIdQualcomm &&
-        pac_metadata_len != types::qcom_codec_metadata::kLeAudioCodecLC3QSupportedFeaturesMetadataLen) {
-      log::debug("Invalid Metadata length");
-      return false;
-    }
-
-    uint8_t pac_metadata_type = pac_vendor_metadata.value()[3];
-    uint8_t req_metadata_type = vendor_metadata.value().vendor_metadata_type;
-    if (pac_metadata_type != req_metadata_type) {
-      log::debug("Vendor Metadata type mismatch, as per pac record {} != requested {}", pac_metadata_type, req_metadata_type);
-      return false;
-    }
-
-    if (pac_company_id == types::kLeAudioVendorCompanyIdQualcomm &&
-        pac_metadata_type != types::qcom_codec_metadata::kLeAudioCodecLC3QSupportedFeaturesMetadataType) {
-      log::debug("Invalid Metadata length");
-      return false;
-    }
-
-    uint8_t pac_decoder_version = pac_vendor_metadata.value()[5];
-    uint8_t req_encoder_version = req_metadata[0];
-    if (pac_decoder_version < req_encoder_version) {
-      log::debug("Encoder version cfg couldn't be negotiated as corresponding peer decoder couldn't be matched as pac_decoder_version {} < req_encoder_version {}", pac_decoder_version, req_encoder_version);
-      return false;
-    }
-
-    uint8_t pac_encoder_version = pac_vendor_metadata.value()[4];
-    uint8_t req_decoder_version = req_metadata[1];
-    if (pac_encoder_version < req_decoder_version) {
-      log::debug("Decoder version cfg couldn't be negotiated as corresponding peer encoder couldn't be matched as pac_encoder_version {} < req_decoder_version {}", pac_encoder_version, req_encoder_version);
-      return false;
-    }
-  }
-
-  log::debug("Cfg Match found against PAC capabilities");
-  return true;
 }
 
 static bool IsCodecConfigurationSupportedVendorAptxLe(types::LeAudioContextType context_type,
@@ -725,55 +516,6 @@ static bool IsCodecConfigurationSupportedVendorAptxLeX(types::LeAudioContextType
 
   log::debug("APTX_LEX codec config matched");
   return true;
-}
-
-bool IsCodecConfigSettingSupported(types::LeAudioContextType context_type,
-    const acs_ac_record& pac, const CodecConfigSetting& codec_config_setting,
-    std::optional<CodecMetadataSetting> vendor_metadata) {
-  const auto& codec_id = codec_config_setting.id;
-  auto cm = CodecManager::GetInstance();
-
-  if (codec_id != pac.codec_id) return false;
-
-  log::debug(": Settings for format: 0x{:02x}", codec_id.coding_format);
-
-  if (utils::IsCodecUsingLtvFormat(codec_id)) {
-    switch (codec_id.coding_format) {
-      case kLeAudioCodingFormatLC3:
-        return IsCodecConfigCoreSupported(context_type, pac.codec_spec_caps, pac.metadata,
-            codec_config_setting.params, vendor_metadata);
-      case types::kLeAudioCodingFormatVendorSpecific:
-        if (!bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
-          log::debug(" Multicodec support disabled, disallow vendor codecs for negotiation");
-          return false;
-        }
-        if (codec_id.vendor_company_id != pac.codec_id.vendor_company_id)
-          return false;
-        if (codec_id != pac.codec_id)
-          return false;
-        switch (codec_id.vendor_company_id) {
-          case types::kLeAudioVendorCompanyIdQualcomm:
-            switch (codec_id.vendor_codec_id) {
-              case types::kLeAudioCodingFormatAptxLe:
-                return cm->IsAptxAdaptiveLeSupported() && IsCodecConfigurationSupportedVendorAptxLe(
-                    context_type, pac.codec_spec_caps, pac.metadata, codec_config_setting.params, vendor_metadata);
-              case types::kLeAudioCodingFormatAptxLeX:
-                return cm->IsAptxAdaptiveLeXSupported() && IsCodecConfigurationSupportedVendorAptxLeX(
-                    context_type, pac.codec_spec_caps, pac.metadata, codec_config_setting.params, vendor_metadata);
-              default:
-                return false;
-            }
-          default:
-            return false;
-        }
-      default:
-        return false;
-    }
-  }
-
-  log::error("Codec {}, seems to be not supported here.",
-             bluetooth::common::ToString(codec_id));
-  return false;
 }
 
 uint32_t CodecConfigSetting::GetSamplingFrequencyHz() const {

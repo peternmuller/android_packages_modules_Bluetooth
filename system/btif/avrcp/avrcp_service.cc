@@ -28,6 +28,8 @@
 #include "btif_av.h"
 #include "btif_common.h"
 #include "device.h"
+#include "osi/include/osi.h"
+#include "stack/include/a2dp_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/main_thread.h"
@@ -53,6 +55,28 @@ class A2dpInterfaceImpl : public A2dpInterface {
   bool is_peer_in_silence_mode(const RawAddress& peer_address) override {
     return btif_av_is_peer_silenced(peer_address);
   }
+
+  void connect_audio_sink_delayed(uint8_t handle,
+                                  const RawAddress& peer_address) override {
+    btif_av_connect_sink_delayed(handle, peer_address);
+  }
+
+  uint16_t find_audio_sink_service(const RawAddress& peer_address,
+                                   tA2DP_FIND_CBACK p_cback) override {
+    uint16_t attr_list[] = {ATTR_ID_SERVICE_CLASS_ID_LIST,
+                            ATTR_ID_BT_PROFILE_DESC_LIST,
+                            ATTR_ID_SUPPORTED_FEATURES};
+
+    tA2DP_SDP_DB_PARAMS db_params = {
+        .db_len = BT_DEFAULT_BUFFER_SIZE,
+        .num_attr = ARRAY_SIZE(attr_list),
+        .p_attrs = attr_list,
+    };
+
+    return A2DP_FindService(UUID_SERVCLASS_AUDIO_SINK, peer_address, &db_params,
+                            p_cback);
+  }
+
 } a2dp_interface_;
 
 class AvrcpInterfaceImpl : public AvrcpInterface {
@@ -492,20 +516,19 @@ ServiceInterface* AvrcpService::GetServiceInterface() {
 }
 
 void AvrcpService::ConnectDevice(const RawAddress& bdaddr) {
-  log::info("address={}", ADDRESS_TO_LOGGABLE_STR(bdaddr));
+  log::info("address={}", bdaddr);
 
   connection_handler_->ConnectDevice(bdaddr);
 }
 
 void AvrcpService::DisconnectDevice(const RawAddress& bdaddr) {
-  log::info("address={}", ADDRESS_TO_LOGGABLE_STR(bdaddr));
+  log::info("address={}", bdaddr);
   connection_handler_->DisconnectDevice(bdaddr);
 }
 
 void AvrcpService::SetBipClientStatus(const RawAddress& bdaddr,
                                       bool connected) {
-  log::info("address={}, connected={}", ADDRESS_TO_LOGGABLE_STR(bdaddr),
-            connected);
+  log::info("address={}, connected={}", bdaddr, connected);
   connection_handler_->SetBipClientStatus(bdaddr, connected);
 }
 
@@ -639,6 +662,27 @@ bool AvrcpService::ServiceInterfaceImpl::DisconnectDevice(
   return true;
 }
 
+bool AvrcpService::IsDeviceConnected(const RawAddress& bdaddr) {
+  if (instance_ == nullptr) {
+    log::warn("AVRCP Target Service not started");
+    return false;
+  }
+
+  auto handler = instance_->connection_handler_;
+  if (handler == nullptr) {
+    log::warn("AVRCP connection handler is null");
+    return false;
+  }
+
+  for (const auto& device : handler->GetListOfDevices()) {
+    if (bdaddr == device->GetAddress()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void AvrcpService::ServiceInterfaceImpl::SetBipClientStatus(
     const RawAddress& bdaddr, bool connected) {
   std::lock_guard<std::mutex> lock(service_interface_lock_);
@@ -690,7 +734,7 @@ void AvrcpService::DebugDump(int fd) {
 /** when a2dp connected, btif will start register vol changed, so we need a
  * interface for it. */
 void AvrcpService::RegisterVolChanged(const RawAddress& bdaddr) {
-  log::info(": address={}", ADDRESS_TO_LOGGABLE_STR(bdaddr));
+  log::info(": address={}", bdaddr);
 
   connection_handler_->RegisterVolChanged(bdaddr);
 }

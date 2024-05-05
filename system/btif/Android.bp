@@ -640,9 +640,6 @@ cc_test {
         "libprotobuf-cpp-lite",
         "libstatslog_bt",
     ],
-    cflags: [
-        "-Wno-unused-parameter",
-    ],
     target: {
         android: {
             static_libs: [
@@ -762,9 +759,6 @@ cc_test {
         "libgmock",
         "libprotobuf-cpp-lite",
         "libstatslog_bt",
-    ],
-    cflags: [
-        "-Wno-unused-parameter",
     ],
     target: {
         android: {
