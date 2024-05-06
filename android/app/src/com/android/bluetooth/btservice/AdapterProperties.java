@@ -1265,6 +1265,13 @@ class AdapterProperties {
         return options.toBundle();
     }
 
+    /**
+     * @return the mVersSupported
+     */
+    int getVendorCapVersion() {
+        return mVersSupported;
+    }
+
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     protected void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
         writer.println(TAG);

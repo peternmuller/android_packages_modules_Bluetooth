@@ -773,11 +773,11 @@ static void btif_get_remote_version(const RawAddress& bd_addr,
   uint8_t tmp_lmp_ver = 0;
   uint16_t tmp_manufacturer = 0;
   uint16_t tmp_lmp_subver = 0;
-  tBTM_STATUS status;
+  bool status;
 
   status = BTM_ReadRemoteVersion(bd_addr, &tmp_lmp_ver, &tmp_manufacturer,
                                  &tmp_lmp_subver);
-  if (status == BTM_SUCCESS &&
+  if (status &&
       (tmp_lmp_ver || tmp_manufacturer || tmp_lmp_subver)) {
     lmp_version = tmp_lmp_ver;
     manufacturer = tmp_manufacturer;

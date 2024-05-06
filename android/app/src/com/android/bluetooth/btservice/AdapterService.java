@@ -6205,6 +6205,10 @@ public class AdapterService extends Service {
         return mRemoteDevices;
     }
 
+    public int getVendorCapVersion() {
+        return mAdapterProperties.getVendorCapVersion();
+    }
+
     @Override
     protected void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
         if (args.length == 0) {
