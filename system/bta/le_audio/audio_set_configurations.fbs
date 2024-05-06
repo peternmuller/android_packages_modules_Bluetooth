@@ -64,10 +64,9 @@ enum CodecSpecificVendorMetadataLtvTypes : byte {
     QCOM_APTX_LE_SUPPORTED_FEATURES = 0x11,
 }
 table AudioSetSubConfiguration {
-    device_cnt: ubyte;
+    ase_channel_cnt: ubyte;
     ase_cnt: ubyte;
     direction: AudioSetConfigurationDirection = SINK;
-    configuration_strategy: AudioSetConfigurationStrategy;
     max_sdu: ushort;
     iso_interval: ushort;
     codec_id : CodecId (required);
