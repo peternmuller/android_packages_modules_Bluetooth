@@ -196,7 +196,7 @@ static auto PrepareStackPacRecord(
       {.codec_id = codec_id,
        .codec_spec_caps = ltv_map,
        .codec_spec_caps_raw = ltv_map.RawPacket(),
-       .metadata = PrepareStackMetadataLtv().RawPacket()});
+       .metadata = PrepareStackMetadataLtv()});
 }
 
 std::pair<aidl::android::hardware::bluetooth::audio::IBluetoothAudioProvider::
@@ -831,7 +831,7 @@ TEST(BluetoothAudioClientInterfaceAidlTest,
   ::bluetooth::le_audio::types::LeAudioLtvMap metadata_ltvs =
       test_utils::PrepareStackMetadataLtv();
   auto aidl_metadata =
-      GetAidlMetadataFromStackFormat(metadata_ltvs.RawPacket());
+      GetAidlMetadataFromStackFormat(metadata_ltvs);
   ASSERT_TRUE(aidl_metadata.has_value());
 
   /* Only kLeAudioMetadataTypePreferredAudioContext,

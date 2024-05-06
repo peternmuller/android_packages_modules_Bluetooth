@@ -1510,7 +1510,8 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
                                : device->src_pacs_;
         const struct types::acs_ac_record* pac = NULL;
         if (utils::IsCodecUsingLtvFormat(ent.codec.id) &&
-            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec, ent.vendor_metadata))) {
+            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec,
+            ent.vendor_metadata, requirements.audio_context_type))) {
           log::debug(
               "Insufficient PAC for {}",
               direction == types::kLeAudioDirectionSink ? "sink" : "source");
@@ -2207,16 +2208,13 @@ void LeAudioDeviceGroup::Dump(int fd, int active_group_id) const {
 }
 
 void LeAudioDeviceGroup::PopulateVendorMetadatabyDirection(LeAudioContextType context_type,
-                                       uint8_t direction, std::vector<uint8_t> pac_metadata,
+                                       uint8_t direction, types::LeAudioLtvMap pacs_metadata,
                                        const set_configurations::AseConfiguration& conf) const {
   std::vector<uint8_t> vendor_metadata;
-  bool parsed_ok = false;
-  auto pacs_metadata =
-      types::LeAudioLtvMap::Parse(pac_metadata.data(), pac_metadata.size(), parsed_ok);
-  auto vndr_metadata = pacs_metadata.Find(types::kLeAudioVendorSpecific);
-  if (vndr_metadata != std::nullopt && parsed_ok && !conf.vendor_metadata->vs_metadata.empty()) {
+  auto vndr_metadata = pacs_metadata.Find(types::kLeAudioMetadataTypeVendorSpecific);
+  if (vndr_metadata != std::nullopt && !conf.vendor_metadata->vs_metadata.empty()) {
     vendor_metadata = vndr_metadata.value();
-    vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioVendorSpecific);
+    vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioMetadataTypeVendorSpecific);
     vendor_metadata.insert(vendor_metadata.begin(), vendor_metadata.size() + 1);
     if (conf.codec.id.coding_format == types::kLeAudioCodingFormatLC3) {
       auto encoder_version_dut = conf.vendor_metadata->vs_metadata[0];
@@ -2228,7 +2226,7 @@ void LeAudioDeviceGroup::PopulateVendorMetadatabyDirection(LeAudioContextType co
       negotiated_decoder_version = std::min(decoder_version_dut, encoder_version_peer);
       vendor_metadata[6] = negotiated_encoder_version;
       vendor_metadata[7] = negotiated_decoder_version;
-    } else if (conf.codec.id.coding_format == types::kLeAudioVendorSpecific) {
+    } else if (conf.codec.id.coding_format == types::kLeAudioCodingFormatVendorSpecific) {
       if ((conf.codec.id.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm) &&
           ((conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
           (conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {

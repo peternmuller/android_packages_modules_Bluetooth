@@ -3383,7 +3383,7 @@ class LeAudioClientImpl : public LeAudioClient {
               : leAudioDevice->src_pacs_;
       for (const auto& ent : stream_conf->conf->confs.get(direction)) {
         if (!bluetooth::le_audio::utils::GetConfigurationSupportedPac(
-                pacs, ent.codec, ent.vendor_metadata)) {
+                pacs, ent.codec, ent.vendor_metadata, configuration_context_type_)) {
           log::info("Configuration is not supported by device {}",
                     leAudioDevice->address_);
 

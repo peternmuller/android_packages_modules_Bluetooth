@@ -353,9 +353,6 @@ constexpr uint8_t kLeAudioMetadataLenLen = 1;
 
 constexpr uint8_t kLeAudioMetadataStreamingAudioContextLen = 2;
 
-/* Vendor Specific Metadata LTV Types */
-constexpr uint8_t kLeAudioVendorSpecific = 0xFF;
-
 namespace qcom_codec_metadata {
 constexpr uint8_t kLeAudioCodecLC3QSupportedFeaturesMetadataType = 0x10;
 constexpr uint8_t kLeAudioCodecAptxLeSupportedFeaturesMetadataType = 0x11;
@@ -1316,7 +1313,7 @@ struct acs_ac_record {
   LeAudioCodecId codec_id;
   LeAudioLtvMap codec_spec_caps;
   std::vector<uint8_t> codec_spec_caps_raw;
-  std::vector<uint8_t> metadata;
+  LeAudioLtvMap metadata;
 };
 
 using PublishedAudioCapabilities =
