@@ -1774,6 +1774,16 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationAvailable(
   return GetConfiguration(group_context_type) != nullptr;
 }
 
+bool LeAudioDeviceGroup::IsLeXDevice(void) const {
+  for (auto* leAudioDevice = GetFirstActiveDevice(); leAudioDevice;
+       leAudioDevice = GetNextActiveDevice(leAudioDevice)) {
+    if (leAudioDevice->isLeXDevice())
+      return true;
+  }
+
+  return false;
+}
+
 bool LeAudioDeviceGroup::IsMetadataChanged(
     const BidirectionalPair<AudioContexts>& context_types,
     const BidirectionalPair<std::vector<uint8_t>>& ccid_lists) const {

@@ -821,23 +821,8 @@ struct iso_impl {
     }
   }
 
-  void process_param_report(uint16_t packet_len, uint8_t* packet) {
-    uint16_t delay;
-    uint8_t mode;
-    log::assert_that(vsc_callback_ != nullptr, "Invalid VSC callback");
-    STREAM_TO_UINT16(delay, packet);
-    STREAM_TO_UINT8(mode, packet);
+  void on_vs_codec_settings_event(uint8_t mode, uint16_t delay) {
     vsc_callback_->OnVscEvent(delay, mode);
-  }
-
-  void on_vsc_event(uint8_t code, uint8_t* packet, uint16_t packet_len) {
-    switch (code) {
-      case HCI_VSE_SUBCODE_PARAMS_REPORT:
-        process_param_report(packet_len, packet);
-        break;
-      default:
-        log::error("Unhandled event code {}", code);
-    }
   }
 
   void handle_iso_data(BT_HDR* p_msg) {

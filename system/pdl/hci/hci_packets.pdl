@@ -923,7 +923,6 @@ enum SubeventCode : 8 {
 
 // Vendor specific events
 enum VseSubeventCode : 8 {
-  QBCE_VS_PARAM_REPORT_EVENT = 0x12,
   QBCE_VS_EVENT = 0x51,
   BLE_THRESHOLD = 0x54,
   BLE_STCHANGE = 0x55,
