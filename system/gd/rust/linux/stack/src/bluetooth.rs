@@ -156,7 +156,7 @@ pub trait IBluetooth {
     fn get_discovery_end_millis(&self) -> u64;
 
     /// Initiates pairing to a remote device. Triggers connection if not already started.
-    fn create_bond(&mut self, device: BluetoothDevice, transport: BtTransport) -> bool;
+    fn create_bond(&mut self, device: BluetoothDevice, transport: BtTransport) -> BtStatus;
 
     /// Cancels any pending bond attempt on given device.
     fn cancel_bond_process(&mut self, device: BluetoothDevice) -> bool;
@@ -237,7 +237,7 @@ pub trait IBluetooth {
     fn remove_sdp_record(&self, handle: i32) -> bool;
 
     /// Connect all profiles supported by device and enabled on adapter.
-    fn connect_all_enabled_profiles(&mut self, device: BluetoothDevice) -> bool;
+    fn connect_all_enabled_profiles(&mut self, device: BluetoothDevice) -> BtStatus;
 
     /// Disconnect all profiles supported by device and enabled on adapter.
     /// Note that it includes all custom profiles enabled by the users e.g. through SocketManager or
@@ -1246,8 +1246,6 @@ pub(crate) trait BtifBluetoothCallbacks {
     fn ssp_request(
         &mut self,
         remote_addr: RawAddress,
-        remote_name: String,
-        cod: u32,
         variant: BtSspVariant,
         passkey: u32,
     ) {
@@ -1614,8 +1612,6 @@ impl BtifBluetoothCallbacks for Bluetooth {
     fn ssp_request(
         &mut self,
         remote_addr: RawAddress,
-        remote_name: String,
-        cod: u32,
         variant: BtSspVariant,
         passkey: u32,
     ) {
@@ -1623,7 +1619,7 @@ impl BtifBluetoothCallbacks for Bluetooth {
         if variant == BtSspVariant::Consent {
             let initiated_by_us = Some(remote_addr.clone()) == self.active_pairing_address;
             self.set_pairing_confirmation(
-                BluetoothDevice::new(remote_addr.to_string(), remote_name.clone()),
+                BluetoothDevice::new(remote_addr.to_string(), "".to_string()),
                 initiated_by_us,
             );
             return;
@@ -1632,9 +1628,13 @@ impl BtifBluetoothCallbacks for Bluetooth {
         // Currently this supports many agent because we accept many callbacks.
         // TODO(b/274706838): We need a way to select the default agent.
         self.callbacks.for_all_callbacks(|callback| {
+            // TODO(b/336960912): libbluetooth changed their API so that we no longer
+            // get the Device name and CoD, which were included in our DBus API.
+            // Now we simply put random values since we aren't ready to change our DBus API
+            // and it works because our Clients are not using these anyway.
             callback.on_ssp_request(
-                BluetoothDevice::new(remote_addr.to_string(), remote_name.clone()),
-                cod,
+                BluetoothDevice::new(remote_addr.to_string(), "".to_string()),
+                0,
                 variant.clone(),
                 passkey,
             );
@@ -2279,7 +2279,7 @@ impl IBluetooth for Bluetooth {
         }
     }
 
-    fn create_bond(&mut self, device: BluetoothDevice, transport: BtTransport) -> bool {
+    fn create_bond(&mut self, device: BluetoothDevice, transport: BtTransport) -> BtStatus {
         let addr = RawAddress::from_string(device.address.clone());
 
         if addr.is_none() {
@@ -2292,7 +2292,7 @@ impl IBluetooth for Bluetooth {
                 0,
             );
             warn!("Can't create bond. Address {} is not valid", device.address);
-            return false;
+            return BtStatus::InvalidParam;
         }
 
         let address = addr.unwrap();
@@ -2308,7 +2308,7 @@ impl IBluetooth for Bluetooth {
                 DisplayAddress(&address),
                 DisplayAddress(&active_address)
             );
-            return false;
+            return BtStatus::Busy;
         }
 
         // There could be a race between bond complete and bond cancel, which makes
@@ -2335,7 +2335,7 @@ impl IBluetooth for Bluetooth {
                 BtBondState::NotBonded,
                 0,
             );
-            return false;
+            return BtStatus::from(status as u32);
         }
 
         // Creating bond automatically create ACL connection as well, therefore also log metrics
@@ -2347,7 +2347,7 @@ impl IBluetooth for Bluetooth {
             metrics::acl_connect_attempt(address, BtAclState::Connected);
         }
 
-        return true;
+        return BtStatus::Success;
     }
 
     fn cancel_bond_process(&mut self, device: BluetoothDevice) -> bool {
@@ -2691,17 +2691,17 @@ impl IBluetooth for Bluetooth {
         self.sdp.as_ref().unwrap().remove_sdp_record(handle) == BtStatus::Success
     }
 
-    fn connect_all_enabled_profiles(&mut self, device: BluetoothDevice) -> bool {
+    fn connect_all_enabled_profiles(&mut self, device: BluetoothDevice) -> BtStatus {
         // Profile init must be complete before this api is callable
         if !self.profiles_ready {
-            return false;
+            return BtStatus::NotReady;
         }
 
         let mut addr = match RawAddress::from_string(device.address.clone()) {
             Some(v) => v,
             None => {
                 warn!("Can't connect profiles on invalid address [{}]", &device.address);
-                return false;
+                return BtStatus::InvalidParam;
             }
         };
 
@@ -2773,7 +2773,7 @@ impl IBluetooth for Bluetooth {
                                 let transport =
                                     match self.get_remote_device_if_found(&device.address) {
                                         Some(context) => context.acl_reported_transport,
-                                        None => return false,
+                                        None => return BtStatus::RemoteDeviceDown,
                                     };
                                 let device_to_send = device.clone();
                                 let transport = match self.get_remote_type(device.clone()) {
@@ -2821,7 +2821,7 @@ impl IBluetooth for Bluetooth {
             self.resume_discovery();
         }
 
-        return true;
+        return BtStatus::Success;
     }
 
     fn disconnect_all_enabled_profiles(&mut self, device: BluetoothDevice) -> bool {

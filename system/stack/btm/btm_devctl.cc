@@ -555,12 +555,9 @@ void btm_vendor_specific_evt(const uint8_t* p, uint8_t evt_len) {
 
         uint8_t i;
         std::vector<uint8_t> reconstructed_event;
-        reconstructed_event.reserve(4 + bqr_parameter_length);
-        reconstructed_event[0] = HCI_VENDOR_SPECIFIC_EVT;
-        reconstructed_event[1] = 3 + bqr_parameter_length;  // event size
-        reconstructed_event[2] = HCI_VSE_SUBCODE_BQR_SUB_EVT;
+        reconstructed_event.push_back(HCI_VSE_SUBCODE_BQR_SUB_EVT);
         for (i = 0; i < bqr_parameter_length; i++) {
-          reconstructed_event.emplace_back(p[i]);
+          reconstructed_event.push_back(p[i]);
         }
 
   for (i = 0; i < BTM_MAX_VSE_CALLBACKS; i++) {
@@ -669,7 +666,7 @@ tBTM_STATUS BTM_DeleteStoredLinkKey(const RawAddress* bd_addr,
   bool delete_all_flag = !bd_addr;
 
   log::verbose("BTM: BTM_DeleteStoredLinkKey: delete_all_flag: {}",
-               delete_all_flag ? "true" : "false");
+               delete_all_flag);
 
   btm_sec_cb.devcb.p_stored_link_key_cmpl_cb = p_cb;
   if (!bd_addr) {

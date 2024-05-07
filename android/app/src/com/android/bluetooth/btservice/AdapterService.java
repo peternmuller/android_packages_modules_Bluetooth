@@ -324,6 +324,8 @@ public class AdapterService extends Service {
 
     private volatile boolean mTestModeEnabled = false;
 
+    private MetricsLogger mMetricsLogger;
+
     /** Handlers for incoming service calls */
     private AdapterServiceBinder mBinder;
 
@@ -644,6 +646,7 @@ public class AdapterService extends Service {
     private void init() {
         Log.d(TAG, "init()");
         Config.init(this);
+        initMetricsLogger();
         mDeviceConfigListener.start();
 
         if (!Flags.fastBindToApp()) {
@@ -816,6 +819,23 @@ public class AdapterService extends Service {
         return mSilenceDeviceManager;
     }
 
+    private boolean initMetricsLogger() {
+        if (mMetricsLogger != null) {
+            return false;
+        }
+        mMetricsLogger = MetricsLogger.getInstance();
+        return mMetricsLogger.init(this);
+    }
+
+    private boolean closeMetricsLogger() {
+        if (mMetricsLogger == null) {
+            return false;
+        }
+        boolean result = mMetricsLogger.close();
+        mMetricsLogger = null;
+        return result;
+    }
+
     /**
      * Log L2CAP CoC Server Connection Metrics
      *
@@ -866,6 +886,10 @@ public class AdapterService extends Service {
                 appUid,
                 socketCreationLatencyMillis,
                 socketAcceptanceLatencyMillis);
+    }
+
+    public void setMetricsLogger(MetricsLogger metricsLogger) {
+        mMetricsLogger = metricsLogger;
     }
 
     /**
@@ -1326,6 +1350,8 @@ public class AdapterService extends Service {
             Log.e(TAG, "cleanup() - Service already starting to cleanup, ignoring request...");
             return;
         }
+
+        closeMetricsLogger();
 
         clearAdapterService(this);
 
@@ -6177,6 +6203,10 @@ public class AdapterService extends Service {
 
     public RemoteDevices getRemoteDevices() {
         return mRemoteDevices;
+    }
+
+    public int getVendorCapVersion() {
+        return mAdapterProperties.getVendorCapVersion();
     }
 
     @Override

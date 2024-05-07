@@ -51,6 +51,7 @@ apex {
     certificate: ":com.android.btservices.certificate",
     updatable: false,
     compressible: false,
+    visibility: ["//packages/modules/common/build"],
 }
 
 apex_key {
