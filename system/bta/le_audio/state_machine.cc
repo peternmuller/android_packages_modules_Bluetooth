@@ -2348,6 +2348,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       }
     };
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     /* ase contain current ASE state. New state is in "arh" */
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_IDLE: {
@@ -2653,6 +2655,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
       return;
     }
+
+    log::debug("ase state: {}", static_cast<int>(ase->state));
 
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED: {
@@ -3152,6 +3156,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED:
         SetAseState(leAudioDevice, ase,
@@ -3226,6 +3232,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
       return;
     }
+
+    log::debug("ase state: {}", static_cast<int>(ase->state));
 
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED:
@@ -3351,6 +3359,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
         /* TODO: Disable */
@@ -3423,6 +3433,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_DISABLING:
       case AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED:
@@ -3448,9 +3460,15 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         bool remove_cig = true;
 
+        log::debug("cis_state: {}", static_cast<int>(ase->cis_state));
+        log::debug("data_path_state: {}", static_cast<int>(ase->data_path_state));
+
         /* Happens when bi-directional completive ASE releasing state came */
         if (ase->cis_state == CisState::DISCONNECTING) break;
-        if ((ase->cis_state == CisState::CONNECTED ||
+
+        if (ase->data_path_state == DataPathState::CONFIGURED) {
+          RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
+        } else if ((ase->cis_state == CisState::CONNECTED ||
              ase->cis_state == CisState::CONNECTING) &&
             ase->data_path_state == DataPathState::IDLE) {
           DisconnectCisIfNeeded(group, leAudioDevice, ase);
@@ -3474,6 +3492,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       case AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING: {
         SetAseState(leAudioDevice, ase,
                     AseState::BTA_LE_AUDIO_ASE_STATE_RELEASING);
+
+        log::debug("cis_state: {}", static_cast<int>(ase->cis_state));
+        log::debug("data_path_state: {}", static_cast<int>(ase->data_path_state));
 
         /* Happens when bi-directional completive ASE releasing state came */
         if (ase->cis_state == CisState::DISCONNECTING) break;
