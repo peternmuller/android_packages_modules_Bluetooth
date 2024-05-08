@@ -89,11 +89,14 @@
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
+#include "osi/include/properties.h"
 #include "stack/include/btm_client_interface.h"
 
 using namespace bluetooth;
 
 extern bool interface_ready(void);
+
+#define SOC_NAME_MAX_SIZE 15
 
 btvendor_callbacks_t* bt_vendor_callbacks = NULL;
 
@@ -112,6 +115,15 @@ btvendor_callbacks_t* bt_vendor_callbacks = NULL;
 *******************************************************************************/
 static bt_status_t init(btvendor_callbacks_t* callbacks) {
   bt_vendor_callbacks = callbacks;
+  char socName[SOC_NAME_MAX_SIZE];
+  osi_property_get("persist.vendor.qcom.bluetooth.soc", socName, "");
+  if(!strcmp(socName,"cherokee")) {
+    //when socName is Cherokee
+    osi_property_set("persist.bluetooth.asha.enabled", "false");
+  }
+  else {
+    osi_property_set("persist.bluetooth.asha.enabled", "true");
+  }
   log::info("init done");
   return BT_STATUS_SUCCESS;
 }
