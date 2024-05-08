@@ -648,7 +648,19 @@ void avdt_scb_hdl_setconfig_cmd(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
           p_scb->stream_config.scb_index);
     } else {
       p_data->msg.hdr.err_code = AVDT_ERR_UNSUP_CFG;
+
+      uint8_t error_code = 0;
+      error_code = A2dp_SendSetConfigRspErrorCodeForPTS();
+      log::info("error_code: {}", error_code);
+
+      //error_code is valid for PTS only as of now.
+      if (error_code != 0) {
+        log::info("Overwrite setconf errorcode passed by prop for PTS.");
+        p_data->msg.hdr.err_code = error_code;
+      }
+
       p_data->msg.hdr.err_param = 0;
+      log::info("called avdt_msg_send_rej()");
       avdt_msg_send_rej(avdt_ccb_by_idx(p_data->msg.hdr.ccb_idx),
                         p_data->msg.hdr.sig_id, &p_data->msg);
     }
