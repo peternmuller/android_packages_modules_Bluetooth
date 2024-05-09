@@ -485,6 +485,8 @@ struct AudioSetConfigurationProviderJson {
 
     /* Parse */
     ok = configurations_parser_.Parse(configurations_json_content.c_str());
+    if (!ok)
+      log::error(": Parsing error {} ", configurations_parser_.error_);
     if (!ok) return ok;
 
     /* Import from flatbuffers */
@@ -579,6 +581,8 @@ struct AudioSetConfigurationProviderJson {
 
     /* Parse */
     ok = scenarios_parser_.Parse(scenarios_json_content.c_str());
+    if (!ok)
+      log::error(": Parsing error {} ", scenarios_parser_.error_);
     if (!ok) return ok;
 
     /* Import from flatbuffers */
