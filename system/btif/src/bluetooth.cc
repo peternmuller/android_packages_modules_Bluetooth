@@ -27,8 +27,8 @@
 
 #define LOG_TAG "bt_btif"
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bluetooth_headset_interface.h>
 #include <hardware/bt_av.h>
@@ -335,7 +335,7 @@ struct CoreInterfaceImpl : bluetooth::core::CoreInterface {
   }
 
   void onLinkDown(const RawAddress& bd_addr) override {
-    if (IS_FLAG_ENABLED(a2dp_concurrent_source_sink)) {
+    if (com::android::bluetooth::flags::a2dp_concurrent_source_sink()) {
       btif_av_acl_disconnected(bd_addr, A2dpType::kSource);
       btif_av_acl_disconnected(bd_addr, A2dpType::kSink);
     } else {
@@ -934,12 +934,8 @@ static const void* get_profile_interface(const char* profile_id) {
   if (is_profile(profile_id, BT_PROFILE_VENDOR_ID))
     return btif_vendor_get_interface();
 
-  bool isBqrEnabled =
-      bluetooth::common::InitFlags::IsBluetoothQualityReportCallbackEnabled();
-  if (isBqrEnabled) {
-    if (is_profile(profile_id, BT_BQR_ID))
-      return bluetooth::bqr::getBluetoothQualityReportInterface();
-  }
+  if (is_profile(profile_id, BT_BQR_ID))
+    return bluetooth::bqr::getBluetoothQualityReportInterface();
 
   return NULL;
 }
