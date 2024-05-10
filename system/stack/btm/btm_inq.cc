@@ -25,8 +25,8 @@
  *
  ******************************************************************************/
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -588,7 +588,7 @@ void BTM_CancelInquiry(void) {
   }
 }
 
-static void btm_classic_inquiry_timeout(UNUSED_ATTR void* data) {
+static void btm_classic_inquiry_timeout(void* /* data */) {
   // When the Inquiry Complete event is received, the classic inquiry
   // will be marked as completed. Therefore, we only need to mark
   // the BLE inquiry as completed here to stop processing BLE results
@@ -855,17 +855,24 @@ tBTM_STATUS BTM_ReadRemoteDeviceName(const RawAddress& remote_bda,
  ******************************************************************************/
 tBTM_STATUS BTM_CancelRemoteDeviceName(void) {
   log::verbose("");
+  bool is_le;
 
   /* Make sure there is not already one in progress */
   if (btm_cb.btm_inq_vars.remname_active) {
-    if (BTM_UseLeLink(btm_cb.btm_inq_vars.remname_bda)) {
+    if (com::android::bluetooth::flags::rnr_store_device_type()) {
+      is_le = (btm_cb.btm_inq_vars.remname_dev_type == BT_DEVICE_TYPE_BLE);
+    } else {
+      is_le = BTM_UseLeLink(btm_cb.btm_inq_vars.remname_bda);
+    }
+
+    if (is_le) {
       /* Cancel remote name request for LE device, and process remote name
        * callback. */
       btm_inq_rmt_name_failed_cancelled();
     } else {
       bluetooth::shim::ACL_CancelRemoteNameRequest(
           btm_cb.btm_inq_vars.remname_bda);
-      if (IS_FLAG_ENABLED(rnr_reset_state_at_cancel)) {
+      if (com::android::bluetooth::flags::rnr_reset_state_at_cancel()) {
         btm_process_remote_name(&btm_cb.btm_inq_vars.remname_bda, nullptr, 0,
                                 HCI_ERR_UNSPECIFIED);
       }
@@ -1044,6 +1051,7 @@ void btm_inq_db_reset(void) {
     alarm_cancel(btm_cb.btm_inq_vars.remote_name_timer);
     btm_cb.btm_inq_vars.remname_active = false;
     btm_cb.btm_inq_vars.remname_bda = RawAddress::kEmpty;
+    btm_cb.btm_inq_vars.remname_dev_type = BT_DEVICE_TYPE_UNKNOWN;
 
     if (btm_cb.btm_inq_vars.p_remname_cmpl_cb) {
       rem_name.status = BTM_DEV_RESET;
@@ -1889,6 +1897,7 @@ tBTM_STATUS btm_initiate_rem_name(const RawAddress& remote_bda, uint8_t origin,
        * and start timer */
       btm_cb.btm_inq_vars.p_remname_cmpl_cb = p_cb;
       btm_cb.btm_inq_vars.remname_bda = remote_bda;
+      btm_cb.btm_inq_vars.remname_dev_type = BT_DEVICE_TYPE_BREDR;
 
       alarm_set_on_mloop(btm_cb.btm_inq_vars.remote_name_timer, timeout_ms,
                          btm_inq_remote_name_timer_timeout, NULL);
@@ -1947,7 +1956,12 @@ void btm_process_remote_name(const RawAddress* bda, const BD_NAME bdn,
       .hci_status = hci_status,
   };
 
-  const bool on_le_link = BTM_UseLeLink(btm_cb.btm_inq_vars.remname_bda);
+  bool on_le_link;
+  if (com::android::bluetooth::flags::rnr_store_device_type()) {
+    on_le_link = (btm_cb.btm_inq_vars.remname_dev_type == BT_DEVICE_TYPE_BLE);
+  } else {
+    on_le_link = BTM_UseLeLink(btm_cb.btm_inq_vars.remname_bda);
+  }
 
   /* If the inquire BDA and remote DBA are the same, then stop the timer and set
    * the active to false */
@@ -1982,6 +1996,7 @@ void btm_process_remote_name(const RawAddress* bda, const BD_NAME bdn,
       /* Reset the remote BDA and call callback if possible */
       btm_cb.btm_inq_vars.remname_active = false;
       btm_cb.btm_inq_vars.remname_bda = RawAddress::kEmpty;
+      btm_cb.btm_inq_vars.remname_dev_type = BT_DEVICE_TYPE_UNKNOWN;
 
       tBTM_NAME_CMPL_CB* p_cb = btm_cb.btm_inq_vars.p_remname_cmpl_cb;
       btm_cb.btm_inq_vars.p_remname_cmpl_cb = nullptr;
@@ -2002,7 +2017,7 @@ void btm_process_remote_name(const RawAddress* bda, const BD_NAME bdn,
   }
 }
 
-void btm_inq_remote_name_timer_timeout(UNUSED_ATTR void* data) {
+void btm_inq_remote_name_timer_timeout(void* /* data */) {
   btm_inq_rmt_name_failed_cancelled();
 }
 

@@ -98,8 +98,6 @@ void btm_dev_init() {
       alarm_new("btm.read_failed_contact_counter_timer");
   btm_cb.devcb.read_automatic_flush_timeout_timer =
       alarm_new("btm.read_automatic_flush_timeout_timer");
-  btm_cb.devcb.read_link_quality_timer =
-      alarm_new("btm.read_link_quality_timer");
   btm_cb.devcb.read_tx_power_timer = alarm_new("btm.read_tx_power_timer");
 }
 
@@ -108,7 +106,6 @@ void btm_dev_free() {
   alarm_free(btm_cb.devcb.read_rssi_timer);
   alarm_free(btm_cb.devcb.read_failed_contact_counter_timer);
   alarm_free(btm_cb.devcb.read_automatic_flush_timeout_timer);
-  alarm_free(btm_cb.devcb.read_link_quality_timer);
   alarm_free(btm_cb.devcb.read_tx_power_timer);
 }
 
@@ -246,7 +243,7 @@ bool BTM_IsDeviceUp(void) {
  * Returns          void
  *
  ******************************************************************************/
-static void btm_read_local_name_timeout(UNUSED_ATTR void* data) {
+static void btm_read_local_name_timeout(void* /* data */) {
   tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_rln_cmpl_cb;
   btm_cb.devcb.p_rln_cmpl_cb = NULL;
   if (p_cb) (*p_cb)((void*)NULL);
@@ -394,7 +391,7 @@ tBTM_STATUS BTM_ReadLocalDeviceNameFromController(
  * Returns          void
  *
  ******************************************************************************/
-void btm_read_local_name_complete(uint8_t* p, UNUSED_ATTR uint16_t evt_len) {
+void btm_read_local_name_complete(uint8_t* p, uint16_t /* evt_len */) {
   tBTM_CMPL_CB* p_cb = btm_cb.devcb.p_rln_cmpl_cb;
   uint8_t status;
 

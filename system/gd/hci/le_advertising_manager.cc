@@ -15,8 +15,8 @@
  */
 #include "hci/le_advertising_manager.h"
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <iterator>
 #include <memory>
@@ -491,7 +491,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       address_manager_registered = true;
     }
 
-    if (IS_FLAG_ENABLED(nrpa_non_connectable_adv) && !config.connectable) {
+    if (com::android::bluetooth::flags::nrpa_non_connectable_adv() && !config.connectable) {
       advertising_sets_[id].address_type = GetAdvertiserAddressTypeNonConnectable(
           config.requested_advertiser_address_type, le_address_manager_->GetAddressPolicy());
     } else {
@@ -627,7 +627,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     advertising_sets_[id].duration = duration;
     advertising_sets_[id].max_extended_advertising_events = max_ext_adv_events;
     advertising_sets_[id].handler = handler;
-    if (IS_FLAG_ENABLED(nrpa_non_connectable_adv) && !config.connectable) {
+    if (com::android::bluetooth::flags::nrpa_non_connectable_adv() && !config.connectable) {
       advertising_sets_[id].address_type = GetAdvertiserAddressTypeNonConnectable(
           config.requested_advertiser_address_type, le_address_manager_->GetAddressPolicy());
     } else {
@@ -973,8 +973,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   bool check_extended_advertising_data(std::vector<GapData> data, bool include_flag) {
     uint16_t data_len = 0;
-    uint16_t data_limit = IS_FLAG_ENABLED(divide_long_single_gap_data) ? kLeMaximumGapDataLength
-                                                                       : kLeMaximumFragmentLength;
+    uint16_t data_limit = com::android::bluetooth::flags::divide_long_single_gap_data()
+                              ? kLeMaximumGapDataLength
+                              : kLeMaximumFragmentLength;
     // check data size
     for (size_t i = 0; i < data.size(); i++) {
       if (data[i].size() > data_limit) {
@@ -1070,7 +1071,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       } break;
       case (AdvertisingApiType::EXTENDED): {
         uint16_t data_len = 0;
-        bool divide_gap_flag = IS_FLAG_ENABLED(divide_long_single_gap_data);
+        bool divide_gap_flag = com::android::bluetooth::flags::divide_long_single_gap_data();
         // check data size
         for (size_t i = 0; i < data.size(); i++) {
           uint16_t data_limit =
@@ -1091,10 +1092,11 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
           data_len += data[i].size();
         }
 
-        int maxDataLength = (IS_FLAG_ENABLED(ble_check_data_length_on_legacy_advertising) &&
-                             advertising_sets_[advertiser_id].is_legacy)
-                                ? kLeMaximumLegacyAdvertisingDataLength
-                                : le_maximum_advertising_data_length_;
+        int maxDataLength =
+            (com::android::bluetooth::flags::ble_check_data_length_on_legacy_advertising() &&
+             advertising_sets_[advertiser_id].is_legacy)
+                ? kLeMaximumLegacyAdvertisingDataLength
+                : le_maximum_advertising_data_length_;
 
         if (data_len > maxDataLength) {
           log::warn("advertising data len {} exceeds maxDataLength {}", data_len, maxDataLength);
@@ -1154,7 +1156,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   void send_data_fragment(
       AdvertiserId advertiser_id, bool set_scan_rsp, std::vector<GapData> data, Operation operation) {
-    if (IS_FLAG_ENABLED(divide_long_single_gap_data)) {
+    if (com::android::bluetooth::flags::divide_long_single_gap_data()) {
       // For first and intermediate fragment, do not trigger advertising_callbacks_.
       bool send_callback =
           (operation == Operation::COMPLETE_ADVERTISEMENT || operation == Operation::LAST_FRAGMENT);
@@ -1331,7 +1333,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   void set_periodic_data(AdvertiserId advertiser_id, std::vector<GapData> data) {
     uint16_t data_len = 0;
-    bool divide_gap_flag = IS_FLAG_ENABLED(divide_long_single_gap_data);
+    bool divide_gap_flag = com::android::bluetooth::flags::divide_long_single_gap_data();
     // check data size
     for (size_t i = 0; i < data.size(); i++) {
       uint16_t data_limit = divide_gap_flag ? kLeMaximumGapDataLength : kLeMaximumFragmentLength;
@@ -1399,7 +1401,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   }
 
   void send_periodic_data_fragment(AdvertiserId advertiser_id, std::vector<GapData> data, Operation operation) {
-    if (IS_FLAG_ENABLED(divide_long_single_gap_data)) {
+    if (com::android::bluetooth::flags::divide_long_single_gap_data()) {
       // For first and intermediate fragment, do not trigger advertising_callbacks_.
       bool send_callback =
           (operation == Operation::COMPLETE_ADVERTISEMENT || operation == Operation::LAST_FRAGMENT);
@@ -1788,7 +1790,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       return;
     }
 
-    if (IS_FLAG_ENABLED(divide_long_single_gap_data)) {
+    if (com::android::bluetooth::flags::divide_long_single_gap_data()) {
       // Do not trigger callback if send_callback is false
       if (!send_callback) {
         return;
