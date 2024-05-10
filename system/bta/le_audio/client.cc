@@ -1002,6 +1002,7 @@ class LeAudioClientImpl : public LeAudioClient {
     if (defer_notify_inactive_until_stop_) {
       if (!defer_notify_active_until_stop_) {
         active_group_id_ = bluetooth::groups::kGroupUnknown;
+        StopAudio();
         ClientAudioInterfaceRelease();
       }
       callbacks_->OnGroupStatus(group_id, GroupStatus::INACTIVE);
@@ -1343,12 +1344,11 @@ class LeAudioClientImpl : public LeAudioClient {
     log::info("Group id: {}", group_id_to_close);
     if (alarm_is_scheduled(suspend_timeout_)) alarm_cancel(suspend_timeout_);
 
-    StopAudio();
-
     log::info("defer_notify_inactive_until_stop_: {}", defer_notify_inactive_until_stop_);
 
     if (!defer_notify_inactive_until_stop_) {
       active_group_id_ = bluetooth::groups::kGroupUnknown;
+      StopAudio();
       ClientAudioInterfaceRelease();
       callbacks_->OnGroupStatus(group_id_to_close, GroupStatus::INACTIVE);
     }
@@ -4257,8 +4257,8 @@ class LeAudioClientImpl : public LeAudioClient {
         audio_sender_state_ = AudioState::READY_TO_RELEASE;
         break;
       case AudioState::RELEASING:
-        log::info("calling source ConfirmSuspendRequest in audio_sender_state_ releasing");
-        le_audio_source_hal_client_->ConfirmSuspendRequest();
+        //ensures ASEs moved to codecconfigured state and ack to MM.
+        defer_source_suspend_ack_until_stop_ = true;
         return;
       case AudioState::IDLE:
         if (audio_receiver_state_ == AudioState::READY_TO_RELEASE) {
@@ -4512,8 +4512,8 @@ class LeAudioClientImpl : public LeAudioClient {
         audio_receiver_state_ = AudioState::READY_TO_RELEASE;
         break;
       case AudioState::RELEASING:
-        log::info("calling sink ConfirmSuspendRequest in audio_receiver_state_ releasing");
-        le_audio_sink_hal_client_->ConfirmSuspendRequest();
+        //ensures ASEs moved to codecconfigured state and ack to MM.
+        defer_sink_suspend_ack_until_stop_ = true;
         return;
       case AudioState::IDLE:
         if (audio_sender_state_ == AudioState::READY_TO_RELEASE) {
@@ -6063,7 +6063,10 @@ class LeAudioClientImpl : public LeAudioClient {
       }
       case GroupStreamStatus::RELEASING:
       case GroupStreamStatus::SUSPENDING:
-        if (active_group_id_ != bluetooth::groups::kGroupUnknown &&
+        log::debug(" defer_notify_inactive_until_stop_: {}",
+                                   defer_notify_inactive_until_stop_);
+        if (!defer_notify_inactive_until_stop_ &&
+            active_group_id_ != bluetooth::groups::kGroupUnknown &&
             (active_group_id_ == group->group_id_) &&
             !group->IsPendingConfiguration() &&
             (audio_sender_state_ == AudioState::STARTED ||
