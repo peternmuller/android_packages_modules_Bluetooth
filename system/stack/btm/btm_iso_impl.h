@@ -649,7 +649,8 @@ struct iso_impl {
                            hci_error_code_text((tHCI_REASON)(reason)).c_str()));
     cis_hdl_to_addr.erase(handle);
 
-    if (cis->state_flags & kStateFlagIsConnected) {
+    if ((cis->state_flags & kStateFlagIsConnected) ||
+        (cis->state_flags & kStateFlagIsConnecting)) {
       cis_disconnected_evt evt = {
           .reason = reason,
           .cig_id = cis->cig_id,
@@ -658,6 +659,7 @@ struct iso_impl {
 
       cig_callbacks_->OnCisEvent(kIsoEventCisDisconnected, &evt);
       cis->state_flags &= ~kStateFlagIsConnected;
+      cis->state_flags &= ~kStateFlagIsConnecting;
 
       /* return used credits */
       iso_credits_ += cis->used_credits;
