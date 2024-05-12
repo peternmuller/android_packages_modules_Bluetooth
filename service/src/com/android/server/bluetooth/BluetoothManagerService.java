@@ -394,7 +394,8 @@ class BluetoothManagerService {
                 TAG,
                 ("delayModeChangedIfNeeded(" + modechanged + "):")
                         + (" state=" + BluetoothAdapter.nameForState(state))
-                        + (" isAirplaneModeOn()=" + isAirplaneModeOn())
+                        + (" Airplane.isOnOverrode=" + AirplaneModeListener.isOnOverrode())
+                        + (" Airplane.isOn=" + AirplaneModeListener.isOn())
                         + (" isSatelliteModeOn()=" + isSatelliteModeOn())
                         + (" delayed=" + delayMs + "ms"));
 
@@ -544,7 +545,7 @@ class BluetoothManagerService {
             return false;
         }
 
-        if (isAirplaneModeOn() && isBluetoothPersistedStateOnAirplane()) {
+        if (AirplaneModeListener.isOnOverrode() && isBluetoothPersistedStateOnAirplane()) {
             Log.d(TAG, "shouldBluetoothBeOn: BT should be off as airplaneMode is on.");
             return false;
         }
@@ -712,11 +713,6 @@ class BluetoothManagerService {
 
     IBluetoothManager.Stub getBinder() {
         return mBinder;
-    }
-
-    /** Returns true if airplane mode is currently on */
-    private boolean isAirplaneModeOn() {
-        return AirplaneModeListener.isOn();
     }
 
     /** Returns true if satellite mode is turned on. */
@@ -1012,8 +1008,14 @@ class BluetoothManagerService {
     }
 
     boolean isBleScanAlwaysAvailable() {
-        if (isAirplaneModeOn() && !mEnable) {
-            return false;
+        if (Flags.airplaneModeXBleOn()) {
+            if (AirplaneModeListener.isOn() && !mEnable) {
+                return false;
+            }
+        } else {
+            if (AirplaneModeListener.isOnOverrode() && !mEnable) {
+                return false;
+            }
         }
         try {
             return Settings.Global.getInt(
@@ -1118,9 +1120,16 @@ class BluetoothManagerService {
                         + (" isBinding=" + isBinding())
                         + (" mState=" + mState));
 
-        if (isAirplaneModeOn()) {
-            Log.d(TAG, "enableBle: not enabling - Airplane mode is on");
-            return false;
+        if (Flags.airplaneModeXBleOn()) {
+            if (AirplaneModeListener.isOn() && !mEnable) {
+                Log.d(TAG, "enableBle: not enabling - Airplane mode is ON on system");
+                return false;
+            }
+        } else {
+            if (AirplaneModeListener.isOnOverrode()) {
+                Log.d(TAG, "enableBle: not enabling - Airplane mode is ON");
+                return false;
+            }
         }
 
         if (isSatelliteModeOn()) {
@@ -1247,7 +1256,9 @@ class BluetoothManagerService {
                 Log.w(TAG, "sendBrEdrDownCallback: mAdapter is null");
                 return;
             }
-            if (isBleAppPresent()) {
+            boolean airplaneDoesNotAllowBleOn =
+                    Flags.airplaneModeXBleOn() && AirplaneModeListener.isOn();
+            if (!airplaneDoesNotAllowBleOn && isBleAppPresent()) {
                 // Need to stay at BLE ON. Disconnect all Gatt connections
                 Log.i(TAG, "sendBrEdrDownCallback: Staying in BLE_ON");
                 mAdapter.unregAllGattClient(mContext.getAttributionSource());
@@ -2585,7 +2596,7 @@ class BluetoothManagerService {
         mHandler.sendEmptyMessageDelayed(MESSAGE_RESTART_BLUETOOTH_SERVICE, ERROR_RESTART_TIME_MS);
 
         if (repeatAirplaneRunnable) {
-            onAirplaneModeChanged(isAirplaneModeOn());
+            onAirplaneModeChanged(AirplaneModeListener.isOnOverrode());
         }
     }
 
@@ -2786,8 +2797,7 @@ class BluetoothManagerService {
         for (Method m : Flags.class.getDeclaredMethods()) {
             String flagStatus = ((Boolean) m.invoke(null)) ? "[■]" : "[ ]";
             String name = m.getName();
-            String snakeCaseName =
-                    name.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.US);
+            String snakeCaseName = name.replaceAll("([A-Z])", "_$1").toLowerCase(Locale.US);
             writer.println(String.format(fmt, flagStatus, name, snakeCaseName));
         }
         writer.println("");
