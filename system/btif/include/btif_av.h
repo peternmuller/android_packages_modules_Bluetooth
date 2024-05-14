@@ -316,6 +316,24 @@ bool btif_av_is_dual_mode_enabled();
  */
 void btif_av_metadata_update(uint16_t context);
 
+/*
+ * Returns the AptX Mode
+ */
+uint16_t btif_av_get_aptx_mode_info();
+
+/*
+ * Updates the AptX Mode
+ */
+void btif_av_update_aptx_mode_info(bool is_ll_enabled);
+
+/**
+ * Initiate an AV connection after 3s timeout to peer audio sink
+ * @param handle bta handle
+ * @param peer_addr peer address
+ */
+void btif_av_connect_sink_delayed(uint8_t handle,
+                                  const RawAddress& peer_address);
+
 /**
  * Check whether A2DP Source is enabled.
  */

@@ -51,6 +51,7 @@ import android.os.UserHandle;
 import android.sysprop.BluetoothProperties;
 import android.telecom.PhoneAccount;
 import android.util.Log;
+import android.os.Bundle;
 
 import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.BluetoothStatsLog;
@@ -69,6 +70,9 @@ import com.android.bluetooth.hfpclient.HeadsetClientStateMachine;
 import com.android.bluetooth.le_audio.LeAudioService;
 import com.android.bluetooth.telephony.BluetoothInCallService;
 import com.android.internal.annotations.VisibleForTesting;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,6 +158,12 @@ public class HeadsetService extends ProfileService {
     @VisibleForTesting static int sStartVrTimeoutMs = 5000;
     private ArrayList<StateMachineTask> mPendingClccResponses = new ArrayList<>();
     private boolean mStarted;
+    private static final int LE_GROUP_STREAM_STATUS_STREAMING = 1;
+    private static final int LE_GROUP_STREAM_STATUS_IDLE = 0;
+    private int mLeGroupStreamStatus = 0;
+    private boolean mSendIndicatorsAfterSuspend;
+    private final Lock lock = new ReentrantLock();
+    private final Condition leStreamStatusSuspend = lock.newCondition();
     private static HeadsetService sHeadsetService;
 
     @VisibleForTesting boolean mIsAptXSwbEnabled = false;
@@ -167,6 +177,7 @@ public class HeadsetService extends ProfileService {
     public static boolean isEnabled() {
         return BluetoothProperties.isProfileHfpAgEnabled().orElse(false);
     }
+    private static final int AUDIO_CONNECTION_DELAY_DEFAULT = 100;
 
     @Override
     public IProfileServiceBinder initBinder() {
@@ -1393,6 +1404,21 @@ public class HeadsetService extends ProfileService {
             }
             BluetoothDevice previousActiveDevice = mActiveDevice;
             mActiveDevice = device;
+
+            /* If HFP is getting active for a phone call and there are active LE Audio devices,
+             * Lets inactive LeAudio device as soon as possible so there is no CISes connected
+             * when SCO is going to be created
+             */
+            if (mSystemInterface.isInCall() || mSystemInterface.isRinging()) {
+                LeAudioService leAudioService = mFactory.getLeAudioService();
+                if (leAudioService != null
+                        && !leAudioService.getConnectedDevices().isEmpty()
+                        && Flags.leaudioResumeActiveAfterHfpHandover()) {
+                    Log.i(TAG, "Make sure no le audio device active for HFP handover.");
+                    leAudioService.setInactiveForHfpHandover(mActiveDevice);
+                }
+            }
+
             if (getAudioState(previousActiveDevice) != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                 int disconnectStatus = disconnectAudio(previousActiveDevice);
                 if (disconnectStatus != BluetoothStatusCodes.SUCCESS) {
@@ -1422,7 +1448,7 @@ public class HeadsetService extends ProfileService {
                  * when SCO is created
                  */
                 LeAudioService leAudioService = mFactory.getLeAudioService();
-                if (leAudioService != null) {
+                if (leAudioService != null && !Flags.leaudioResumeActiveAfterHfpHandover()) {
                     Log.i(TAG, "Make sure there is no le audio device active.");
                     leAudioService.setInactiveForHfpHandover(mActiveDevice);
                 }
@@ -1491,6 +1517,8 @@ public class HeadsetService extends ProfileService {
     }
 
     int connectAudio(BluetoothDevice device) {
+        int connDelay = SystemProperties.getInt("persist.vendor.bluetooth.audioconnect.delay",
+                AUDIO_CONNECTION_DELAY_DEFAULT);
         Log.i(TAG, "connectAudio: device=" + device + ", " + Utils.getUidPidString());
         synchronized (mStateMachines) {
             final HeadsetStateMachine stateMachine = mStateMachines.get(device);
@@ -1509,6 +1537,23 @@ public class HeadsetService extends ProfileService {
             }
             if (stateMachine.getAudioState() != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                 logD("connectAudio: audio is not idle for device " + device);
+                /**
+                 * add for case that device disconnecting audio has been set active again,
+                 * then send CONNECT_AUDIO if not contained in queue and should persist audio
+                 */
+                if (mActiveDevice != null && mActiveDevice.equals(device) &&
+                        stateMachine.getAudioState() == BluetoothHeadset.STATE_AUDIO_DISCONNECTING
+                        && !stateMachine.hasMessagesInQueue(HeadsetStateMachine.CONNECT_AUDIO) &&
+                        !stateMachine.hasDeferredMessagesInQueue(HeadsetStateMachine.CONNECT_AUDIO)
+                        && shouldPersistAudio()) {
+                    if (stateMachine.getIfDeviceBlacklistedForSCOAfterSLC() == true)
+                        connDelay = 0;
+
+                    Log.i(TAG, "connectAudio: active again and connect audio after "
+                            + connDelay + " ms");
+                    stateMachine.sendMessageDelayed(HeadsetStateMachine.CONNECT_AUDIO,
+                            device, connDelay);
+                }
                 return BluetoothStatusCodes.SUCCESS;
             }
             if (isAudioOn()) {
@@ -1516,7 +1561,12 @@ public class HeadsetService extends ProfileService {
                         + Arrays.toString(getNonIdleAudioDevices().toArray()));
                 return BluetoothStatusCodes.ERROR_AUDIO_DEVICE_ALREADY_CONNECTED;
             }
-            stateMachine.sendMessage(HeadsetStateMachine.CONNECT_AUDIO, device);
+
+            if (stateMachine.getIfDeviceBlacklistedForSCOAfterSLC() == true)
+                connDelay = 0;
+
+            Log.i(TAG, "connectAudio: connect audio after " + connDelay + " ms");
+            stateMachine.sendMessageDelayed(HeadsetStateMachine.CONNECT_AUDIO, device, connDelay);
         }
         return BluetoothStatusCodes.SUCCESS;
     }
@@ -1620,6 +1670,25 @@ public class HeadsetService extends ProfileService {
     }
 
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    public void updateLeStreamStatus(BluetoothDevice device, int streamStatus) {
+        Log.i(TAG, "updateLeStreamStatus: received ");
+        lock.lock();
+        if (streamStatus == LE_GROUP_STREAM_STATUS_STREAMING) {
+           Log.i(TAG, "LE Status Moved to streaming State");
+           mLeGroupStreamStatus = LE_GROUP_STREAM_STATUS_STREAMING;
+        } else if (streamStatus == LE_GROUP_STREAM_STATUS_IDLE) {
+           Log.i(TAG, "LE Status Moved to Suspended State");
+           mLeGroupStreamStatus = LE_GROUP_STREAM_STATUS_IDLE;
+           if (mSendIndicatorsAfterSuspend == true) {
+             Log.i(TAG, "LE stream status is suspended");
+             leStreamStatusSuspend.signal();
+             mSendIndicatorsAfterSuspend = false;
+           }
+        }
+        lock.unlock();
+    }
+
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     boolean stopScoUsingVirtualVoiceCall() {
         Log.i(TAG, "stopScoUsingVirtualVoiceCall: " + Utils.getUidPidString());
         synchronized (mStateMachines) {
@@ -1629,6 +1698,7 @@ public class HeadsetService extends ProfileService {
                 return false;
             }
             mVirtualCallStarted = false;
+            mSendIndicatorsAfterSuspend = false;
             // 2. Send virtual phone state changed to close SCO
             phoneStateChanged(0, 0, HeadsetHalConstants.CALL_STATE_IDLE, "", 0, "", true);
         }
@@ -1682,6 +1752,13 @@ public class HeadsetService extends ProfileService {
                 if (!stopScoUsingVirtualVoiceCall()) {
                     Log.e(TAG, "dialOutgoingCall failed to stop current virtual call");
                     return false;
+                }
+                HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
+                if (stateMachine != null &&
+                    stateMachine.isDeviceBlacklistedForDelayingCLCCRespAfterVOIPCall()) {
+                    // send delayed message for active device if Blacklisted
+                    stateMachine.sendMessageDelayed(
+                    HeadsetStateMachine.SEND_CLCC_RESP_AFTER_VOIP_CALL, 1000);
                 }
             }
             if (!setActiveDevice(fromDevice)) {
@@ -1860,6 +1937,13 @@ public class HeadsetService extends ProfileService {
                 if (!isVirtualCall && mVirtualCallStarted) {
                     // stop virtual voice call if there is an incoming Telecom call update
                     stopScoUsingVirtualVoiceCall();
+                    HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
+                    if (stateMachine != null &&
+                        stateMachine.isDeviceBlacklistedForDelayingCLCCRespAfterVOIPCall()) {
+                        // send delayed message for active device if Blacklisted
+                        stateMachine.sendMessageDelayed(
+                        HeadsetStateMachine.SEND_CLCC_RESP_AFTER_VOIP_CALL, 300);
+                    }
                 }
                 if (mVoiceRecognitionStarted) {
                     // stop voice recognition if there is any incoming call
@@ -1894,10 +1978,43 @@ public class HeadsetService extends ProfileService {
             if (mActiveDevice != null && callState != HeadsetHalConstants.CALL_STATE_DISCONNECTED
                 && !mSystemInterface.isCallIdle() && isCallIdleBefore
                 && !Utils.isScoManagedByAudioEnabled()) {
+                Log.i(TAG, "Before A2dp suspension");
                 mSystemInterface.getAudioManager().setA2dpSuspended(true);
-                if (isAtLeastU()) {
-                    mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                Log.i(TAG, "After A2dp suspension");
+                if (Utils.isDualModeAudioEnabled()) {
+                   Bundle preferredAudioProfiles =
+                        mAdapterService.getPreferredAudioProfiles(mActiveDevice);
+                   if (preferredAudioProfiles != null && !preferredAudioProfiles.isEmpty()
+                      && preferredAudioProfiles.getInt("audio_mode_duplex") !=
+                                                       BluetoothProfile.LE_AUDIO) {
+                      Log.i(TAG, "Setting LE suspension only for HFP preference case");
+                      if (isAtLeastU()) {
+                          mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                      }
+                   } else {
+                     Log.i(TAG, "Not setting LE suspension. LE is the pref duplex profile");
+                   }
+                } else {
+                  if (isAtLeastU()) {
+                      mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                  }
                 }
+                //Adding the wait mechanism Logic.
+                lock.lock();
+                if (mLeGroupStreamStatus == LE_GROUP_STREAM_STATUS_STREAMING) {
+                    Log.d(TAG, "streaming in progress. Need to wait");
+                    try {
+                         mSendIndicatorsAfterSuspend = true;
+                         Log.d(TAG, "Phonestatechange: Acquired lock wait for phonestate change");
+                         leStreamStatusSuspend.await();
+                    } catch (InterruptedException e) {
+                         Log.d(TAG, "LEstreamSuspendlock:: Unblocked because of exception: " + e);
+                    } finally {
+                         Log.d(TAG, "LEstreamSuspendlock:: unlock");
+                         mSendIndicatorsAfterSuspend = false;
+                    }
+                }
+                lock.unlock();
             }
         });
         doForEachConnectedStateMachine(
@@ -2202,21 +2319,23 @@ public class HeadsetService extends ProfileService {
                                 + "voice call");
                     }
                 }
+                // Resumes LE audio previous active device if HFP handover happened before.
+                // Do it here because some controllers cannot handle SCO and CIS
+                // co-existence see {@link LeAudioService#setInactiveForHfpHandover}
+                if (Flags.leaudioResumeActiveAfterHfpHandover()) {
+                    LeAudioService leAudioService = mFactory.getLeAudioService();
+                    if (leAudioService != null
+                            && !leAudioService.getConnectedDevices().isEmpty()
+                            && leAudioService.getActiveDevices().get(0) == null) {
+                        leAudioService.setActiveAfterHfpHandover();
+                    }
+                }
+
                 // Unsuspend A2DP when SCO connection is gone and call state is idle
                 if (mSystemInterface.isCallIdle()) {
                     mSystemInterface.getAudioManager().setA2dpSuspended(false);
                     if (isAtLeastU()) {
                         mSystemInterface.getAudioManager().setLeAudioSuspended(false);
-
-                        // Resumes LE audio previous active device if HFP handover happened before.
-                        // Do it here because some controllers cannot handle SCO and CIS
-                        // co-existence see {@link LeAudioService#setInactiveForHfpHandover}
-                        if (Flags.leaudioResumeActiveAfterHfpHandover()) {
-                            LeAudioService leAudioService = mFactory.getLeAudioService();
-                            if (leAudioService != null) {
-                                leAudioService.setActiveAfterHfpHandover();
-                            }
-                        }
                     }
                 }
             }

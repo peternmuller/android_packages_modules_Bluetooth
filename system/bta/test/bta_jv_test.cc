@@ -28,6 +28,8 @@
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
 
+bool bta_ag_is_call_present(const RawAddress* peer_addr) { return true; }
+
 namespace {
 const RawAddress kRawAddress = RawAddress({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
 const RawAddress kRawAddress2 =

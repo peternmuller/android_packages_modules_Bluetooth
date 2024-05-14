@@ -33,10 +33,10 @@
 #include <vector>
 
 #include "bluetooth/uuid.h"
-#include "bta_le_audio_uuids.h"
-#include "btm_iso_api_types.h"
+#include "bta/include/bta_le_audio_uuids.h"
 #include "osi/include/alarm.h"
 #include "stack/include/bt_types.h"
+#include "stack/include/btm_iso_api_types.h"
 
 #define NON_HS_TOPOLOGY_CONFIG_MASK 0x1
 #define MONO_SRC_CONFIG_MASK        0x2
@@ -677,6 +677,7 @@ struct LeAudioCoreCodecConfig {
     return GetChannelCountPerIsoStream() * octets_per_codec_frame.value_or(0) *
            codec_frames_blocks_per_sdu.value_or(1);
   }
+
 };
 
 struct LeAudioCoreCodecCapabilities {
@@ -933,8 +934,6 @@ class LeAudioLtvMap {
          sizeof(decltype(core.audio_channel_allocation)::value_type))) {
       auto ptr = vec_opt->data();
       STREAM_TO_UINT32(core.audio_channel_allocation, ptr);
-      core.allocated_channel_count =
-              std::bitset<32>(core.audio_channel_allocation.value()).count();
     }
 
     return core;
@@ -1172,6 +1171,7 @@ struct ase {
   /* Codec configuration */
   LeAudioCodecId codec_id;
   LeAudioLtvMap codec_config;
+  uint8_t channel_count;
 
   /* Set to true, if the codec is implemented in BT controller, false if it's
    * implemented in host, or in separate DSP
@@ -1269,6 +1269,8 @@ struct QosConfigSetting {
   uint8_t target_latency;
   uint8_t retransmission_number;
   uint16_t max_transport_latency;
+  int sduIntervalUs;
+  int maxSdu;
 
   bool operator!=(const QosConfigSetting& other) { return !(*this == other); }
 
@@ -1321,18 +1323,6 @@ struct AudioSetConfiguration {
             // (codec_flags == other.codec_flags) &&
             (confs == other.confs));
   }
-  struct TopologyInfo {
-    /* How many sink and source devices must be in the set */
-    types::BidirectionalPair<uint8_t> device_count;
-    /* Note: Strategy is used for selecting a particular configuration from the
-     * set of configurations if the configuration provider did not select a
-     * single configuration for us (json file configuration provider).
-     */
-    types::BidirectionalPair<types::LeAudioConfigurationStrategy> strategy = {
-        types::LeAudioConfigurationStrategy::RFU,
-        types::LeAudioConfigurationStrategy::RFU};
-  };
-  std::optional<TopologyInfo> topology_info = std::nullopt;
 };
 
 using AudioSetConfigurations = std::vector<const AudioSetConfiguration*>;
@@ -1363,17 +1353,6 @@ void get_cis_count(types::LeAudioContextType context_type,
                    uint8_t& cis_count_bidir, uint8_t& cis_count_unidir_sink,
                    uint8_t& cis_count_unidir_source,
                    types::BidirectionalPair<types::AudioContexts> group_contexts);
-bool check_if_may_cover_scenario(
-    const AudioSetConfigurations* audio_set_configurations, uint8_t group_size);
-bool check_if_may_cover_scenario(
-    const AudioSetConfiguration* audio_set_configuration, uint8_t group_size);
-bool IsCodecConfigSettingSupported(
-    types::LeAudioContextType context_type,
-    const types::acs_ac_record& pac_record,
-    const CodecConfigSetting& codec_capability_setting,
-    std::optional<CodecMetadataSetting> vendor_metadata);
-uint8_t get_num_of_devices_in_configuration(
-    const AudioSetConfiguration* audio_set_configuration);
 }  // namespace set_configurations
 
 struct stream_parameters {

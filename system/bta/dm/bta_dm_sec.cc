@@ -89,7 +89,7 @@ void bta_dm_ble_sirk_sec_cb_register(tBTA_DM_SEC_CBACK* p_cback) {
 
 void bta_dm_ble_sirk_confirm_device_reply(const RawAddress& bd_addr,
                                           bool accept) {
-  log::debug("addr:{}", ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+  log::debug("addr:{}", bd_addr);
   get_btm_client_interface().security.BTM_BleSirkConfirmDeviceReply(
       bd_addr, accept ? BTM_SUCCESS : BTM_NOT_AUTHORIZED);
 }
@@ -99,9 +99,7 @@ void bta_dm_consolidate(const RawAddress& identity_addr,
   for (auto i = 0; i < bta_dm_cb.device_list.count; i++) {
     if (bta_dm_cb.device_list.peer_device[i].peer_bdaddr != rpa) continue;
 
-    log::info("consolidating bda_dm_cb record {} -> {}",
-              ADDRESS_TO_LOGGABLE_CSTR(rpa),
-              ADDRESS_TO_LOGGABLE_CSTR(identity_addr));
+    log::info("consolidating bda_dm_cb record {} -> {}", rpa, identity_addr);
     bta_dm_cb.device_list.peer_device[i].peer_bdaddr = identity_addr;
   }
 }
@@ -132,8 +130,8 @@ void bta_dm_remote_key_missing(const RawAddress bd_addr) {
 void bta_dm_bond(const RawAddress& bd_addr, tBLE_ADDR_TYPE addr_type,
                  tBT_TRANSPORT transport, tBT_DEVICE_TYPE device_type) {
   log::debug("Bonding with peer device:{} type:{} transport:{} type:{}",
-             ADDRESS_TO_LOGGABLE_CSTR(bd_addr), AddressTypeText(addr_type),
-             bt_transport_text(transport), DeviceTypeText(device_type));
+             bd_addr, AddressTypeText(addr_type), bt_transport_text(transport),
+             DeviceTypeText(device_type));
 
   tBTA_DM_SEC sec_event;
 
@@ -181,7 +179,7 @@ void bta_dm_bond_cancel(const RawAddress& bd_addr) {
   tBTM_STATUS status;
   tBTA_DM_SEC sec_event;
 
-  log::debug("addr:{}", ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+  log::debug("addr:{}", bd_addr);
 
   status = get_btm_client_interface().security.BTM_SecBondCancel(bd_addr);
 
@@ -294,8 +292,7 @@ static uint8_t bta_dm_pin_cback(const RawAddress& bd_addr, DEV_CLASS dev_class,
         BTM_CMD_STARTED)
       return BTM_CMD_STARTED;
 
-    log::warn("Failed to start Remote Name Request, addr:{}",
-              ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+    log::warn("Failed to start Remote Name Request, addr:{}", bd_addr);
   }
 
   tBTA_DM_SEC sec_event = {.pin_req = {
@@ -395,8 +392,7 @@ static void bta_dm_authentication_complete_cback(const RawAddress& bd_addr,
       case HCI_ERR_KEY_MISSING:
       case HCI_ERR_HOST_REJECT_SECURITY:
       case HCI_ERR_ENCRY_MODE_NOT_ACCEPTABLE:
-        log::warn("authentication failed entry:{}, reason:{}",
-                  ADDRESS_TO_LOGGABLE_CSTR(bd_addr),
+        log::warn("authentication failed entry:{}, reason:{}", bd_addr,
                   hci_reason_code_text(reason));
         break;
 
@@ -515,7 +511,7 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
                   BT_TRANSPORT_BR_EDR)) == BTM_CMD_STARTED)
             return BTM_CMD_STARTED;
           log::warn("Failed to start Remote Name Request, addr:{}",
-                    ADDRESS_TO_LOGGABLE_CSTR(p_data->key_notif.bd_addr));
+                    p_data->key_notif.bd_addr);
         } else {
           sec_event.key_notif.bd_addr = p_data->key_notif.bd_addr;
           sec_event.key_notif.dev_class = p_data->key_notif.dev_class;
@@ -568,8 +564,7 @@ static void bta_dm_reset_sec_dev_pending(const RawAddress& remote_bd_addr) {
     auto& dev = bta_dm_cb.device_list.peer_device[i];
     if (dev.peer_bdaddr == remote_bd_addr) {
       if (dev.remove_dev_pending) {
-        log::info("Clearing remove_dev_pending for {}",
-                  ADDRESS_TO_LOGGABLE_CSTR(dev.peer_bdaddr));
+        log::info("Clearing remove_dev_pending for {}", dev.peer_bdaddr);
         dev.remove_dev_pending = false;
       }
       return;
@@ -596,14 +591,13 @@ static void bta_dm_remove_sec_dev_entry(const RawAddress& remote_bd_addr) {
       get_btm_client_interface().peer.BTM_IsAclConnectionUp(
           remote_bd_addr, BT_TRANSPORT_BR_EDR)) {
     log::debug("ACL is not down. Schedule for Dev Removal when ACL closes:{}",
-               ADDRESS_TO_LOGGABLE_CSTR(remote_bd_addr));
+               remote_bd_addr);
     get_btm_client_interface().security.BTM_SecClearSecurityFlags(
         remote_bd_addr);
     for (int i = 0; i < bta_dm_cb.device_list.count; i++) {
       auto& dev = bta_dm_cb.device_list.peer_device[i];
       if (dev.peer_bdaddr == remote_bd_addr) {
-        log::info("Setting remove_dev_pending for {}",
-                  ADDRESS_TO_LOGGABLE_CSTR(dev.peer_bdaddr));
+        log::info("Setting remove_dev_pending for {}", dev.peer_bdaddr);
         dev.remove_dev_pending = TRUE;
         break;
       }
@@ -692,8 +686,7 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
   tBTM_STATUS status = BTM_SUCCESS;
   tBTA_DM_SEC sec_event;
 
-  log::debug("addr:{},event:{}", ADDRESS_TO_LOGGABLE_CSTR(bda),
-             ble_evt_to_text(event));
+  log::debug("addr:{},event:{}", bda, ble_evt_to_text(event));
 
   if (!bta_dm_sec_cb.p_sec_cback) return BTM_NOT_AUTHORIZED;
 
@@ -744,8 +737,7 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
 
     case BTM_LE_NC_REQ_EVT:
       sec_event.key_notif.bd_addr = bda;
-      bd_name_from_char_pointer(sec_event.key_notif.bd_name,
-                                bta_dm_get_remname());
+      bd_name_clear(sec_event.key_notif.bd_name);
       sec_event.key_notif.passkey = p_data->key_notif;
       bta_dm_sec_cb.p_sec_cback(BTA_DM_BLE_NC_REQ_EVT, &sec_event);
       break;
@@ -842,9 +834,9 @@ void bta_dm_encrypt_cback(const RawAddress* bd_addr, tBT_TRANSPORT transport,
   }
 
   log::debug("Encrypted:{:c}, peer:{} transport:{} status:{} callback:{:c}",
-             result == BTM_SUCCESS ? 'T' : 'F',
-             ADDRESS_TO_LOGGABLE_CSTR((*bd_addr)), bt_transport_text(transport),
-             btm_status_text(result), (p_callback) ? 'T' : 'F');
+             result == BTM_SUCCESS ? 'T' : 'F', *bd_addr,
+             bt_transport_text(transport), btm_status_text(result),
+             (p_callback) ? 'T' : 'F');
 
   tBTA_STATUS bta_status = BTA_SUCCESS;
   switch (result) {
@@ -874,15 +866,14 @@ void bta_dm_set_encryption(const RawAddress& bd_addr, tBT_TRANSPORT transport,
                            tBTA_DM_ENCRYPT_CBACK* p_callback,
                            tBTM_BLE_SEC_ACT sec_act) {
   if (p_callback == nullptr) {
-    log::error("callback is not provided,addr:{}",
-               ADDRESS_TO_LOGGABLE_CSTR(bd_addr));
+    log::error("callback is not provided,addr:{}", bd_addr);
     return;
   }
 
   tBTA_DM_PEER_DEVICE* device = find_connected_device(bd_addr, transport);
   if (device == nullptr) {
     log::error("Unable to find active ACL connection device:{} transport:{}",
-               ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bt_transport_text(transport));
+               bd_addr, bt_transport_text(transport));
     return;
   }
 
@@ -890,7 +881,7 @@ void bta_dm_set_encryption(const RawAddress& bd_addr, tBT_TRANSPORT transport,
     log::error(
         "Unable to start encryption as already in progress peer:{} "
         "transport:{}",
-        ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bt_transport_text(transport));
+        bd_addr, bt_transport_text(transport));
     (*p_callback)(bd_addr, transport, BTA_BUSY);
     return;
   }
@@ -899,11 +890,11 @@ void bta_dm_set_encryption(const RawAddress& bd_addr, tBT_TRANSPORT transport,
           bd_addr, transport, bta_dm_encrypt_cback, NULL, sec_act) ==
       BTM_CMD_STARTED) {
     device->p_encrypt_cback = p_callback;
-    log::debug("Started encryption peer:{} transport:{}",
-               ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bt_transport_text(transport));
+    log::debug("Started encryption peer:{} transport:{}", bd_addr,
+               bt_transport_text(transport));
   } else {
     log::error("Unable to start encryption process peer:{} transport:{}",
-               ADDRESS_TO_LOGGABLE_CSTR(bd_addr), bt_transport_text(transport));
+               bd_addr, bt_transport_text(transport));
   }
 }
 

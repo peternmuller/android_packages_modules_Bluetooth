@@ -39,6 +39,7 @@
 #endif
 
 #include "btif/include/btif_config.h"
+#include "device/include/interop_config.h"
 #include "device/include/device_iot_config.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_sec_api_types.h"
@@ -60,6 +61,9 @@ using namespace bluetooth::legacy::stack::sdp;
 
 /* maximum AT command length */
 #define BTA_AG_CMD_MAX 512
+
+/* SLC TIMER exception for IOT devices */
+#define SLC_EXCEPTION_TIMEOUT_MS 10000
 
 const uint16_t bta_ag_uuid[BTA_AG_NUM_IDX] = {
     UUID_SERVCLASS_HEADSET_AUDIO_GATEWAY, UUID_SERVCLASS_AG_HANDSFREE};
@@ -395,8 +399,10 @@ void bta_ag_rfc_close(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
   /* Clear these flags upon SLC teardown */
   p_scb->codec_updated = false;
   p_scb->codec_fallback = false;
+  p_scb->trying_cvsd_safe_settings = false;
   p_scb->retransmission_effort_retries = 0;
   p_scb->codec_msbc_settings = BTA_AG_SCO_MSBC_SETTINGS_T2;
+  p_scb->codec_cvsd_settings = BTA_AG_SCO_CVSD_SETTINGS_S4;
   p_scb->codec_aptx_settings = BTA_AG_SCO_APTX_SWB_SETTINGS_Q0;
   p_scb->is_aptx_swb_codec = false;
   p_scb->codec_lc3_settings = BTA_AG_SCO_LC3_SETTINGS_T2;
@@ -476,6 +482,7 @@ void bta_ag_rfc_close(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
  *
  ******************************************************************************/
 void bta_ag_rfc_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
+  int ag_conn_timeout = p_bta_ag_cfg->conn_tout;
   /* initialize AT feature variables */
   p_scb->clip_enabled = false;
   p_scb->ccwa_enabled = false;
@@ -488,8 +495,7 @@ void bta_ag_rfc_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
     if (!btif_config_get_bin(
             p_scb->peer_addr.ToString(), BTIF_STORAGE_KEY_HFP_VERSION,
             (uint8_t*)&p_scb->peer_version, &version_value_size)) {
-      log::warn("Failed read cached peer HFP version for {}",
-                ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
+      log::warn("Failed read cached peer HFP version for {}", p_scb->peer_addr);
       p_scb->peer_version = HFP_HSP_VERSION_UNKNOWN;
     }
     size_t sdp_features_size = sizeof(p_scb->peer_sdp_features);
@@ -510,7 +516,7 @@ void bta_ag_rfc_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
       }
     } else {
       log::warn("Failed read cached peer HFP SDP features for {}",
-                ADDRESS_TO_LOGGABLE_CSTR(p_scb->peer_addr));
+                p_scb->peer_addr);
     }
   }
 
@@ -526,9 +532,15 @@ void bta_ag_rfc_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
 
   bta_ag_cback_open(p_scb, p_scb->peer_addr, BTA_AG_SUCCESS);
 
+  if (interop_match_addr(INTEROP_INCREASE_AG_CONN_TIMEOUT, &p_scb->peer_addr)) {
+    /* use higher value for ag conn timeout */
+    ag_conn_timeout = SLC_EXCEPTION_TIMEOUT_MS;
+  }
+
+  log::verbose("bta_ag_rfc_open: ag_conn_timeout: {}", ag_conn_timeout);
   if (p_scb->conn_service == BTA_AG_HFP) {
     /* if hfp start timer for service level conn */
-    bta_sys_start_timer(p_scb->ring_timer, p_bta_ag_cfg->conn_tout,
+    bta_sys_start_timer(p_scb->ring_timer,ag_conn_timeout,
                         BTA_AG_SVC_TIMEOUT_EVT, bta_ag_scb_to_idx(p_scb));
   } else {
     /* else service level conn is open */
@@ -566,8 +578,7 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
   for (tBTA_AG_SCB& ag_scb : bta_ag_cb.scb) {
     // Cancel any pending collision timers
     if (ag_scb.in_use && alarm_is_scheduled(ag_scb.collision_timer)) {
-      log::verbose("cancel collision alarm for {}",
-                   ADDRESS_TO_LOGGABLE_STR(ag_scb.peer_addr));
+      log::verbose("cancel collision alarm for {}", ag_scb.peer_addr);
       alarm_cancel(ag_scb.collision_timer);
       if (dev_addr != ag_scb.peer_addr && p_scb != &ag_scb) {
         // Resume outgoing connection if incoming is not on the same device
@@ -577,7 +588,7 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
     if (dev_addr == ag_scb.peer_addr && p_scb != &ag_scb) {
       log::info(
           "close outgoing connection before accepting {} with conn_handle={}",
-          ADDRESS_TO_LOGGABLE_STR(ag_scb.peer_addr), ag_scb.conn_handle);
+          ag_scb.peer_addr, ag_scb.conn_handle);
       if (!IS_FLAG_ENABLED(close_rfcomm_instead_of_reset)) {
         // Fail the outgoing connection to clean up any upper layer states
         bta_ag_rfc_fail(&ag_scb, tBTA_AG_DATA::kEmpty);
@@ -589,7 +600,7 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
         if (status != PORT_SUCCESS) {
           log::warn(
               "RFCOMM_RemoveConnection failed for {}, handle {}, error {}",
-              ADDRESS_TO_LOGGABLE_STR(dev_addr), ag_scb.conn_handle, status);
+              dev_addr, ag_scb.conn_handle, status);
         }
       } else if (IS_FLAG_ENABLED(reset_after_collision)) {
         // As no existing outgoing rfcomm connection, then manual reset current
@@ -597,10 +608,8 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
         bta_ag_rfc_fail(&ag_scb, tBTA_AG_DATA::kEmpty);
       }
     }
-    log::info("dev_addr={}, peer_addr={}, in_use={}, index={}",
-              ADDRESS_TO_LOGGABLE_STR(dev_addr),
-              ADDRESS_TO_LOGGABLE_STR(ag_scb.peer_addr), ag_scb.in_use,
-              bta_ag_scb_to_idx(p_scb));
+    log::info("dev_addr={}, peer_addr={}, in_use={}, index={}", dev_addr,
+              ag_scb.peer_addr, ag_scb.in_use, bta_ag_scb_to_idx(p_scb));
   }
 
   p_scb->peer_addr = dev_addr;
@@ -663,14 +672,13 @@ void bta_ag_rfc_data(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
     /* read data from rfcomm; if bad status, we're done */
     if (PORT_ReadData(p_scb->conn_handle, buf, BTA_AG_RFC_READ_MAX, &len) !=
         PORT_SUCCESS) {
-      log::error("failed to read data {}",
-                 ADDRESS_TO_LOGGABLE_STR(p_scb->peer_addr));
+      log::error("failed to read data {}", p_scb->peer_addr);
       break;
     }
 
     /* if no data, we're done */
     if (len == 0) {
-      log::warn("no data for {}", ADDRESS_TO_LOGGABLE_STR(p_scb->peer_addr));
+      log::warn("no data for {}", p_scb->peer_addr);
       break;
     }
 

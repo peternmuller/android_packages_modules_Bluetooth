@@ -358,7 +358,7 @@ struct iso_impl {
     if (iso == nullptr) {
       /* That can happen when ACL has been disconnected while ISO patch was
        * creating */
-      log::warn("Invalid connection handle: {}", +conn_handle);
+      log::warn("Invalid connection handle: {}", conn_handle);
       return;
     }
 
@@ -419,7 +419,7 @@ struct iso_impl {
     if (iso == nullptr) {
       /* That could happen when ACL has been disconnected while removing data
        * path */
-      log::warn("Invalid connection handle: {}", +conn_handle);
+      log::warn("Invalid connection handle: {}", conn_handle);
       return;
     }
 
@@ -478,7 +478,7 @@ struct iso_impl {
 
     STREAM_TO_UINT8(status, stream);
     if (status != HCI_SUCCESS) {
-      log::error("Failed to Read ISO Link Quality, status: {}", loghex(status));
+      log::error("Failed to Read ISO Link Quality, status: 0x{:x}", status);
       return;
     }
 
@@ -488,7 +488,7 @@ struct iso_impl {
     if (iso == nullptr) {
       /* That could happen when ACL has been disconnected while waiting on the
        * read respose */
-      log::warn("Invalid connection handle: {}", +conn_handle);
+      log::warn("Invalid connection handle: {}", conn_handle);
       return;
     }
 
@@ -510,7 +510,7 @@ struct iso_impl {
   void read_iso_link_quality(uint16_t iso_handle) {
     iso_base* iso = GetIsoIfKnown(iso_handle);
     if (iso == nullptr) {
-      log::error("No such iso connection: {}", loghex(iso_handle));
+      log::error("No such iso connection: 0x{:x}", iso_handle);
       return;
     }
 
@@ -550,7 +550,7 @@ struct iso_impl {
 
     if (!(iso->state_flags & kStateFlagIsBroadcast)) {
       if (!(iso->state_flags & kStateFlagIsConnected)) {
-        log::warn("Cis handle: {} not established", loghex(iso_handle));
+        log::warn("Cis handle: 0x{:x} not established", iso_handle);
         return;
       }
     }
@@ -573,9 +573,9 @@ struct iso_impl {
           bluetooth::common::time_get_os_boottime_us();
 
       log::warn(
-          ", dropping ISO packet, len: {}, iso credits: {}, iso handle: {}",
+          ", dropping ISO packet, len: {}, iso credits: {}, iso handle: 0x{:x}",
           static_cast<int>(data_len), static_cast<int>(iso_credits_),
-          loghex(iso_handle));
+          iso_handle);
       return;
     }
 
@@ -641,7 +641,7 @@ struct iso_impl {
 
     log::assert_that(cig_callbacks_ != nullptr, "Invalid CIG callbacks");
 
-    log::info("flags: {}", +cis->state_flags);
+    log::info("flags: {}", cis->state_flags);
 
     BTM_LogHistory(
         kBtmLogTag, cis_hdl_to_addr[handle], "CIS disconnected",
@@ -714,7 +714,7 @@ struct iso_impl {
       uint16_t conn_handle;
       STREAM_TO_UINT16(conn_handle, data);
       evt.conn_handles.push_back(conn_handle);
-      log::info(" received BIS conn_hdl {}", +conn_handle);
+      log::info("received BIS conn_hdl {}", conn_handle);
 
       if (evt.status == HCI_SUCCESS) {
         auto bis = std::unique_ptr<iso_bis>(new iso_bis());
@@ -815,7 +815,7 @@ struct iso_impl {
         /* Not supported */
         break;
       default:
-        log::error("Unhandled event code {}", +code);
+        log::error("Unhandled event code {}", code);
     }
   }
 

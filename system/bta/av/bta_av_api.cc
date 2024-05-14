@@ -155,9 +155,8 @@ void BTA_AvDeregister(tBTA_AV_HNDL hndl) {
  ******************************************************************************/
 void BTA_AvOpen(const RawAddress& bd_addr, tBTA_AV_HNDL handle, bool use_rc,
                 uint16_t uuid) {
-  log::info("peer {} bta_handle:0x{:x} use_rc={} uuid=0x{:x}",
-            ADDRESS_TO_LOGGABLE_CSTR(bd_addr), handle,
-            (use_rc) ? "true" : "false", uuid);
+  log::info("peer {} bta_handle:0x{:x} use_rc={} uuid=0x{:x}", bd_addr, handle,
+            use_rc, uuid);
 
   tBTA_AV_API_OPEN* p_buf =
       (tBTA_AV_API_OPEN*)osi_malloc(sizeof(tBTA_AV_API_OPEN));
@@ -237,7 +236,7 @@ void BTA_AvStart(tBTA_AV_HNDL handle, bool use_latency_mode) {
   log::info(
       "Starting audio/video stream data transfer bta_handle:{}, "
       "use_latency_mode:{}",
-      handle, use_latency_mode ? "true" : "false");
+      handle, use_latency_mode);
 
   tBTA_AV_DO_START* p_buf =
       (tBTA_AV_DO_START*)osi_malloc(sizeof(tBTA_AV_DO_START));
@@ -627,7 +626,7 @@ void BTA_AvMetaCmd(uint8_t rc_handle, uint8_t label, tBTA_AV_CMD cmd_code,
 void BTA_AvSetLatency(tBTA_AV_HNDL handle, bool is_low_latency) {
   log::info(
       "Set audio/video stream low latency bta_handle:{}, is_low_latency:{}",
-      handle, is_low_latency ? "true" : "false");
+      handle, is_low_latency);
 
   tBTA_AV_API_SET_LATENCY* p_buf =
       (tBTA_AV_API_SET_LATENCY*)osi_malloc(sizeof(tBTA_AV_API_SET_LATENCY));
@@ -683,8 +682,14 @@ void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode) {
 }
 
 void BTA_AvUpdateAptxData(uint32_t data) {
+  log::info("BTA_AvUpdateAptxData");
   bool battery_info = (data & APTX_BATTERY_INFO);
   uint16_t aptx_mode = (uint16_t)(data & APTX_MODE_MASK);
+  if(aptx_mode == APTX_HQ) {
+    btif_av_update_codec_mode(false);
+  } else if(aptx_mode == APTX_LL) {
+    btif_av_update_codec_mode(true);
+  }
   if(battery_info) {
     tBTA_AV_APTX_DATA* p_buf_battery =
         (tBTA_AV_APTX_DATA*)osi_malloc(sizeof(tBTA_AV_APTX_DATA));

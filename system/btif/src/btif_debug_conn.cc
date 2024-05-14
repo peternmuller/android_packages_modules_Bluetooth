@@ -18,7 +18,6 @@
 
 #include "btif/include/btif_debug_conn.h"
 
-#include <stdio.h>
 #include <time.h>
 
 #include "os/logging/log_adapter.h"

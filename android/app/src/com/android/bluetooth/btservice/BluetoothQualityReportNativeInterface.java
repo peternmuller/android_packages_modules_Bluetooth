@@ -96,6 +96,13 @@ public class BluetoothQualityReportNativeInterface {
             return;
         }
 
+        AdapterService adapterService = AdapterService.getAdapterService();
+        if (adapterService == null) {
+            Log.e(TAG, "bqrDeliver failed: adapterService is null");
+            return;
+        }
+
+        int versionSupported = adapterService.getVendorCapVersion();
         BluetoothQualityReport bqr;
         try {
             bqr =
@@ -106,6 +113,7 @@ public class BluetoothQualityReportNativeInterface {
                             .setManufacturerId(manufacturerId)
                             .setRemoteName(remoteName)
                             .setBluetoothClass(remoteBtClass)
+                            .setVersionSupported(versionSupported)
                             .build();
             Log.i(TAG, bqr.toString());
         } catch (Exception e) {
@@ -114,11 +122,6 @@ public class BluetoothQualityReportNativeInterface {
         }
 
         try {
-            AdapterService adapterService = AdapterService.getAdapterService();
-            if (adapterService == null) {
-                Log.e(TAG, "bqrDeliver failed: adapterService is null");
-                return;
-            }
             int status = adapterService.bluetoothQualityReportReadyCallback(device, bqr);
             if (status != BluetoothStatusCodes.SUCCESS) {
                 Log.e(TAG, "bluetoothQualityReportReadyCallback failed, status: " + status);

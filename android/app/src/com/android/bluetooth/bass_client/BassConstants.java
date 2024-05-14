@@ -67,6 +67,7 @@ public class BassConstants {
     public static final int BCAST_RCVR_STATE_BIS_SYNC_SIZE = 4;
     // 30 secs time out for all gatt writes
     public static final int GATT_TXN_TIMEOUT_MS = 30000;
+    public static final int SOURCE_OPERATION_TIMEOUT_MS = 3000;
     // 3 min time out for keeping PSYNC active
     public static final int PSYNC_ACTIVE_TIMEOUT_MS = 3 * 60000;
     // 2 secs time out achieving psync
@@ -84,4 +85,6 @@ public class BassConstants {
     // BIS_Sync parameter value
     public static final long BIS_SYNC_NOT_SYNC_TO_BIS = 0x00000000L;
     public static final long BIS_SYNC_FAILED_SYNC_TO_BIG = 0xFFFFFFFFL;
+    // 100 ms time out for removing source
+    public static final int REMOVE_SOURCE_TIMEOUT_MS = 100;
 }

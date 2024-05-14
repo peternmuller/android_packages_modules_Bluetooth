@@ -37,7 +37,15 @@
 #include "test/mock/mock_stack_btm_sec.h"
 #include "types/raw_address.h"
 
+namespace bluetooth::testing {
 void set_hal_cbacks(bt_callbacks_t* callbacks);
+}  // namespace bluetooth::testing
+
+namespace bluetooth::legacy::testing {
+void bta_dm_acl_down(const RawAddress& bd_addr, tBT_TRANSPORT transport);
+void bta_dm_acl_up(const RawAddress& bd_addr, tBT_TRANSPORT transport,
+                   uint16_t acl_handle);
+}  // namespace bluetooth::legacy::testing
 
 const tBTA_AG_RES_DATA tBTA_AG_RES_DATA::kEmpty = {};
 
@@ -48,9 +56,12 @@ module_t gd_shim_module;
 module_t osi_module;
 module_t rust_module;
 
+bool bta_ag_is_call_present(const RawAddress* peer_addr) { return true; }
+
 namespace {
 
 const RawAddress kRawAddress({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
+const uint16_t kHciHandle = 123;
 
 auto timeout_time = std::chrono::seconds(3);
 
@@ -74,7 +85,6 @@ void pin_request_callback(RawAddress* /* remote_bd_addr */,
                           bt_bdname_t* /* bd_name */, uint32_t /* cod */,
                           bool /* min_16_digit */) {}
 void ssp_request_callback(RawAddress* /* remote_bd_addr */,
-                          bt_bdname_t* /* bd_name */, uint32_t /* cod */,
                           bt_ssp_variant_t /* pairing_variant */,
                           uint32_t /* pass_key */) {}
 void bond_state_changed_callback(bt_status_t /* status */,
@@ -108,6 +118,8 @@ void generate_local_oob_data_callback(tBT_TRANSPORT /* transport */,
                                       bt_oob_data_t /* oob_data */) {}
 void switch_buffer_size_callback(bool /* is_low_latency_buffer_size */) {}
 void switch_codec_callback(bool /* is_low_latency_buffer_size */) {}
+void le_rand_callback(uint64_t /* random */) {}
+void key_missing_callback(const RawAddress /* bd_addr */) {}
 #undef TESTCB
 
 bt_callbacks_t callbacks = {
@@ -131,16 +143,20 @@ bt_callbacks_t callbacks = {
     .generate_local_oob_data_cb = generate_local_oob_data_callback,
     .switch_buffer_size_cb = switch_buffer_size_callback,
     .switch_codec_cb = switch_codec_callback,
+    .le_rand_cb = le_rand_callback,
+    .key_missing_cb = key_missing_callback,
 };
 
 }  // namespace
+
+class BtifUtilsTest : public ::testing::Test {};
 
 class BtifCoreTest : public ::testing::Test {
  protected:
   void SetUp() override {
     callback_map_.clear();
     bluetooth::hci::testing::mock_controller_ = &controller_;
-    set_hal_cbacks(&callbacks);
+    bluetooth::testing::set_hal_cbacks(&callbacks);
     auto promise = std::promise<void>();
     auto future = promise.get_future();
     callback_map_["callback_thread_event"] = [&promise]() {
@@ -166,6 +182,7 @@ class BtifCoreTest : public ::testing::Test {
 };
 
 class BtifCoreWithControllerTest : public BtifCoreTest {
+ protected:
   void SetUp() override {
     BtifCoreTest::SetUp();
     ON_CALL(controller_, SupportsSniffSubrating).WillByDefault(Return(true));
@@ -174,13 +191,27 @@ class BtifCoreWithControllerTest : public BtifCoreTest {
   void TearDown() override { BtifCoreTest::TearDown(); }
 };
 
+class BtifCoreWithConnectionTest : public BtifCoreWithControllerTest {
+ protected:
+  void SetUp() override {
+    BtifCoreWithControllerTest::SetUp();
+    bluetooth::legacy::testing::bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO,
+                                              kHciHandle);
+  }
+
+  void TearDown() override {
+    bluetooth::legacy::testing::bta_dm_acl_down(kRawAddress, BT_TRANSPORT_AUTO);
+    BtifCoreWithControllerTest::TearDown();
+  }
+};
+
 std::promise<int> promise0;
 void callback0(int val) { promise0.set_value(val); }
 
 TEST_F(BtifCoreTest, test_nop) {}
 
 TEST_F(BtifCoreTest, test_post_on_bt_simple0) {
-  const int val = 123;
+  const int val = kHciHandle;
   promise0 = std::promise<int>();
   std::future<int> future0 = promise0.get_future();
   post_on_bt_jni([=]() { callback0(val); });
@@ -214,7 +245,7 @@ TEST_F(BtifCoreTest, test_post_on_bt_jni_simple3) {
 }
 
 extern const char* dump_av_sm_event_name(int event);
-TEST_F(BtifCoreTest, dump_av_sm_event_name) {
+TEST_F(BtifUtilsTest, dump_av_sm_event_name) {
   std::vector<std::pair<int, std::string>> events = {
       std::make_pair(BTA_AV_ENABLE_EVT, "BTA_AV_ENABLE_EVT"),
       std::make_pair(BTA_AV_REGISTER_EVT, "BTA_AV_REGISTER_EVT"),
@@ -243,15 +274,14 @@ TEST_F(BtifCoreTest, dump_av_sm_event_name) {
                      "BTA_AV_OFFLOAD_START_RSP_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_av_sm_event_name(event.first));
+    ASSERT_EQ(event.second, dump_av_sm_event_name(event.first));
   }
   std::ostringstream oss;
   oss << "UNKNOWN_EVENT";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_av_sm_event_name(std::numeric_limits<int>::max()));
+  ASSERT_EQ(oss.str(), dump_av_sm_event_name(std::numeric_limits<int>::max()));
 }
 
-TEST_F(BtifCoreTest, dump_dm_search_event) {
+TEST_F(BtifUtilsTest, dump_dm_search_event) {
   std::vector<std::pair<uint16_t, std::string>> events = {
       std::make_pair(BTA_DM_INQ_RES_EVT, "BTA_DM_INQ_RES_EVT"),
       std::make_pair(BTA_DM_INQ_CMPL_EVT, "BTA_DM_INQ_CMPL_EVT"),
@@ -261,15 +291,13 @@ TEST_F(BtifCoreTest, dump_dm_search_event) {
       std::make_pair(BTA_DM_NAME_READ_EVT, "BTA_DM_NAME_READ_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_dm_search_event(event.first));
+    ASSERT_TRUE(dump_dm_search_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_dm_search_event(std::numeric_limits<uint16_t>::max()));
+  ASSERT_TRUE(dump_dm_search_event(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_property_type) {
+TEST_F(BtifUtilsTest, dump_property_type) {
   std::vector<std::pair<bt_property_type_t, std::string>> types = {
       std::make_pair(BT_PROPERTY_BDNAME, "BT_PROPERTY_BDNAME"),
       std::make_pair(BT_PROPERTY_BDADDR, "BT_PROPERTY_BDADDR"),
@@ -288,16 +316,14 @@ TEST_F(BtifCoreTest, dump_property_type) {
                      "BT_PROPERTY_REMOTE_FRIENDLY_NAME"),
   };
   for (const auto& type : types) {
-    ASSERT_STREQ(type.second.c_str(), dump_property_type(type.first));
+    EXPECT_TRUE(dump_property_type(type.first).starts_with(type.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN PROPERTY ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_property_type(static_cast<bt_property_type_t>(
-                   std::numeric_limits<uint16_t>::max())));
+  EXPECT_TRUE(dump_property_type(static_cast<bt_property_type_t>(
+                                     std::numeric_limits<uint16_t>::max()))
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_dm_event) {
+TEST_F(BtifUtilsTest, dump_dm_event) {
   std::vector<std::pair<uint8_t, std::string>> events = {
       std::make_pair(BTA_DM_PIN_REQ_EVT, "BTA_DM_PIN_REQ_EVT"),
       std::make_pair(BTA_DM_AUTH_CMPL_EVT, "BTA_DM_AUTH_CMPL_EVT"),
@@ -321,15 +347,13 @@ TEST_F(BtifCoreTest, dump_dm_event) {
       std::make_pair(BTA_DM_ENER_INFO_READ, "BTA_DM_ENER_INFO_READ"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_dm_event(event.first));
+    ASSERT_TRUE(dump_dm_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN DM EVENT";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_dm_event(std::numeric_limits<uint8_t>::max()));
+  ASSERT_TRUE(dump_dm_event(std::numeric_limits<uint8_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_hf_event) {
+TEST_F(BtifUtilsTest, dump_hf_event) {
   std::vector<std::pair<uint8_t, std::string>> events = {
       std::make_pair(BTA_AG_ENABLE_EVT, "BTA_AG_ENABLE_EVT"),
       std::make_pair(BTA_AG_REGISTER_EVT, "BTA_AG_REGISTER_EVT"),
@@ -366,15 +390,13 @@ TEST_F(BtifCoreTest, dump_hf_event) {
       std::make_pair(BTA_AG_AT_BIA_EVT, "BTA_AG_AT_BIA_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_hf_event(event.first));
+    ASSERT_TRUE(dump_hf_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_hf_event(std::numeric_limits<uint8_t>::max()));
+  ASSERT_TRUE(dump_hf_event(std::numeric_limits<uint8_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_hf_client_event) {
+TEST_F(BtifUtilsTest, dump_hf_client_event) {
   std::vector<std::pair<int, std::string>> events = {
       std::make_pair(BTA_HF_CLIENT_ENABLE_EVT, "BTA_HF_CLIENT_ENABLE_EVT"),
       std::make_pair(BTA_HF_CLIENT_REGISTER_EVT, "BTA_HF_CLIENT_REGISTER_EVT"),
@@ -410,12 +432,10 @@ TEST_F(BtifCoreTest, dump_hf_client_event) {
                      "BTA_HF_CLIENT_RING_INDICATION"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_hf_client_event(event.first));
+    ASSERT_TRUE(dump_hf_client_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_hf_client_event(std::numeric_limits<uint16_t>::max()));
+  ASSERT_TRUE(dump_hf_client_event(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
 TEST_F(BtifCoreTest, bta_hh_event_text) {
@@ -438,15 +458,13 @@ TEST_F(BtifCoreTest, bta_hh_event_text) {
       std::make_pair(BTA_HH_API_ERR_EVT, "BTA_HH_API_ERR_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_EQ(event.second, bta_hh_event_text(event.first));
+    ASSERT_TRUE(bta_hh_event_text(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  auto unknown_evt = std::numeric_limits<uint16_t>::max();
-  oss << "UNKNOWN[" << unknown_evt << "]";
-  ASSERT_EQ(oss.str(), bta_hh_event_text(unknown_evt));
+  ASSERT_TRUE(bta_hh_event_text(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_hd_event) {
+TEST_F(BtifUtilsTest, dump_hd_event) {
   std::vector<std::pair<uint16_t, std::string>> events = {
       std::make_pair(BTA_HD_ENABLE_EVT, "BTA_HD_ENABLE_EVT"),
       std::make_pair(BTA_HD_DISABLE_EVT, "BTA_HD_DISABLE_EVT"),
@@ -463,29 +481,26 @@ TEST_F(BtifCoreTest, dump_hd_event) {
       std::make_pair(BTA_HD_API_ERR_EVT, "BTA_HD_API_ERR_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_hd_event(event.first));
+    ASSERT_TRUE(dump_hd_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_hd_event(std::numeric_limits<uint16_t>::max()));
+  ASSERT_TRUE(dump_hd_event(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_thread_evt) {
+TEST_F(BtifUtilsTest, dump_thread_evt) {
   std::vector<std::pair<bt_cb_thread_evt, std::string>> events = {
       std::make_pair(ASSOCIATE_JVM, "ASSOCIATE_JVM"),
       std::make_pair(DISASSOCIATE_JVM, "DISASSOCIATE_JVM"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_thread_evt(event.first));
+    ASSERT_TRUE(dump_thread_evt(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "unknown thread evt";
-  ASSERT_STREQ(oss.str().c_str(), dump_thread_evt(static_cast<bt_cb_thread_evt>(
-                                      std::numeric_limits<uint16_t>::max())));
+  ASSERT_TRUE(dump_thread_evt(static_cast<bt_cb_thread_evt>(
+                                  std::numeric_limits<uint16_t>::max()))
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_av_conn_state) {
+TEST_F(BtifUtilsTest, dump_av_conn_state) {
   std::vector<std::pair<uint16_t, std::string>> events = {
       std::make_pair(BTAV_CONNECTION_STATE_DISCONNECTED,
                      "BTAV_CONNECTION_STATE_DISCONNECTED"),
@@ -497,15 +512,13 @@ TEST_F(BtifCoreTest, dump_av_conn_state) {
                      "BTAV_CONNECTION_STATE_DISCONNECTING"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_av_conn_state(event.first));
+    ASSERT_TRUE(dump_av_conn_state(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_av_conn_state(std::numeric_limits<uint16_t>::max()));
+  ASSERT_TRUE(dump_av_conn_state(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_av_audio_state) {
+TEST_F(BtifUtilsTest, dump_av_audio_state) {
   std::vector<std::pair<uint16_t, std::string>> events = {
       std::make_pair(BTAV_AUDIO_STATE_REMOTE_SUSPEND,
                      "BTAV_AUDIO_STATE_REMOTE_SUSPEND"),
@@ -513,15 +526,13 @@ TEST_F(BtifCoreTest, dump_av_audio_state) {
       std::make_pair(BTAV_AUDIO_STATE_STARTED, "BTAV_AUDIO_STATE_STARTED"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_av_audio_state(event.first));
+    ASSERT_TRUE(dump_av_audio_state(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN MSG ID";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_av_audio_state(std::numeric_limits<uint16_t>::max()));
+  ASSERT_TRUE(dump_av_audio_state(std::numeric_limits<uint16_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_adapter_scan_mode) {
+TEST_F(BtifUtilsTest, dump_adapter_scan_mode) {
   std::vector<std::pair<bt_scan_mode_t, std::string>> events = {
       std::make_pair(BT_SCAN_MODE_NONE, "BT_SCAN_MODE_NONE"),
       std::make_pair(BT_SCAN_MODE_CONNECTABLE, "BT_SCAN_MODE_CONNECTABLE"),
@@ -529,16 +540,14 @@ TEST_F(BtifCoreTest, dump_adapter_scan_mode) {
                      "BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_adapter_scan_mode(event.first));
+    ASSERT_TRUE(dump_adapter_scan_mode(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "unknown scan mode";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_adapter_scan_mode(static_cast<bt_scan_mode_t>(
-                   std::numeric_limits<int>::max())));
+  ASSERT_TRUE(dump_adapter_scan_mode(
+                  static_cast<bt_scan_mode_t>(std::numeric_limits<int>::max()))
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_bt_status) {
+TEST_F(BtifUtilsTest, dump_bt_status) {
   std::vector<std::pair<bt_status_t, std::string>> events = {
       std::make_pair(BT_STATUS_SUCCESS, "BT_STATUS_SUCCESS"),
       std::make_pair(BT_STATUS_FAIL, "BT_STATUS_FAIL"),
@@ -548,15 +557,14 @@ TEST_F(BtifCoreTest, dump_bt_status) {
       std::make_pair(BT_STATUS_UNSUPPORTED, "BT_STATUS_UNSUPPORTED"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_bt_status(event.first));
+    ASSERT_TRUE(dump_bt_status(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "unknown scan mode";
-  ASSERT_STREQ(oss.str().c_str(), dump_bt_status(static_cast<bt_status_t>(
-                                      std::numeric_limits<int>::max())));
+  ASSERT_TRUE(
+      dump_bt_status(static_cast<bt_status_t>(std::numeric_limits<int>::max()))
+          .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_rc_event) {
+TEST_F(BtifUtilsTest, dump_rc_event) {
   std::vector<std::pair<uint8_t, std::string>> events = {
       std::make_pair(BTA_AV_RC_OPEN_EVT, "BTA_AV_RC_OPEN_EVT"),
       std::make_pair(BTA_AV_RC_CLOSE_EVT, "BTA_AV_RC_CLOSE_EVT"),
@@ -571,15 +579,13 @@ TEST_F(BtifCoreTest, dump_rc_event) {
       std::make_pair(BTA_AV_RC_PSM_EVT, "BTA_AV_RC_PSM_EVT"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(), dump_rc_event(event.first));
+    ASSERT_TRUE(dump_rc_event(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "UNKNOWN_EVENT";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_rc_event(std::numeric_limits<uint8_t>::max()));
+  ASSERT_TRUE(dump_rc_event(std::numeric_limits<uint8_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_rc_notification_event_id) {
+TEST_F(BtifUtilsTest, dump_rc_notification_event_id) {
   std::vector<std::pair<uint8_t, std::string>> events = {
       std::make_pair(AVRC_EVT_PLAY_STATUS_CHANGE,
                      "AVRC_EVT_PLAY_STATUS_CHANGE"),
@@ -604,16 +610,14 @@ TEST_F(BtifCoreTest, dump_rc_notification_event_id) {
       std::make_pair(AVRC_EVT_UIDS_CHANGE, "AVRC_EVT_UIDS_CHANGE"),
   };
   for (const auto& event : events) {
-    ASSERT_STREQ(event.second.c_str(),
-                 dump_rc_notification_event_id(event.first));
+    ASSERT_TRUE(
+        dump_rc_notification_event_id(event.first).starts_with(event.second));
   }
-  std::ostringstream oss;
-  oss << "Unhandled Event ID";
-  ASSERT_STREQ(oss.str().c_str(), dump_rc_notification_event_id(
-                                      std::numeric_limits<uint8_t>::max()));
+  ASSERT_TRUE(dump_rc_notification_event_id(std::numeric_limits<uint8_t>::max())
+                  .starts_with("Unknown"));
 }
 
-TEST_F(BtifCoreTest, dump_rc_pdu) {
+TEST_F(BtifUtilsTest, dump_rc_pdu) {
   std::vector<std::pair<uint8_t, std::string>> pdus = {
       std::make_pair(AVRC_PDU_LIST_PLAYER_APP_ATTR,
                      "AVRC_PDU_LIST_PLAYER_APP_ATTR"),
@@ -659,25 +663,18 @@ TEST_F(BtifCoreTest, dump_rc_pdu) {
       std::make_pair(AVRC_PDU_GENERAL_REJECT, "AVRC_PDU_GENERAL_REJECT"),
   };
   for (const auto& pdu : pdus) {
-    ASSERT_STREQ(pdu.second.c_str(), dump_rc_pdu(pdu.first));
+    ASSERT_TRUE(dump_rc_pdu(pdu.first).starts_with(pdu.second));
   }
-  std::ostringstream oss;
-  oss << "Unknown PDU";
-  ASSERT_STREQ(oss.str().c_str(),
-               dump_rc_pdu(std::numeric_limits<uint8_t>::max()));
+  ASSERT_TRUE(
+      dump_rc_pdu(std::numeric_limits<uint8_t>::max()).starts_with("Unknown"));
 }
-
-void bta_dm_acl_up(const RawAddress& bd_addr, tBT_TRANSPORT transport,
-                   uint16_t acl_handle);
 
 TEST_F(BtifCoreWithControllerTest, btif_dm_get_connection_state__unconnected) {
   ASSERT_EQ(0, btif_dm_get_connection_state(kRawAddress));
 }
 
-TEST_F(BtifCoreWithControllerTest,
+TEST_F(BtifCoreWithConnectionTest,
        btif_dm_get_connection_state__connected_no_encryption) {
-  bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO, 0x123);
-
   test::mock::stack_btm_sec::BTM_IsEncrypted.body =
       [](const RawAddress& /* bd_addr */, tBT_TRANSPORT transport) {
         switch (transport) {
@@ -692,10 +689,8 @@ TEST_F(BtifCoreWithControllerTest,
   test::mock::stack_btm_sec::BTM_IsEncrypted = {};
 }
 
-TEST_F(BtifCoreWithControllerTest,
+TEST_F(BtifCoreWithConnectionTest,
        btif_dm_get_connection_state__connected_classic_encryption) {
-  bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO, 0x123);
-
   test::mock::stack_btm_sec::BTM_IsEncrypted.body =
       [](const RawAddress& /* bd_addr */, tBT_TRANSPORT transport) {
         switch (transport) {
@@ -707,13 +702,12 @@ TEST_F(BtifCoreWithControllerTest,
         return false;
       };
   ASSERT_EQ(3, btif_dm_get_connection_state(kRawAddress));
+
   test::mock::stack_btm_sec::BTM_IsEncrypted = {};
 }
 
-TEST_F(BtifCoreWithControllerTest,
+TEST_F(BtifCoreWithConnectionTest,
        btif_dm_get_connection_state__connected_le_encryption) {
-  bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO, 0x123);
-
   test::mock::stack_btm_sec::BTM_IsEncrypted.body =
       [](const RawAddress& /* bd_addr */, tBT_TRANSPORT transport) {
         switch (transport) {
@@ -728,10 +722,8 @@ TEST_F(BtifCoreWithControllerTest,
   test::mock::stack_btm_sec::BTM_IsEncrypted = {};
 }
 
-TEST_F(BtifCoreWithControllerTest,
+TEST_F(BtifCoreWithConnectionTest,
        btif_dm_get_connection_state__connected_both_encryption) {
-  bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO, 0x123);
-
   test::mock::stack_btm_sec::BTM_IsEncrypted.body =
       [](const RawAddress& /* bd_addr */, tBT_TRANSPORT transport) {
         switch (transport) {
@@ -746,9 +738,7 @@ TEST_F(BtifCoreWithControllerTest,
   test::mock::stack_btm_sec::BTM_IsEncrypted = {};
 }
 
-TEST_F(BtifCoreWithControllerTest, btif_dm_get_connection_state_sync) {
-  bta_dm_acl_up(kRawAddress, BT_TRANSPORT_AUTO, 0x123);
-
+TEST_F(BtifCoreWithConnectionTest, btif_dm_get_connection_state_sync) {
   test::mock::stack_btm_sec::BTM_IsEncrypted.body =
       [](const RawAddress& /* bd_addr */, tBT_TRANSPORT transport) {
         switch (transport) {
