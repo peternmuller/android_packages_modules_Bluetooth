@@ -3014,13 +3014,6 @@ public class LeAudioService extends ProfileService {
                 return;
             }
 
-            descriptor.mCodecStatus = new BluetoothLeAudioCodecStatus(
-                            null,
-                            null,
-                            mInputLocalCodecCapabilities,
-                            mOutputLocalCodecCapabilities,
-                            descriptor.mInputSelectableConfig,
-                            descriptor.mOutputSelectableConfig);
             descriptor.mInputSelectableConfig = new ArrayList<>(stackEvent.valueCodecList1);
             descriptor.mOutputSelectableConfig = new ArrayList<>(stackEvent.valueCodecList2);
 
@@ -3029,6 +3022,13 @@ public class LeAudioService extends ProfileService {
 
             descriptor.mInputSelectableConfig.removeIf(n -> n.equals(emptyConfig));
             descriptor.mOutputSelectableConfig.removeIf(n -> n.equals(emptyConfig));
+            descriptor.mCodecStatus = new BluetoothLeAudioCodecStatus(
+                            null,
+                            null,
+                            mInputLocalCodecCapabilities,
+                            mOutputLocalCodecCapabilities,
+                            descriptor.mInputSelectableConfig,
+                            descriptor.mOutputSelectableConfig);
 
         } else if (stackEvent.type
                 == LeAudioStackEvent.EVENT_TYPE_AUDIO_GROUP_CURRENT_CODEC_CONFIG_CHANGED) {
