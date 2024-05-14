@@ -1383,6 +1383,7 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
         continue;
       }
 
+      bool is_vendor_metadata_populated_by_direction = false;
       int needed_ase_per_dev =
           std::min(static_cast<int>(max_required_ase_per_dev),
                    static_cast<int>(ase_cnt - active_ase_cnt));
@@ -1396,7 +1397,8 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
         auto const& pacs = (direction == types::kLeAudioDirectionSink)
                                ? device->snk_pacs_
                                : device->src_pacs_;
-        if (!utils::GetConfigurationSupportedPac(pacs, ent.codec)) {
+        const struct types::acs_ac_record* pac = NULL;
+        if (!(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec))) {
           log::debug(
               "Insufficient PAC for {}",
               direction == types::kLeAudioDirectionSink ? "sink" : "source");
@@ -1414,6 +1416,13 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
               lex_codec_disabled.first) {
             log::info("Skipping LeX config as Lex is disabled");
             continue;
+          }
+
+          if (!is_vendor_metadata_populated_by_direction) {
+            log::debug("Populate Vendor Metadata by direction {}", direction);
+            PopulateVendorMetadatabyDirection(requirements.audio_context_type,
+                direction, pac->metadata, ent);
+            is_vendor_metadata_populated_by_direction = true;
           }
         }
 
