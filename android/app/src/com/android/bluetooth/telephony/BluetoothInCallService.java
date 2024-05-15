@@ -199,7 +199,7 @@ public class BluetoothInCallService extends InCallService {
     private boolean mEnableDsdaMode = false;
 
     private static final String ENABLE_DSDA_SUPPORT =
-          "persist.bluetooth.init.DSDA.support";
+          "persist.bluetooth.init.dsda.support";
 
     /**
      * Listens to connections and disconnections of bluetooth headsets. We need to save the current
@@ -1178,7 +1178,7 @@ public class BluetoothInCallService extends InCallService {
         intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
         registerReceiver(mBluetoothAdapterReceiver, intentFilter);
         mOnCreateCalled = true;
-        mEnableDsdaMode = SystemProperties.getBoolean(ENABLE_DSDA_SUPPORT, false);
+        mEnableDsdaMode = SystemProperties.getBoolean(ENABLE_DSDA_SUPPORT, true);
         if (mEnableDsdaMode)  {
           Log.d(TAG, "MEnableDsdaMode is: " + mEnableDsdaMode);
           if (mHandler == null) {
