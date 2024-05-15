@@ -62,6 +62,7 @@ constexpr char kBtmLogTag[] = "BOND";
 }
 
 static void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
+  p_dev_rec->sm4 = BTM_SM4_UNKNOWN;
   p_dev_rec->sec_rec.link_key.fill(0);
   memset(&p_dev_rec->sec_rec.ble_keys, 0, sizeof(tBTM_SEC_BLE_KEYS));
   list_remove(btm_sec_cb.sec_dev_rec, p_dev_rec);
