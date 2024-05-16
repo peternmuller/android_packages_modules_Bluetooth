@@ -99,6 +99,7 @@ import android.os.PowerManager;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.DeviceConfig;
@@ -1039,6 +1040,14 @@ public class AdapterService extends Service {
 
     void startProfileServices() {
         Log.d(TAG, "startCoreServices()");
+        String socName = SystemProperties.get("persist.vendor.qcom.bluetooth.soc");
+        Log.i(TAG, "socName: " + socName);
+        if(socName.equals("cherokee")) {
+            Config.setProfileEnabled(BluetoothProfile.HEARING_AID, false);
+        } else {
+            Config.setProfileEnabled(BluetoothProfile.HEARING_AID, true);
+        }
+
         int[] supportedProfileServices = Config.getSupportedProfiles();
         // TODO(b/228875190): GATT is assumed supported. If we support no other profiles then just
         // move on to BREDR_STARTED. Note that configuring GATT to NOT supported will cause adapter
