@@ -526,9 +526,52 @@ types::LeAudioConfigurationStrategy GetStrategyForAseConfig(
   return types::LeAudioConfigurationStrategy::MONO_ONE_CIS_PER_DEVICE;
 }
 
-static bool IsCodecConfigSupported(const types::LeAudioLtvMap& pacs,
+static bool IsCodecConfigSupported(const types::LeAudioCodecId codec,
+                                   const types::LeAudioLtvMap& pacs,
                                    const types::LeAudioLtvMap& reqs,
                                    uint8_t channel_cnt_per_ase) {
+  if (codec.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
+      codec.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm &&
+      codec.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) {
+    uint8_t u8_req_val, u8_pac_val;
+    uint16_t u16_pac_val;
+    auto req = reqs.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq);
+    auto pac = pacs.Find(codec_spec_caps::kLeAudioLtvTypeSupportedSamplingFrequencies);
+    if (!req || !pac) {
+      log::debug(", lack of sampling frequency fields");
+      return false;
+    }
+    u8_req_val = VEC_UINT8_TO_UINT8(req.value());
+    u16_pac_val = VEC_UINT8_TO_UINT16(pac.value());
+
+    if (!(u16_pac_val &
+          codec_spec_caps::SamplingFreqConfig2Capability(u8_req_val))) {
+      log::debug("Req:SamplFreq= 0x{:04x} (Assigned Numbers: Codec_Specific_Configuration)", u8_req_val);
+      log::debug("Pac:SamplFreq= 0x{:04x}  (Assigned numbers: Codec_Specific_Capabilities - bitfield)", u16_pac_val);
+      log::debug(", sampling frequency not supported");
+      return false;
+    }
+
+    pac = pacs.Find(codec_spec_caps::kLeAudioLtvTypeSupportedAudioChannelCounts);
+
+    if (!pac) {
+      log::debug(", no Audio_Channel_Counts field in PAC, using default 0x01");
+      u8_pac_val = 0x01;
+    } else {
+      u8_pac_val = VEC_UINT8_TO_UINT8(pac.value());
+    }
+
+    if (!((1 << (channel_cnt_per_ase - 1)) & u8_pac_val)) {
+      log::debug("Req:AudioChanCnt=0x{:04x}", 1 << (channel_cnt_per_ase - 1));
+      log::debug("Pac:AudioChanCnt=0x{:04x}", u8_pac_val);
+      log::debug(", channel count warning");
+      return false;
+    }
+
+    log::debug("APTX_LEX codec config matched");
+    return true;
+  }
+
   auto caps = pacs.GetAsCoreCodecCapabilities();
   auto config = reqs.GetAsCoreCodecConfig();
 
@@ -602,7 +645,7 @@ static bool IsCodecConfigSettingSupported(
     log::assert_that(
         !pac.codec_spec_caps.IsEmpty(),
         "Codec specific capabilities are not parsed approprietly.");
-    return IsCodecConfigSupported(
+    return IsCodecConfigSupported(codec_id,
         pac.codec_spec_caps, codec_config_setting.params,
         codec_config_setting.GetChannelCountPerIsoStream());
   }
