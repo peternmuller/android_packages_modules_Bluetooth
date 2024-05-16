@@ -469,6 +469,10 @@ void Device::HandleNotification(
 
     case Event::PLAYBACK_POS_CHANGED: {
       play_pos_interval_ = pkt->GetInterval();
+      if (play_pos_interval_ < 3) {
+        play_pos_interval_ = 3;
+      }
+      log::info("play_pos_interval = {}", play_pos_interval_);
       media_interface_->GetPlayStatus(
           base::Bind(&Device::PlaybackPosNotificationResponse,
                      weak_ptr_factory_.GetWeakPtr(), label, true));
