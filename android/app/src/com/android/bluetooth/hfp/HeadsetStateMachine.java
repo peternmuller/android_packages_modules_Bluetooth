@@ -1048,8 +1048,6 @@ public class HeadsetStateMachine extends StateMachine {
                     break;
                 }
                 case CALL_STATE_CHANGED: {
-                    if (mDeviceSilenced) break;
-
                     HeadsetCallState callState = (HeadsetCallState) message.obj;
                     setAptxVoice(callState);
 
