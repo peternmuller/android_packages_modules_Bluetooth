@@ -5941,7 +5941,7 @@ class LeAudioClientImpl : public LeAudioClient {
           return;
         }
 
-        handleAsymmetricPhyForUnicast(group);
+        //handleAsymmetricPhyForUnicast(group);
 
         if ((audio_sender_state_ == AudioState::IDLE) &&
             (audio_receiver_state_ == AudioState::IDLE)) {
@@ -6030,7 +6030,7 @@ class LeAudioClientImpl : public LeAudioClient {
         CleanCachedMicrophoneData();
 
         if (group) {
-          handleAsymmetricPhyForUnicast(group);
+          //handleAsymmetricPhyForUnicast(group);
           UpdateLocationsAndContextsAvailability(group);
           if (group->IsPendingConfiguration()) {
             SuspendedForReconfiguration();
@@ -6261,7 +6261,7 @@ class LeAudioClientImpl : public LeAudioClient {
     if (!group) {
       log::error("Invalid group: {}", static_cast<int>(active_group_id_));
     } else {
-      handleAsymmetricPhyForUnicast(group);
+      //handleAsymmetricPhyForUnicast(group);
       log::info("ClientAudioInterfaceRelease - cleanup");
     }
 
