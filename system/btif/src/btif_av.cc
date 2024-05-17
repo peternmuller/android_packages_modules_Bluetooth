@@ -2461,9 +2461,10 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
           should_suspend = true;
         }
 
+        log::info("Peer should suspend {}", should_suspend ? "true" : "false");
         // If peer is A2DP Source, do ACK commands to audio HAL and start
         // media task
-        if (btif_a2dp_on_started(
+        if (!should_suspend && btif_a2dp_on_started(
                 peer_.PeerAddress(), &p_av->start,
                 peer_.IsSource() ? A2dpType::kSink : A2dpType::kSource)) {
           // Only clear pending flag after acknowledgement
