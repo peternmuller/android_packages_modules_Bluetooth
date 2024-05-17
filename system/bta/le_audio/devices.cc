@@ -332,17 +332,8 @@ bool LeAudioDevice::ConfigureAses(
       ase->codec_id = ase_cfg.codec.id;
       ase->codec_config = ase_cfg.codec.params;
       ase->channel_count = ase_cfg.codec.channel_count_per_iso_stream;
-
-      /* Let's choose audio channel allocation if not set */
-      ase->codec_config.Add(
-          codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
-          PickAudioLocation(strategy, audio_locations,
-                            group_audio_locations_memo));
-
-      /* Get default value if no requirement for specific frame blocks per sdu
-       */
-      if (!ase->codec_config.Find(
-              codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu)) {
+      if (ase->codec_id.coding_format == types::kLeAudioCodingFormatLC3) {
+        /* Let's choose audio channel allocation if not set */
         ase->codec_config.Add(
             codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
             PickAudioLocation(strategy, audio_locations,
