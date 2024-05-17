@@ -13,10 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #ifndef ANDROID_INCLUDE_BLUETOOTH_H
@@ -399,13 +395,6 @@ typedef enum {
    * Data Type - char array.
    */
   BT_PROPERTY_REMOTE_MODEL_NUM,
-
-  /*
-   * Description - Encrypted Data Key material char value
-    * Access mode - GET.
-    * Data type   - uint8_t*.
-    */
-  BT_PROPERTY_ENC_KEY_MATERIAL,
 
   /**
    * Description - Address type of the remote device - PUBLIC or REMOTE

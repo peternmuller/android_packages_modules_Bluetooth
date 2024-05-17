@@ -13,6 +13,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #pragma once
@@ -47,18 +51,15 @@ class MockBleAdvertisingManager : public BleAdvertiserInterface {
               (override));
   MOCK_METHOD((void), StartAdvertisingSet,
               (uint8_t client_id, int reg_id,
-               IdTxPowerStatusCallback register_cb, 
-               AdvertiseParameters params,
+               IdTxPowerStatusCallback register_cb, AdvertiseParameters params,
                std::vector<uint8_t> advertise_data,
                std::vector<uint8_t> advertise_data_enc,
                std::vector<uint8_t> scan_response_data,
                std::vector<uint8_t> scan_response_data_enc,
                PeriodicAdvertisingParameters periodic_params,
-               std::vector<uint8_t> periodic_data, 
-               std::vector<uint8_t> periodic_data_enc,
-               uint16_t duration,
-               uint8_t maxExtAdvEvents,
-               std::vector<uint8_t> enc_key_value,
+               std::vector<uint8_t> periodic_data,
+               std::vector<uint8_t> periodic_data_enc, uint16_t duration,
+               uint8_t maxExtAdvEvents, std::vector<uint8_t> enc_key_value,
                IdStatusCallback timeout_cb),
               (override));
   MOCK_METHOD((void), RegisterAdvertiser, (IdStatusCallback cb), (override));
@@ -80,8 +81,8 @@ class MockBleAdvertisingManager : public BleAdvertiserInterface {
                StatusCallback cb),
               (override));
   MOCK_METHOD((void), SetPeriodicAdvertisingData,
-              (int advertiser_id, std::vector<uint8_t> data, std::vector<uint8_t> data_enc,
-              StatusCallback cb),
+              (int advertiser_id, std::vector<uint8_t> data,
+               std::vector<uint8_t> data_enc, StatusCallback cb),
               (override));
   MOCK_METHOD((void), SetPeriodicAdvertisingEnable,
               (int advertiser_id, bool enable, bool include_adi,

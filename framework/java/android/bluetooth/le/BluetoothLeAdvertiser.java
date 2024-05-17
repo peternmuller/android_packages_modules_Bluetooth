@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -658,6 +658,7 @@ public final class BluetoothLeAdvertiser {
         boolean encryptionBytesAdded = false;
         // Flags field is omitted if the advertising is not connectable.
         int size = (isFlagsIncluded) ? FLAGS_FIELD_BYTES : 0;
+
         if (data.getServiceUuids() != null) {
             int num16BitUuids = 0;
             int num32BitUuids = 0;
@@ -685,10 +686,7 @@ public final class BluetoothLeAdvertiser {
                         OVERHEAD_BYTES_PER_FIELD
                                 + num128BitUuids * BluetoothUuid.UUID_BYTES_128_BIT;
             }
-            if (data.getDeviceNameEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getServiceUuidsEnc();
         }
         if (data.getServiceSolicitationUuids() != null) {
             int num16BitUuids = 0;
@@ -717,21 +715,14 @@ public final class BluetoothLeAdvertiser {
                         OVERHEAD_BYTES_PER_FIELD
                                 + num128BitUuids * BluetoothUuid.UUID_BYTES_128_BIT;
             }
-            if (!encryptionBytesAdded &&
-                    data.getServiceSolicitationUuidsEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+
+            encryptionBytesAdded |= data.getServiceSolicitationUuidsEnc();
         }
         for (TransportDiscoveryData transportDiscoveryData : data.getTransportDiscoveryData()) {
             size += OVERHEAD_BYTES_PER_FIELD + transportDiscoveryData.totalBytes();
         }
         if (!data.getTransportDiscoveryData().isEmpty()) {
-            if (!encryptionBytesAdded &&
-                    data.getTransportDiscoveryDataEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getTransportDiscoveryDataEnc();
         }
         for (ParcelUuid uuid : data.getServiceData().keySet()) {
             int uuidLen = BluetoothUuid.uuidToBytes(uuid).length;
@@ -741,11 +732,7 @@ public final class BluetoothLeAdvertiser {
                             + byteLength(data.getServiceData().get(uuid));
         }
         if (!data.getServiceData().isEmpty()) {
-            if (!encryptionBytesAdded &&
-                    data.getServiceDataEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getServiceDataEnc();
         }
         for (int i = 0; i < data.getManufacturerSpecificData().size(); ++i) {
             size +=
@@ -754,31 +741,21 @@ public final class BluetoothLeAdvertiser {
                             + byteLength(data.getManufacturerSpecificData().valueAt(i));
         }
         if ((data.getManufacturerSpecificData().size()) > 0) {
-            if (!encryptionBytesAdded &&
-                    data.getManufacturerSpecificDataEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getManufacturerSpecificDataEnc();
         }
         if (data.getIncludeTxPowerLevel()) {
             size += OVERHEAD_BYTES_PER_FIELD + 1; // tx power level value is one byte.
-            if (!encryptionBytesAdded &&
-                    data.getTxPowerLevelEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getTxPowerLevelEnc();
         }
         if (data.getIncludeDeviceName()) {
             final int length = mBluetoothAdapter.getNameLengthForAdvertise();
             if (length >= 0) {
                 size += OVERHEAD_BYTES_PER_FIELD + length;
             }
-            if (!encryptionBytesAdded &&
-                    data.getDeviceNameEnc()) {
-                size += ENCRYPTION_OVERHEAD_BYTES;
-                encryptionBytesAdded = true;
-            }
+            encryptionBytesAdded |= data.getDeviceNameEnc();
         }
+
+        if (encryptionBytesAdded) size += ENCRYPTION_OVERHEAD_BYTES;
         Log.d(TAG, " Total bytes: size:" + size);
         return size;
     }

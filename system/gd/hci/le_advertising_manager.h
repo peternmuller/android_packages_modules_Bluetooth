@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #pragma once
 
@@ -22,11 +26,28 @@
 
 #include "common/callback.h"
 #include "hci/address_with_type.h"
+#include "hci/hci_layer.h"
 #include "hci/hci_packets.h"
 #include "module.h"
+#include "storage/storage_module.h"
 
 namespace bluetooth {
+namespace shim {
+namespace legacy {
+#define GATT_UUID_GAP_ENC_KEY_MATERIAL 0x2B88
+}  // namespace legacy
+}  // namespace shim
 namespace hci {
+class EncKeyMaterialCallback {
+ public:
+  virtual ~EncKeyMaterialCallback() = default;
+  virtual void OnGetEncKeyMaterial(std::vector<uint8_t> temp, uint16_t attr_uuid) = 0;
+};
+
+struct EncrDataKey {
+  std::vector<uint8_t> key;
+  std::vector<uint8_t> iv;
+};
 
 class PeriodicAdvertisingParameters {
  public:
@@ -48,6 +69,11 @@ class AdvertisingConfig {
  public:
   std::vector<GapData> advertisement;
   std::vector<GapData> scan_response;
+  std::vector<uint8_t> randomizer;
+  std::vector<GapData> advertisement_enc;
+  std::vector<GapData> scan_response_enc;
+  std::vector<GapData> periodic_data_enc;
+  std::vector<uint8_t> enc_key_value;
   uint16_t interval_min;
   uint16_t interval_max;
   AdvertisingType advertising_type;
@@ -150,12 +176,21 @@ class LeAdvertisingManager : public bluetooth::Module {
 
   void SetData(AdvertiserId advertiser_id, bool set_scan_rsp, std::vector<GapData> data);
 
+  void SetData(
+      AdvertiserId advertiser_id,
+      bool set_scan_rsp,
+      std::vector<GapData> data,
+      std::vector<GapData> data_encrypt);
+
   void EnableAdvertiser(
       AdvertiserId advertiser_id, bool enable, uint16_t duration, uint8_t max_extended_advertising_events);
 
   void SetPeriodicParameters(AdvertiserId advertiser_id, PeriodicAdvertisingParameters periodic_advertising_parameters);
 
   void SetPeriodicData(AdvertiserId advertiser_id, std::vector<GapData> data);
+
+  void SetPeriodicData(
+      AdvertiserId advertiser_id, std::vector<GapData> data, std::vector<GapData> data_encrypt);
 
   void EnablePeriodicAdvertising(AdvertiserId advertiser_id, bool enable, bool include_adi);
 
@@ -164,6 +199,10 @@ class LeAdvertisingManager : public bluetooth::Module {
   void ResetAdvertiser(AdvertiserId advertiser_id);
 
   void RegisterAdvertisingCallback(AdvertisingCallback* advertising_callback);
+
+  void RegisterEncKeyMaterialCallback(EncKeyMaterialCallback* enc_key_material_callback);
+
+  void GetEncKeyMaterial();
 
   static const ModuleFactory Factory;
 

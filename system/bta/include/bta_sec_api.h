@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #pragma once
@@ -73,6 +77,7 @@ typedef enum : uint8_t {
   BTA_DM_LE_ADDR_ASSOC_EVT = 33,     /* identity address association event */
   BTA_DM_SIRK_VERIFICATION_REQ_EVT = 35,
   BTA_DM_KEY_MISSING_EVT = 36,
+  BTA_DM_ENC_KEY_MATERIAL = 38, /* Enc Data Key Material value */
 } tBTA_DM_SEC_EVT;
 
 /* Structure associated with BTA_DM_PIN_REQ_EVT */
@@ -227,6 +232,10 @@ typedef struct {
   Octet16 local_oob_r; /* Local OOB Data Randomizer */
 } tBTA_DM_LOC_OOB_DATA;
 
+typedef struct {
+  uint8_t enc_key_value[24]; /* Enc Key Material char value */
+} tBTA_DM_ENC_KEY_MATERIAL;
+
 /* Union of all security callback structures */
 typedef union {
   tBTA_DM_PIN_REQ pin_req;        /* PIN request. */
@@ -245,6 +254,7 @@ typedef union {
   tBTA_DM_RC_UNPAIR delete_key_RC_to_unpair;
   tBTA_DM_PROC_ID_ADDR proc_id_addr; /* Identity address event */
   tBTA_DM_KEY_MISSING key_missing;
+  tBTA_DM_ENC_KEY_MATERIAL enc_key_material; /* Enc Data Key Material value*/
 } tBTA_DM_SEC;
 
 /* Security callback */

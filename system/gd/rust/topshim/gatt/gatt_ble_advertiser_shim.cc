@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -177,7 +177,8 @@ void BleAdvertiserIntf::StartAdvertisingSet(
   AdvertiseParameters converted_params = internal::ConvertRustAdvParams(params);
   PeriodicAdvertisingParameters converted_periodic_params = internal::ConvertRustPeriodicAdvParams(periodic_params);
   std::vector<uint8_t> converted_adv_data, converted_scan_rsp_data, converted_periodic_data;
-  std::vector<uint8_t> converted_adv_data_enc, converted_scan_rsp_data_enc, converted_periodic_data_enc;
+  std::vector<uint8_t> converted_adv_data_enc, converted_scan_rsp_data_enc,
+      converted_periodic_data_enc;
   std::copy(advertise_data.begin(), advertise_data.end(), std::back_inserter(converted_adv_data));
   std::copy(scan_response_data.begin(), scan_response_data.end(), std::back_inserter(converted_scan_rsp_data));
   std::copy(periodic_data.begin(), periodic_data.end(), std::back_inserter(converted_periodic_data));
@@ -214,7 +215,9 @@ void BleAdvertiserIntf::SetPeriodicAdvertisingData(uint8_t adv_id, ::rust::Vec<u
   std::copy(data.begin(), data.end(), std::back_inserter(converted));
 
   adv_intf_->SetPeriodicAdvertisingData(
-      adv_id, converted, converted_enc,
+      adv_id,
+      converted,
+      converted_enc,
       base::Bind(&BleAdvertiserIntf::OnIdStatusCallback, base::Unretained(this), adv_id));
 }
 
