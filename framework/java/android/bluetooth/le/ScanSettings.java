@@ -240,7 +240,6 @@ public final class ScanSettings implements Parcelable {
      * @hide
      * Returns high rssi threshold for the scan results.
      */
-    @SystemApi
     @RequiresBluetoothScanPermission
     @RequiresBluetoothLocationPermission
     @RequiresPermission(allOf = {
@@ -255,7 +254,6 @@ public final class ScanSettings implements Parcelable {
      * @hide
      * Returns low rssi threshold for the scan results.
      */
-    @SystemApi
     @RequiresBluetoothScanPermission
     @RequiresBluetoothLocationPermission
     @RequiresPermission(allOf = {
@@ -500,7 +498,6 @@ public final class ScanSettings implements Parcelable {
         /**
          * @hide
          */
-        @SystemApi
         @RequiresBluetoothScanPermission
         @RequiresBluetoothLocationPermission
         @RequiresPermission(allOf = {
@@ -516,7 +513,6 @@ public final class ScanSettings implements Parcelable {
         /**
          * @hide
          */
-        @SystemApi
         @RequiresBluetoothScanPermission
         @RequiresBluetoothLocationPermission
         @RequiresPermission(allOf = {
