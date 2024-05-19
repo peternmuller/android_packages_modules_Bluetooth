@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.bluetooth.gatt;
@@ -41,7 +45,7 @@ public class AdvertiseHelperTest {
 
     @Test
     public void advertiseDataToBytes() throws Exception {
-        byte[] emptyBytes = AdvertiseHelper.advertiseDataToBytes(null, "");
+        byte[] emptyBytes = AdvertiseHelper.advertiseDataToBytes(null, "", false);
 
         assertThat(emptyBytes.length).isEqualTo(0);
 
@@ -70,15 +74,65 @@ public class AdvertiseHelperTest {
         String deviceName = "TestDeviceName";
 
         int expectedAdvDataBytesLength = 86;
-        byte[] advDataBytes = AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName);
+        byte[] advDataBytes =
+                AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName, false);
 
         String deviceNameLong = "TestDeviceNameLongTestDeviceName";
 
         assertThat(advDataBytes.length).isEqualTo(expectedAdvDataBytesLength);
 
         int expectedAdvDataBytesLongNameLength = 98;
-        byte[] advDataBytesLongName = AdvertiseHelper
-                .advertiseDataToBytes(advertiseData, deviceNameLong);
+        byte[] advDataBytesLongName =
+                AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceNameLong, false);
+
+        assertThat(advDataBytesLongName.length).isEqualTo(expectedAdvDataBytesLongNameLength);
+    }
+
+    @Test
+    public void advertiseDataEncToBytes() throws Exception {
+        byte[] emptyBytes = AdvertiseHelper.advertiseDataToBytes(null, "", true);
+
+        assertThat(emptyBytes.length).isEqualTo(0);
+
+        int manufacturerId = 1;
+        byte[] manufacturerData = new byte[] {0x30, 0x31, 0x32, 0x34};
+
+        byte[] serviceData = new byte[] {0x10, 0x12, 0x14};
+
+        byte[] transportDiscoveryData = new byte[] {0x40, 0x44, 0x48};
+
+        AdvertiseData advertiseData =
+                new AdvertiseData.Builder()
+                        .setIncludeDeviceName(true)
+                        .setIncludeDeviceNameEncrypted(true)
+                        .addManufacturerData(manufacturerId, manufacturerData)
+                        .setManufacturerDataEncrypted(true)
+                        .setIncludeTxPowerLevel(true)
+                        .setIncludeTxPowerLevelEncrypted(true)
+                        .addServiceUuid(new ParcelUuid(UUID.randomUUID()))
+                        .setServiceUuidEncrypted(true)
+                        .addServiceData(new ParcelUuid(UUID.randomUUID()), serviceData)
+                        .setServiceDataEncrypted(true)
+                        .addServiceSolicitationUuid(new ParcelUuid(UUID.randomUUID()))
+                        .setSolicitationUuidEncrypted(true)
+                        .addTransportDiscoveryData(
+                                new TransportDiscoveryData(transportDiscoveryData))
+                        .setTransportDiscoveryDataEncrypted(true)
+                        .setIncludePublicBroadcastDeviceName(true)
+                        .setIncludePublicBroadcastDeviceNameEncrypted(true)
+                        .build();
+        String deviceName = "TestDeviceName";
+
+        int expectedAdvDataBytesLength = 86;
+        byte[] advDataBytes = AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName, true);
+
+        String deviceNameLong = "TestDeviceNameLongTestDeviceName";
+
+        assertThat(advDataBytes.length).isEqualTo(expectedAdvDataBytesLength);
+
+        int expectedAdvDataBytesLongNameLength = 98;
+        byte[] advDataBytesLongName =
+                AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceNameLong, true);
 
         assertThat(advDataBytesLongName.length).isEqualTo(expectedAdvDataBytesLongNameLength);
     }

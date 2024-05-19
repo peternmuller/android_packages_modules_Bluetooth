@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #define LOG_TAG "bt_shim_scanner"
@@ -38,7 +42,9 @@
 #include "os/log.h"
 #include "stack/btm/btm_int_types.h"
 #include "stack/include/advertise_data_parser.h"
+#include "stack/include/ble_hci_link_interface.h"
 #include "stack/include/bt_dev_class.h"
+#include "stack/include/btm_ble_addr.h"
 #include "stack/include/btm_log_history.h"
 #include "storage/device.h"
 #include "storage/le_device.h"
@@ -665,6 +671,21 @@ void BleScannerInterfaceImpl::OnPeriodicSyncStarted(
                                   status, sync_handle, advertising_sid,
                                   static_cast<int>(ble_addr_type), raw_address,
                                   phy, interval));
+}
+
+bool BleScannerInterfaceImpl::OnFetchPseudoAddressFromIdentityAddress(
+    bluetooth::hci::Address address, uint8_t address_type,
+    bluetooth::hci::Address* pseudo_address) {
+  RawAddress raw_address = ToRawAddress(address);
+  tBLE_ADDR_TYPE ble_addr_type = to_ble_addr_type(address_type);
+  if (ble_addr_type & BLE_ADDR_TYPE_ID_BIT) {
+    if (btm_identity_addr_to_random_pseudo(&raw_address, &ble_addr_type,
+                                           false)) {
+      *pseudo_address = ToGdAddress(raw_address);
+      return true;
+    }
+  }
+  return false;
 }
 
 void BleScannerInterfaceImpl::OnPeriodicSyncReport(uint16_t sync_handle,

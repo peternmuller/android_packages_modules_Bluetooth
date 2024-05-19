@@ -303,7 +303,6 @@ public abstract class BluetoothGattCallback {
      *     successfully.
      * @hide
      */
-    @SystemApi
     public void onSubrateChange(
             BluetoothGatt gatt,
             int subrateFactor,

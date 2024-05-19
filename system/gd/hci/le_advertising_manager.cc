@@ -12,11 +12,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #include "hci/le_advertising_manager.h"
 
+#include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
 #include <com_android_bluetooth_flags.h>
+#include <openssl/aead.h>
+#include <openssl/base.h>
+#include <openssl/rand.h>
 
 #include <iterator>
 #include <memory>
@@ -32,11 +40,15 @@
 #include "hci/hci_packets.h"
 #include "hci/le_advertising_interface.h"
 #include "hci/vendor_specific_event_manager.h"
+#include "le_rand_callback.h"
 #include "module.h"
 #include "os/handler.h"
 #include "os/log.h"
 #include "os/system_properties.h"
 #include "packet/fragmenting_inserter.h"
+#include "stack/include/gap_api.h"
+#include "storage/config_cache.h"
+#include "storage/storage_module.h"
 
 namespace bluetooth {
 namespace hci {
@@ -84,7 +96,17 @@ struct Advertiser {
   bool discoverable = false;
   bool directed = false;
   bool in_use = false;
+  bool include_adi = false;
   std::unique_ptr<os::Alarm> address_rotation_alarm;
+
+  std::vector<GapData> advertisement;
+  std::vector<GapData> scan_response;
+  std::vector<GapData> periodic_data;
+  std::vector<uint8_t> randomizer;
+  std::vector<GapData> advertisement_enc;
+  std::vector<GapData> scan_response_enc;
+  std::vector<GapData> periodic_data_enc;
+  std::vector<uint8_t> enc_key_value;
 };
 
 /**
@@ -148,7 +170,8 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       hci::HciLayer* hci_layer,
       hci::Controller* controller,
       hci::AclManager* acl_manager,
-      hci::VendorSpecificEventManager* vendor_specific_event_manager) {
+      hci::VendorSpecificEventManager* vendor_specific_event_manager,
+      storage::StorageModule* storage) {
     module_handler_ = handler;
     hci_layer_ = hci_layer;
     controller_ = controller;
@@ -156,7 +179,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     acl_manager_ = acl_manager;
     le_address_manager_ = acl_manager->GetLeAddressManager();
     num_instances_ = controller_->GetLeNumberOfSupportedAdverisingSets();
+    storage_module_ = storage;
 
+    storage_module_ = storage;
     le_advertising_interface_ =
         hci_layer_->GetLeAdvertisingInterface(module_handler_->BindOn(this, &LeAdvertisingManager::impl::handle_event));
     vendor_specific_event_manager->RegisterEventHandler(
@@ -244,6 +269,10 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
   void register_advertising_callback(AdvertisingCallback* advertising_callback) {
     advertising_callbacks_ = advertising_callback;
+  }
+
+  void register_enc_key_material_callback(EncKeyMaterialCallback* enc_key_material_callback) {
+    enc_key_material_callback_ = enc_key_material_callback;
   }
 
   void multi_advertising_state_change(hci::VendorSpecificEventView event) {
@@ -505,9 +534,17 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       case (AdvertisingApiType::LEGACY): {
         if (config.advertising_type == AdvertisingType::ADV_IND ||
             config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
-          set_data(id, true, config.scan_response);
+          if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+            set_data(id, true, config.scan_response);
+          } else {
+            set_enc_data(id, true, config.scan_response, config.scan_response_enc);
+          }
         }
-        set_data(id, false, config.advertisement);
+        if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+          set_data(id, false, config.advertisement);
+        } else {
+          set_enc_data(id, false, config.advertisement, config.advertisement_enc);
+        }
         if (!paused) {
           enable_advertiser(id, true, 0, 0);
         } else {
@@ -517,9 +554,17 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       case (AdvertisingApiType::ANDROID_HCI): {
         if (config.advertising_type == AdvertisingType::ADV_IND ||
             config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
-          set_data(id, true, config.scan_response);
+          if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+            set_data(id, true, config.scan_response);
+          } else {
+            set_enc_data(id, true, config.scan_response, config.scan_response_enc);
+          }
         }
-        set_data(id, false, config.advertisement);
+        if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+          set_data(id, false, config.advertisement);
+        } else {
+          set_enc_data(id, false, config.advertisement, config.advertisement_enc);
+        }
         if (advertising_sets_[id].address_type != AdvertiserAddressType::PUBLIC) {
           le_advertising_interface_->EnqueueCommand(
               hci::LeMultiAdvtSetRandomAddrBuilder::Create(
@@ -611,7 +656,10 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     // check extended advertising data is valid before start advertising
     if (!check_extended_advertising_data(
             config.advertisement, config.connectable && config.discoverable) ||
-        !check_extended_advertising_data(config.scan_response, false)) {
+        !check_extended_advertising_data(
+            config.advertisement_enc, config.connectable && config.discoverable) ||
+        !check_extended_advertising_data(config.scan_response, false) ||
+        !check_extended_advertising_data(config.scan_response_enc, false)) {
       advertising_callbacks_->OnAdvertisingSetStarted(
           reg_id, id, le_physical_channel_tx_power_, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
       return;
@@ -673,28 +721,60 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
             le_address_manager_->GetNextPrivateAddressIntervalMs());
       }
     }
-    if (config.advertising_type == AdvertisingType::ADV_IND ||
-        config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
-      set_data(id, true, config.scan_response);
-    }
-    set_data(id, false, config.advertisement);
+    if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (config.advertising_type == AdvertisingType::ADV_IND ||
+          config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
+        set_data(id, true, config.scan_response);
+      }
+      set_data(id, false, config.advertisement);
+      if (!config.periodic_data.empty()) {
+        set_periodic_parameter(id, config.periodic_advertising_parameters);
+        set_periodic_data(id, config.periodic_data);
+        enable_periodic_advertising(
+            id,
+            config.periodic_advertising_parameters.enable,
+            config.periodic_advertising_parameters.include_adi);
+      }
 
-    if (!config.periodic_data.empty()) {
-      set_periodic_parameter(id, config.periodic_advertising_parameters);
-      set_periodic_data(id, config.periodic_data);
-      enable_periodic_advertising(
-          id, config.periodic_advertising_parameters.enable, config.periodic_advertising_parameters.include_adi);
-    }
-
-    if (!paused) {
-      enable_advertiser(id, true, duration, max_ext_adv_events);
+      if (!paused) {
+        enable_advertiser(id, true, duration, max_ext_adv_events);
+      } else {
+        EnabledSet curr_set;
+        curr_set.advertising_handle_ = id;
+        curr_set.duration_ = duration;
+        curr_set.max_extended_advertising_events_ = max_ext_adv_events;
+        std::vector<EnabledSet> enabled_sets = {curr_set};
+        enabled_sets_[id] = curr_set;
+      }
     } else {
-      EnabledSet curr_set;
-      curr_set.advertising_handle_ = id;
-      curr_set.duration_ = duration;
-      curr_set.max_extended_advertising_events_ = max_ext_adv_events;
-      std::vector<EnabledSet> enabled_sets = {curr_set};
-      enabled_sets_[id] = curr_set;
+      if (config.advertising_type == AdvertisingType::ADV_IND ||
+          config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
+        set_enc_data(id, true, config.scan_response, config.scan_response_enc);
+      }
+      set_enc_data(id, false, config.advertisement, config.advertisement_enc);
+      if (!config.periodic_data.empty() || !config.periodic_data_enc.empty()) {
+        set_periodic_parameter(id, config.periodic_advertising_parameters);
+        set_periodic_enc_data(id, config.periodic_data, config.periodic_data_enc);
+        if (config.periodic_data_enc.empty()) {
+          enable_periodic_advertising(
+              id,
+              config.periodic_advertising_parameters.enable,
+              config.periodic_advertising_parameters.include_adi);
+        }
+      }
+
+      if (config.advertisement_enc.empty() && config.scan_response_enc.empty()) {
+        if (!paused) {
+          enable_advertiser(id, true, duration, max_ext_adv_events);
+        } else {
+          EnabledSet curr_set;
+          curr_set.advertising_handle_ = id;
+          curr_set.duration_ = duration;
+          curr_set.max_extended_advertising_events_ = max_ext_adv_events;
+          std::vector<EnabledSet> enabled_sets = {curr_set};
+          enabled_sets_[id] = curr_set;
+        }
+      }
     }
   }
 
@@ -740,6 +820,29 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     enabled_sets_[advertiser_id].advertising_handle_ = kInvalidHandle;
   }
 
+  void set_encrypted_advertiser_data(AdvertiserId advertiser_id) {
+    Advertiser* adv_inst = &advertising_sets_[advertiser_id];
+
+    if (!adv_inst->advertisement_enc.empty()) {
+      log::debug("Encrypted Advertisement");
+      impl::set_enc_data(
+          advertiser_id, false, adv_inst->advertisement, adv_inst->advertisement_enc);
+      impl::set_enc_data(advertiser_id, true, adv_inst->scan_response, adv_inst->scan_response_enc);
+      if (!adv_inst->periodic_data_enc.empty()) {
+        log::debug("Encrypted Periodic");
+        impl::set_periodic_enc_data(
+            advertiser_id, adv_inst->periodic_data, adv_inst->periodic_data_enc);
+      }
+    } else if (!adv_inst->scan_response_enc.empty()) {
+      log::debug("Encrypted Scan Response");
+      impl::set_enc_data(advertiser_id, true, adv_inst->scan_response, adv_inst->scan_response_enc);
+    } else if (!adv_inst->periodic_data_enc.empty()) {
+      log::debug("Encrypted Periodic Only");
+      impl::set_periodic_enc_data(
+          advertiser_id, adv_inst->periodic_data, adv_inst->periodic_data_enc);
+    }
+  }
+
   void rotate_advertiser_address(AdvertiserId advertiser_id) {
     if (advertising_api_type_ == AdvertisingApiType::EXTENDED) {
       AddressWithType address_with_type = new_advertiser_address(advertiser_id);
@@ -778,6 +881,10 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     }
 
     rotate_advertiser_address(advertiser_id);
+
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      set_encrypted_advertiser_data(advertiser_id);
+    }
 
     // If we are paused, we will be enabled in OnResume(), so don't resume now.
     // Note that OnResume() can never re-enable us while we are changing our address, since the
@@ -821,6 +928,10 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     advertising_sets_[advertiser_id].discoverable = config.discoverable;
     advertising_sets_[advertiser_id].tx_power = config.tx_power;
     advertising_sets_[advertiser_id].directed = config.directed;
+
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      advertising_sets_[advertiser_id].enc_key_value = config.enc_key_value;
+    }
 
     // based on logic in new_advertiser_address
     auto own_address_type = static_cast<OwnAddressType>(
@@ -1462,6 +1573,412 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
             advertiser_id));
   }
 
+  bool check_chained_data(std::vector<GapData> data, bool include_flag) {
+    uint16_t data_len = 0;
+    // check data size
+    for (size_t i = 0; i < data.size(); i++) {
+      if (data[i].size() > kLeMaximumFragmentLength) {
+        log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+      }
+      data_len += data[i].size();
+    }
+
+    // The Flags data type shall be included when any of the Flag bits are non-zero and the
+    // advertising packet is connectable and discoverable. It will be added by set_data() function,
+    // we should count it here.
+    if (include_flag && !data_has_flags(data)) {
+      data_len += kLenOfFlags;
+    }
+    if (data_len > kLeMaximumFragmentLength) {
+      return true;
+    }
+    return false;
+  };
+
+  GapData EncryptedAdvertising(Advertiser* adv_inst, std::vector<GapData> data) {
+    GapData ED_AD_Data; /*Randomizer + Payload + Out_Tag(MIC)*/
+    std::vector<uint8_t> key_iv;
+    std::stringstream str;
+    if (!adv_inst->enc_key_value.empty()) {
+      key_iv.clear();
+      key_iv = adv_inst->enc_key_value;
+    } else {
+      std::optional<std::vector<uint8_t>> keyiv =
+          std::move(storage_module_->GetBin("Adapter", BTIF_STORAGE_KEY_ENCR_DATA));
+      key_iv.clear();
+      key_iv.insert(key_iv.end(), keyiv->begin(), keyiv->end());
+    }
+    std::vector<uint8_t> key;
+    std::vector<uint8_t> iv;
+    key.insert(key.end(), key_iv.begin(), key_iv.begin() + 16);
+    iv.insert(iv.end(), key_iv.begin() + 16, key_iv.end());
+    std::vector<uint8_t> nonce;
+    static const std::vector<uint8_t> ad = {0xEA};
+
+    nonce.insert(nonce.end(), adv_inst->randomizer.rbegin(), adv_inst->randomizer.rend());
+    nonce.insert(nonce.end(), iv.rbegin(), iv.rend());
+    std::vector<uint8_t> in;
+    for (size_t i = 0; i < data.size(); i++) {
+      in.push_back((data[i].data_.size()) + 1);
+      in.push_back((uint8_t)(data[i].data_type_));
+      in.insert(in.end(), data[i].data_.begin(), data[i].data_.end());
+    }
+    std::vector<uint8_t> out(in.size());
+    const EVP_AEAD* ccm_instance = EVP_aead_aes_128_ccm_bluetooth();
+    const EVP_AEAD_CTX* aeadCTX =
+        EVP_AEAD_CTX_new(ccm_instance, key.data(), key.size(), EVP_AEAD_DEFAULT_TAG_LENGTH);
+    if (aeadCTX == nullptr) return ED_AD_Data;
+    size_t out_tag_len;
+    std::vector<uint8_t> out_tag(EVP_AEAD_max_overhead(ccm_instance));
+    if (!key.empty() && key.data() != NULL) {
+      log::debug(
+          "Encr Data Key Material (Key): {}", base::HexEncode(key.data(), key.size()).c_str());
+    }
+    if (!iv.empty() && iv.data() != NULL) {
+      log::debug("Encr Data Key Material (IV): {}", base::HexEncode(iv.data(), iv.size()).c_str());
+    }
+    str << "\nRandomizer: "
+        << base::HexEncode(adv_inst->randomizer.data(), adv_inst->randomizer.size())
+        << "\nInput: " << base::HexEncode(in.data(), in.size())
+        << "\nNonce: " << base::HexEncode(nonce.data(), nonce.size())
+        << "\nInput AD: " << base::HexEncode(ad.data(), ad.size());
+    /* Function below encrypts the Input (From BoringSSL) */
+    int result = EVP_AEAD_CTX_seal_scatter(
+        aeadCTX,
+        out.data(),
+        out_tag.data(),
+        &out_tag_len,
+        out_tag.size(),
+        nonce.data(),
+        nonce.size(),
+        in.data(),
+        in.size(),
+        nullptr,
+        0,
+        ad.data(),
+        ad.size());
+    str << "\nOut: " << base::HexEncode(out.data(), out.size())
+        << "\nMIC: " << base::HexEncode(out_tag.data(), out_tag.size()) << "\nResult: " << result;
+
+    ED_AD_Data.data_.insert(
+        ED_AD_Data.data_.end(), adv_inst->randomizer.rbegin(), adv_inst->randomizer.rend());
+    ED_AD_Data.data_.insert(ED_AD_Data.data_.end(), out.begin(), out.end());
+    ED_AD_Data.data_.insert(ED_AD_Data.data_.end(), out_tag.begin(), out_tag.end());
+
+    str << "\nED AD Data: " << base::HexEncode(ED_AD_Data.data_.data(), ED_AD_Data.data_.size());
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      log::info("{}", str.str().c_str());
+    }
+    /* Below we are forming the LTV for Encrypted Data */
+    ED_AD_Data.data_type_ = GapDataType::ENCRYPTED_ADVERTISING_DATA;
+    // ED_AD_Data.insert(ED_AD_Data.begin(), ED_AD_Data.size());
+    return ED_AD_Data;
+  }
+
+  void set_enc_data(
+      AdvertiserId advertiser_id,
+      bool set_scan_rsp,
+      std::vector<GapData> data,
+      std::vector<GapData> data_encrypt) {
+    // The Flags data type shall be included when any of the Flag bits are non-zero and the
+    // advertising packet is connectable and discoverable.
+    /*    if (!data_encrypt.empty()) {
+          log::warn("Encrypted Data Received but Encrypted Advertising is not enabled");
+          if (set_scan_rsp) {
+            advertising_callbacks_->OnScanResponseDataSet(
+                advertiser_id, AdvertisingCallback::AdvertisingStatus::FEATURE_UNSUPPORTED);
+          } else {
+            advertising_callbacks_->OnAdvertisingDataSet(
+                advertiser_id, AdvertisingCallback::AdvertisingStatus::FEATURE_UNSUPPORTED);
+          }
+          return;
+        }*/
+
+    std::stringstream str;
+    Advertiser* adv_inst = &advertising_sets_[advertiser_id];
+    if (!set_scan_rsp) {
+      str << "Advertising Data";
+      for (unsigned int i = 0; i < data.size(); i++) {
+        str << "\nData: " << base::HexEncode(data[i].data_.data(), data[i].data_.size())
+            << " Data Type: " << (uint8_t)data[i].data_type_ << " Size: " << data[i].data_.size();
+      }
+      for (unsigned int i = 0; i < data_encrypt.size(); i++) {
+        str << "\nData Encrypt: "
+            << base::HexEncode(data_encrypt[i].data_.data(), data_encrypt[i].data_.size())
+            << " Data Type: " << (uint8_t)data_encrypt[i].data_type_
+            << " Size: " << data_encrypt[i].data_.size();
+      }
+      adv_inst->advertisement = data;
+      adv_inst->advertisement_enc = data_encrypt;
+    } else {
+      str << "Scan Response Data";
+      for (unsigned int i = 0; i < data.size(); i++) {
+        str << "\nData: " << base::HexEncode(data[i].data_.data(), data[i].data_.size())
+            << " Data Type: " << (uint8_t)data[i].data_type_ << " Size: " << data[i].data_.size();
+      }
+      for (unsigned int i = 0; i < data_encrypt.size(); i++) {
+        str << "\nData Encrypt: "
+            << base::HexEncode(data_encrypt[i].data_.data(), data_encrypt[i].data_.size())
+            << " Data Type: " << (uint8_t)data_encrypt[i].data_type_
+            << " Size: " << data_encrypt[i].data_.size();
+      }
+      adv_inst->scan_response = data;
+      adv_inst->scan_response_enc = data_encrypt;
+    }
+    log::info("{}", str.str().c_str());
+    if (!set_scan_rsp && advertising_sets_[advertiser_id].connectable &&
+        advertising_sets_[advertiser_id].discoverable && !data_has_flags(data)) {
+      GapData gap_data;
+      gap_data.data_type_ = GapDataType::FLAGS;
+      if (advertising_sets_[advertiser_id].duration == 0) {
+        gap_data.data_.push_back(static_cast<uint8_t>(AdvertisingFlag::LE_GENERAL_DISCOVERABLE));
+      } else {
+        gap_data.data_.push_back(static_cast<uint8_t>(AdvertisingFlag::LE_LIMITED_DISCOVERABLE));
+      }
+      data.insert(data.begin(), gap_data);
+    }
+
+    // Find and fill TX Power with the correct value.
+    for (auto& gap_data : data) {
+      if (gap_data.data_type_ == GapDataType::TX_POWER_LEVEL) {
+        gap_data.data_[0] = advertising_sets_[advertiser_id].tx_power;
+        break;
+      }
+    }
+    for (auto& gap_data : data_encrypt) {
+      if (gap_data.data_type_ == GapDataType::TX_POWER_LEVEL) {
+        gap_data.data_[0] = advertising_sets_[advertiser_id].tx_power;
+        break;
+      }
+    }
+    if (!data_encrypt.empty()) {
+      encrypted_advertising_complete(adv_inst, advertiser_id, set_scan_rsp, data, data_encrypt);
+    } else {
+      if (advertising_api_type_ != AdvertisingApiType::EXTENDED &&
+          !check_advertising_data(data, false)) {
+        if (set_scan_rsp) {
+          advertising_callbacks_->OnScanResponseDataSet(
+              advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+        } else {
+          advertising_callbacks_->OnAdvertisingDataSet(
+              advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+        }
+        return;
+      }
+
+      switch (advertising_api_type_) {
+        case (AdvertisingApiType::LEGACY): {
+          if (set_scan_rsp) {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeSetScanResponseDataBuilder::Create(data),
+                module_handler_->BindOnceOn(
+                    this,
+                    &impl::check_status_with_id<LeSetScanResponseDataCompleteView>,
+                    true,
+                    advertiser_id));
+          } else {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeSetAdvertisingDataBuilder::Create(data),
+                module_handler_->BindOnceOn(
+                    this,
+                    &impl::check_status_with_id<LeSetAdvertisingDataCompleteView>,
+                    true,
+                    advertiser_id));
+          }
+        } break;
+        case (AdvertisingApiType::ANDROID_HCI): {
+          if (set_scan_rsp) {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeMultiAdvtSetScanRespBuilder::Create(data, advertiser_id),
+                module_handler_->BindOnceOn(
+                    this,
+                    &impl::check_status_with_id<LeMultiAdvtCompleteView>,
+                    true,
+                    advertiser_id));
+          } else {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeMultiAdvtSetDataBuilder::Create(data, advertiser_id),
+                module_handler_->BindOnceOn(
+                    this,
+                    &impl::check_status_with_id<LeMultiAdvtCompleteView>,
+                    true,
+                    advertiser_id));
+          }
+        } break;
+        case (AdvertisingApiType::EXTENDED): {
+          uint16_t data_len = 0;
+          for (size_t i = 0; i < data.size(); i++) {
+            if (data[i].size() > kLeMaximumFragmentLength) {
+              log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+              if (advertising_callbacks_ != nullptr) {
+                if (set_scan_rsp) {
+                  advertising_callbacks_->OnScanResponseDataSet(
+                      advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+                } else {
+                  advertising_callbacks_->OnAdvertisingDataSet(
+                      advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+                }
+              }
+              return;
+            }
+            data_len += data[i].size();
+          }
+
+          if (data_len > le_maximum_advertising_data_length_) {
+            log::warn(
+                "advertising data len exceeds le_maximum_advertising_data_length_ {}",
+                le_maximum_advertising_data_length_);
+            if (advertising_callbacks_ != nullptr) {
+              if (set_scan_rsp) {
+                advertising_callbacks_->OnScanResponseDataSet(
+                    advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+              } else {
+                advertising_callbacks_->OnAdvertisingDataSet(
+                    advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+              }
+            }
+            return;
+          }
+
+          if (data_len <= kLeMaximumFragmentLength) {
+            send_data_fragment(
+                advertiser_id, set_scan_rsp, data, Operation::COMPLETE_ADVERTISEMENT);
+          } else {
+            EnabledSet curr_set;
+            curr_set.advertising_handle_ = advertiser_id;
+            curr_set.duration_ = advertising_sets_[advertiser_id].duration;
+            curr_set.max_extended_advertising_events_ =
+                advertising_sets_[advertiser_id].max_extended_advertising_events;
+            std::vector<EnabledSet> enabled_sets = {curr_set};
+            // check data size
+            bool chained =
+                check_chained_data(data, adv_inst->connectable && adv_inst->discoverable);
+            if (chained && adv_inst->started) {
+              le_advertising_interface_->EnqueueCommand(
+                  hci::LeSetExtendedAdvertisingEnableBuilder::Create(
+                      Enable::DISABLED, enabled_sets),
+                  module_handler_->BindOnce(
+                      check_complete<LeSetExtendedAdvertisingEnableCompleteView>));
+            }
+            std::vector<GapData> sub_data;
+            uint16_t sub_data_len = 0;
+            Operation operation = Operation::FIRST_FRAGMENT;
+
+            for (size_t i = 0; i < data.size(); i++) {
+              if (sub_data_len + data[i].size() > kLeMaximumFragmentLength) {
+                send_data_fragment(advertiser_id, set_scan_rsp, sub_data, operation);
+                operation = Operation::INTERMEDIATE_FRAGMENT;
+                sub_data_len = 0;
+                sub_data.clear();
+              }
+              sub_data.push_back(data[i]);
+              sub_data_len += data[i].size();
+            }
+            send_data_fragment(advertiser_id, set_scan_rsp, sub_data, Operation::LAST_FRAGMENT);
+            if (chained && adv_inst->started) {
+              le_advertising_interface_->EnqueueCommand(
+                  hci::LeSetExtendedAdvertisingEnableBuilder::Create(Enable::ENABLED, enabled_sets),
+                  module_handler_->BindOnce(
+                      check_complete<LeSetExtendedAdvertisingEnableCompleteView>));
+            }
+          }
+        } break;
+      }
+    }
+  }
+
+  void set_periodic_enc_data(
+      AdvertiserId advertiser_id, std::vector<GapData> data, std::vector<GapData> data_encrypt) {
+    uint16_t data_len = 0;
+    std::stringstream str;
+    // check data size
+    Advertiser* adv_inst = &advertising_sets_[advertiser_id];
+    str << "Periodic Advertising Data";
+    for (unsigned int i = 0; i < data.size(); i++) {
+      str << "\nData: " << base::HexEncode(data[i].data_.data(), data[i].data_.size())
+          << " Data Type: " << (uint8_t)data[i].data_type_ << " Size: " << data[i].data_.size();
+    }
+    for (unsigned int i = 0; i < data_encrypt.size(); i++) {
+      str << "\nData Encrypt: "
+          << base::HexEncode(data_encrypt[i].data_.data(), data_encrypt[i].data_.size())
+          << " Data Type: " << (uint8_t)data_encrypt[i].data_type_
+          << " Size: " << data_encrypt[i].data_.size();
+    }
+    log::info("{}", str.str().c_str());
+    adv_inst->periodic_data = data;
+    adv_inst->periodic_data_enc = data_encrypt;
+
+    if (!data_encrypt.empty()) {
+      encrypted_periodic_advertising_complete(adv_inst, advertiser_id, data, data_encrypt);
+    } else {
+      bool divide_gap_flag = com::android::bluetooth::flags::divide_long_single_gap_data();
+      // check data size
+      for (size_t i = 0; i < data.size(); i++) {
+        uint16_t data_limit = divide_gap_flag ? kLeMaximumGapDataLength : kLeMaximumFragmentLength;
+        if (data[i].size() > data_limit) {
+          log::warn("AD data len shall not greater than {}", data_limit);
+          if (advertising_callbacks_ != nullptr) {
+            advertising_callbacks_->OnPeriodicAdvertisingDataSet(
+                advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+          }
+          return;
+        }
+        data_len += data[i].size();
+      }
+
+      if (data_len > le_maximum_advertising_data_length_) {
+        log::warn(
+            "advertising data len exceeds le_maximum_advertising_data_length_ {}",
+            le_maximum_advertising_data_length_);
+        if (advertising_callbacks_ != nullptr) {
+          advertising_callbacks_->OnPeriodicAdvertisingDataSet(
+              advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+        }
+        return;
+      }
+
+      uint16_t data_fragment_limit =
+          divide_gap_flag ? kLeMaximumPeriodicDataFragmentLength : kLeMaximumFragmentLength;
+      if (data_len <= data_fragment_limit) {
+        send_periodic_data_fragment(advertiser_id, data, Operation::COMPLETE_ADVERTISEMENT);
+      } else {
+        std::vector<GapData> sub_data;
+        uint16_t sub_data_len = 0;
+        Operation operation = Operation::FIRST_FRAGMENT;
+
+        if (divide_gap_flag) {
+          std::vector<std::unique_ptr<packet::RawBuilder>> fragments;
+          packet::FragmentingInserter it(
+              kLeMaximumPeriodicDataFragmentLength, std::back_insert_iterator(fragments));
+          for (auto gap_data : data) {
+            gap_data.Serialize(it);
+          }
+          it.finalize();
+
+          for (size_t i = 0; i < fragments.size(); i++) {
+            send_periodic_data_fragment_with_raw_builder(
+                advertiser_id,
+                std::move(fragments[i]),
+                (i == fragments.size() - 1) ? Operation::LAST_FRAGMENT : operation);
+            operation = Operation::INTERMEDIATE_FRAGMENT;
+          }
+        } else {
+          for (size_t i = 0; i < data.size(); i++) {
+            if (sub_data_len + data[i].size() > kLeMaximumFragmentLength) {
+              send_periodic_data_fragment(advertiser_id, sub_data, operation);
+              operation = Operation::INTERMEDIATE_FRAGMENT;
+              sub_data_len = 0;
+              sub_data.clear();
+            }
+            sub_data.push_back(data[i]);
+            sub_data_len += data[i].size();
+          }
+          send_periodic_data_fragment(advertiser_id, sub_data, Operation::LAST_FRAGMENT);
+        }
+      }
+    }
+  }
+
   void OnPause() override {
     if (!address_manager_registered) {
       log::warn("Unregistered!");
@@ -1584,6 +2101,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   common::Callback<void(Address, AddressType)> scan_callback_;
   common::ContextualCallback<void(ErrorCode, uint16_t, hci::AddressWithType)> set_terminated_callback_{};
   AdvertisingCallback* advertising_callbacks_ = nullptr;
+  EncKeyMaterialCallback* enc_key_material_callback_ = nullptr;
   os::Handler* registered_handler_{nullptr};
   Module* module_;
   os::Handler* module_handler_;
@@ -1598,7 +2116,9 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   hci::AclManager* acl_manager_;
   bool address_manager_registered = false;
   bool paused = false;
-
+  storage::ConfigCache* configcache_;
+  storage::StorageModule* storage_module_;
+  EncrDataKey* key_iv = new EncrDataKey;
   std::mutex id_mutex_;
   size_t num_instances_;
   std::vector<hci::EnabledSet> enabled_sets_;
@@ -1622,6 +2142,286 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       return;
     }
     le_physical_channel_tx_power_ = complete_view.GetTransmitPowerLevel();
+  }
+
+  template <class View>
+  void GenerateKeyIV(EncrDataKey* KeyIV, int iteration, CommandCompleteView view) {
+    ASSERT(view.IsValid());
+    auto rand_view = LeRandCompleteView::Create(view);
+    ASSERT(rand_view.IsValid());
+    uint8_t finalresult[8];
+    std::vector<uint8_t> temp_rand;
+    uint64_t rand = rand_view.GetRandomNumber();
+    memcpy(finalresult, &rand, 8);
+    for (int i = 0; i < 8; i++) {
+      temp_rand.push_back(finalresult[i]);
+    }
+    if (iteration == 1) {
+      KeyIV->key.insert(KeyIV->key.end(), temp_rand.begin(), temp_rand.end());
+    } else if (iteration == 2) {
+      KeyIV->key.insert(KeyIV->key.begin() + 8, temp_rand.begin(), temp_rand.end());
+    } else if (iteration == 3) {
+      KeyIV->iv.insert(KeyIV->iv.end(), temp_rand.begin(), temp_rand.end());
+      std::vector<uint8_t> completeKeyIV;
+      completeKeyIV.insert(completeKeyIV.end(), KeyIV->key.begin(), KeyIV->key.end());
+      completeKeyIV.insert(completeKeyIV.end(), KeyIV->iv.begin(), KeyIV->iv.end());
+      std::string completekeyiv = base::HexEncode(completeKeyIV.data(), completeKeyIV.size());
+      storage_module_->SetBin("Adapter", BTIF_STORAGE_KEY_ENCR_DATA, completeKeyIV);
+      enc_key_material_callback_->OnGetEncKeyMaterial(
+          completeKeyIV, GATT_UUID_GAP_ENC_KEY_MATERIAL);
+    } else {
+      std::optional<std::vector<uint8_t>> keyiv =
+          std::move(storage_module_->GetBin("Adapter", BTIF_STORAGE_KEY_ENCR_DATA));
+      std::vector<uint8_t> enc_key_material(keyiv->begin(), keyiv->end());
+      enc_key_material_callback_->OnGetEncKeyMaterial(
+          enc_key_material, GATT_UUID_GAP_ENC_KEY_MATERIAL);
+    }
+  }
+
+  void encrypted_periodic_advertising_complete(
+      Advertiser* adv_inst,
+      AdvertiserId advertiser_id,
+      std::vector<GapData> data,
+      std::vector<GapData> data_encrypt) {
+    uint8_t finalresult[5];
+    std::vector<uint8_t> temp_rand;
+
+    RAND_pseudo_bytes(finalresult, 5);
+    for (int i = 0; i < 5; i++) {
+      temp_rand.push_back(finalresult[i]);
+    }
+    adv_inst->randomizer = temp_rand;
+    GapData Encr_Data;
+    Encr_Data = EncryptedAdvertising(adv_inst, data_encrypt);
+    data.push_back(Encr_Data);
+    uint16_t data_len = 0;
+
+    std::vector<uint8_t> advertising_data;
+    for (unsigned int i = 0; i < data.size(); i++) {
+      uint8_t length = (uint8_t)(1 + data[i].data_.size());
+      advertising_data.push_back(length);
+      advertising_data.push_back((uint8_t)(data[i].data_type_));
+      advertising_data.insert(advertising_data.end(), data[i].data_.begin(), data[i].data_.end());
+    }
+    log::debug(
+        "Periodic Advertising Data {}",
+        base::HexEncode(advertising_data.data(), advertising_data.size()).c_str());
+    for (size_t i = 0; i < data.size(); i++) {
+      if (data[i].size() > kLeMaximumFragmentLength) {
+        log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+        if (advertising_callbacks_ != nullptr) {
+          advertising_callbacks_->OnPeriodicAdvertisingDataSet(
+              advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+        }
+        return;
+      }
+      data_len += data[i].size();
+    }
+
+    if (data_len > le_maximum_advertising_data_length_) {
+      log::warn(
+          "advertising data len exceeds le_maximum_advertising_data_length_ {}",
+          le_maximum_advertising_data_length_);
+      if (advertising_callbacks_ != nullptr) {
+        advertising_callbacks_->OnPeriodicAdvertisingDataSet(
+            advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+      }
+      return;
+    }
+
+    if (data_len <= kLeMaximumFragmentLength) {
+      send_periodic_data_fragment(advertiser_id, data, Operation::COMPLETE_ADVERTISEMENT);
+    } else {
+      if (adv_inst->started) {
+        enable_periodic_advertising(advertiser_id, false, adv_inst->include_adi);
+      }
+      std::vector<GapData> sub_data;
+      uint16_t sub_data_len = 0;
+      Operation operation = Operation::FIRST_FRAGMENT;
+
+      for (size_t i = 0; i < data.size(); i++) {
+        if (sub_data_len + data[i].size() > kLeMaximumFragmentLength) {
+          send_periodic_data_fragment(advertiser_id, sub_data, operation);
+          operation = Operation::INTERMEDIATE_FRAGMENT;
+          sub_data_len = 0;
+          sub_data.clear();
+        }
+        sub_data.push_back(data[i]);
+        sub_data_len += data[i].size();
+      }
+      send_periodic_data_fragment(advertiser_id, sub_data, Operation::LAST_FRAGMENT);
+      if (adv_inst->started) {
+        enable_periodic_advertising(advertiser_id, true, adv_inst->include_adi);
+      }
+    }
+    if (!adv_inst->started) {
+      enable_periodic_advertising(advertiser_id, true, adv_inst->include_adi);
+    }
+  }
+
+  void encrypted_advertising_complete(
+      Advertiser* adv_inst,
+      AdvertiserId advertiser_id,
+      bool set_scan_rsp,
+      std::vector<GapData> data,
+      std::vector<GapData> data_encrypt) {
+    uint8_t finalresult[5];
+    std::vector<uint8_t> temp_rand;
+
+    RAND_pseudo_bytes(finalresult, 5);
+    for (int i = 0; i < 5; i++) {
+      temp_rand.push_back(finalresult[i]);
+    }
+    adv_inst->randomizer = temp_rand;
+    GapData Encr_Data;
+    Encr_Data = EncryptedAdvertising(adv_inst, data_encrypt);
+    data.push_back(Encr_Data);
+
+    std::vector<uint8_t> advertising_data;
+    for (unsigned int i = 0; i < data.size(); i++) {
+      uint8_t length = (uint8_t)(1 + data[i].data_.size());
+      advertising_data.push_back(length);
+      advertising_data.push_back((uint8_t)(data[i].data_type_));
+      advertising_data.insert(advertising_data.end(), data[i].data_.begin(), data[i].data_.end());
+    }
+    log::info(
+        "Advertising Data {}",
+        base::HexEncode(advertising_data.data(), advertising_data.size()).c_str());
+    if (advertising_api_type_ != AdvertisingApiType::EXTENDED &&
+        !check_advertising_data(data, false)) {
+      if (set_scan_rsp) {
+        advertising_callbacks_->OnScanResponseDataSet(
+            advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+      } else {
+        advertising_callbacks_->OnAdvertisingDataSet(
+            advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+      }
+      return;
+    }
+
+    switch (advertising_api_type_) {
+      case (AdvertisingApiType::LEGACY): {
+        if (set_scan_rsp) {
+          le_advertising_interface_->EnqueueCommand(
+              hci::LeSetScanResponseDataBuilder::Create(data),
+              module_handler_->BindOnceOn(
+                  this,
+                  &impl::check_status_with_id<LeSetScanResponseDataCompleteView>,
+                  true,
+                  advertiser_id));
+        } else {
+          le_advertising_interface_->EnqueueCommand(
+              hci::LeSetAdvertisingDataBuilder::Create(data),
+              module_handler_->BindOnceOn(
+                  this,
+                  &impl::check_status_with_id<LeSetAdvertisingDataCompleteView>,
+                  true,
+                  advertiser_id));
+        }
+      } break;
+      case (AdvertisingApiType::ANDROID_HCI): {
+        if (set_scan_rsp) {
+          le_advertising_interface_->EnqueueCommand(
+              hci::LeMultiAdvtSetScanRespBuilder::Create(data, advertiser_id),
+              module_handler_->BindOnceOn(
+                  this, &impl::check_status_with_id<LeMultiAdvtCompleteView>, true, advertiser_id));
+        } else {
+          le_advertising_interface_->EnqueueCommand(
+              hci::LeMultiAdvtSetDataBuilder::Create(data, advertiser_id),
+              module_handler_->BindOnceOn(
+                  this, &impl::check_status_with_id<LeMultiAdvtCompleteView>, true, advertiser_id));
+        }
+      } break;
+      case (AdvertisingApiType::EXTENDED): {
+        uint16_t data_len = 0;
+        // check data size
+        for (size_t i = 0; i < data.size(); i++) {
+          if (data[i].size() > kLeMaximumFragmentLength) {
+            log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+            if (advertising_callbacks_ != nullptr) {
+              if (set_scan_rsp) {
+                advertising_callbacks_->OnScanResponseDataSet(
+                    advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+              } else {
+                advertising_callbacks_->OnAdvertisingDataSet(
+                    advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
+              }
+            }
+            return;
+          }
+          data_len += data[i].size();
+        }
+
+        if (data_len > le_maximum_advertising_data_length_) {
+          log::warn(
+              "advertising data len exceeds le_maximum_advertising_data_length_ {}",
+              le_maximum_advertising_data_length_);
+          if (advertising_callbacks_ != nullptr) {
+            if (set_scan_rsp) {
+              advertising_callbacks_->OnScanResponseDataSet(
+                  advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+            } else {
+              advertising_callbacks_->OnAdvertisingDataSet(
+                  advertiser_id, AdvertisingCallback::AdvertisingStatus::DATA_TOO_LARGE);
+            }
+          }
+          return;
+        }
+
+        if (data_len <= kLeMaximumFragmentLength) {
+          send_data_fragment(advertiser_id, set_scan_rsp, data, Operation::COMPLETE_ADVERTISEMENT);
+        } else {
+          EnabledSet curr_set;
+          curr_set.advertising_handle_ = advertiser_id;
+          curr_set.duration_ = advertising_sets_[advertiser_id].duration;
+          curr_set.max_extended_advertising_events_ =
+              advertising_sets_[advertiser_id].max_extended_advertising_events;
+          std::vector<EnabledSet> enabled_sets = {curr_set};
+          // check data size
+          bool chained = check_chained_data(data, adv_inst->connectable && adv_inst->discoverable);
+          if (chained && adv_inst->started) {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeSetExtendedAdvertisingEnableBuilder::Create(Enable::DISABLED, enabled_sets),
+                module_handler_->BindOnce(
+                    check_complete<LeSetExtendedAdvertisingEnableCompleteView>));
+          }
+          std::vector<GapData> sub_data;
+          uint16_t sub_data_len = 0;
+          Operation operation = Operation::FIRST_FRAGMENT;
+
+          for (size_t i = 0; i < data.size(); i++) {
+            if (sub_data_len + data[i].size() > kLeMaximumFragmentLength) {
+              send_data_fragment(advertiser_id, set_scan_rsp, sub_data, operation);
+              operation = Operation::INTERMEDIATE_FRAGMENT;
+              sub_data_len = 0;
+              sub_data.clear();
+            }
+            sub_data.push_back(data[i]);
+            sub_data_len += data[i].size();
+          }
+          send_data_fragment(advertiser_id, set_scan_rsp, sub_data, Operation::LAST_FRAGMENT);
+          if (chained && adv_inst->started) {
+            le_advertising_interface_->EnqueueCommand(
+                hci::LeSetExtendedAdvertisingEnableBuilder::Create(Enable::ENABLED, enabled_sets),
+                module_handler_->BindOnce(
+                    check_complete<LeSetExtendedAdvertisingEnableCompleteView>));
+          }
+        }
+      } break;
+    }
+    if (!adv_inst->started) {
+      if (!paused) {
+        enable_advertiser(
+            advertiser_id, true, adv_inst->duration, adv_inst->max_extended_advertising_events);
+      } else {
+        EnabledSet curr_set;
+        curr_set.advertising_handle_ = advertiser_id;
+        curr_set.duration_ = adv_inst->duration;
+        curr_set.max_extended_advertising_events_ = adv_inst->max_extended_advertising_events;
+        std::vector<EnabledSet> enabled_sets = {curr_set};
+        enabled_sets_[advertiser_id] = curr_set;
+      }
+    }
   }
 
   template <class View>
@@ -1847,6 +2647,40 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         "assert failed: status != AdvertisingCallback::AdvertisingStatus::SUCCESS");
     advertising_callbacks_->OnAdvertisingSetStarted(reg_id, kInvalidId, 0, status);
   }
+
+  void get_enc_key_material(
+      storage::StorageModule* storage_module_, hci::HciLayer* hci_layer_, os::Handler* handler) {
+    std::optional<std::vector<uint8_t>> keyiv =
+        std::move(storage_module_->GetBin("Adapter", BTIF_STORAGE_KEY_ENCR_DATA));
+    std::vector<uint8_t> enc_key_material;
+    enc_key_material.insert(enc_key_material.end(), keyiv->begin(), keyiv->end());
+    if (!storage_module_->HasProperty("Adapter", BTIF_STORAGE_KEY_ENCR_DATA) ||
+        enc_key_material.size() < ENC_KEY_MATERIAL_LEN) {
+      log::info(" Encrypted Data Key Material not in Config");
+      hci_layer_->EnqueueCommand(
+          LeRandBuilder::Create(),
+          handler->BindOnceOn(this, &impl::GenerateKeyIV<LeRandCompleteView>, key_iv, 1));
+      hci_layer_->EnqueueCommand(
+          LeRandBuilder::Create(),
+          handler->BindOnceOn(this, &impl::GenerateKeyIV<LeRandCompleteView>, key_iv, 2));
+      hci_layer_->EnqueueCommand(
+          LeRandBuilder::Create(),
+          handler->BindOnceOn(this, &impl::GenerateKeyIV<LeRandCompleteView>, key_iv, 3));
+    } else {
+      log::info(" Encrypted Data Key Material in Config");
+      std::optional<std::vector<uint8_t>> keyiv =
+          std::move(storage_module_->GetBin("Adapter", BTIF_STORAGE_KEY_ENCR_DATA));
+      std::vector<uint8_t> enc_key_material;
+      enc_key_material.insert(enc_key_material.end(), keyiv->begin(), keyiv->end());
+      if (enc_key_material_callback_ != nullptr) {
+        log::info(" enc_key_material_callback_ is not NULL");
+        enc_key_material_callback_->OnGetEncKeyMaterial(
+            enc_key_material, GATT_UUID_GAP_ENC_KEY_MATERIAL);
+      } else {
+        log::warn(" enc_key_material_callback_ is NULL");
+      }
+    }
+  }
 };
 
 LeAdvertisingManager::LeAdvertisingManager() {
@@ -1858,6 +2692,7 @@ void LeAdvertisingManager::ListDependencies(ModuleList* list) const {
   list->add<hci::Controller>();
   list->add<hci::AclManager>();
   list->add<hci::VendorSpecificEventManager>();
+  list->add<storage::StorageModule>();
 }
 
 void LeAdvertisingManager::Start() {
@@ -1866,11 +2701,17 @@ void LeAdvertisingManager::Start() {
       GetDependency<hci::HciLayer>(),
       GetDependency<hci::Controller>(),
       GetDependency<AclManager>(),
-      GetDependency<VendorSpecificEventManager>());
+      GetDependency<VendorSpecificEventManager>(),
+      GetDependency<storage::StorageModule>());
 }
 
 void LeAdvertisingManager::Stop() {
   pimpl_.reset();
+}
+
+void LeAdvertisingManager::GetEncKeyMaterial() {
+  pimpl_->get_enc_key_material(
+      GetDependency<storage::StorageModule>(), GetDependency<hci::HciLayer>(), GetHandler());
 }
 
 std::string LeAdvertisingManager::ToString() const {
@@ -2006,8 +2847,17 @@ void LeAdvertisingManager::SetParameters(AdvertiserId advertiser_id, Advertising
   CallOn(pimpl_.get(), &impl::set_parameters, advertiser_id, config);
 }
 
-void LeAdvertisingManager::SetData(AdvertiserId advertiser_id, bool set_scan_rsp, std::vector<GapData> data) {
+void LeAdvertisingManager::SetData(
+    AdvertiserId advertiser_id, bool set_scan_rsp, std::vector<GapData> data) {
   CallOn(pimpl_.get(), &impl::set_data, advertiser_id, set_scan_rsp, data);
+}
+
+void LeAdvertisingManager::SetData(
+    AdvertiserId advertiser_id,
+    bool set_scan_rsp,
+    std::vector<GapData> data,
+    std::vector<GapData> data_encrypt) {
+  CallOn(pimpl_.get(), &impl::set_enc_data, advertiser_id, set_scan_rsp, data, data_encrypt);
 }
 
 void LeAdvertisingManager::EnableAdvertiser(
@@ -2024,6 +2874,11 @@ void LeAdvertisingManager::SetPeriodicData(AdvertiserId advertiser_id, std::vect
   CallOn(pimpl_.get(), &impl::set_periodic_data, advertiser_id, data);
 }
 
+void LeAdvertisingManager::SetPeriodicData(
+    AdvertiserId advertiser_id, std::vector<GapData> data, std::vector<GapData> data_encrypt) {
+  CallOn(pimpl_.get(), &impl::set_periodic_enc_data, advertiser_id, data, data_encrypt);
+}
+
 void LeAdvertisingManager::EnablePeriodicAdvertising(AdvertiserId advertiser_id, bool enable, bool include_adi) {
   CallOn(pimpl_.get(), &impl::enable_periodic_advertising, advertiser_id, enable, include_adi);
 }
@@ -2038,6 +2893,11 @@ void LeAdvertisingManager::ResetAdvertiser(AdvertiserId advertiser_id) {
 
 void LeAdvertisingManager::RegisterAdvertisingCallback(AdvertisingCallback* advertising_callback) {
   CallOn(pimpl_.get(), &impl::register_advertising_callback, advertising_callback);
+}
+
+void LeAdvertisingManager::RegisterEncKeyMaterialCallback(
+    EncKeyMaterialCallback* enc_key_material_callback) {
+  CallOn(pimpl_.get(), &impl::register_enc_key_material_callback, enc_key_material_callback);
 }
 
 }  // namespace hci

@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #pragma once
 
@@ -92,6 +96,8 @@ class ScanningCallback {
   virtual void OnPeriodicSyncLost(uint16_t sync_handle) = 0;
   virtual void OnPeriodicSyncTransferred(int pa_source, uint8_t status, Address address) = 0;
   virtual void OnBigInfoReport(uint16_t sync_handle, bool encrypted) = 0;
+  virtual bool OnFetchPseudoAddressFromIdentityAddress(
+      Address address, uint8_t address_type, Address* pseudo_address) = 0;
 };
 
 class AdvertisingPacketContentFilterCommand {

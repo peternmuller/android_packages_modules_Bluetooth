@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
- *
  */
 
 #ifndef ANDROID_INCLUDE_BLE_ADVERTISER_H
@@ -160,9 +159,8 @@ class BleAdvertiserInterface {
       std::vector<uint8_t> scan_response_data_enc,
       PeriodicAdvertisingParameters periodic_params,
       std::vector<uint8_t> periodic_data,
-      std::vector<uint8_t> periodic_data_enc,
-      uint16_t duration, uint8_t maxExtAdvEvents,
-      std::vector<uint8_t> enc_key_value,
+      std::vector<uint8_t> periodic_data_enc, uint16_t duration,
+      uint8_t maxExtAdvEvents, std::vector<uint8_t> enc_key_value,
       IdStatusCallback timeout_cb) = 0;
 
   virtual void SetPeriodicAdvertisingParameters(

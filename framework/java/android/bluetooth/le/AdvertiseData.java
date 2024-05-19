@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
- *
  */
 
 package android.bluetooth.le;
@@ -59,9 +58,7 @@ public final class AdvertiseData implements Parcelable {
     private final boolean mIncludeTxPowerLevel;
     private final boolean mIncludeDeviceName;
     private final boolean mIncludePublicBroadcastDeviceName;
-    private final byte[] mEncryptedKeyMaterialValue;
     private final String mPublicBroadcastDeviceName;
-
     private final boolean mServiceUuidsEnc;
     private final boolean mServiceSolicitationUuidsEnc;
     private final boolean mTransportDiscoveryDataEnc;
@@ -88,8 +85,7 @@ public final class AdvertiseData implements Parcelable {
             boolean deviceNameEnc,
             boolean includePublicBroadcastDeviceName,
             String publicBroadcastDeviceName,
-            boolean publicBroadcastDeviceNameEnc,
-            byte[] encryptedKeyMaterialValue) {
+            boolean publicBroadcastDeviceNameEnc) {
         mServiceUuids = serviceUuids;
         mServiceUuidsEnc = serviceUuidsEnc;
         mServiceSolicitationUuids = serviceSolicitationUuids;
@@ -107,7 +103,6 @@ public final class AdvertiseData implements Parcelable {
         mIncludePublicBroadcastDeviceName = includePublicBroadcastDeviceName;
         mPublicBroadcastDeviceName = publicBroadcastDeviceName;
         mPublicBroadcastDeviceNameEnc = publicBroadcastDeviceNameEnc;
-        mEncryptedKeyMaterialValue = encryptedKeyMaterialValue;
     }
 
     /**
@@ -120,6 +115,7 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Service Uuids need to be encrypted.
+     *
      * @hide
      */
     public boolean getServiceUuidsEnc() {
@@ -137,9 +133,9 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Service Solicitation Uuids need to be encrypted.
+     *
      * @hide
      */
-    @NonNull
     public boolean getServiceSolicitationUuidsEnc() {
         return mServiceSolicitationUuidsEnc;
     }
@@ -155,9 +151,9 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Transport Discovery data need to be encrypted.
+     *
      * @hide
      */
-    @NonNull
     public boolean getTransportDiscoveryDataEnc() {
         return mTransportDiscoveryDataEnc;
     }
@@ -172,6 +168,7 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Manufacturer specific data need to be encrypted.
+     *
      * @hide
      */
     public boolean getManufacturerSpecificDataEnc() {
@@ -185,6 +182,7 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Service data need to be encrypted.
+     *
      * @hide
      */
     public boolean getServiceDataEnc() {
@@ -198,6 +196,7 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Returns whether Tx Power level needs to be encrypted.
+     *
      * @hide
      */
     public boolean getTxPowerLevelEnc() {
@@ -210,7 +209,9 @@ public final class AdvertiseData implements Parcelable {
     }
 
     /**
+     * Whether the public broadcast device name will be included in the advertisement packet.
      * Returns whether Device name needs to be encrypted.
+     *
      * @hide
      */
     public boolean getDeviceNameEnc() {
@@ -219,6 +220,7 @@ public final class AdvertiseData implements Parcelable {
 
     /**
      * Whether the public broadcast device name will be included in the advertisement packet.
+     *
      * @hide
      */
     public boolean getIncludePublicBroadcastDeviceName() {
@@ -241,16 +243,9 @@ public final class AdvertiseData implements Parcelable {
         return mPublicBroadcastDeviceNameEnc;
     }
 
-    /**
-     * Get the Encrypted Data Key Material Characteristic value.
-     * @hide
-     */
-    public byte[] getEncryptedKeyMaterialValue() {
-        return mEncryptedKeyMaterialValue;
-    }
-
     /** @hide */
     @Override
+    @SuppressWarnings("ArrayHashCode")
     public int hashCode() {
         return Objects.hash(
                 mServiceUuids,
@@ -269,8 +264,7 @@ public final class AdvertiseData implements Parcelable {
                 mDeviceNameEnc,
                 mIncludePublicBroadcastDeviceName,
                 mPublicBroadcastDeviceName,
-                mPublicBroadcastDeviceNameEnc,
-                Arrays.hashCode(mEncryptedKeyMaterialValue));
+                mPublicBroadcastDeviceNameEnc);
     }
 
     /** @hide */
@@ -300,49 +294,30 @@ public final class AdvertiseData implements Parcelable {
                 && mDeviceNameEnc == other.mDeviceNameEnc
                 && mIncludePublicBroadcastDeviceName == other.mIncludePublicBroadcastDeviceName
                 && Objects.equals(mPublicBroadcastDeviceName, other.mPublicBroadcastDeviceName)
-                && mPublicBroadcastDeviceNameEnc == other.mPublicBroadcastDeviceNameEnc
-                && BluetoothLeUtils.equals(mEncryptedKeyMaterialValue,
-                    other.mEncryptedKeyMaterialValue);
+                && mPublicBroadcastDeviceNameEnc == other.mPublicBroadcastDeviceNameEnc;
     }
 
     @Override
     public String toString() {
-        return "AdvertiseData [mServiceUuids="
-                + mServiceUuids
-                + ", mServiceUuidsEnc="
-                + mServiceUuidsEnc
-                + ", mServiceSolicitationUuids="
-                + mServiceSolicitationUuids
-                + ", mServiceSolicitationUuidsEnc="
-                + mServiceSolicitationUuidsEnc
-                + ", mTransportDiscoveryData="
-                + mTransportDiscoveryData
-                + ", mTransportDiscoveryDataEnc="
-                + mTransportDiscoveryDataEnc
+        return "AdvertiseData ["
+                + ("mServiceUuids=" + mServiceUuids)
+                + (", mServiceUuidsEnc=" + mServiceUuidsEnc)
+                + (", mServiceSolicitationUuids=" + mServiceSolicitationUuids)
+                + (", mServiceSolicitationUuidsEnc=" + mServiceSolicitationUuidsEnc)
+                + (", mTransportDiscoveryData=" + mTransportDiscoveryData)
+                + (", mTransportDiscoveryDataEnc=" + mTransportDiscoveryDataEnc)
                 + ", mManufacturerSpecificData="
                 + BluetoothLeUtils.toString(mManufacturerSpecificData)
-                + ", mManufacturerSpecificDataEnc="
-                + mManufacturerSpecificDataEnc
-                + ", mServiceData="
-                + BluetoothLeUtils.toString(mServiceData)
-                + ", mServiceDataEnc="
-                + mServiceDataEnc
-                + ", mIncludeTxPowerLevel="
-                + mIncludeTxPowerLevel
-                + ", mTxPowerLevelEnc="
-                + mTxPowerLevelEnc
-                + ", mIncludeDeviceName="
-                + mIncludeDeviceName
-                + ", mDeviceNameEnc="
-                + mDeviceNameEnc
-                + ", mIncludePublicBroadcastDeviceName="
-                + mIncludePublicBroadcastDeviceName
-                + ", mPublicBroadcastDeviceName="
-                + mPublicBroadcastDeviceName
-                + ", mPublicBroadcastDeviceNameEnc="
-                + mPublicBroadcastDeviceNameEnc
-                + ", mEncryptedKeyMaterialValue="
-                + BluetoothLeUtils.toString(mEncryptedKeyMaterialValue)
+                + (", mManufacturerSpecificDataEnc=" + mManufacturerSpecificDataEnc)
+                + (", mServiceData=" + BluetoothLeUtils.toString(mServiceData))
+                + (", mServiceDataEnc=" + mServiceDataEnc)
+                + (", mIncludeTxPowerLevel=" + mIncludeTxPowerLevel)
+                + (", mTxPowerLevelEnc=" + mTxPowerLevelEnc)
+                + (", mIncludeDeviceName=" + mIncludeDeviceName)
+                + (", mDeviceNameEnc=" + mDeviceNameEnc)
+                + (", mIncludePublicBroadcastDeviceName=" + mIncludePublicBroadcastDeviceName)
+                + mIncludePublicBroadcastDeviceName + ", mPublicBroadcastDeviceName="
+                + (", mPublicBroadcastDeviceNameEnc=" + mPublicBroadcastDeviceNameEnc)
                 + "]";
     }
 
@@ -356,7 +331,8 @@ public final class AdvertiseData implements Parcelable {
         dest.writeTypedArray(mServiceUuids.toArray(new ParcelUuid[mServiceUuids.size()]), flags);
         dest.writeByte((byte) (getServiceUuidsEnc() ? 1 : 0));
         dest.writeTypedArray(
-                mServiceSolicitationUuids.toArray(new ParcelUuid[mServiceSolicitationUuids.size()]), flags);
+                mServiceSolicitationUuids.toArray(new ParcelUuid[mServiceSolicitationUuids.size()]),
+                flags);
         dest.writeByte((byte) (getServiceSolicitationUuidsEnc() ? 1 : 0));
 
         dest.writeTypedList(mTransportDiscoveryData);
@@ -382,13 +358,6 @@ public final class AdvertiseData implements Parcelable {
         dest.writeByte((byte) (getIncludePublicBroadcastDeviceName() ? 1 : 0));
         dest.writeString(getPublicBroadcastDeviceName());
         dest.writeByte((byte) (getPublicBroadcastDeviceNameEnc() ? 1 : 0));
-
-        if(mEncryptedKeyMaterialValue != null) {
-            dest.writeInt(mEncryptedKeyMaterialValue.length);
-            dest.writeByteArray(mEncryptedKeyMaterialValue);
-        } else {
-            dest.writeInt(0);
-        }
     }
 
     public static final @android.annotation.NonNull Parcelable.Creator<AdvertiseData> CREATOR =
@@ -404,21 +373,30 @@ public final class AdvertiseData implements Parcelable {
                     ArrayList<ParcelUuid> uuids = in.createTypedArrayList(ParcelUuid.CREATOR);
                     boolean uuidsEnc = (in.readByte() == 1);
                     for (ParcelUuid uuid : uuids) {
-                        builder.addServiceUuid(uuid, uuidsEnc);
+                        builder.addServiceUuid(uuid);
+                    }
+                    if (uuidsEnc) {
+                        builder.setServiceUuidEncrypted(uuidsEnc);
                     }
 
                     ArrayList<ParcelUuid> solicitationUuids =
                             in.createTypedArrayList(ParcelUuid.CREATOR);
                     boolean solicitationUuidsEnc = (in.readByte() == 1);
                     for (ParcelUuid uuid : solicitationUuids) {
-                        builder.addServiceSolicitationUuid(uuid, solicitationUuidsEnc);
+                        builder.addServiceSolicitationUuid(uuid);
+                    }
+                    if (solicitationUuidsEnc) {
+                        builder.setSolicitationUuidEncrypted(solicitationUuidsEnc);
                     }
 
                     List<TransportDiscoveryData> transportDiscoveryData =
                             in.createTypedArrayList(TransportDiscoveryData.CREATOR);
                     boolean tddEnc = (in.readByte() == 1);
                     for (TransportDiscoveryData tdd : transportDiscoveryData) {
-                        builder.addTransportDiscoveryData(tdd, tddEnc);
+                        builder.addTransportDiscoveryData(tdd);
+                    }
+                    if (tddEnc) {
+                        builder.setTransportDiscoveryDataEncrypted(tddEnc);
                     }
 
                     int manufacturerSize = in.readInt();
@@ -426,24 +404,39 @@ public final class AdvertiseData implements Parcelable {
                     for (int i = 0; i < manufacturerSize; ++i) {
                         int manufacturerId = in.readInt();
                         byte[] manufacturerData = in.createByteArray();
-                        builder.addManufacturerData(manufacturerId, manufacturerData, manufacturerDataEnc);
+                        builder.addManufacturerData(manufacturerId, manufacturerData);
+                    }
+                    if (manufacturerDataEnc) {
+                        builder.setManufacturerDataEncrypted(manufacturerDataEnc);
                     }
                     int serviceDataSize = in.readInt();
                     boolean serviceDataEnc = (in.readByte() == 1);
                     for (int i = 0; i < serviceDataSize; ++i) {
                         ParcelUuid serviceDataUuid = in.readTypedObject(ParcelUuid.CREATOR);
                         byte[] serviceData = in.createByteArray();
-                        builder.addServiceData(serviceDataUuid, serviceData, serviceDataEnc);
-                    }
-                    builder.setIncludeTxPowerLevel((in.readByte() == 1), (in.readByte() == 1));
-                    builder.setIncludeDeviceName((in.readByte() == 1), (in.readByte() == 1));
-                    builder.setIncludePublicBroadcastDeviceName((in.readByte() == 1), in.readString(), (in.readByte() == 1));
 
-                    int encryptedKeyMaterialValueSize = in.readInt();
-                    if (encryptedKeyMaterialValueSize > 0) {
-                        byte[] encryptedKeyMaterialValue = in.createByteArray();
-                        builder.setEncryptedKeyMaterialValue(encryptedKeyMaterialValue);
+                        builder.addServiceData(serviceDataUuid, serviceData);
                     }
+                    if (serviceDataEnc) {
+                        builder.setServiceDataEncrypted(serviceDataEnc);
+                    }
+                    builder.setIncludeTxPowerLevel((in.readByte() == 1));
+                    boolean includeTxPowerEnc = (in.readByte() == 1);
+                    if (includeTxPowerEnc) {
+                        builder.setIncludeTxPowerLevelEncrypted(includeTxPowerEnc);
+                    }
+                    builder.setIncludeDeviceName((in.readByte() == 1));
+                    boolean includeDeviceNameEnc = (in.readByte() == 1);
+                    if (includeDeviceNameEnc) {
+                        builder.setIncludeDeviceNameEncrypted(includeDeviceNameEnc);
+                    }
+                    builder.setIncludePublicBroadcastDeviceName((in.readByte() == 1), in.readString());
+                    boolean includePublicBroadcastDeviceNameEnc = (in.readByte() == 1);
+                    if (includePublicBroadcastDeviceNameEnc) {
+                        builder.setIncludePublicBroadcastDeviceNameEncrypted(
+                                includePublicBroadcastDeviceNameEnc);
+                    }
+
                     return builder.build();
                 }
             };
@@ -471,7 +464,6 @@ public final class AdvertiseData implements Parcelable {
         private boolean mTxPowerLevelEnc;
         private boolean mDeviceNameEnc;
         private boolean mPublicBroadcastDeviceNameEnc;
-        private byte[] mEncryptedKeyMaterialValue;
 
         /**
          * Add a service UUID to advertise data.
@@ -483,23 +475,18 @@ public final class AdvertiseData implements Parcelable {
             if (serviceUuid == null) {
                 throw new IllegalArgumentException("serviceUuid is null");
             }
-            return addServiceUuid(serviceUuid, false);
+            mServiceUuids.add(serviceUuid);
+            return this;
         }
 
         /**
-         * Add a service UUID to advertise data.
+         * set the encryption flag for encrypting Service UUID.
          *
-         * @param serviceUuid A service UUID to be advertised.
-         * @param needEncryption need encryption for service uuid
-         * @throws IllegalArgumentException If the {@code serviceUuid} is null.
+         * @param enableEncryption enables encryption for service uuid
          * @hide
          */
-        public Builder addServiceUuid(ParcelUuid serviceUuid, boolean needEncryption) {
-            if (serviceUuid == null) {
-                throw new IllegalArgumentException("serviceUuid is null");
-            }
-            mServiceUuids.add(serviceUuid);
-            mServiceUuidsEnc = needEncryption;
+        public Builder setServiceUuidEncrypted(boolean enableEncryption) {
+            mServiceUuidsEnc = enableEncryption;
             return this;
         }
 
@@ -514,25 +501,19 @@ public final class AdvertiseData implements Parcelable {
             if (serviceSolicitationUuid == null) {
                 throw new IllegalArgumentException("serviceSolicitationUuid is null");
             }
-            return addServiceSolicitationUuid(serviceSolicitationUuid, false);
+            mServiceSolicitationUuids.add(serviceSolicitationUuid);
+            return this;
         }
 
         /**
-         * Add a service solicitation UUID to advertise data.
+         * set the encryption flag for encrypting solicitation UUID.
          *
-         * @param serviceSolicitationUuid A service solicitation UUID to be advertised.
-         * @param needEncryption need encryption for service solicitation uuid
-         * @throws IllegalArgumentException If the {@code serviceSolicitationUuid} is null.
+         * @param enableEncryption enables encryption for solicitation uuid
          * @hide
          */
         @NonNull
-        public Builder addServiceSolicitationUuid(@NonNull ParcelUuid serviceSolicitationUuid,
-                boolean needEncryption) {
-            if (serviceSolicitationUuid == null) {
-                throw new IllegalArgumentException("serviceSolicitationUuid is null");
-            }
-            mServiceSolicitationUuids.add(serviceSolicitationUuid);
-            mServiceSolicitationUuidsEnc = needEncryption;
+        public Builder setSolicitationUuidEncrypted(boolean enableEncryption) {
+            mServiceSolicitationUuidsEnc = enableEncryption;
             return this;
         }
 
@@ -548,27 +529,18 @@ public final class AdvertiseData implements Parcelable {
             if (serviceDataUuid == null || serviceData == null) {
                 throw new IllegalArgumentException("serviceDataUuid or serviceDataUuid is null");
             }
-            return addServiceData(serviceDataUuid, serviceData, false);
+            mServiceData.put(serviceDataUuid, serviceData);
+            return this;
         }
 
         /**
-         * Add service data to advertise data.
+         * set the encryption flag for encrypting service data.
          *
-         * @param serviceDataUuid 16-bit UUID of the service the data is associated with
-         * @param serviceData Service data
-         * @param needEncryption need encryption for service data
-         * @throws IllegalArgumentException If the {@code serviceDataUuid} or {@code serviceData} is
-         * empty.
+         * @param enableEncryption enables encryption for service data
          * @hide
          */
-        public Builder addServiceData(ParcelUuid serviceDataUuid, byte[] serviceData,
-                boolean needEncryption) {
-            if (serviceDataUuid == null || serviceData == null) {
-                throw new IllegalArgumentException(
-                        "serviceDataUuid or serviceDataUuid is null");
-            }
-            mServiceData.put(serviceDataUuid, serviceData);
-            mServiceDataEnc = needEncryption;
+        public Builder setServiceDataEncrypted(boolean enableEncryption) {
+            mServiceDataEnc = enableEncryption;
             return this;
         }
 
@@ -585,26 +557,19 @@ public final class AdvertiseData implements Parcelable {
             if (transportDiscoveryData == null) {
                 throw new IllegalArgumentException("transportDiscoveryData is null");
             }
-            return addTransportDiscoveryData(transportDiscoveryData, false);
+            mTransportDiscoveryData.add(transportDiscoveryData);
+            return this;
         }
 
         /**
-         * Add Transport Discovery Data to advertise data.
+         * Set the encryption flag for encrypting Transport Discovery Data.
          *
-         * @param transportDiscoveryData Transport Discovery Data, consisting of one or more
-         * Transport Blocks. Transport Discovery Data AD Type Code is already included.
-         * @param needEncryption need encryption for Transport Discovery data
-         * @throws IllegalArgumentException If the {@code transportDiscoveryData} is empty
+         * @param enableEncryption enables encryption for Transport Discovery data
          * @hide
          */
         @NonNull
-        public Builder addTransportDiscoveryData(
-                @NonNull TransportDiscoveryData transportDiscoveryData, boolean needEncryption) {
-            if (transportDiscoveryData == null) {
-                throw new IllegalArgumentException("transportDiscoveryData is null");
-            }
-            mTransportDiscoveryData.add(transportDiscoveryData);
-            mTransportDiscoveryDataEnc = needEncryption;
+        public Builder setTransportDiscoveryDataEncrypted(boolean enableEncryption) {
+            mTransportDiscoveryDataEnc = enableEncryption;
             return this;
         }
 
@@ -627,34 +592,18 @@ public final class AdvertiseData implements Parcelable {
             if (manufacturerSpecificData == null) {
                 throw new IllegalArgumentException("manufacturerSpecificData is null");
             }
-            return addManufacturerData(manufacturerId, manufacturerSpecificData, false);
+            mManufacturerSpecificData.put(manufacturerId, manufacturerSpecificData);
+            return this;
         }
 
         /**
-         * Add manufacturer specific data.
-         * <p>
-         * Please refer to the Bluetooth Assigned Numbers document provided by the <a
-         * href="https://www.bluetooth.org">Bluetooth SIG</a> for a list of existing company
-         * identifiers.
+         * Set the encryption flag for encrypting manufacturer specific data.
          *
-         * @param manufacturerId Manufacturer ID assigned by Bluetooth SIG.
-         * @param manufacturerSpecificData Manufacturer specific data
-         * @param needEncryption Need encryption for manufacturer data
-         * @throws IllegalArgumentException If the {@code manufacturerId} is negative or {@code
-         * manufacturerSpecificData} is null.
+         * @param enableEncryption enables encryption for manufacturer data
          * @hide
          */
-        public Builder addManufacturerData(int manufacturerId, byte[] manufacturerSpecificData,
-                boolean needEncryption) {
-            if (manufacturerId < 0) {
-                throw new IllegalArgumentException(
-                        "invalid manufacturerId - " + manufacturerId);
-            }
-            if (manufacturerSpecificData == null) {
-                throw new IllegalArgumentException("manufacturerSpecificData is null");
-            }
-            mManufacturerSpecificData.put(manufacturerId, manufacturerSpecificData);
-            mManufacturerSpecificDataEnc = needEncryption;
+        public Builder setManufacturerDataEncrypted(boolean enableEncryption) {
+            mManufacturerSpecificDataEnc = enableEncryption;
             return this;
         }
 
@@ -663,42 +612,47 @@ public final class AdvertiseData implements Parcelable {
          * level field takes 3 bytes in advertise packet.
          */
         public Builder setIncludeTxPowerLevel(boolean includeTxPowerLevel) {
-            return setIncludeTxPowerLevel(includeTxPowerLevel, false);
+            mIncludeTxPowerLevel = includeTxPowerLevel;
+            return this;
         }
 
         /**
-         * Whether the transmission power level should be included in the advertise packet. Tx power
-         * level field takes 3 bytes in advertise packet.
+         * Set the encryption flag for encrypting Include Tx Power Level.
+         *
+         * @param enableEncryption enables encryption for Include Tx Power Level
          * @hide
          */
-        public Builder setIncludeTxPowerLevel(boolean includeTxPowerLevel, boolean needEncryption) {
-            mIncludeTxPowerLevel = includeTxPowerLevel;
-            mTxPowerLevelEnc = needEncryption;
+        public Builder setIncludeTxPowerLevelEncrypted(boolean enableEncryption) {
+            mTxPowerLevelEnc = enableEncryption;
             return this;
         }
 
         /** Set whether the device name should be included in advertise packet. */
         public Builder setIncludeDeviceName(boolean includeDeviceName) {
-            return setIncludeDeviceName(includeDeviceName, false);
-        }
-
-        /**
-         * Set whether the device name should be included in advertise packet.
-         * @hide
-         */
-        public Builder setIncludeDeviceName(boolean includeDeviceName, boolean needEncryption) {
             mIncludeDeviceName = includeDeviceName;
-            mDeviceNameEnc = needEncryption;
             return this;
         }
 
         /**
          * Set whether the public broadcast device name should be included in advertise packet.
+         * Set the encryption flag for encrypting Device Name.
+         *
+         * @param enableEncryption enables encryption for Device Name
+         * @hide
+         */
+        public Builder setIncludeDeviceNameEncrypted(boolean enableEncryption) {
+            mDeviceNameEnc = enableEncryption;
+            return this;
+        }
+
+        /**
+         * Set whether the public broadcast device name should be included in advertise packet.
+         *
          * @hide
          */
         @NonNull
         public Builder setIncludePublicBroadcastDeviceName(boolean includeDeviceName) {
-            return setIncludePublicBroadcastDeviceName(includeDeviceName, null, false);
+            return setIncludePublicBroadcastDeviceName(includeDeviceName, null);
         }
 
         /**
@@ -707,36 +661,20 @@ public final class AdvertiseData implements Parcelable {
          */
         @NonNull
         public Builder setIncludePublicBroadcastDeviceName(boolean includeDeviceName, String pubBroadcastName) {
-            return setIncludePublicBroadcastDeviceName(includeDeviceName, pubBroadcastName, false);
-        }
-
-        /**
-         * Set whether the public broadcast device name should be included in advertise packet.
-         * @hide
-         */
-        @NonNull
-        public Builder setIncludePublicBroadcastDeviceName(boolean includeDeviceName, String pubBroadcastName, boolean
-                needEncryption) {
             mIncludePublicBroadcastDeviceName = includeDeviceName;
             mPublicBroadcastDeviceName = pubBroadcastName;
-            mPublicBroadcastDeviceNameEnc = needEncryption;
             return this;
         }
 
         /**
-         * Set Encrypted Data Key Material characteristic value.
+         * Set the encryption flag for public broadcast device name.
          *
-         * @param value value of Encrypted Data Key Material Char value
-         * @throws IllegalArgumentException If the {@code value} is
-         * empty.
+         * @param enableEncryption enables encryption for public broadcast device name
          * @hide
          */
-        public Builder setEncryptedKeyMaterialValue(byte[] value) {
-            if (value == null) {
-                throw new IllegalArgumentException(
-                        " Encrypted Data Key Material value is null");
-            }
-            mEncryptedKeyMaterialValue = value;
+        @NonNull
+        public Builder setIncludePublicBroadcastDeviceNameEncrypted(boolean enableEncryption) {
+            mPublicBroadcastDeviceNameEnc = enableEncryption;
             return this;
         }
 
@@ -759,8 +697,7 @@ public final class AdvertiseData implements Parcelable {
                     mDeviceNameEnc,
                     mIncludePublicBroadcastDeviceName,
                     mPublicBroadcastDeviceName,
-                    mPublicBroadcastDeviceNameEnc,
-                    mEncryptedKeyMaterialValue);
+                    mPublicBroadcastDeviceNameEnc);
         }
     }
 }

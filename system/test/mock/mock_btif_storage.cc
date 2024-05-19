@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 /*
  * Generated mock file from original source file
@@ -77,6 +81,9 @@ struct btif_storage_set_gatt_sr_supp_feat btif_storage_set_gatt_sr_supp_feat;
 struct btif_storage_set_remote_addr_type btif_storage_set_remote_addr_type;
 struct btif_storage_set_remote_device_property
     btif_storage_set_remote_device_property;
+struct btif_storage_get_enc_key_material_length
+    btif_storage_get_enc_key_material_length;
+struct btif_storage_get_enc_key_material btif_storage_get_enc_key_material;
 
 }  // namespace btif_storage
 }  // namespace mock
@@ -116,6 +123,8 @@ bt_status_t btif_storage_remove_bonded_device::return_value = BT_STATUS_SUCCESS;
 bt_status_t btif_storage_set_adapter_property::return_value = BT_STATUS_SUCCESS;
 bt_status_t btif_storage_set_remote_device_property::return_value =
     BT_STATUS_SUCCESS;
+size_t btif_storage_get_enc_key_material_length::return_value = 24;
+bt_status_t btif_storage_get_enc_key_material::return_value = BT_STATUS_SUCCESS;
 
 }  // namespace btif_storage
 }  // namespace mock
@@ -308,5 +317,21 @@ bt_status_t btif_storage_set_remote_device_property(
   return test::mock::btif_storage::btif_storage_set_remote_device_property(
       remote_bd_addr, property);
 }
+
+size_t btif_storage_get_enc_key_material_length(
+    const RawAddress* remote_bd_addr) {
+  inc_func_call_count(__func__);
+  return test::mock::btif_storage::btif_storage_get_enc_key_material_length(
+      remote_bd_addr);
+}
+
+bt_status_t btif_storage_get_enc_key_material(const RawAddress* remote_bd_addr,
+                                              uint8_t* key_value,
+                                              size_t* key_length) {
+  inc_func_call_count(__func__);
+  return test::mock::btif_storage::btif_storage_get_enc_key_material(
+      remote_bd_addr, key_value, key_length);
+}
+
 // Mocked functions complete
 // END mockcify generation

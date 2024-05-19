@@ -12,9 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #include "hci/le_scanning_manager.h"
 
+#include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
 #include <com_android_bluetooth_flags.h>
 
@@ -27,6 +32,7 @@
 #include "hci/hci_layer.h"
 #include "hci/hci_packets.h"
 #include "hci/le_periodic_sync_manager.h"
+#include "hci/le_scanning_decrypter.h"
 #include "hci/le_scanning_interface.h"
 #include "hci/le_scanning_reassembler.h"
 #include "hci/vendor_specific_event_manager.h"
@@ -34,6 +40,7 @@
 #include "os/handler.h"
 #include "os/log.h"
 #include "os/system_properties.h"
+#include "storage/config_keys.h"
 #include "storage/storage_module.h"
 
 namespace bluetooth {
@@ -157,6 +164,11 @@ class NullScanningCallback : public ScanningCallback {
   void OnBigInfoReport(uint16_t /* sync_handle */, bool /* encrypted */) {
     log::info("OnBigInfoReport in NullScanningCallback");
   };
+
+  bool OnFetchPseudoAddressFromIdentityAddress(Address, uint8_t, Address*) {
+    log::info("OnFetchPseudoAddressFromIdentityAddress in NullScanningCallback");
+    return false;
+  }
 };
 
 enum class BatchScanState {
@@ -465,6 +477,47 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
     std::optional<LeScanningReassembler::CompleteAdvertisingData> processed_report =
         scanning_reassembler_.ProcessAdvertisingReport(
             event_type, address_type, address, advertising_sid, advertising_data);
+
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (processed_report.has_value() &&
+          scanning_decrypter_.ContainsEncryptedData(
+              processed_report->data.data(), processed_report->data.size())) {
+        Address pseudo_address;
+        bool pseudoAddresssAvailable = scanning_callbacks_->OnFetchPseudoAddressFromIdentityAddress(
+            address, address_type, &pseudo_address);
+        if (pseudoAddresssAvailable) {
+          auto enc_key_material =
+              storage_module_->GetBin(pseudo_address.ToString(), BTIF_STORAGE_KEY_ENCR_DATA)
+                  .value_or(std::vector<uint8_t>{});
+          if (enc_key_material.size() > 0) {
+            std::vector<uint8_t> decrypted_data;
+            bool is_decrypt_success = false;
+            is_decrypt_success = scanning_decrypter_.ExtractEncryptedData(
+                processed_report->data, enc_key_material, &decrypted_data);
+            if (!is_decrypt_success) {
+              log::info(
+                  "Decryption FAILED ENC_KEY_MATERIAL {}",
+                  base::HexEncode(enc_key_material.data(), enc_key_material.size()).c_str());
+            } else {
+              processed_report->data = decrypted_data;
+              log::info(
+                  "Decryption succesfully  addr: {} , pseudo_address: {} data: {}",
+                  address.ToString().c_str(),
+                  pseudo_address.ToString().c_str(),
+                  base::HexEncode(processed_report->data.data(), processed_report->data.size())
+                      .c_str());
+            }
+          } else {
+            log::info(
+                "enc_key_material size is <= 0  addr: {} , pseudo_address: {}",
+                address.ToString().c_str(),
+                pseudo_address.ToString().c_str());
+          }
+        } else {
+          log::info("pseudo_address not available {}", address.ToString().c_str());
+        }
+      }
+    }
 
     if (processed_report.has_value()) {
       switch (address_type) {
@@ -1714,6 +1767,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
   bool scan_on_resume_ = false;
   bool paused_ = false;
   LeScanningReassembler scanning_reassembler_;
+  LeScanningDecrypter scanning_decrypter_;
   bool is_filter_supported_ = false;
   bool is_ad_type_filter_supported_ = false;
   bool is_batch_scan_supported_ = false;

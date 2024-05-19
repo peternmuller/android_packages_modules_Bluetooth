@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 /*
@@ -42,4 +46,9 @@ void GAP_BleAttrDBUpdate(uint16_t /* attr_uuid */,
                          tGAP_BLE_ATTR_VALUE* /* p_value */) {
   inc_func_call_count(__func__);
 }
+
+void GAP_BleGetEncKeyMaterialInfo(const RawAddress& /* peer_bda */) {
+  inc_func_call_count(__func__);
+}
+
 void gap_attr_db_init(void) { inc_func_call_count(__func__); }

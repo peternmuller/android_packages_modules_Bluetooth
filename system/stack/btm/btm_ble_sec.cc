@@ -13,6 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 #define LOG_TAG "ble_sec"
@@ -22,11 +26,13 @@
 #include <android_bluetooth_sysprop.h>
 #include <base/strings/stringprintf.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 
+#include "btif/include/btif_config.h"
 #include "btif/include/btif_storage.h"
 #include "crypto_toolbox/crypto_toolbox.h"
 #include "device/include/interop.h"
@@ -45,6 +51,7 @@
 #include "stack/btm/btm_sec_int_types.h"
 #include "stack/btm/security_device_record.h"
 #include "stack/eatt/eatt.h"
+#include "stack/gatt/gatt_int.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_name.h"
 #include "stack/include/bt_octets.h"
@@ -55,6 +62,7 @@
 #include "stack/include/btm_ble_sec_api.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/btm_status.h"
+#include "stack/include/gap_api.h"
 #include "stack/include/gatt_api.h"
 #include "stack/include/l2cap_security_interface.h"
 #include "stack/include/smp_api.h"
@@ -1348,6 +1356,22 @@ void btm_ble_link_encrypted(const RawAddress& bd_addr, uint8_t encr_enable) {
   } else {
     btm_ble_notify_enc_cmpl(p_dev_rec->ble.pseudo_addr, encr_enable);
   }
+
+  if (com::android::bluetooth::flags::encrypted_advertising_data() && encr_enable &&
+      btm_sec_is_a_bonded_dev(p_dev_rec->ble.pseudo_addr)) {
+    size_t length =
+        btif_storage_get_enc_key_material_length(&p_dev_rec->ble.pseudo_addr);
+
+    tGATT_TCB* p_tcb =
+        gatt_find_tcb_by_addr(p_dev_rec->ble.pseudo_addr, BT_TRANSPORT_LE);
+    /* Resume pending read of encrypted data key material*/
+    if (p_tcb && (p_tcb->is_read_enc_key_pending ||
+                  (!p_tcb->is_read_enc_key_pending && (length > 0)))) {
+      log::debug(" btm_ble_link_encrypted, read enc key values");
+      GAP_BleGetEncKeyMaterialInfo(p_dev_rec->ble.pseudo_addr);
+      p_tcb->is_read_enc_key_pending = false;
+    }
+  }
 }
 
 /*******************************************************************************
@@ -2005,4 +2029,31 @@ std::optional<tBLE_BD_ADDR> BTM_BleGetIdentityAddress(
   }
 
   return p_dev_rec->ble.identity_address_with_type;
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_BleGetEncKeyMaterial
+ *
+ * Description      This function is called to get the local device Encrypted
+ *                  Data Key Material characteristic value associated with
+ *                  GAP service.
+ *
+ * params           enc_key_value with size > 24bytes
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void BTM_BleGetEncKeyMaterial(uint8_t* enc_key_value) {
+  // Length of enc_key_value is always 24 bytesi(Key + IV).
+  // Since this is local device encrypted data key characteristic.
+
+  log::debug("BTM_BleGetEncKeyMaterial");
+  size_t len = btif_storage_get_enc_key_material_length(NULL);
+  if (len > 0) {
+    if (btif_storage_get_enc_key_material(NULL, enc_key_value, &len) ==
+        BT_STATUS_SUCCESS) {
+      log::verbose(" Found Adapter Enc Key Material value");
+    }
+  }
 }

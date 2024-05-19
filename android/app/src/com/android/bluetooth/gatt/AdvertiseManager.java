@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.bluetooth.gatt;
@@ -226,6 +230,7 @@ public class AdvertiseManager {
         AdvertisingSetDeathRecipient deathRecipient =
                 new AdvertisingSetDeathRecipient(callback, packageName);
         IBinder binder = toBinder(callback);
+        byte[] encryptedKeyMaterialValue = new byte[0];
         try {
             binder.linkToDeath(deathRecipient, 0);
         } catch (RemoteException e) {
@@ -234,11 +239,18 @@ public class AdvertiseManager {
 
         String deviceName = AdapterService.getAdapterService().getName();
         try {
-            byte[] advDataBytes = AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName);
+            byte[] advDataBytes =
+                    AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName, false);
+            byte[] advDataEncBytes =
+                    AdvertiseHelper.advertiseDataToBytes(advertiseData, deviceName, true);
             byte[] scanResponseBytes =
-                    AdvertiseHelper.advertiseDataToBytes(scanResponse, deviceName);
+                    AdvertiseHelper.advertiseDataToBytes(scanResponse, deviceName, false);
+            byte[] scanResponseEncBytes =
+                    AdvertiseHelper.advertiseDataToBytes(scanResponse, deviceName, true);
             byte[] periodicDataBytes =
-                    AdvertiseHelper.advertiseDataToBytes(periodicData, deviceName);
+                    AdvertiseHelper.advertiseDataToBytes(periodicData, deviceName, false);
+            byte[] periodicDataEncBytes =
+                    AdvertiseHelper.advertiseDataToBytes(periodicData, deviceName, true);
 
             int cbId = --sTempRegistrationId;
             mAdvertisers.put(binder, new AdvertiserInfo(cbId, deathRecipient, callback));
@@ -252,11 +264,15 @@ public class AdvertiseManager {
             mNativeInterface.startAdvertisingSet(
                     parameters,
                     advDataBytes,
+                    advDataEncBytes,
                     scanResponseBytes,
+                    scanResponseEncBytes,
                     periodicParameters,
                     periodicDataBytes,
+                    periodicDataEncBytes,
                     duration,
                     maxExtAdvEvents,
+                    encryptedKeyMaterialValue,
                     cbId,
                     serverIf);
 
@@ -346,7 +362,9 @@ public class AdvertiseManager {
         String deviceName = AdapterService.getAdapterService().getName();
         try {
             mNativeInterface.setAdvertisingData(
-                    advertiserId, AdvertiseHelper.advertiseDataToBytes(data, deviceName));
+                    advertiserId,
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, false),
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, true));
 
             mAdvertiserMap.setAdvertisingData(advertiserId, data);
         } catch (IllegalArgumentException e) {
@@ -368,7 +386,9 @@ public class AdvertiseManager {
         String deviceName = AdapterService.getAdapterService().getName();
         try {
             mNativeInterface.setScanResponseData(
-                    advertiserId, AdvertiseHelper.advertiseDataToBytes(data, deviceName));
+                    advertiserId,
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, false),
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, true));
 
             mAdvertiserMap.setScanResponseData(advertiserId, data);
         } catch (IllegalArgumentException e) {
@@ -413,7 +433,9 @@ public class AdvertiseManager {
         String deviceName = AdapterService.getAdapterService().getName();
         try {
             mNativeInterface.setPeriodicAdvertisingData(
-                    advertiserId, AdvertiseHelper.advertiseDataToBytes(data, deviceName));
+                    advertiserId,
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, false),
+                    AdvertiseHelper.advertiseDataToBytes(data, deviceName, true));
 
             mAdvertiserMap.setPeriodicAdvertisingData(advertiserId, data);
         } catch (IllegalArgumentException e) {

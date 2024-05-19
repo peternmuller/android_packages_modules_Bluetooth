@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #ifndef GAP_API_H
@@ -68,6 +72,10 @@
 #define GAP_PREFER_CONN_SP_TOUT 2000
 #endif
 
+#define ENC_KEY_LEN 16
+#define ENC_IV_LEN 8
+#define ENC_KEY_MATERIAL_LEN (ENC_KEY_LEN + ENC_IV_LEN)
+
 struct tGAP_COC_CREDITS {
   uint16_t credits_received;
   uint16_t credit_count;
@@ -100,8 +108,14 @@ typedef struct {
   uint16_t sp_tout;
 } tGAP_BLE_PREF_PARAM;
 
+typedef struct {
+  uint8_t session_key[ENC_KEY_LEN];
+  uint8_t init_vector[ENC_IV_LEN];
+} tGAP_BLE_ENC_KEY_MATERIAL;
+
 typedef union {
   tGAP_BLE_PREF_PARAM conn_param;
+  tGAP_BLE_ENC_KEY_MATERIAL enc_key_material;
   RawAddress reconn_bda;
   uint16_t icon;
   uint8_t* p_dev_name;
@@ -289,5 +303,41 @@ bool GAP_BleReadPeerDevName(const RawAddress& peer_bda,
  *
  ******************************************************************************/
 bool GAP_BleCancelReadPeerDevName(const RawAddress& peer_bda);
+
+/*******************************************************************************
+ *
+ * Function         GAP_BleReadEncKeyMaterial
+ *
+ * Description      Start a process to read a connected peripheral's Encryption
+ *                  Key material characteristic.
+ *
+ * Returns          true if request accepted
+ *
+ ******************************************************************************/
+bool GAP_BleReadEncKeyMaterial(const RawAddress& peer_bda,
+                               tGAP_BLE_CMPL_CBACK* p_cback);
+
+/*******************************************************************************
+ *
+ * Function         GAP_BleGetEncKeyMaterialInfo
+ *
+ * Description      Get Encryption Key Material information characteristic value
+ *                  from remote device
+ *
+ * Returns          none
+ *
+ ******************************************************************************/
+void GAP_BleGetEncKeyMaterialInfo(const RawAddress& remote_bda);
+
+/*******************************************************************************
+ *
+ * Function         GAP_BleGetAdapterEncKeyMaterial
+ *
+ * Description      Get Encrypted Data Key Material from Adapter
+ *
+ * Returns          none
+ *
+ ******************************************************************************/
+void GAP_BleGetAdapterEncKeyMaterial(uint8_t* enc_key_value);
 
 #endif /* GAP_API_H */

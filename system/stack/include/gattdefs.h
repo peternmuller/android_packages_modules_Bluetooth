@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 /******************************************************************************
@@ -62,6 +66,7 @@
 #define GATT_UUID_GAP_ICON 0x2A01
 #define GATT_UUID_GAP_PREF_CONN_PARAM 0x2A04
 #define GATT_UUID_GAP_CENTRAL_ADDR_RESOL 0x2AA6
+#define GATT_UUID_GAP_ENC_KEY_MATERIAL 0x2B88
 
 /* Attribute Profile Attribute UUID */
 #define GATT_UUID_GATT_SRV_CHGD 0x2A05
