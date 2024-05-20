@@ -2143,7 +2143,6 @@ public class BluetoothInCallService extends InCallService {
                   mCallSwapPending = 0;
                   return;
                }
-               Log.d(TAG, "this should happen only if held is moved to active");
                if (numHeldCalls < mDsDaHeldCalls) {
                    //for this to work, active should have been none earlier
                    if ((numActiveCalls == 1) && (mDsdaActiveCalls == 0)) {
@@ -2167,6 +2166,11 @@ public class BluetoothInCallService extends InCallService {
                         Log.d(TAG, "conference call event came");
                         updateHeadsetWithDSDACallState(true /*force */, DSDS_EVENT);
                    }
+               } else {
+                   Log.d(TAG, "silent ringing call moved to active");
+                   mDsdaIncomingCalls--;
+                   mFirstIncomingCallId = -1;
+                   updateHeadsetWithDSDACallState(true /* force */, DSDS_EVENT);
                }
            }
          break;
