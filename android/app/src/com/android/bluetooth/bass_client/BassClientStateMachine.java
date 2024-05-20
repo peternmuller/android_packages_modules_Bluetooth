@@ -496,16 +496,24 @@ public class BassClientStateMachine extends StateMachine {
                 if (listOfUuids.containsKey(BassConstants.BAAS_UUID)) {
                     byte[] bId = listOfUuids.get(BassConstants.BAAS_UUID);
                     broadcastId = BassUtils.parseBroadcastId(bId);
+                    if (broadcastId == BassConstants.INVALID_BROADCAST_ID) {
+                        Log.w(TAG, "Invalid broadcast ID");
+                        return false;
+                    }
                 }
                 if (listOfUuids.containsKey(BassConstants.PUBLIC_BROADCAST_UUID)) {
                     byte[] pbAnnouncement =
                             listOfUuids.get(BassConstants.PUBLIC_BROADCAST_UUID);
                     pbData = PublicBroadcastData.parsePublicBroadcastData(pbAnnouncement);
+                    if (pbData == null) {
+                        Log.w(TAG, "Invalid public broadcast data");
+                        return false;
+                    }
                 }
             }
 
-            if (broadcastId == BassConstants.INVALID_BROADCAST_ID || pbData == null) {
-                Log.w(TAG, "Invalid broadcast ID or public broadcast data");
+            if (broadcastId == BassConstants.INVALID_BROADCAST_ID && pbData == null) {
+                Log.w(TAG, "It is not BAP or PBP source");
                 return false;
             }
 
