@@ -1656,6 +1656,19 @@ void sdpu_set_avrc_target_features(const tSDP_ATTRIBUTE* p_attr,
     p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION - 1] |=
         AVRCP_CA_SUPPORT_BITMASK;
   }
+
+  if (avrcp_version >= AVRC_REV_1_4 && interop_match_addr(
+       INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS, bdaddr)) {
+    log::error("device found in PLAYER_APPLICATION_SETTING_CMDS BL");
+    log::error("Show player app settings not supported");
+    p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION] &=
+            ~AVRCP_PLAYER_APP_SETTINGS_SUPPORT_BITMASK;
+  } else {
+     log::info("device NOT found in PLAYER_APPLICATION_SETTING_CMDS BL");
+     log::info("Show player app settings supported");
+     p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION] |=
+            AVRCP_PLAYER_APP_SETTINGS_SUPPORT_BITMASK;
+  }
 }
 
 size_t sdp_get_num_records(const tSDP_DISCOVERY_DB& db) {
