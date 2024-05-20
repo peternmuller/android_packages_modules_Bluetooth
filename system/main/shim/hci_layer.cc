@@ -26,18 +26,15 @@
 
 #include "common/bidi_queue.h"
 #include "common/init_flags.h"
-#include "hci/hci_layer.h"
+#include "hci/hci_interface.h"
 #include "hci/hci_packets.h"
 #include "hci/include/packet_fragmenter.h"
-#include "hci/vendor_specific_event_manager.h"
 #include "main/shim/entry.h"
-#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "packet/raw_builder.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/btm_iso_api.h"
-#include "stack/include/dev_hci_link_interface.h"
 #include "stack/include/hcimsgs.h"
 #include "stack/include/main_thread.h"
 
@@ -161,19 +158,6 @@ static void subevent_callback(
   }
   send_data_upwards.Run(FROM_HERE, WrapPacketAndCopy(MSG_HC_TO_STACK_HCI_EVT,
                                                      &le_meta_event_view));
-}
-
-static void vendor_specific_event_callback(
-    bluetooth::hci::VendorSpecificEventView vendor_specific_event_view) {
-  auto bqr =
-      bluetooth::hci::BqrEventView::CreateOptional(vendor_specific_event_view);
-  if (!bqr) {
-    return;
-  }
-
-  auto payload = vendor_specific_event_view.GetPayload();
-  std::vector<uint8_t> bytes{payload.begin(), payload.end()};
-  btm_vendor_specific_evt(bytes.data(), bytes.size());
 }
 
 static void qbce_vse_cb(
@@ -303,18 +287,6 @@ static void register_event(bluetooth::hci::EventCode event_code) {
   auto handler = bluetooth::shim::GetGdShimHandler();
   bluetooth::shim::GetHciLayer()->RegisterEventHandler(
       event_code, handler->Bind(event_callback));
-}
-
-static void register_vs_event() {
-  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-      bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
-      get_main_thread()->Bind(cpp::qbce_vse_cb));
-  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-      bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
-      get_main_thread()->Bind(cpp::qbce_param_report_vse_cb));
-  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-      bluetooth::hci::VseSubeventCode::QBCE_VS_LINK_POWER_CTRL_EVENT,
-      get_main_thread()->Bind(cpp::qbce_link_power_ctrl_vse_cb));
 }
 
 static void register_le_event(bluetooth::hci::SubeventCode subevent_code) {
@@ -461,12 +433,6 @@ void bluetooth::shim::hci_on_reset_complete() {
     cpp::register_le_event(subevent_code);
   }
 
-  // TODO handle BQR event in GD
-  bluetooth::shim::GetVendorSpecificEventManager()->RegisterEventHandler(
-      bluetooth::hci::VseSubeventCode::BQR_EVENT,
-      get_main_thread()->Bind(cpp::vendor_specific_event_callback));
-
-  cpp::register_vs_event();
   cpp::register_for_iso();
 }
 

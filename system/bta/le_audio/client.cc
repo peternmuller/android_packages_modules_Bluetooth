@@ -3285,7 +3285,7 @@ class LeAudioClientImpl : public LeAudioClient {
     }
 
     log::error(
-        "Failed to register for indications: 0x{:04x}, device: {}, status: "
+        "Failed to register for notifications: 0x{:04x}, device: {}, status: "
         "0x{:02x}",
         hdl, leAudioDevice->address_, status);
 
@@ -4299,9 +4299,6 @@ class LeAudioClientImpl : public LeAudioClient {
         if (audio_receiver_state_ == AudioState::READY_TO_RELEASE) {
           defer_source_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
-        } else {
-          log::info("calling source ConfirmSuspendRequest in audio_sender_state_ idle");
-          le_audio_source_hal_client_->ConfirmSuspendRequest();
         }
         return;
       case AudioState::READY_TO_RELEASE:
@@ -4315,13 +4312,6 @@ class LeAudioClientImpl : public LeAudioClient {
       OnAudioSuspend();
       bluetooth::le_audio::MetricsCollector::Get()->OnStreamEnded(
           active_group_id_);
-    } else {
-      //In VBC and Call streaming cases, send immediate ack
-      //for the first initiate suspsend.
-      if (le_audio_source_hal_client_) {
-        log::info("calling source ConfirmSuspendRequest");
-        le_audio_source_hal_client_->ConfirmSuspendRequest();
-      }
     }
 
     log::info("OUT: audio_receiver_state_: {},  audio_sender_state_: {}",
@@ -4564,9 +4554,6 @@ class LeAudioClientImpl : public LeAudioClient {
         if (audio_sender_state_ == AudioState::READY_TO_RELEASE) {
           defer_sink_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
-        } else {
-          log::info("calling sink ConfirmSuspendRequest in audio_receiver_state_ IDLE");
-          le_audio_sink_hal_client_->ConfirmSuspendRequest();
         }
         return;
       case AudioState::READY_TO_RELEASE:
@@ -4578,13 +4565,6 @@ class LeAudioClientImpl : public LeAudioClient {
         (audio_sender_state_ == AudioState::READY_TO_RELEASE)) {
       defer_sink_suspend_ack_until_stop_ = true;
       OnAudioSuspend();
-    } else {
-      //In VBC and Call streaming cases, send immediate ack
-      //for the first initiate suspsend.
-      if (le_audio_sink_hal_client_) {
-        log::info("calling sink ConfirmSuspendRequest");
-        le_audio_sink_hal_client_->ConfirmSuspendRequest();
-      }
     }
 
     log::info("OUT: audio_receiver_state_: {},  audio_sender_state_: {}",
@@ -6075,22 +6055,6 @@ class LeAudioClientImpl : public LeAudioClient {
               callbacks_->OnUnicastMonitorModeStatus(
                   bluetooth::le_audio::types::kLeAudioDirectionSource,
                   UnicastMonitorModeStatus::STREAMING_SUSPENDED);
-            }
-
-            if (defer_source_suspend_ack_until_stop_) {
-              if (le_audio_source_hal_client_) {
-                defer_source_suspend_ack_until_stop_ = false;
-                log::info("calling source ConfirmSuspendRequest");
-                le_audio_source_hal_client_->ConfirmSuspendRequest();
-              }
-            }
-
-            if (defer_sink_suspend_ack_until_stop_) {
-              if (le_audio_sink_hal_client_) {
-                defer_sink_suspend_ack_until_stop_ = false;
-                log::info("calling sink ConfirmSuspendRequest");
-                le_audio_sink_hal_client_->ConfirmSuspendRequest();
-              }
             }
 
             log::info("active_group_id_: {}", active_group_id_);
