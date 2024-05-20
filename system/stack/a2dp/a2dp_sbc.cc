@@ -803,6 +803,13 @@ bool A2DP_AdjustCodecSbc(uint8_t* p_codec_info) {
               cfg_cie.max_bitpool, A2DP_SBC_MAX_BITPOOL);
     cfg_cie.max_bitpool = A2DP_SBC_MAX_BITPOOL;
   }
+  if (cfg_cie.min_bitpool > cfg_cie.max_bitpool) {
+    log::warn("min bitpool value received for SBC"
+             " is more than DUT supported Max bitpool "
+             " Updated the SBC codec max bitpool from {} to {}",
+             cfg_cie.max_bitpool, cfg_cie.min_bitpool);
+    cfg_cie.max_bitpool = cfg_cie.min_bitpool;
+  }
 
   return (A2DP_BuildInfoSbc(AVDT_MEDIA_TYPE_AUDIO, &cfg_cie, p_codec_info) ==
           A2DP_SUCCESS);
@@ -1415,11 +1422,11 @@ bool A2dpCodecConfigSbcBase::setCodecConfig(const uint8_t* p_peer_codec_info,
     result_config_cie.max_bitpool = peer_info_cie.max_bitpool;
   if (result_config_cie.min_bitpool > result_config_cie.max_bitpool) {
     log::error(
-        "cannot match min/max bitpool: local caps min/max = 0x{:x}/0x{:x} peer "
-        "info min/max = 0x{:x}/0x{:x}",
+        "result_min bitpool > max bitpool, make both = min:  "
+        "local caps min/max = 0x{:x}/0x{:x} peer info min/max = 0x{:x}/0x{:x}",
         p_a2dp_sbc_caps->min_bitpool, p_a2dp_sbc_caps->max_bitpool,
         peer_info_cie.min_bitpool, peer_info_cie.max_bitpool);
-    goto fail;
+    result_config_cie.max_bitpool = result_config_cie.min_bitpool;
   }
 
   if (A2DP_BuildInfoSbc(AVDT_MEDIA_TYPE_AUDIO, &result_config_cie,

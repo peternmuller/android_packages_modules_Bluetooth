@@ -63,6 +63,11 @@
 #define A2DP_SBC_IE_MAX_BITPOOL 250
 #define A2DP_SBC_BITPOOL_MIDDLE_QUALITY 35
 
+/* Max bitpool do not result in excess of the max bit rate */
+#define A2DP_SBC_SINK_MAX_BITPOOL 86
+#define A2DP_SBC_IE_MIN_BITPOOL_OFFSET 5
+#define A2DP_SBC_IE_MAX_BITPOOL_OFFSET 6
+
 /* for media payload header */
 #define A2DP_SBC_HDR_F_MSK 0x80
 #define A2DP_SBC_HDR_S_MSK 0x40
