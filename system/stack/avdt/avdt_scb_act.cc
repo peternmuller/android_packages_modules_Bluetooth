@@ -574,7 +574,7 @@ void avdt_scb_hdl_setconfig_cmd(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
                                   p_data->msg.config_cmd.p_cfg->codec_info));
     AvdtpSepConfig* p_cfg = p_data->msg.config_cmd.p_cfg;
     codec_type = A2DP_GetCodecType(p_cfg->codec_info);
-    if (A2DP_GetCodecType(p_scb->curr_cfg.codec_info) == codec_type) { // check
+    if (A2DP_GetCodecType(p_scb->stream_config.cfg.codec_info) == codec_type) { // check
       /* copy info to scb */
       AvdtpCcb* p_ccb = avdt_ccb_by_idx(p_data->msg.config_cmd.hdr.ccb_idx);
       if (p_scb->p_ccb != p_ccb) {
