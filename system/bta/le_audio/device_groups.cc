@@ -1393,6 +1393,22 @@ bool CheckIfStrategySupported(types::LeAudioConfigurationStrategy strategy,
 bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
     const CodecManager::UnicastConfigurationRequirements& requirements,
     const set_configurations::AudioSetConfiguration* audio_set_conf) const {
+  if (requirements.audio_context_type == LeAudioContextType::LIVE) {
+    if (audio_set_conf->confs.get(types::kLeAudioDirectionSink).size() &&
+        audio_set_conf->confs.get(types::kLeAudioDirectionSource).size()) {
+      log::debug("Requested config is bi-directional");
+      if (!(GetLatestAvailableContexts().sink.test(
+          requirements.audio_context_type) &&
+          GetLatestAvailableContexts().source.test(
+          requirements.audio_context_type))) {
+        log::error("Remote does not supports context::{} in both direction",
+            bluetooth::common::ToString(requirements.audio_context_type));
+        return false;
+
+      }
+    }
+  }
+
   /* TODO For now: set ase if matching with first pac.
    * 1) We assume as well that devices will match requirements in order
    *    e.g. 1 Device - 1 Requirement, 2 Device - 2 Requirement etc.
