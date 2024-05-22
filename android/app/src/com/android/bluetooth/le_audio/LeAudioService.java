@@ -1123,8 +1123,6 @@ public class LeAudioService extends ProfileService {
             Log.i(TAG, "Unicast group is active, queueing Broadcast creation, while the Unicast"
                         + " group is deactivated.");
             mCreateBroadcastQueue.add(broadcastSettings);
-            mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE,
-                    AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
             if (Flags.leaudioBroadcastAudioHandoverPolicies()) {
                 mLeAudioNativeInterface.setUnicastMonitorMode(LeAudioStackEvent.DIRECTION_SINK,
                         true);
@@ -2524,6 +2522,8 @@ public class LeAudioService extends ProfileService {
                     && areAllGroupsInNotGettingActiveState()
                     && (!mCreateBroadcastQueue.isEmpty()
                             || mBroadcastIdDeactivatedForUnicastTransition.isPresent())) {
+                mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                        AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
 
