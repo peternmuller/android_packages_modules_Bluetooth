@@ -64,6 +64,7 @@
             "name": "Media",
             "configurations": [
                 "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
                 "Two-OneChan-SnkAse-Lc3_48_4_High_Reliability",
                 "Two-OneChan-SnkAse-Lc3_48_4_2",
                 "Two-OneChan-SnkAse-Lc3_48_2_High_Reliability",
@@ -112,7 +113,6 @@
                 "One-OneChan-SnkAse-Lc3_16_1_2",
                 "Two-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
                 "One-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
-                "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
                 "VND_One-TwoChan-SnkAse-Aptx_LeX_V1_48_High_Reliability",
                 "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
                 "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
@@ -124,6 +124,10 @@
         {
             "name": "Game",
             "configurations": [
+                "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V2_1",
+                "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V1_1",
+                "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R3_L8-One-OneChan-SrcAse-Lc3_32_1_45octs_R3_L8_V2_1",
+                "Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1_1",
                 "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_R5_L20-One-OneChan_SrcAse-Lc3_16_2_40octs_R5_L10_1",
                 "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_R5_L20",
                 "Two-OneChan-SnkAse-Lc3_32_2-Two-OneChan-SrcAse-Lc3_32_2_1",
@@ -162,11 +166,7 @@
                 "One-TwoChan-SnkAse-Lc3_24_2_Low_Latency",
                 "One-TwoChan-SnkAse-Lc3_24_1_Low_Latency",
                 "One-TwoChan-SnkAse-Lc3_16_2_Low_Latency",
-                "One-TwoChan-SnkAse-Lc3_16_1_Low_Latency",
-                "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R3_L8-One-OneChan-SrcAse-Lc3_32_1_45octs_R3_L8_V2_1",
-                "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V2_1",
-                "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V1_1",
-                "One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1_1"
+                "One-TwoChan-SnkAse-Lc3_16_1_Low_Latency"
             ]
         },
         {
