@@ -104,6 +104,7 @@
 #include "stack/sdp/sdpint.h"
 #include "storage/config_keys.h"
 #include "types/raw_address.h"
+#include "stack/include/btm_api_types.h"
 
 #ifdef __ANDROID__
 #include <android/sysprop/BluetoothProperties.sysprop.h>
@@ -160,6 +161,8 @@ const Uuid UUID_A2DP_SINK = Uuid::FromString("110B");
 
 #define ENCRYPTED_BREDR 2
 #define ENCRYPTED_LE 4
+
+#define PHONE_COD_MAJOR_CLASS_MASK 0x1F00
 
 struct btif_dm_pairing_cb_t {
   bt_bond_state_t state;
@@ -526,6 +529,10 @@ bool check_cod_hid(const RawAddress* remote_bdaddr) {
   return (get_cod(remote_bdaddr) & COD_HID_MASK) == COD_HID_MAJOR;
 }
 
+bool check_cod_phone(const RawAddress& bd_addr) {
+  return (get_cod(&bd_addr) & PHONE_COD_MAJOR_CLASS_MASK) == (BTM_COD_MAJOR_PHONE << 8);
+}
+
 bool check_cod_hid(const RawAddress& bd_addr) {
   return (get_cod(&bd_addr) & COD_HID_MASK) == COD_HID_MAJOR;
 }
@@ -787,6 +794,43 @@ bool is_device_le_audio_capable(const RawAddress bd_addr) {
   return false;
 }
 
+bool is_le_audio_preferred(const RawAddress bd_addr) {
+  if (!GetInterfaceToProfiles()
+           ->profileSpecific_HACK->IsLeAudioClientRunning()) {
+    /* If LE Audio profile is not enabled, do nothing. */
+    return false;
+  }
+
+  if (!check_cod_le_audio(bd_addr) && !BTA_DmCheckLeAudioCapable(bd_addr)) {
+    /* LE Audio not present in CoD or in LE Advertisement, do nothing.*/
+    return false;
+  }
+
+  /* First try reading device type from BTIF - it persists over multiple
+   * inquiry sessions */
+  int dev_type = 0;
+  if (com::android::bluetooth::flags::le_audio_dev_type_detection_fix() &&
+      (btif_get_device_type(bd_addr, &dev_type) &&
+       (dev_type & BT_DEVICE_TYPE_BLE) == BT_DEVICE_TYPE_BLE) && !check_cod_phone(bd_addr)) {
+    /* LE Audio capable device is discoverable over both LE and Classic using
+     * same address. Prefer to use LE transport, as we don't know if it can do
+     * CTKD from Classic to LE */
+    return true;
+  }
+
+  tBT_DEVICE_TYPE tmp_dev_type;
+  tBLE_ADDR_TYPE addr_type = BLE_ADDR_PUBLIC;
+  BTM_ReadDevInfo(bd_addr, &tmp_dev_type, &addr_type);
+  if ((tmp_dev_type & BT_DEVICE_TYPE_BLE) && !check_cod_phone(bd_addr)) {
+    /* LE Audio capable device is discoverable over both LE and Classic using
+     * same address. Prefer to use LE transport, as we don't know if it can do
+     * CTKD from Classic to LE */
+    return true;
+  }
+
+  return false;
+}
+
 /* use to check if device is LE Audio Capable during bonding */
 bool is_le_audio_capable_during_service_discovery(const RawAddress& bd_addr) {
   if (!GetInterfaceToProfiles()
@@ -824,7 +868,7 @@ static void btif_dm_cb_create_bond(const RawAddress bd_addr,
   bool is_hid = check_cod_hid_major(bd_addr, COD_HID_POINTING);
   bond_state_changed(BT_STATUS_SUCCESS, bd_addr, BT_BOND_STATE_BONDING);
 
-  if (transport == BT_TRANSPORT_AUTO && is_device_le_audio_capable(bd_addr)) {
+  if (transport == BT_TRANSPORT_AUTO && is_le_audio_preferred(bd_addr)) {
     log::debug("LE Audio capable, forcing LE transport for Bonding");
     transport = BT_TRANSPORT_LE;
   }
