@@ -1204,7 +1204,6 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
       /* TODO: Should we suspend all broadcasts - remove BIGs? */
       if (instance) {
         instance->audio_data_path_state_ = AudioDataPathState::SUSPENDED;
-        instance->le_audio_source_hal_client_->ConfirmSuspendRequest();
       }
     }
 
