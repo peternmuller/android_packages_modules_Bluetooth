@@ -212,15 +212,6 @@ void LeAudioClientInterface::Sink::StartSession() {
   }
 }
 
-void LeAudioClientInterface::Sink::ConfirmSuspendRequest() {
-  LOG(INFO) << __func__;
-  if (HalVersionManager::GetHalTransport() ==
-      BluetoothAudioHalTransport::AIDL) {
-    get_aidl_client_interface(is_broadcaster_)
-        ->StreamSuspended(aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
-  }
-}
-
 void LeAudioClientInterface::Sink::ConfirmStreamingRequest() {
   if (HalVersionManager::GetHalTransport() ==
       BluetoothAudioHalTransport::HIDL) {
@@ -579,15 +570,6 @@ void LeAudioClientInterface::Source::ReconfigurationComplete() {
     //        StreamSuspended() with SUCCESS_FINISHED ack code.
     aidl::le_audio::LeAudioSourceTransport::interface->StreamSuspended(
         aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
-  }
-}
-
-void LeAudioClientInterface::Source::ConfirmSuspendRequest() {
-  LOG(INFO) << __func__;
-  if (HalVersionManager::GetHalTransport() ==
-      BluetoothAudioHalTransport::AIDL) {
-    aidl::le_audio::LeAudioSourceTransport::interface->StreamSuspended(
-         aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
   }
 }
 

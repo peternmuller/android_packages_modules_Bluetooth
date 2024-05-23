@@ -244,10 +244,10 @@ class BluetoothManagerService {
         @Override
         public String toString() {
             return timeToLog(mTimestamp)
-                    + ("\tPackage [" + mPackageName + "]")
+                    + (" \tPackage [" + mPackageName + "]")
                     + " requested to"
                     + (" [" + (mEnable ? "Enable" : "Disable") + (mIsBle ? "Ble" : "") + "]")
-                    + (".\tReason is " + getEnableDisableReasonString(mReason));
+                    + (". \tReason is " + getEnableDisableReasonString(mReason));
         }
 
         long getTimestamp() {
@@ -1950,6 +1950,7 @@ class BluetoothManagerService {
                         if (mAdapter == null) {
                             break;
                         }
+                        mContext.unbindService(mConnection);
                         mAdapter = null;
                     } finally {
                         mAdapterLock.writeLock().unlock();

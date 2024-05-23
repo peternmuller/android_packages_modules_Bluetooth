@@ -96,8 +96,6 @@ bool BTM_IsSpiltA2dpSupported();
 bool BTM_IsAACFrameCtrlEnabled();
 
 uint8_t* BTM_GetScramblingSupportedFreqs(uint8_t* number_of_freqs);
-void BTM_RegisterForQleCigLatencyChangedEvt(
-    tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
 
 /*******************************************************************************
  *

@@ -466,7 +466,10 @@ void bta_ag_rfc_close(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
   }
   /* else close port and deallocate scb */
   else {
-    RFCOMM_RemoveServer(p_scb->conn_handle);
+    if (RFCOMM_RemoveServer(p_scb->conn_handle) != PORT_SUCCESS) {
+      log::warn("Unable to remove RFCOMM server peer:{} handle:{}",
+                p_scb->peer_addr, p_scb->conn_handle);
+    };
     bta_ag_scb_dealloc(p_scb);
   }
 }
@@ -916,8 +919,11 @@ void bta_ag_handle_collision(tBTA_AG_SCB* p_scb,
                              const tBTA_AG_DATA& /* data */) {
   /* Cancel SDP if it had been started. */
   if (p_scb->p_disc_db) {
-    get_legacy_stack_sdp_api()->service.SDP_CancelServiceSearch(
-        p_scb->p_disc_db);
+    if (!get_legacy_stack_sdp_api()->service.SDP_CancelServiceSearch(
+            p_scb->p_disc_db)) {
+      log::warn("Unable to cancel SDP service discovery search peer:{}",
+                p_scb->peer_addr);
+    }
     bta_ag_free_db(p_scb, tBTA_AG_DATA::kEmpty);
   }
 

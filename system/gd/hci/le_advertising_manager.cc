@@ -97,6 +97,7 @@ struct Advertiser {
   bool directed = false;
   bool in_use = false;
   bool include_adi = false;
+  bool is_periodic = false;
   std::unique_ptr<os::Alarm> address_rotation_alarm;
 
   std::vector<GapData> advertisement;
@@ -779,7 +780,8 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
   }
 
   void stop_advertising(AdvertiserId advertiser_id) {
-    if (advertising_sets_.find(advertiser_id) == advertising_sets_.end()) {
+    auto advertising_iter = advertising_sets_.find(advertiser_id);
+    if (advertising_iter == advertising_sets_.end()) {
       log::info("Unknown advertising set {}", advertiser_id);
       return;
     }
@@ -806,8 +808,11 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
             hci::LeSetExtendedAdvertisingEnableBuilder::Create(Enable::DISABLED, enabled_vector),
             module_handler_->BindOnce(check_complete<LeSetExtendedAdvertisingEnableCompleteView>));
 
+        bool is_periodic = advertising_iter->second.is_periodic;
+        log::debug("advertiser_id: {} is_periodic: {}", advertiser_id, is_periodic);
+
         // Only set periodic advertising if supported.
-        if (controller_->SupportsBlePeriodicAdvertising()) {
+        if (is_periodic && controller_->SupportsBlePeriodicAdvertising()) {
           le_advertising_interface_->EnqueueCommand(
               hci::LeSetPeriodicAdvertisingEnableBuilder::Create(false, false, advertiser_id),
               module_handler_->BindOnce(
@@ -928,6 +933,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     advertising_sets_[advertiser_id].discoverable = config.discoverable;
     advertising_sets_[advertiser_id].tx_power = config.tx_power;
     advertising_sets_[advertiser_id].directed = config.directed;
+    advertising_sets_[advertiser_id].is_periodic = config.periodic_advertising_parameters.enable;
 
     if (com::android::bluetooth::flags::encrypted_advertising_data()) {
       advertising_sets_[advertiser_id].enc_key_value = config.enc_key_value;

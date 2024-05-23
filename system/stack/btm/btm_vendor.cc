@@ -96,7 +96,6 @@ uint8_t qhs_support_mask = 0;
 static bt_device_qll_local_supported_features_t qll_features;
 static uint8_t qll_local_supported_features_length = 0;
 static bt_configstore_interface_t* bt_configstore_intf = NULL;
-tBTM_VS_EVT_CB* p_vnd_qle_cig_latency_changed_cb = nullptr;
 static bool is_power_backoff_enabled = false;
 
 extern tBTM_CB btm_cb;
@@ -158,11 +157,6 @@ uint8_t* BTM_GetScramblingSupportedFreqs(uint8_t* number_of_freqs) {
     return scrambling_supported_freqs;
   }
   return NULL;
-}
-
-void BTM_RegisterForQleCigLatencyChangedEvt(
-    tBTM_VS_EVT_CB* qle_cig_latency_changed_cb) {
-  p_vnd_qle_cig_latency_changed_cb = qle_cig_latency_changed_cb;
 }
 
 /*******************************************************************************
@@ -719,11 +713,6 @@ void btm_vendor_vse_cback(uint8_t vse_subcode, uint8_t evt_len, uint8_t* p) {
           btm_acl_update_qcm_phy_state(pp);
           break;
         case MSG_QBCE_QLE_CIG_LATENCY_CHANGED:
-          if (p_vnd_qle_cig_latency_changed_cb != nullptr) {
-            log::info("Calling qle_cig_latency_changed_cb");
-            (*p_vnd_qle_cig_latency_changed_cb)((evt_len - 2), pp);
-            return;
-          }
           break;
         default:
           log::info(":: unknown msg type: {}", vse_msg_type);
