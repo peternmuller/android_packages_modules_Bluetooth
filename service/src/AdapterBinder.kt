@@ -25,7 +25,7 @@ import com.android.server.bluetooth.BluetoothManagerService.timeToLog
 class AdapterBinder(rawBinder: IBinder) {
     private val TAG = "AdapterBinder"
     val adapterBinder: IBluetooth = IBluetooth.Stub.asInterface(rawBinder)
-    val createdAt = System.currentTimeMillis()
+    private val createdAt = System.currentTimeMillis()
 
     override fun toString(): String =
         "[Binder=" + adapterBinder.hashCode() + ", createdAt=" + timeToLog(createdAt) + "]"
@@ -96,6 +96,11 @@ class AdapterBinder(rawBinder: IBinder) {
         } catch (ex: RemoteException) {
             Log.e(TAG, "Error when calling updateQuietModeStatus", ex)
         }
+    }
+
+    @Throws(RemoteException::class)
+    fun killBluetoothProcess() {
+        adapterBinder.killBluetoothProcess()
     }
 }
 
