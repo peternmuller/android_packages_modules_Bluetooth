@@ -67,6 +67,7 @@ import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.sysprop.BluetoothProperties;
@@ -4004,7 +4005,8 @@ public class LeAudioService extends ProfileService {
             updateFallbackUnicastGroupIdForBroadcast(LE_AUDIO_GROUP_ID_INVALID);
             stopBroadcast(broadcastId.get());
             Log.d(TAG, "Wait for broadcast to stop");
-            int waitCount = 4;
+            int waitCount = SystemProperties.getInt(
+                    "persist.bluetooth.stop_broadcast_waiting_count", 5);
             for (int c = 0; c < waitCount; c++) {
                 try {
                     Thread.sleep(50);
