@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
 
-#include <gmock/gmock.h>
+package com.android.bluetooth.channelsoundingtestapp;
 
-#include "common/contextual_callback.h"
-#include "hci/hci_packets.h"
-#include "hci/vendor_specific_event_manager_interface.h"
+import static com.google.common.truth.Truth.assertThat;
 
-namespace bluetooth::hci::testing {
+import org.junit.Test;
 
-class MockVendorSpecificEventManager : public VendorSpecificEventManagerInterface {
- public:
-  MOCK_METHOD(
-      (void),
-      RegisterEventHandler,
-      (VseSubeventCode, common::ContextualCallback<void(VendorSpecificEventView)>),
-      (override));
-  MOCK_METHOD((void), UnregisterEventHandler, (VseSubeventCode), (override));
-};
+/**
+ * Example local unit test, which will execute on the development machine (host).
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+public class ExampleUnitTest {
 
-}  // namespace bluetooth::hci::testing
+    @Test
+    public void addition_isCorrect() {
+        assertThat(2 + 2).isEqualTo(4);
+    }
+}

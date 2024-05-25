@@ -21,8 +21,10 @@ filegroup {
     srcs: [
         ":statslog-bluetooth-java-gen",
         "src/**/*.java",
+        "src/AdapterBinder.kt",
         "src/AdapterState.kt",
         "src/AutoOnFeature.kt",
+        "src/BluetoothService.kt",
         "src/Log.kt",
         "src/RadioModeListener.kt",
         "src/airplane/ModeListener.kt",
