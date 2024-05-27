@@ -521,7 +521,7 @@ class BtifAvSource {
       return true;  // Nothing has changed
     }
 
-    if(!peer_address.IsEmpty() &&
+    if(!peer_address.IsEmpty() && peer &&
       (peer->IsSink() && AllowedToConnect(peer_address)) &&
       peer->CheckFlags(BtifAvPeer::kFlagPendingStart)) {
       log::error("Pending Start Response on  {}, Return Fail", ADDRESS_TO_LOGGABLE_STR(peer_address));
