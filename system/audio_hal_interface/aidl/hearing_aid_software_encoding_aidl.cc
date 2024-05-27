@@ -273,6 +273,11 @@ void set_remote_delay(uint16_t delay_report_ms) {
   hearing_aid_sink->SetRemoteDelay(delay_report_ms);
 }
 
+void stop_request() {
+  log::info("stop_request");
+  hearing_aid_sink->StopRequest();
+}
+
 }  // namespace hearing_aid
 }  // namespace aidl
 }  // namespace audio
