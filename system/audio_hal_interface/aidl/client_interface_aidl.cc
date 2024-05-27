@@ -17,6 +17,7 @@
 #define LOG_TAG "BTAudioClientAIDL"
 
 #include "client_interface_aidl.h"
+#include "hearing_aid_software_encoding_aidl.h"
 
 #include <android/binder_manager.h>
 #include <bluetooth/log.h>
@@ -60,6 +61,10 @@ BluetoothAudioClientInterface::BluetoothAudioClientInterface(
       latency_modes_({LatencyMode::FREE}) {
   death_recipient_ = ::ndk::ScopedAIBinder_DeathRecipient(
       AIBinder_DeathRecipient_new(binderDiedCallbackAidl));
+}
+
+bool BluetoothAudioClientInterface::IsValid() const {
+  return provider_ != nullptr;
 }
 
 bool BluetoothAudioClientInterface::is_aidl_available() {
@@ -600,7 +605,11 @@ void BluetoothAudioClientInterface::RenewAudioProviderAndSession() {
   if (session_started_) {
     log::info("Restart the session while audio HAL recovering");
     session_started_ = false;
-
+    if(transport_->GetSessionType() ==
+                 SessionType::HEARING_AID_SOFTWARE_ENCODING_DATAPATH) {
+      log::info("Session type: HEARING_AID_SOFTWARE_ENCODING_DATAPATH");
+      bluetooth::audio::aidl::hearing_aid::stop_request();
+    }
     StartSession();
   }
 }

@@ -1365,17 +1365,17 @@ class LeAudioClientImpl : public LeAudioClient {
     }
     auto group_id_to_close = active_group_id_;
     sink_monitor_notified_status_ = std::nullopt;
+    log::info("Group id: {}", active_group_id_);
 
-    log::info("Group id: {}", group_id_to_close);
     if (alarm_is_scheduled(suspend_timeout_)) alarm_cancel(suspend_timeout_);
 
     log::info("defer_notify_inactive_until_stop_: {}", defer_notify_inactive_until_stop_);
 
     if (!defer_notify_inactive_until_stop_) {
-      active_group_id_ = bluetooth::groups::kGroupUnknown;
       StopAudio();
       ClientAudioInterfaceRelease();
       callbacks_->OnGroupStatus(group_id_to_close, GroupStatus::INACTIVE);
+      active_group_id_ = bluetooth::groups::kGroupUnknown;
     }
   }
 
@@ -1552,6 +1552,7 @@ class LeAudioClientImpl : public LeAudioClient {
     }
 
     /* Remove device from the background connect if it is there */
+    BTA_GATTC_Close(leAudioDevice->conn_id_);
     BTA_GATTC_CancelOpen(gatt_if_, address, false);
     btif_storage_set_leaudio_autoconnect(address, false);
 

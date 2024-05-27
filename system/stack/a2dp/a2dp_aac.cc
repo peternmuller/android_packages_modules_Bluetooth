@@ -36,7 +36,7 @@
 #include "osi/include/properties.h"
 #include "stack/include/bt_hdr.h"
 
-#define A2DP_AAC_DEFAULT_BITRATE 320000  // 320 kbps
+#define A2DP_AAC_DEFAULT_BITRATE 165000  // 165 kbps
 #define A2DP_AAC_MIN_BITRATE 64000       // 64 kbps
 
 using namespace bluetooth;

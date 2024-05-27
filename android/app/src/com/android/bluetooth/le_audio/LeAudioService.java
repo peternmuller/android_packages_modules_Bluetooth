@@ -208,12 +208,14 @@ public class LeAudioService extends ProfileService {
     Optional<Integer> mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
     Optional<Boolean> mQueuedInCallValue = Optional.empty();
     Optional<Integer> mBroadcastIdPendingStart = Optional.empty();
+    Optional<Integer> mBroadcastIdPendingStop = Optional.empty();
     BluetoothDevice mAudioManagerAddedOutDevice = null;
     boolean mTmapStarted = false;
     private boolean mAwaitingBroadcastCreateResponse = false;
     private final LinkedList<BluetoothLeBroadcastSettings> mCreateBroadcastQueue =
             new LinkedList<>();
     boolean mIsSourceStreamMonitorModeEnabled = false;
+    boolean mLeAudioSuspended = false;
 
     @VisibleForTesting
     TbsService mTbsService;
@@ -551,6 +553,7 @@ public class LeAudioService extends ProfileService {
         mCreateBroadcastQueue.clear();
         mAwaitingBroadcastCreateResponse = false;
         mIsSourceStreamMonitorModeEnabled = false;
+        mLeAudioSuspended = false;
 
         clearBroadcastTimeoutCallback();
 
@@ -626,6 +629,7 @@ public class LeAudioService extends ProfileService {
         mLeAudioCodecConfig = null;
 
         mBroadcastIdPendingStart = Optional.empty();
+        mBroadcastIdPendingStop = Optional.empty();
         mAudioManagerAddedOutDevice = null;
 
         // Set the service and BLE devices as inactive
@@ -1123,8 +1127,6 @@ public class LeAudioService extends ProfileService {
             Log.i(TAG, "Unicast group is active, queueing Broadcast creation, while the Unicast"
                         + " group is deactivated.");
             mCreateBroadcastQueue.add(broadcastSettings);
-            mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE,
-                    AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
             if (Flags.leaudioBroadcastAudioHandoverPolicies()) {
                 mLeAudioNativeInterface.setUnicastMonitorMode(LeAudioStackEvent.DIRECTION_SINK,
                         true);
@@ -1321,6 +1323,15 @@ public class LeAudioService extends ProfileService {
         if (mUnicastGroupIdDeactivatedForBroadcastTransition != LE_AUDIO_GROUP_ID_INVALID) {
             mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE,
                     AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
+        }
+
+        mBroadcastIdPendingStart = Optional.empty();
+        if (mDialingOutTimeoutEvent != null &&
+                mDialingOutTimeoutEvent.mBroadcastId.equals(broadcastId)) {
+            Log.w(TAG, "stopBroadcast: pending stopBrodcast while start Broadcast is ongoing: "
+                    + broadcastId);
+            mBroadcastIdPendingStop = Optional.of(broadcastId);
+            return;
         }
         Log.d(TAG, "stopBroadcast");
         mLeAudioBroadcasterNativeInterface.stopBroadcast(broadcastId);
@@ -1960,6 +1971,12 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
+
+                    if (mLeAudioSuspended) {
+                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
+                        mAudioManager.setLeAudioSuspended(false);
+                        mLeAudioSuspended = false;
+                    }
                 }
 
                 handleAudioDeviceRemoved(
@@ -2212,8 +2229,12 @@ public class LeAudioService extends ProfileService {
             /* Native will clear its states and send us group Inactive.
              * However we would like to notify audio framework that LeAudio is not
              * active anymore and does not want to get more audio data.
+             * Notify audio framework LeAudio InActive until it is inactive
+             * in stack if broadcast create request in queue.
              */
-            handleGroupTransitToInactive(currentlyActiveGroupId);
+            if (mCreateBroadcastQueue.isEmpty()) {
+                handleGroupTransitToInactive(currentlyActiveGroupId);
+            }
         }
         return true;
     }
@@ -2524,8 +2545,15 @@ public class LeAudioService extends ProfileService {
                     && areAllGroupsInNotGettingActiveState()
                     && (!mCreateBroadcastQueue.isEmpty()
                             || mBroadcastIdDeactivatedForUnicastTransition.isPresent())) {
+                mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                        AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
+                if (!mLeAudioSuspended) {
+                    Log.d(TAG, "Suspend LeAudio stream before update unicast device inactive");
+                    mAudioManager.setLeAudioSuspended(true);
+                    mLeAudioSuspended = true;
+                }
 
                 /* Update Broadcast device before streaming state in handover case to avoid switch
                  * to non LE Audio device in Audio Manager e.g. Phone Speaker.
@@ -3426,6 +3454,11 @@ public class LeAudioService extends ProfileService {
                         if (!Objects.equals(device, mActiveBroadcastAudioDevice)) {
                             updateBroadcastActiveDevice(device, mActiveBroadcastAudioDevice, true);
                         }
+                    }
+                    if (mBroadcastIdPendingStop.isPresent()) {
+                        Log.d(TAG, "mBroadcastIdPendingStop exist, Stop pending broadcast");
+                        stopBroadcast(mBroadcastIdPendingStop.get());
+                        mBroadcastIdPendingStop = Optional.empty();
                     }
                     break;
                 default:
@@ -4938,6 +4971,7 @@ public class LeAudioService extends ProfileService {
             Log.w(TAG, "Failed to start Broadcast in time: " + mBroadcastId);
 
             mDialingOutTimeoutEvent = null;
+            mBroadcastIdPendingStop = Optional.empty();
 
             if (getLeAudioService() == null) {
                 Log.e(TAG, "DialingOutTimeoutEvent: No LE Audio service");

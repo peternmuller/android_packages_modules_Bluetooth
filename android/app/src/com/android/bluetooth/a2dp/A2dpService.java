@@ -1353,8 +1353,8 @@ public class A2dpService extends ProfileService {
                     .setCodecType(SOURCE_CODEC_TYPE_APTX_ADAPTIVE) // remove in U
                     .build();
 
-            Log.i(TAG, "updateLowLatencyAudioSupport: " + codecStatus.
-                                                isCodecConfigSelectable(lowLatencyCodec));
+            Log.i(TAG, "updateLowLatencyAudioSupport: codecStatus: " + codecStatus +
+                                                ", lowLatencyCodec: " + lowLatencyCodec);
             if (codecStatus != null
                     && codecStatus.isCodecConfigSelectable(lowLatencyCodec)
                     && getOptionalCodecsEnabled(device)
