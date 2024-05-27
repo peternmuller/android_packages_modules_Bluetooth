@@ -103,7 +103,6 @@ void bta_dm_remote_key_missing(const RawAddress bd_addr);
 void bta_dm_process_remove_device(const RawAddress& bd_addr);
 void btm_inq_clear_ssp(void);
 
-static tBTM_STATUS btm_sec_execute_procedure(tBTM_SEC_DEV_REC* p_dev_rec);
 static bool btm_sec_start_get_name(tBTM_SEC_DEV_REC* p_dev_rec);
 static void btm_sec_wait_and_start_authentication(tBTM_SEC_DEV_REC* p_dev_rec);
 static void btm_sec_auth_timer_timeout(void* data);
@@ -3872,12 +3871,6 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle,
   /* the name, or if we are originator because some procedure can have */
   /* been scheduled while connection was down */
   log::debug("Is connection locally initiated:{}", p_dev_rec->is_originator);
-  if (!(p_dev_rec->sec_rec.sec_flags & BTM_SEC_NAME_KNOWN) ||
-      p_dev_rec->is_originator) {
-    res = btm_sec_execute_procedure(p_dev_rec);
-    if (res != BTM_CMD_STARTED)
-      btm_sec_dev_rec_cback_event(p_dev_rec, res, false);
-  }
 }
 
 tBTM_STATUS btm_sec_disconnect(uint16_t handle, tHCI_STATUS reason,

@@ -747,6 +747,23 @@ void btm_sec_set_peer_sec_caps(uint16_t hci_handle, bool ssp_supported,
 
 /*******************************************************************************
  *
+ * Function         btm_sec_execute_procedure
+ *
+ * Description      This function is called to start required security
+ *                  procedure.  There is a case when multiplexing protocol
+ *                  calls this function on the originating side, connection to
+ *                  the peer will not be established.  This function in this
+ *                  case performs only authorization.
+ *
+ * Returns          BTM_SUCCESS     - permission is granted
+ *                  BTM_CMD_STARTED - in process
+ *                  BTM_NO_RESOURCES  - permission declined
+ *
+ ******************************************************************************/
+extern tBTM_STATUS btm_sec_execute_procedure (tBTM_SEC_DEV_REC *p_dev_rec);
+
+/*******************************************************************************
+ *
  * Function         btm_sec_cr_loc_oob_data_cback_event
  *
  * Description      This function is called to pass the local oob up to caller
