@@ -42,6 +42,12 @@ tGATT_TCB* gatt_find_tcb_by_addr(const RawAddress& /*bda */,
   return &test_tcb;
 }
 
+uint8_t gatt_num_app_hold_links(const RawAddress& /*bda */,
+                                tBT_TRANSPORT /* transport */) {
+  inc_func_call_count(__func__);
+  return 0;
+}
+
 tGATT_STATUS GATTC_Discover(uint16_t /* conn_id */,
                             tGATT_DISC_TYPE /* disc_type */,
                             uint16_t /* start_handle */,

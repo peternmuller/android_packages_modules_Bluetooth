@@ -27,6 +27,8 @@ void l2cu_update_lcb_4_bonding(const RawAddress& p_bd_addr, bool is_bonding);
 
 bool l2cu_start_post_bond_timer(uint16_t handle);
 
+void l2cu_reset_lcb_timeout(uint16_t handle);
+
 void l2c_pin_code_request(const RawAddress& bd_addr);
 
 void l2cu_resubmit_pending_sec_req(const RawAddress* p_bda);

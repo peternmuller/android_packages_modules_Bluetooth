@@ -1881,3 +1881,26 @@ bool gatt_auto_connect_dev_remove(tGATT_IF gatt_if, const RawAddress& bd_addr) {
     return connection_manager::background_connect_remove(gatt_if, bd_addr);
   }
 }
+
+/*******************************************************************************
+ *
+ * Function         gatt_num_app_hold_links
+ *
+ * Description      calculates number of app links registered for the given
+ *remote bd addr
+ *
+ * Returns          number of app hold links for the given bdaddr
+ *
+ ******************************************************************************/
+
+uint8_t gatt_num_app_hold_links(const RawAddress& bda,
+                                tBT_TRANSPORT transport) {
+  uint8_t num_links = 0;
+
+  tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bda, transport);
+  if (p_tcb != NULL) {
+    num_links = p_tcb->app_hold_link.size();
+  }
+  log::debug(" num_links = {}", num_links);
+  return num_links;
+}

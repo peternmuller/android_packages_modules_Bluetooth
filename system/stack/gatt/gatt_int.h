@@ -468,6 +468,8 @@ extern tGATT_CB gatt_cb;
 void gatt_set_err_rsp(bool enable, uint8_t req_op_code, uint8_t err_status);
 #endif
 
+uint8_t gatt_num_app_hold_links(const RawAddress& bda, tBT_TRANSPORT transport);
+
 /* from gatt_main.cc */
 bool gatt_disconnect(tGATT_TCB* p_tcb);
 bool gatt_act_connect(tGATT_REG* p_reg, const RawAddress& bd_addr,
