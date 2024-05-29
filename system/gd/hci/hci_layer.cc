@@ -16,9 +16,7 @@
 
 #include "hci/hci_layer.h"
 
-#ifdef TARGET_FLOSS
 #include <signal.h>
-#endif
 #include <bluetooth/log.h>
 
 #include <map>
@@ -37,6 +35,8 @@
 #include "osi/include/stack_power_telemetry.h"
 #include "packet/raw_builder.h"
 #include "storage/storage_module.h"
+
+#define SIGKILL 9
 
 namespace bluetooth {
 namespace hci {
@@ -68,7 +68,8 @@ static void fail_if_reset_complete_not_success(CommandCompleteView complete) {
 }
 
 static void abort_after_time_out(OpCode op_code) {
-  log::fatal("Done waiting for debug information after HCI timeout ({})", OpCodeText(op_code));
+  log::warn("Done waiting for debug information after HCI timeout ({})", OpCodeText(op_code));
+  kill(getpid(), SIGKILL);
 }
 
 class CommandQueueEntry {
@@ -374,7 +375,8 @@ struct HciLayer::impl {
   }
 
   static void abort_after_root_inflammation(uint8_t vse_error) {
-    log::fatal("Root inflammation with reason 0x{:02x}", vse_error);
+    log::warn("Root inflammation with reason 0x{:02x}", vse_error);
+    kill(getpid(), SIGKILL);
   }
 
   void handle_root_inflammation(uint8_t vse_error_reason) {
@@ -497,7 +499,8 @@ struct HciLayer::impl {
     // error state of the BT controller.
     kill(getpid(), SIGINT);
 #else
-    log::fatal("Hardware Error Event with code 0x{:02x}", event_view.GetHardwareCode());
+    log::warn("Hardware Error Event with code 0x{:02x}", event_view.GetHardwareCode());
+    kill(getpid(), SIGKILL);
 #endif
   }
 
