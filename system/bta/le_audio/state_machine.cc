@@ -3483,6 +3483,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         if (ase->data_path_state == DataPathState::CONFIGURED) {
           RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
+          remove_cig = false;
         } else if ((ase->cis_state == CisState::CONNECTED ||
              ase->cis_state == CisState::CONNECTING) &&
             ase->data_path_state == DataPathState::IDLE) {
