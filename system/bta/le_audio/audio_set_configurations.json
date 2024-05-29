@@ -1423,7 +1423,7 @@
             "name": "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
             "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs",
             "qos_config_name": [
-                "VND_QoS_Config_R13_L100"
+                "VND_QoS_Config_R24_L100"
             ]
         },
         {
@@ -1442,8 +1442,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R3_L8-One-OneChan-SrcAse-Lc3_32_1_45octs_R3_L8_V2_1",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_32_1",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R3_L8-One-OneChan-SrcAse-Lc3_32_1_45octs_R3_L8_V2_1",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_32_1",
             "qos_config_name": [
                 "VND_QoS_Config_R3_L8",
                 "VND_QoS_Config_R3_L8"
@@ -1454,8 +1454,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V2_1",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V2_1",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
             "qos_config_name": [
                 "VND_QoS_Config_R5_L12",
                 "VND_QoS_Config_R3_L12"
@@ -1466,8 +1466,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V1_1",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_48_1_75octs_R5_L12-One-OneChan-SrcAse-Lc3_16_1_30octs_R3_L12_V1_1",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
             "qos_config_name": [
                 "VND_QoS_Config_R5_L12",
                 "VND_QoS_Config_R3_L12"
@@ -1478,8 +1478,8 @@
             ]
         },
         {
-            "name": "One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1_1",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
+            "name": "Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1_1",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
             "qos_config_name": [
                 "QoS_Config_48_1_1",
                 "VND_QoS_Config_R3_L15"
@@ -7569,10 +7569,10 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_16_1",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "codec_id": {
                         "coding_format": 6,
@@ -7618,7 +7618,7 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 },
                 {
                     "ase_cnt": 1,
@@ -7672,10 +7672,10 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_32_1",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_48_1-One-OneChan-SrcAse-Lc3_32_1",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "codec_id": {
                         "coding_format": 6,
@@ -7721,7 +7721,7 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 },
                 {
                     "ase_cnt": 1,
