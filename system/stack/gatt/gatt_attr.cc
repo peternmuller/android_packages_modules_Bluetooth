@@ -578,14 +578,6 @@ static bool gatt_att_write_cl_supp_feat(uint16_t conn_id, uint16_t handle) {
     return false;
   }
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
-    gatt_op_cb_data cb_data;
-    cb_data.cb = base::BindOnce(
-        [](const RawAddress& bdaddr, uint8_t support) { return; });
-    cb_data.op_uuid = GATT_UUID_CLIENT_SUP_FEAT;
-    OngoingOps[conn_id].emplace_back(std::move(cb_data));
-  }
-
   return true;
 }
 
