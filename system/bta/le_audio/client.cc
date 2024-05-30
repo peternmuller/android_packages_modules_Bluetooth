@@ -5192,13 +5192,15 @@ class LeAudioClientImpl : public LeAudioClient {
                is_releasing_for_reconfiguration ? "True" : "False");
     log::debug("is_ongoing_call_on_other_direction={}",
                is_ongoing_call_on_other_direction ? "True" : "False");
+    log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
 
     if (remote_metadata.get(remote_other_direction)
             .test_any(kLeAudioContextAllBidir) &&
         !is_streaming_other_direction) {
       log::debug(
-          "The other direction is not streaming bidirectional, ignore that "
-          "context.");
+            "The other direction is not streaming bidirectional, ignore that "
+            "context.");
       remote_metadata.get(remote_other_direction).clear();
     }
 
