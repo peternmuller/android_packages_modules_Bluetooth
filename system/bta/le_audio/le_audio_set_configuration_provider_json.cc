@@ -263,7 +263,7 @@ struct AudioSetConfigurationProviderJson {
 
     // Store each ASE configuration
     for (auto i = flat_subconfig->ase_cnt(); i; --i) {
-      subconfigs.push_back(std::move(config));
+      subconfigs.push_back(config);
     }
   }
 

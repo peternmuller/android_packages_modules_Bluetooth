@@ -1370,8 +1370,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1380,8 +1380,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1390,8 +1390,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1400,8 +1400,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -7252,10 +7252,10 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1976,
                     "iso_interval": 15000,
@@ -7287,15 +7287,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1976,
                     "iso_interval": 15000,
@@ -7327,15 +7327,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1304,
                     "iso_interval": 15000,
@@ -7367,15 +7367,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1304,
                     "iso_interval": 15000,
@@ -7407,7 +7407,7 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
