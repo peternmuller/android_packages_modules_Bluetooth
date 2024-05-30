@@ -1215,6 +1215,11 @@ public class LeAudioService extends ProfileService {
         }
 
         Log.d(TAG, "startBroadcast");
+        if (mLeAudioSuspended) {
+            Log.d(TAG, "startBroadcast: Release LeAudio stream");
+            mAudioManager.setLeAudioSuspended(false);
+            mLeAudioSuspended = false;
+        }
 
         /* Start timeout to recover from stucked/error start Broadcast operation */
         mDialingOutTimeoutEvent = new DialingOutTimeoutEvent(broadcastId);
@@ -1971,12 +1976,6 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
-
-                    if (mLeAudioSuspended) {
-                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
-                        mAudioManager.setLeAudioSuspended(false);
-                        mLeAudioSuspended = false;
-                    }
                 }
 
                 handleAudioDeviceRemoved(
@@ -2545,15 +2544,17 @@ public class LeAudioService extends ProfileService {
                     && areAllGroupsInNotGettingActiveState()
                     && (!mCreateBroadcastQueue.isEmpty()
                             || mBroadcastIdDeactivatedForUnicastTransition.isPresent())) {
-                mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
-                        AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
+                if (!mCreateBroadcastQueue.isEmpty()) {
+                    mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                            AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
+                    if (!mLeAudioSuspended) {
+                        Log.d(TAG, "Suspend LeAudio stream before update unicast device inactive");
+                        mAudioManager.setLeAudioSuspended(true);
+                        mLeAudioSuspended = true;
+                    }
+                }
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
-                if (!mLeAudioSuspended) {
-                    Log.d(TAG, "Suspend LeAudio stream before update unicast device inactive");
-                    mAudioManager.setLeAudioSuspended(true);
-                    mLeAudioSuspended = true;
-                }
 
                 /* Update Broadcast device before streaming state in handover case to avoid switch
                  * to non LE Audio device in Audio Manager e.g. Phone Speaker.
