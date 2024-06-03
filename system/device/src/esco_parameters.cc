@@ -23,6 +23,7 @@
 
 #include "hci/controller_interface.h"
 #include "main/shim/entry.h"
+#include "osi/include/properties.h"
 
 using namespace bluetooth;
 
@@ -369,6 +370,12 @@ enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
   log::assert_that((int)codec >= 0, "codec index {}< 0", (int)codec);
   log::assert_that(codec < ESCO_NUM_CODECS, "codec index {} > {}", (int)codec,
                    ESCO_NUM_CODECS);
+
+  if ((codec == ESCO_CODEC_LC3_T2) &&
+      osi_property_get_bool("vendor.bluetooth.sco.force_lc3_t1", false)) {
+    log::info("codec={}, force_lc3_t1 is true", (int)codec);
+    codec = ESCO_CODEC_LC3_T1;
+  }
 
   if (codec == ESCO_CODEC_LC3_T1 || codec == ESCO_CODEC_LC3_T2) {
     enh_esco_params_t param = default_esco_parameters[codec];
