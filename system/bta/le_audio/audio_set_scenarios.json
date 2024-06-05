@@ -64,6 +64,10 @@
             "name": "Media",
             "configurations": [
                 "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
                 "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
                 "Two-OneChan-SnkAse-Lc3_48_4_High_Reliability",
                 "Two-OneChan-SnkAse-Lc3_48_4_2",
@@ -115,10 +119,6 @@
                 "Two-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
                 "One-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
                 "VND_One-TwoChan-SnkAse-Aptx_LeX_V1_48_High_Reliability",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
                 "VND_One-TwoChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2"
             ]
         },

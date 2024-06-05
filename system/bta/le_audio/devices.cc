@@ -229,7 +229,7 @@ bool LeAudioDevice::IsAudioSetConfigurationSupported(
     auto const& pacs =
         (direction == types::kLeAudioDirectionSink) ? snk_pacs_ : src_pacs_;
     for (const auto& ent : confs) {
-      if (!utils::GetConfigurationSupportedPac(pacs, ent.codec)) {
+      if (!utils::GetConfigurationSupportedPac(pacs, ent.codec, ent.vendor_metadata)) {
         log::info("Configuration is NOT supported by device {}", address_);
         return false;
       }
@@ -267,7 +267,7 @@ bool LeAudioDevice::ConfigureAses(
   for (size_t i = 0; i < ase_configs.size() && ase; ++i) {
     auto const& ase_cfg = ase_configs.at(i);
     if (utils::IsCodecUsingLtvFormat(ase_cfg.codec.id) &&
-        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
+        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec, ase_cfg.vendor_metadata)) {
       return false;
     }
   }
@@ -293,7 +293,7 @@ bool LeAudioDevice::ConfigureAses(
   for (int i = 0; i < needed_ase; ++i) {
     auto const& ase_cfg = ase_configs.at(i);
     if (utils::IsCodecUsingLtvFormat(ase_cfg.codec.id) &&
-        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
+        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec, ase_cfg.vendor_metadata)) {
       log::error("No matching PAC found. Stop the activation.");
       return false;
     }
@@ -351,7 +351,7 @@ bool LeAudioDevice::ConfigureAses(
           ase->codec_config.Add(
               codec_spec_conf::kLeAudioLtvTypeCodecFrameBlocksPerSdu,
               GetMaxCodecFramesPerSduFromPac(
-                  utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)));
+                  utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec, ase_cfg.vendor_metadata)));
         }
       } else if (ase->codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
           (ase->codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
