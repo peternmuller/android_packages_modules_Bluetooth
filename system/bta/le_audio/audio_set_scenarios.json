@@ -8,6 +8,7 @@
         {
             "name": "Conversational",
             "configurations": [
+                "VND_Two-OneChan-SnkAse-Lc3_32_2_80octs-Two-OneChan-SrcAse-Lc3_32_2_80octs_2",
                 "Two-OneChan-SnkAse-Lc3_32_2-Two-OneChan-SrcAse-Lc3_32_2_1",
                 "Two-OneChan-SnkAse-Lc3_32_2-Two-OneChan-SrcAse-Lc3_32_2_Low_Latency",
                 "Two-OneChan-SnkAse-Lc3_16_2-Two-OneChan-SrcAse-Lc3_16_2_Low_Latency",
@@ -56,7 +57,6 @@
                 "Two-OneChan-SnkAse-Lc3_16_2_Balanced_Reliability",
                 "One-TwoChan-SnkAse-Lc3_16_2_Balanced_Reliability",
                 "One-OneChan-SnkAse-Lc3_16_2_Balanced_Reliability",
-                "VND_One-TwoChan-SnkAse-Lc3_32_2_80octs-One-TwoChan-SrcAse-Lc3_32_2_80octs_2",
                 "One-TwoChan-SnkAse-Lc3_32_2_80octs-One-TwoChan-SrcAse-Lc3_32_2_80octs_2"
             ]
         },
@@ -64,6 +64,10 @@
             "name": "Media",
             "configurations": [
                 "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
+                "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
                 "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
                 "Two-OneChan-SnkAse-Lc3_48_4_High_Reliability",
                 "Two-OneChan-SnkAse-Lc3_48_4_2",
@@ -93,6 +97,7 @@
                 "One-TwoChan-SnkAse-Lc3_16_2_2",
                 "One-TwoChan-SnkAse-Lc3_16_1_Balanced_Reliability",
                 "One-TwoChan-SnkAse-Lc3_16_1_2",
+                "VND_One-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
                 "One-OneChan-SnkAse-Lc3_48_4_High_Reliability",
                 "One-OneChan-SnkAse-Lc3_48_4_2",
                 "One-OneChan-SnkAse-Lc3_48_2_High_Reliability",
@@ -114,10 +119,6 @@
                 "Two-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
                 "One-OneChan-SrcAse-Lc3_16_2_Balanced_Reliability",
                 "VND_One-TwoChan-SnkAse-Aptx_LeX_V1_48_High_Reliability",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
-                "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
                 "VND_One-TwoChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2"
             ]
         },

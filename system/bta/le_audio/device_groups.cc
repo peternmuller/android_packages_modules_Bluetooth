@@ -1495,7 +1495,7 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
                                : device->src_pacs_;
         const struct types::acs_ac_record* pac = NULL;
         if (utils::IsCodecUsingLtvFormat(ent.codec.id) &&
-            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec))) {
+            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec, ent.vendor_metadata))) {
           log::debug(
               "Insufficient PAC for {}",
               direction == types::kLeAudioDirectionSink ? "sink" : "source");

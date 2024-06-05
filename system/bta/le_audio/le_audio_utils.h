@@ -70,6 +70,7 @@ GetAudioSessionCodecConfigFromAudioSetConfiguration(
 const struct types::acs_ac_record* GetConfigurationSupportedPac(
     const ::bluetooth::le_audio::types::PublishedAudioCapabilities& pacs,
     const ::bluetooth::le_audio::set_configurations::CodecConfigSetting&
-        codec_config_setting);
+        codec_config_setting,
+    std::optional<set_configurations::CodecMetadataSetting> vendor_metadata);
 }  // namespace utils
 }  // namespace bluetooth::le_audio

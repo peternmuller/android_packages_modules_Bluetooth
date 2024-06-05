@@ -1109,6 +1109,13 @@
             ]
         },
         {
+            "name": "VND_One-OneChan-SnkAse-Lc3_48_2_155octs_High_Reliability_2",
+            "codec_config_name": "VND_One-OneChan-SnkAse-Lc3_48_2",
+            "qos_config_name": [
+                "VND_QoS_Config_R24_L100"
+            ]
+        },
+        {
             "name": "One-OneChan-SnkAse-Lc3_48_4_High_Reliability",
             "codec_config_name": "One-OneChan-SnkAse-Lc3_48_4",
             "qos_config_name": [
@@ -1370,8 +1377,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1380,8 +1387,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1390,8 +1397,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1400,8 +1407,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
-            "codec_config_name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96_High_Reliability",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96",
             "qos_config_name": [
                 "VND_QoS_Config_R10_L74"
             ],
@@ -1493,8 +1500,8 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Lc3_32_2_80octs-One-TwoChan-SrcAse-Lc3_32_2_80octs_2",
-            "codec_config_name": "One-TwoChan-SnkAse-Lc3_32_2-One-TwoChan_SrcAse-Lc3_32_2",
+            "name": "VND_Two-OneChan-SnkAse-Lc3_32_2_80octs-Two-OneChan-SrcAse-Lc3_32_2_80octs_2",
+            "codec_config_name": "Two-OneChan-SnkAse-Lc3_32_2-Two-OneChan_SrcAse-Lc3_32_2",
             "qos_config_name": [
                 "VND_QoS_Config_R8_L30"
             ],
@@ -4254,6 +4261,60 @@
                         }
                     ],
                     "ase_channel_cnt": 2
+                }
+            ]
+        },
+        {
+            "name": "VND_One-OneChan-SnkAse-Lc3_48_2",
+            "subconfigurations": [
+                {
+                    "ase_cnt": 1,
+                    "direction": "SINK",
+                    "codec_id": {
+                        "coding_format": 6,
+                        "vendor_company_id": 0,
+                        "vendor_codec_id": 0
+                    },
+                    "codec_configuration": [
+                        {
+                            "name": "sampling_frequency",
+                            "type": 1,
+                            "compound_value": {
+                                "value": [
+                                    8
+                                ]
+                            }
+                        },
+                        {
+                            "name": "frame_duration",
+                            "type": 2,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "name": "octets_per_codec_frame",
+                            "type": 4,
+                            "compound_value": {
+                                "value": [
+                                    155,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "name": "codec_frame_blocks_per_sdu",
+                            "type": 5,
+                            "compound_value": {
+                                "value": [
+                                    1
+                                ]
+                            }
+                        }
+                    ],
+                    "ase_channel_cnt": 1
                 }
             ]
         },
@@ -7252,10 +7313,10 @@
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1976,
                     "iso_interval": 15000,
@@ -7287,15 +7348,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V2_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V2_96",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1976,
                     "iso_interval": 15000,
@@ -7327,15 +7388,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_48",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_48",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1304,
                     "iso_interval": 15000,
@@ -7367,15 +7428,15 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
         {
-            "name": "VND_One-TwoChan-SnkAse-Aptx_Le_V1_96",
+            "name": "VND_Two-OneChan-SnkAse-Aptx_Le_V1_96",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "max_sdu": 1304,
                     "iso_interval": 15000,
@@ -7407,7 +7468,7 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         },
@@ -7775,10 +7836,10 @@
             ]
         },
         {
-            "name": "One-TwoChan-SnkAse-Lc3_32_2-One-TwoChan_SrcAse-Lc3_32_2",
+            "name": "Two-OneChan-SnkAse-Lc3_32_2-Two-OneChan_SrcAse-Lc3_32_2",
             "subconfigurations": [
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SINK",
                     "codec_id": {
                         "coding_format": 6,
@@ -7824,10 +7885,10 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 },
                 {
-                    "ase_cnt": 1,
+                    "ase_cnt": 2,
                     "direction": "SOURCE",
                     "codec_id": {
                         "coding_format": 6,
@@ -7873,7 +7934,7 @@
                             }
                         }
                     ],
-                    "ase_channel_cnt": 2
+                    "ase_channel_cnt": 1
                 }
             ]
         }
