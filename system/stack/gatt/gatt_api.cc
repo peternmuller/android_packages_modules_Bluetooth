@@ -25,17 +25,15 @@
 
 #include "stack/include/gatt_api.h"
 
-#include <android_bluetooth_flags.h>
 #include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <string>
 
 #include "internal_include/bt_target.h"
-#include "internal_include/bt_trace.h"
 #include "internal_include/stack_config.h"
 #include "l2c_api.h"
-#include "os/log.h"
 #include "os/system_properties.h"
 #include "osi/include/allocator.h"
 #include "rust/src/connection/ffi/connection_shim.h"
@@ -46,6 +44,7 @@
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/l2cap_acl_interface.h"
+#include "stack/include/l2cdefs.h"
 #include "stack/include/sdp_api.h"
 #include "types/bluetooth/uuid.h"
 #include "types/bt_transport.h"
@@ -420,7 +419,9 @@ void GATTS_StopService(uint16_t service_handle) {
   }
 
   if (it->sdp_handle) {
-    get_legacy_stack_sdp_api()->handle.SDP_DeleteRecord(it->sdp_handle);
+    if (!get_legacy_stack_sdp_api()->handle.SDP_DeleteRecord(it->sdp_handle)) {
+      log::warn("Unable to delete record handle:{}", it->sdp_handle);
+    }
   }
 
   gatt_cb.srv_list_info->erase(it);
@@ -1425,7 +1426,8 @@ bool GATT_Connect(tGATT_IF gatt_if, const RawAddress& bd_addr,
                bd_addr);
     bool tcb_exist = !!gatt_find_tcb_by_addr(bd_addr, transport);
 
-    if (!IS_FLAG_ENABLED(gatt_reconnect_on_bt_on_fix) || tcb_exist) {
+    if (!com::android::bluetooth::flags::gatt_reconnect_on_bt_on_fix() ||
+        tcb_exist) {
       /* Consider to remove gatt_act_connect at all */
       ret = gatt_act_connect(p_reg, bd_addr, addr_type, transport,
                              initiating_phys);

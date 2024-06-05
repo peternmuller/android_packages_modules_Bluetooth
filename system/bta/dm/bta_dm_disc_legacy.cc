@@ -18,10 +18,10 @@
 
 #include "bta/dm/bta_dm_disc_legacy.h"
 
-#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/strings/stringprintf.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 #include <stddef.h>
 
 #include <cstdint>
@@ -29,11 +29,11 @@
 #include <variant>
 #include <vector>
 
-#include "android_bluetooth_flags.h"
 #include "bta/dm/bta_dm_disc_int_legacy.h"
 #include "bta/include/bta_gatt_api.h"
 #include "bta/include/bta_sdp_api.h"
 #include "btif/include/btif_config.h"
+#include "com_android_bluetooth_flags.h"
 #include "common/circular_buffer.h"
 #include "common/init_flags.h"
 #include "common/strings.h"
@@ -322,13 +322,11 @@ static void bta_dm_search_cancel() {
      active */
   else if (!bta_dm_search_cb.name_discover_done) {
     get_btm_client_interface().peer.BTM_CancelRemoteDeviceName();
-#ifndef TARGET_FLOSS
     /* bta_dm_search_cmpl is called when receiving the remote name cancel evt */
-    if (!IS_FLAG_ENABLED(
-            bta_dm_defer_device_discovery_state_change_until_rnr_complete)) {
+    if (!com::android::bluetooth::flags::
+            bta_dm_defer_device_discovery_state_change_until_rnr_complete()) {
       bta_dm_search_cmpl();
     }
-#endif
   } else {
     bta_dm_inq_cmpl();
   }
@@ -576,8 +574,11 @@ static void bta_dm_store_audio_profiles_version() {
 
     uint16_t profile_version = 0;
     /* get profile version (if failure, version parameter is not updated) */
-    get_legacy_stack_sdp_api()->record.SDP_FindProfileVersionInRec(
-        sdp_rec, audio_profile.btprofile_uuid, &profile_version);
+    if (!get_legacy_stack_sdp_api()->record.SDP_FindProfileVersionInRec(
+            sdp_rec, audio_profile.btprofile_uuid, &profile_version)) {
+      log::warn("Unable to find SDP profile version in record peer:{}",
+                sdp_rec->remote_bd_addr);
+    }
     if (profile_version != 0) {
       if (btif_config_set_bin(sdp_rec->remote_bd_addr.ToString().c_str(),
                               audio_profile.profile_key,
@@ -1092,8 +1093,12 @@ static void bta_dm_find_services(const RawAddress& bd_addr) {
       }
 
       log::info("search UUID = {}", uuid.ToString());
-      get_legacy_stack_sdp_api()->service.SDP_InitDiscoveryDb(
-          bta_dm_search_cb.p_sdp_db, BTA_DM_SDP_DB_SIZE, 1, &uuid, 0, NULL);
+      if (!get_legacy_stack_sdp_api()->service.SDP_InitDiscoveryDb(
+              bta_dm_search_cb.p_sdp_db, BTA_DM_SDP_DB_SIZE, 1, &uuid, 0,
+              NULL)) {
+        log::warn("Unable to initialize SDP service discovery db peer:{}",
+                  bd_addr);
+      }
 
       memset(g_disc_raw_data_buf, 0, sizeof(g_disc_raw_data_buf));
       bta_dm_search_cb.p_sdp_db->raw_data = g_disc_raw_data_buf;
@@ -1103,6 +1108,9 @@ static void bta_dm_find_services(const RawAddress& bd_addr) {
       if (!get_legacy_stack_sdp_api()
                ->service.SDP_ServiceSearchAttributeRequest(
                    bd_addr, bta_dm_search_cb.p_sdp_db, &bta_dm_sdp_callback)) {
+        log::warn(
+            "Unable to start SDP service search attribute request peer:{}",
+            bd_addr);
         /*
          * If discovery is not successful with this device, then
          * proceed with the next one.
@@ -1811,7 +1819,7 @@ static void bta_dm_gatt_disc_complete(uint16_t conn_id, tGATT_STATUS status) {
   } else {
     bta_dm_search_cb.conn_id = GATT_INVALID_CONN_ID;
 
-    if (IS_FLAG_ENABLED(bta_dm_disc_stuck_in_cancelling_fix)) {
+    if (com::android::bluetooth::flags::bta_dm_disc_stuck_in_cancelling_fix()) {
       log::info(
           "Discovery complete for invalid conn ID. Will pick up next job");
       bta_dm_search_set_state(BTA_DM_SEARCH_IDLE);
@@ -2211,8 +2219,8 @@ static void bta_dm_search_sm_execute(tBTA_DM_EVT event,
           break;
         case BTA_DM_API_SEARCH_CANCEL_EVT:
           bta_dm_search_clear_queue();
-          if (IS_FLAG_ENABLED(
-                  continue_service_discovery_when_cancel_device_discovery)) {
+          if (com::android::bluetooth::flags::
+                  continue_service_discovery_when_cancel_device_discovery()) {
             bta_dm_search_set_state(BTA_DM_SEARCH_CANCELLING);
           }
           bta_dm_search_cancel_notify();

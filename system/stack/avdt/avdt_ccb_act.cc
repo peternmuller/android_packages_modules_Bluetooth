@@ -77,7 +77,7 @@ static void avdt_ccb_clear_ccb(AvdtpCcb* p_ccb) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_chan_open(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_chan_open(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   avdt_ad_open_req(AVDT_CHAN_SIG, p_ccb, NULL, AVDT_INT);
 }
 
@@ -92,7 +92,7 @@ void avdt_ccb_chan_open(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_chan_close(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_chan_close(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   /* close the transport channel used by this CCB */
   avdt_ad_close_req(AVDT_CHAN_SIG, p_ccb, NULL);
 }
@@ -108,7 +108,7 @@ void avdt_ccb_chan_close(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_chk_close(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_chk_close(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   int i;
   AvdtpScb* p_scb = &(p_ccb->scb[0]);
 
@@ -643,7 +643,7 @@ void avdt_ccb_snd_suspend_rsp(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_clear_cmds(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_clear_cmds(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   int i;
   AvdtpScb* p_scb = &(p_ccb->scb[0]);
   uint8_t err_code = AVDT_ERR_CONNECT;
@@ -729,7 +729,7 @@ void avdt_ccb_cmd_fail(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_free_cmd(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_free_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   osi_free_and_reset((void**)&p_ccb->p_curr_cmd);
 }
 
@@ -802,7 +802,7 @@ void avdt_ccb_ret_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_snd_cmd(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_snd_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   BT_HDR* p_msg;
 
   /* do we have commands to send?  send next command;  make sure we're clear;
@@ -831,7 +831,7 @@ void avdt_ccb_snd_cmd(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_snd_msg(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_snd_msg(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   BT_HDR* p_msg;
 
   /* if not congested */
@@ -867,7 +867,7 @@ void avdt_ccb_snd_msg(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_set_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_set_reconn(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   p_ccb->reconn = true;
 }
 
@@ -881,7 +881,7 @@ void avdt_ccb_set_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_clr_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_clr_reconn(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   p_ccb->reconn = false;
 }
 
@@ -897,7 +897,7 @@ void avdt_ccb_clr_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_chk_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_chk_reconn(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   if (p_ccb->reconn) {
     p_ccb->reconn = false;
 
@@ -928,7 +928,7 @@ void avdt_ccb_chk_reconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_chk_timer(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_chk_timer(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   alarm_cancel(p_ccb->idle_ccb_timer);
 }
 
@@ -977,7 +977,7 @@ void avdt_ccb_set_disconn(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_do_disconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_do_disconn(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   /* clear any pending commands */
   avdt_ccb_clear_cmds(p_ccb, NULL);
 
@@ -995,7 +995,7 @@ void avdt_ccb_do_disconn(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
  * Returns          void.
  *
  ******************************************************************************/
-void avdt_ccb_ll_closed(AvdtpCcb* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
+void avdt_ccb_ll_closed(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* /* p_data */) {
   tAVDT_CTRL_CBACK* p_cback;
   tAVDT_CTRL avdt_ctrl;
 

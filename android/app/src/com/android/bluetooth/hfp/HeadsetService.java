@@ -22,6 +22,9 @@ import static android.Manifest.permission.MODIFY_PHONE_STATE;
 import static com.android.bluetooth.Utils.enforceBluetoothPrivilegedPermission;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastU;
 
+import static java.util.Objects.requireNonNull;
+
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.bluetooth.BluetoothClass;
@@ -133,17 +136,19 @@ public class HeadsetService extends ProfileService {
     // Timeout for state machine thread join, to prevent potential ANR.
     private static final int SM_THREAD_JOIN_TIMEOUT_MS = 1000;
 
+    private final AdapterService mAdapterService;
+    private final DatabaseManager mDatabaseManager;
+    private final HeadsetNativeInterface mNativeInterface;
+    private final HashMap<BluetoothDevice, HeadsetStateMachine> mStateMachines = new HashMap<>();
+    private final Handler mHandler;
+    private final Looper mStateMachinesLooper;
+    private final Handler mStateMachinesThreadHandler;
+    private final HandlerThread mStateMachinesThread;
+    // This is also used as a lock for shared data in HeadsetService
+    private final HeadsetSystemInterface mSystemInterface;
+
     private int mMaxHeadsetConnections = 1;
     private BluetoothDevice mActiveDevice;
-    private AdapterService mAdapterService;
-    private DatabaseManager mDatabaseManager;
-    private HandlerThread mStateMachinesThread;
-    private Handler mStateMachinesThreadHandler;
-    private Handler mHandler;
-    // This is also used as a lock for shared data in HeadsetService
-    private final HashMap<BluetoothDevice, HeadsetStateMachine> mStateMachines = new HashMap<>();
-    private HeadsetNativeInterface mNativeInterface;
-    private HeadsetSystemInterface mSystemInterface;
     private boolean mAudioRouteAllowed = true;
     // Indicates whether SCO audio needs to be forced to open regardless ANY OTHER restrictions
     private boolean mForceScoAudio;
@@ -157,7 +162,6 @@ public class HeadsetService extends ProfileService {
     // Timeout when voice recognition is started by remote device
     @VisibleForTesting static int sStartVrTimeoutMs = 5000;
     private ArrayList<StateMachineTask> mPendingClccResponses = new ArrayList<>();
-    private boolean mStarted;
     private static final int LE_GROUP_STREAM_STATUS_STREAMING = 1;
     private static final int LE_GROUP_STREAM_STATUS_IDLE = 0;
     private int mLeGroupStreamStatus = 0;
@@ -165,43 +169,42 @@ public class HeadsetService extends ProfileService {
     private final Lock lock = new ReentrantLock();
     private final Condition leStreamStatusSuspend = lock.newCondition();
     private static HeadsetService sHeadsetService;
+    private static final int AUDIO_CONNECTION_DELAY_DEFAULT = 100;
 
     @VisibleForTesting boolean mIsAptXSwbEnabled = false;
     @VisibleForTesting boolean mIsAptXSwbPmEnabled = false;
 
     @VisibleForTesting ServiceFactory mFactory = new ServiceFactory();
 
-    public HeadsetService(Context ctx) {
-        super(ctx);
-    }
-    public static boolean isEnabled() {
-        return BluetoothProperties.isProfileHfpAgEnabled().orElse(false);
-    }
-    private static final int AUDIO_CONNECTION_DELAY_DEFAULT = 100;
-
-    @Override
-    public IProfileServiceBinder initBinder() {
-        return new BluetoothHeadsetBinder(this);
+    public HeadsetService(AdapterService adapterService) {
+        this(adapterService, HeadsetNativeInterface.getInstance(), null);
     }
 
-    @Override
-    public void start() {
-        Log.i(TAG, "start()");
-        if (mStarted) {
-            throw new IllegalStateException("start() called twice");
+    @VisibleForTesting
+    HeadsetService(AdapterService adapterService, HeadsetNativeInterface nativeInterface) {
+        this(adapterService, nativeInterface, null);
+    }
+
+    @VisibleForTesting
+    HeadsetService(
+            AdapterService adapterService, HeadsetNativeInterface nativeInterface, Looper looper) {
+        super(requireNonNull(adapterService));
+        mAdapterService = adapterService;
+        mDatabaseManager = requireNonNull(mAdapterService.getDatabase());
+        mNativeInterface = requireNonNull(nativeInterface);
+        if (looper != null) {
+            mHandler = new Handler(looper);
+            mStateMachinesThread = null;
+            mStateMachinesLooper = looper;
+        } else {
+            mHandler = new Handler(Looper.getMainLooper());
+            mStateMachinesThread = new HandlerThread("HeadsetService.StateMachines");
+            mStateMachinesThread.start();
+            mStateMachinesLooper = mStateMachinesThread.getLooper();
         }
-
+        mStateMachinesThreadHandler = new Handler(mStateMachinesLooper);
         setComponentAvailable(HFP_AG_IN_CALL_SERVICE, true);
 
-        // Step 1: Get AdapterService and DatabaseManager, should never be null
-        mAdapterService = Objects.requireNonNull(AdapterService.getAdapterService(),
-                "AdapterService cannot be null when HeadsetService starts");
-        mDatabaseManager = Objects.requireNonNull(mAdapterService.getDatabase(),
-                "DatabaseManager cannot be null when HeadsetService starts");
-        // Step 2: Start handler thread for state machines
-        mHandler = new Handler(Looper.getMainLooper());
-        mStateMachinesThread = new HandlerThread("HeadsetService.StateMachines");
-        mStateMachinesThread.start();
         // Step 3: Initialize system interface
         mSystemInterface = HeadsetObjectsFactory.getInstance().makeSystemInterface(this);
         // Step 4: Initialize native interface
@@ -216,7 +219,6 @@ public class HeadsetService extends ProfileService {
         }
         setHeadsetService(this);
         mMaxHeadsetConnections = mAdapterService.getMaxConnectedAudioDevices();
-        mNativeInterface = HeadsetObjectsFactory.getInstance().getNativeInterface();
         // Add 1 to allow a pending device to be connecting or disconnecting
         mNativeInterface.init(mMaxHeadsetConnections + 1, isInbandRingingEnabled());
         if (Flags.hfpCodecAptxVoice()) {
@@ -225,12 +227,6 @@ public class HeadsetService extends ProfileService {
                     mIsAptXSwbEnabled,
                     mActiveDevice);
         }
-        // Step 5: Check if state machine table is empty, crash if not
-        if (mStateMachines.size() > 0) {
-            throw new IllegalStateException(
-                    "start(): mStateMachines is not empty, " + mStateMachines.size()
-                            + " is already created. Was stop() called properly?");
-        }
         // Step 6: Setup broadcast receivers
         IntentFilter filter = new IntentFilter();
         filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
@@ -238,21 +234,20 @@ public class HeadsetService extends ProfileService {
         filter.addAction(AudioManager.ACTION_VOLUME_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         registerReceiver(mHeadsetReceiver, filter);
-        // Step 7: Mark service as started
-        mStarted = true;
+    }
+
+    public static boolean isEnabled() {
+        return BluetoothProperties.isProfileHfpAgEnabled().orElse(false);
+    }
+
+    @Override
+    public IProfileServiceBinder initBinder() {
+        return new BluetoothHeadsetBinder(this);
     }
 
     @Override
     public void stop() {
         Log.i(TAG, "stop()");
-        if (!mStarted) {
-            Log.w(TAG, "stop() called before start()");
-            // Still return true because it is considered "stopped" and doesn't have any functional
-            // impact on the user
-            return;
-        }
-        // Step 7: Mark service as stopped
-        mStarted = false;
         // Step 6: Tear down broadcast receivers
         unregisterReceiver(mHeadsetReceiver);
         synchronized (mStateMachines) {
@@ -265,13 +260,11 @@ public class HeadsetService extends ProfileService {
             mVoiceRecognitionStarted = false;
             mVirtualCallStarted = false;
             if (mDialingOutTimeoutEvent != null) {
-                getStateMachinesThreadHandler()
-                        .removeCallbacks(mDialingOutTimeoutEvent);
+                mStateMachinesThreadHandler.removeCallbacks(mDialingOutTimeoutEvent);
                 mDialingOutTimeoutEvent = null;
             }
             if (mVoiceRecognitionTimeoutEvent != null) {
-                getStateMachinesThreadHandler()
-                        .removeCallbacks(mVoiceRecognitionTimeoutEvent);
+                mStateMachinesThreadHandler.removeCallbacks(mVoiceRecognitionTimeoutEvent);
                 mVoiceRecognitionTimeoutEvent = null;
                 if (mSystemInterface.getVoiceRecognitionWakeLock().isHeld()) {
                     mSystemInterface.getVoiceRecognitionWakeLock().release();
@@ -289,26 +282,19 @@ public class HeadsetService extends ProfileService {
         // Step 3: Destroy system interface
         mSystemInterface.stop();
         // Step 2: Stop handler thread
-        try {
-            mStateMachinesThread.quitSafely();
-            mStateMachinesThread.join(SM_THREAD_JOIN_TIMEOUT_MS);
-            mStateMachinesThread = null;
-        } catch (InterruptedException e) {
-            // Do not rethrow as we are shutting down anyway
+        if (mStateMachinesThread != null) {
+            try {
+                mStateMachinesThread.quitSafely();
+                mStateMachinesThread.join(SM_THREAD_JOIN_TIMEOUT_MS);
+            } catch (InterruptedException e) {
+                // Do not rethrow as we are shutting down anyway
+            }
         }
-
-        mStateMachinesThreadHandler = null;
 
         // Unregister Handler and stop all queued messages.
-        if (mHandler != null) {
-            mHandler.removeCallbacksAndMessages(null);
-            mHandler = null;
-        }
+        mHandler.removeCallbacksAndMessages(null);
 
         // Step 1: Clear
-        synchronized (mStateMachines) {
-            mAdapterService = null;
-        }
         setComponentAvailable(HFP_AG_IN_CALL_SERVICE, false);
     }
 
@@ -323,7 +309,7 @@ public class HeadsetService extends ProfileService {
      * @return True if the object can accept binder calls, False otherwise
      */
     public boolean isAlive() {
-        return isAvailable() && mStarted;
+        return isAvailable();
     }
 
     /**
@@ -393,10 +379,15 @@ public class HeadsetService extends ProfileService {
                     case HeadsetHalConstants.CONNECTION_STATE_CONNECTING: {
                         // Create new state machine if none is found
                         if (stateMachine == null) {
-                            stateMachine = HeadsetObjectsFactory.getInstance()
-                                    .makeStateMachine(stackEvent.device,
-                                            mStateMachinesThread.getLooper(), this, mAdapterService,
-                                            mNativeInterface, mSystemInterface);
+                                stateMachine =
+                                        HeadsetObjectsFactory.getInstance()
+                                                .makeStateMachine(
+                                                        stackEvent.device,
+                                                        mStateMachinesLooper,
+                                                        this,
+                                                        mAdapterService,
+                                                        mNativeInterface,
+                                                        mSystemInterface);
                             mStateMachines.put(stackEvent.device, stateMachine);
                         }
                         break;
@@ -897,9 +888,15 @@ public class HeadsetService extends ProfileService {
             Log.i(TAG, "connect: device=" + device + ", " + Utils.getUidPidString());
             HeadsetStateMachine stateMachine = mStateMachines.get(device);
             if (stateMachine == null) {
-                stateMachine = HeadsetObjectsFactory.getInstance()
-                        .makeStateMachine(device, mStateMachinesThread.getLooper(), this,
-                                mAdapterService, mNativeInterface, mSystemInterface);
+                stateMachine =
+                        HeadsetObjectsFactory.getInstance()
+                                .makeStateMachine(
+                                        device,
+                                        mStateMachinesLooper,
+                                        this,
+                                        mAdapterService,
+                                        mNativeInterface,
+                                        mSystemInterface);
                 mStateMachines.put(device, stateMachine);
             }
             int connectionState = stateMachine.getConnectionState();
@@ -980,7 +977,7 @@ public class HeadsetService extends ProfileService {
     public List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
         ArrayList<BluetoothDevice> devices = new ArrayList<>();
         synchronized (mStateMachines) {
-            if (states == null || mAdapterService == null) {
+            if (states == null) {
                 return devices;
             }
             final BluetoothDevice[] bondedDevices = mAdapterService.getBondedDevices();
@@ -1111,7 +1108,7 @@ public class HeadsetService extends ProfileService {
                             + ", fall back to requesting device");
                     device = mVoiceRecognitionTimeoutEvent.mVoiceRecognitionDevice;
                 }
-                getStateMachinesThreadHandler().removeCallbacks(mVoiceRecognitionTimeoutEvent);
+                mStateMachinesThreadHandler.removeCallbacks(mVoiceRecognitionTimeoutEvent);
                 mVoiceRecognitionTimeoutEvent = null;
                 if (mSystemInterface.getVoiceRecognitionWakeLock().isHeld()) {
                     mSystemInterface.getVoiceRecognitionWakeLock().release();
@@ -1339,6 +1336,10 @@ public class HeadsetService extends ProfileService {
      */
     private void removeActiveDevice() {
         synchronized (mStateMachines) {
+            if (mActiveDevice == null) {
+              Log.w(TAG, "removeActiveDevice: Already active device set to null.");
+              return;
+            }
             // As per b/202602952, if we remove the active device due to a disconnection,
             // we need to check if another device is connected and set it active instead.
             // Calling this before any other active related calls has the same effect as
@@ -1740,10 +1741,6 @@ public class HeadsetService extends ProfileService {
     public boolean dialOutgoingCall(BluetoothDevice fromDevice, String dialNumber) {
         synchronized (mStateMachines) {
             Log.i(TAG, "dialOutgoingCall: from " + fromDevice);
-            if (!isOnStateMachineThread()) {
-                Log.e(TAG, "dialOutgoingCall must be called from state machine thread");
-                return false;
-            }
             if (mDialingOutTimeoutEvent != null) {
                 Log.e(TAG, "dialOutgoingCall, already dialing by " + mDialingOutTimeoutEvent);
                 return false;
@@ -1770,8 +1767,8 @@ public class HeadsetService extends ProfileService {
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
             mDialingOutTimeoutEvent = new DialingOutTimeoutEvent(fromDevice);
-            getStateMachinesThreadHandler()
-                    .postDelayed(mDialingOutTimeoutEvent, DIALING_OUT_TIMEOUT_MS);
+            mStateMachinesThreadHandler.postDelayed(
+                    mDialingOutTimeoutEvent, DIALING_OUT_TIMEOUT_MS);
             return true;
         }
     }
@@ -1866,8 +1863,8 @@ public class HeadsetService extends ProfileService {
                 return false;
             }
             mVoiceRecognitionTimeoutEvent = new VoiceRecognitionTimeoutEvent(fromDevice);
-            getStateMachinesThreadHandler()
-                    .postDelayed(mVoiceRecognitionTimeoutEvent, sStartVrTimeoutMs);
+            mStateMachinesThreadHandler.postDelayed(
+                    mVoiceRecognitionTimeoutEvent, sStartVrTimeoutMs);
 
             if (!mSystemInterface.getVoiceRecognitionWakeLock().isHeld()) {
                 mSystemInterface.getVoiceRecognitionWakeLock().acquire(sStartVrTimeoutMs);
@@ -1896,8 +1893,7 @@ public class HeadsetService extends ProfileService {
                 if (mSystemInterface.getVoiceRecognitionWakeLock().isHeld()) {
                     mSystemInterface.getVoiceRecognitionWakeLock().release();
                 }
-                getStateMachinesThreadHandler()
-                        .removeCallbacks(mVoiceRecognitionTimeoutEvent);
+                mStateMachinesThreadHandler.removeCallbacks(mVoiceRecognitionTimeoutEvent);
 
                 mVoiceRecognitionTimeoutEvent = null;
             }
@@ -1953,8 +1949,7 @@ public class HeadsetService extends ProfileService {
             if (mDialingOutTimeoutEvent != null) {
                 // Send result to state machine when dialing starts
                 if (callState == HeadsetHalConstants.CALL_STATE_DIALING) {
-                    getStateMachinesThreadHandler()
-                            .removeCallbacks(mDialingOutTimeoutEvent);
+                    mStateMachinesThreadHandler.removeCallbacks(mDialingOutTimeoutEvent);
                     doForStateMachine(mDialingOutTimeoutEvent.mDialingOutDevice,
                             stateMachine -> stateMachine.sendMessage(
                                     HeadsetStateMachine.DIALING_OUT_RESULT, 1 /* success */, 0,
@@ -1962,14 +1957,13 @@ public class HeadsetService extends ProfileService {
                 } else if (callState == HeadsetHalConstants.CALL_STATE_ACTIVE
                         || callState == HeadsetHalConstants.CALL_STATE_IDLE) {
                     // Clear the timeout event when the call is connected or disconnected
-                    if (!getStateMachinesThreadHandler()
-                            .hasCallbacks(mDialingOutTimeoutEvent)) {
+                    if (!mStateMachinesThreadHandler.hasCallbacks(mDialingOutTimeoutEvent)) {
                         mDialingOutTimeoutEvent = null;
                     }
                 }
             }
         }
-        getStateMachinesThreadHandler().post(() -> {
+        mStateMachinesThreadHandler.post(() -> {
             boolean isCallIdleBefore = mSystemInterface.isCallIdle();
             mSystemInterface.getHeadsetPhoneState().setNumActiveCall(numActive);
             mSystemInterface.getHeadsetPhoneState().setNumHeldCall(numHeld);
@@ -2036,17 +2030,19 @@ public class HeadsetService extends ProfileService {
                 }
             }
         }
-        getStateMachinesThreadHandler().post(() -> {
-            if (callState == HeadsetHalConstants.CALL_STATE_IDLE
-                && mSystemInterface.isCallIdle() && !isAudioOn()
-                && !Utils.isScoManagedByAudioEnabled()) {
-                // Resume A2DP when call ended and SCO is not connected
-                mSystemInterface.getAudioManager().setA2dpSuspended(false);
-                if (isAtLeastU()) {
-                    mSystemInterface.getAudioManager().setLeAudioSuspended(false);
-                }
-            }
-        });
+        mStateMachinesThreadHandler.post(
+                () -> {
+                    if (callState == HeadsetHalConstants.CALL_STATE_IDLE
+                            && mSystemInterface.isCallIdle()
+                            && !isAudioOn()
+                            && !Utils.isScoManagedByAudioEnabled()) {
+                        // Resume A2DP when call ended and SCO is not connected
+                        mSystemInterface.getAudioManager().setA2dpSuspended(false);
+                        if (isAtLeastU()) {
+                            mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                        }
+                    }
+                });
         if (callState == HeadsetHalConstants.CALL_STATE_IDLE) {
             final HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
             if (stateMachine == null) {
@@ -2252,16 +2248,36 @@ public class HeadsetService extends ProfileService {
     }
 
     public boolean isInCall() {
-         boolean isCallOngoing = mSystemInterface.isInCall();
-         Log.d(TAG," isInCall " + isCallOngoing);
-         return isCallOngoing;
-     }
+        boolean isCallOngoing = mSystemInterface.isInCall();
+        Log.d(TAG," isInCall " + isCallOngoing);
+        return isCallOngoing;
+    }
 
-     public boolean isRinging() {
-         boolean isRingOngoing = mSystemInterface.isRinging();
-         Log.d(TAG," isRinging " + isRingOngoing);
-         return isRingOngoing;
-     }
+    public boolean isRinging() {
+        boolean isRingOngoing = mSystemInterface.isRinging();
+        Log.d(TAG," isRinging " + isRingOngoing);
+        return isRingOngoing;
+    }
+
+    /**
+     * Check if the device only allows HFP profile as audio profile
+     *
+     * @param device Bluetooth device
+     * @return true if it is a BluetoothDevice with only HFP profile connectable
+     */
+    private boolean isHFPAudioOnly(@NonNull BluetoothDevice device) {
+        int hfpPolicy =
+                mDatabaseManager.getProfileConnectionPolicy(device, BluetoothProfile.HEADSET);
+        int a2dpPolicy = mDatabaseManager.getProfileConnectionPolicy(device, BluetoothProfile.A2DP);
+        int leAudioPolicy =
+                mDatabaseManager.getProfileConnectionPolicy(device, BluetoothProfile.LE_AUDIO);
+        int ashaPolicy =
+                mDatabaseManager.getProfileConnectionPolicy(device, BluetoothProfile.HEARING_AID);
+        return hfpPolicy == BluetoothProfile.CONNECTION_POLICY_ALLOWED
+                && a2dpPolicy != BluetoothProfile.CONNECTION_POLICY_ALLOWED
+                && leAudioPolicy != BluetoothProfile.CONNECTION_POLICY_ALLOWED
+                && ashaPolicy != BluetoothProfile.CONNECTION_POLICY_ALLOWED;
+    }
 
     private boolean shouldCallAudioBeActive() {
         return mSystemInterface.isInCall() || (mSystemInterface.isRinging()
@@ -2324,10 +2340,28 @@ public class HeadsetService extends ProfileService {
                 // co-existence see {@link LeAudioService#setInactiveForHfpHandover}
                 if (Flags.leaudioResumeActiveAfterHfpHandover()) {
                     LeAudioService leAudioService = mFactory.getLeAudioService();
-                    if (leAudioService != null
+                    if (!Flags.keepHfpActiveDuringLeaudioHandover()
+                            && leAudioService != null
                             && !leAudioService.getConnectedDevices().isEmpty()
                             && leAudioService.getActiveDevices().get(0) == null) {
                         leAudioService.setActiveAfterHfpHandover();
+                    }
+
+                    // usually controller limitation cause CONNECTING -> DISCONNECTED, so only
+                    // resume LE audio active device if it is HFP audio only and SCO disconnected
+                    Log.v(
+                            TAG,
+                            "keep HFP active during handover: isHFPAudioOnly="
+                                    + isHFPAudioOnly(device));
+                    if (Flags.keepHfpActiveDuringLeaudioHandover()
+                            && fromState != BluetoothHeadset.STATE_AUDIO_CONNECTING
+                            && isHFPAudioOnly(device)) {
+
+                        if (leAudioService != null
+                                && !leAudioService.getConnectedDevices().isEmpty()
+                                && leAudioService.getActiveDevices().get(0) == null) {
+                            leAudioService.setActiveAfterHfpHandover();
+                        }
                     }
                 }
 
@@ -2468,11 +2502,6 @@ public class HeadsetService extends ProfileService {
         }
     }
 
-    private boolean isOnStateMachineThread() {
-        final Looper myLooper = Looper.myLooper();
-        return myLooper != null && (mStateMachinesThread != null) && (myLooper.getThread().getId()
-                == mStateMachinesThread.getId());
-    }
 
     /**
      * Retrieves the most recently connected device in the A2DP connected devices list.
@@ -2529,7 +2558,6 @@ public class HeadsetService extends ProfileService {
             ProfileService.println(sb, "mVirtualCallStarted: " + mVirtualCallStarted);
             ProfileService.println(sb, "mDialingOutTimeoutEvent: " + mDialingOutTimeoutEvent);
             ProfileService.println(sb, "mForceScoAudio: " + mForceScoAudio);
-            ProfileService.println(sb, "mStarted: " + mStarted);
             ProfileService.println(sb, "AudioManager.isBluetoothScoOn(): " + isScoOn);
             ProfileService.println(sb, "Telecom.isInCall(): " + mSystemInterface.isInCall());
             ProfileService.println(sb, "Telecom.isRinging(): " + mSystemInterface.isRinging());
@@ -2562,12 +2590,5 @@ public class HeadsetService extends ProfileService {
 
     private static void logD(String message) {
         Log.d(TAG, message);
-    }
-
-    private Handler getStateMachinesThreadHandler() {
-        if (mStateMachinesThreadHandler == null) {
-            mStateMachinesThreadHandler = new Handler(mStateMachinesThread.getLooper());
-        }
-        return mStateMachinesThreadHandler;
     }
 }

@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #ifndef BTIF_STORAGE_H
@@ -339,6 +343,28 @@ void btif_storage_remove_leaudio_has(const RawAddress& address);
 /** Set/Unset the HAS device acceptlist flag. */
 void btif_storage_set_leaudio_has_acceptlist(const RawAddress& address,
                                              bool add_to_acceptlist);
+
+/* Set Encrypted Data Key Material CCCD value for remote client */
+void btif_storage_set_encr_data_cccd(const RawAddress& bd_addr, uint8_t cccd);
+
+/* Get Encrypted Data Key Material CCCD value for remote client */
+uint8_t btif_storage_get_encr_data_cccd(const RawAddress& bd_addr);
+
+/** Store encryption key material char value of remote server */
+void btif_storage_set_enc_key_material(const RawAddress& remote_bd_addr,
+                                       uint8_t* key, size_t key_length);
+
+/** Get encryption key material char value of remote server */
+bt_status_t btif_storage_get_enc_key_material(const RawAddress* remote_bd_addr,
+                                              uint8_t* key_value,
+                                              size_t* key_length);
+
+/** Get encryption key material length of remote server */
+size_t btif_storage_get_enc_key_material_length(
+    const RawAddress* remote_bd_addr);
+
+/** Remove encryption key material char value of remote server */
+void btif_storage_remove_enc_key_material(const RawAddress* remote_bd_addr);
 
 /*******************************************************************************
  *

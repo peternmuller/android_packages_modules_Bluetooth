@@ -16,9 +16,7 @@
 
 #include "hci/hci_layer.h"
 
-#ifdef TARGET_FLOSS
 #include <signal.h>
-#endif
 #include <bluetooth/log.h>
 
 #include <map>
@@ -33,9 +31,12 @@
 #include "os/alarm.h"
 #include "os/metrics.h"
 #include "os/queue.h"
+#include "osi/include/properties.h"
 #include "osi/include/stack_power_telemetry.h"
 #include "packet/raw_builder.h"
 #include "storage/storage_module.h"
+
+#define SIGKILL 9
 
 namespace bluetooth {
 namespace hci {
@@ -67,7 +68,8 @@ static void fail_if_reset_complete_not_success(CommandCompleteView complete) {
 }
 
 static void abort_after_time_out(OpCode op_code) {
-  log::fatal("Done waiting for debug information after HCI timeout ({})", OpCodeText(op_code));
+  log::warn("Done waiting for debug information after HCI timeout ({})", OpCodeText(op_code));
+  kill(getpid(), SIGKILL);
 }
 
 class CommandQueueEntry {
@@ -112,6 +114,9 @@ class CommandQueueEntry {
 struct HciLayer::impl {
   impl(hal::HciHal* hal, HciLayer& module) : hal_(hal), module_(module) {
     hci_timeout_alarm_ = new Alarm(module.GetHandler());
+
+    hal_test_supported = osi_property_get_bool("persist.vendor.bluetooth.haltest", false);
+    log::warn("hal_test_supported: {}", hal_test_supported);
   }
 
   ~impl() {
@@ -346,18 +351,32 @@ struct HciLayer::impl {
 
   void register_le_event(SubeventCode event, ContextualCallback<void(LeMetaEventView)> handler) {
     log::assert_that(
-        subevent_handlers_.count(event) == 0,
+        le_event_handlers_.count(event) == 0,
         "Can not register a second handler for {}",
         SubeventCodeText(event));
-    subevent_handlers_[event] = handler;
+    le_event_handlers_[event] = handler;
   }
 
   void unregister_le_event(SubeventCode event) {
-    subevent_handlers_.erase(subevent_handlers_.find(event));
+    le_event_handlers_.erase(le_event_handlers_.find(event));
+  }
+
+  void register_vs_event(
+      VseSubeventCode event, ContextualCallback<void(VendorSpecificEventView)> handler) {
+    log::assert_that(
+        vs_event_handlers_.count(event) == 0,
+        "Can not register a second handler for {}",
+        VseSubeventCodeText(event));
+    vs_event_handlers_[event] = handler;
+  }
+
+  void unregister_vs_event(VseSubeventCode event) {
+    vs_event_handlers_.erase(vs_event_handlers_.find(event));
   }
 
   static void abort_after_root_inflammation(uint8_t vse_error) {
-    log::fatal("Root inflammation with reason 0x{:02x}", vse_error);
+    log::warn("Root inflammation with reason 0x{:02x}", vse_error);
+    kill(getpid(), SIGKILL);
   }
 
   void handle_root_inflammation(uint8_t vse_error_reason) {
@@ -389,23 +408,41 @@ struct HciLayer::impl {
         auto view = CommandCompleteView::Create(event);
         log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
         auto op_code = view.GetCommandOpCode();
-        log::assert_that(
-            op_code == OpCode::NONE,
-            "Received {} event with OpCode {} without a waiting command(is the HAL "
-            "sending commands, but not handling the events?)",
-            EventCodeText(event_code),
-            OpCodeText(op_code));
+        if (hal_test_supported && op_code != OpCode::NONE) {
+          log::warn(
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+          return;
+        } else {
+          log::assert_that(
+              op_code == OpCode::NONE,
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+        }
       }
       if (event_code == EventCode::COMMAND_STATUS) {
         auto view = CommandStatusView::Create(event);
         log::assert_that(view.IsValid(), "assert failed: view.IsValid()");
         auto op_code = view.GetCommandOpCode();
-        log::assert_that(
-            op_code == OpCode::NONE,
-            "Received {} event with OpCode {} without a waiting command(is the HAL "
-            "sending commands, but not handling the events?)",
-            EventCodeText(event_code),
-            OpCodeText(op_code));
+        if (hal_test_supported && op_code != OpCode::NONE) {
+          log::warn(
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+          return;
+        } else {
+          log::assert_that(
+              op_code == OpCode::NONE,
+              "Received {} event with OpCode {} without a waiting command(is the HAL "
+              "sending commands, but not handling the events?)",
+              EventCodeText(event_code),
+              OpCodeText(op_code));
+        }
       }
       std::unique_ptr<CommandView> no_waiting_command{nullptr};
       log_hci_event(no_waiting_command, event, module_.GetDependency<storage::StorageModule>());
@@ -440,6 +477,9 @@ struct HciLayer::impl {
       case EventCode::HARDWARE_ERROR:
         on_hardware_error(event);
         break;
+      case EventCode::VENDOR_SPECIFIC:
+        on_vs_event(event);
+        break;
       default:
         if (event_handlers_.find(event_code) == event_handlers_.end()) {
           log::warn("Unhandled event of type {}", EventCodeText(event_code));
@@ -459,7 +499,8 @@ struct HciLayer::impl {
     // error state of the BT controller.
     kill(getpid(), SIGINT);
 #else
-    log::fatal("Hardware Error Event with code 0x{:02x}", event_view.GetHardwareCode());
+    log::warn("Hardware Error Event with code 0x{:02x}", event_view.GetHardwareCode());
+    kill(getpid(), SIGKILL);
 #endif
   }
 
@@ -467,21 +508,35 @@ struct HciLayer::impl {
     LeMetaEventView meta_event_view = LeMetaEventView::Create(event);
     log::assert_that(meta_event_view.IsValid(), "assert failed: meta_event_view.IsValid()");
     SubeventCode subevent_code = meta_event_view.GetSubeventCode();
-    if (subevent_handlers_.find(subevent_code) == subevent_handlers_.end()) {
+    if (le_event_handlers_.find(subevent_code) == le_event_handlers_.end()) {
       log::warn("Unhandled le subevent of type {}", SubeventCodeText(subevent_code));
       return;
     }
-    subevent_handlers_[subevent_code](meta_event_view);
+    le_event_handlers_[subevent_code](meta_event_view);
+  }
+
+  void on_vs_event(EventView event) {
+    VendorSpecificEventView vs_event_view = VendorSpecificEventView::Create(event);
+    log::assert_that(vs_event_view.IsValid(), "assert failed: vs_event_view.IsValid()");
+    VseSubeventCode subevent_code = vs_event_view.GetSubeventCode();
+    if (vs_event_handlers_.find(subevent_code) == vs_event_handlers_.end()) {
+      log::warn("Unhandled vendor specific event of type {}", VseSubeventCodeText(subevent_code));
+      return;
+    }
+    vs_event_handlers_[subevent_code](vs_event_view);
   }
 
   hal::HciHal* hal_;
   HciLayer& module_;
+  bool hal_test_supported;
 
   // Command Handling
   std::list<CommandQueueEntry> command_queue_;
 
   std::map<EventCode, ContextualCallback<void(EventView)>> event_handlers_;
-  std::map<SubeventCode, ContextualCallback<void(LeMetaEventView)>> subevent_handlers_;
+  std::map<SubeventCode, ContextualCallback<void(LeMetaEventView)>> le_event_handlers_;
+  std::map<VseSubeventCode, ContextualCallback<void(VendorSpecificEventView)>> vs_event_handlers_;
+
   OpCode waiting_command_{OpCode::NONE};
   uint8_t command_credits_{1};  // Send reset first
   Alarm* hci_timeout_alarm_{nullptr};
@@ -579,6 +634,15 @@ void HciLayer::RegisterLeEventHandler(SubeventCode event, ContextualCallback<voi
 
 void HciLayer::UnregisterLeEventHandler(SubeventCode event) {
   CallOn(impl_, &impl::unregister_le_event, event);
+}
+
+void HciLayer::RegisterVendorSpecificEventHandler(
+    VseSubeventCode event, ContextualCallback<void(VendorSpecificEventView)> handler) {
+  CallOn(impl_, &impl::register_vs_event, event, handler);
+}
+
+void HciLayer::UnregisterVendorSpecificEventHandler(VseSubeventCode event) {
+  CallOn(impl_, &impl::unregister_vs_event, event);
 }
 
 void HciLayer::on_disconnection_complete(EventView event_view) {

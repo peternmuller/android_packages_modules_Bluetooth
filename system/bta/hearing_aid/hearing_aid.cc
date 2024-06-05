@@ -21,11 +21,11 @@
 
 #define LOG_TAG "bluetooth"
 
-#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/functional/callback.h>
 #include <base/strings/string_number_conversions.h>  // HexEncode
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <chrono>
 #include <cstdint>
@@ -53,6 +53,7 @@
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/l2c_api.h"  // L2CAP_MIN_OFFSET
+#include "stack/include/main_thread.h"
 #include "types/bluetooth/uuid.h"
 #include "types/bt_transport.h"
 #include "types/raw_address.h"
@@ -364,7 +365,7 @@ class HearingAidImpl : public HearingAid {
   // Reset and configure the ASHA resampling context using the input device
   // devices as reference for the BT clock estimation.
   void ConfigureAsrc() {
-    if (!IS_FLAG_ENABLED(asha_asrc)) {
+    if (!com::android::bluetooth::flags::asha_asrc()) {
       log::info("Asha resampling disabled: feature flag off");
       return;
     }
@@ -373,6 +374,7 @@ class HearingAidImpl : public HearingAid {
     if (asrc == nullptr) {
       log::info("Configuring Asha resampler");
       asrc = std::make_unique<bluetooth::audio::asrc::SourceAudioHalAsrc>(
+          /*thread*/ get_main_thread(),
           /*channels*/ 2,
           /*sample_rate*/ codec_in_use == CODEC_G722_24KHZ ? 24000 : 16000,
           /*bit_depth*/ 16,
@@ -1178,6 +1180,7 @@ class HearingAidImpl : public HearingAid {
   }
 
   void OnAudioSuspend(const std::function<void()>& stop_audio_ticks) {
+    log::info("");
     log::assert_that((bool)stop_audio_ticks, "stop_audio_ticks is empty");
 
     if (!audio_running) {
@@ -1211,6 +1214,7 @@ class HearingAidImpl : public HearingAid {
   }
 
   void OnAudioResume(const std::function<void()>& start_audio_ticks) {
+    log::info("");
     log::assert_that((bool)start_audio_ticks, "start_audio_ticks is empty");
 
     if (audio_running) {
@@ -1436,7 +1440,7 @@ class HearingAidImpl : public HearingAid {
     }
 
     uint16_t l2cap_flush_threshold = 0;
-    if (IS_FLAG_ENABLED(higher_l2cap_flush_threshold)) {
+    if (com::android::bluetooth::flags::higher_l2cap_flush_threshold()) {
       l2cap_flush_threshold = 1;
     }
 
@@ -1448,7 +1452,7 @@ class HearingAidImpl : public HearingAid {
     // to the number of credits specified for the ASHA l2cap streaming
     // channel. This will ensure it is only triggered in case of
     // critical failure.
-    if (IS_FLAG_ENABLED(asha_asrc)) {
+    if (com::android::bluetooth::flags::asha_asrc()) {
       l2cap_flush_threshold = 8;
     }
 

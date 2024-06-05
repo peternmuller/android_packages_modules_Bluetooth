@@ -14,10 +14,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 #include <string.h>
 
 #include "gap_api.h"
@@ -26,6 +30,7 @@
 #include "l2c_api.h"
 #include "l2cdefs.h"
 #include "main/shim/entry.h"
+#include "main/shim/le_advertising_manager.h"
 #include "osi/include/allocator.h"
 #include "osi/include/fixed_queue.h"
 #include "osi/include/mutex.h"
@@ -319,7 +324,10 @@ uint16_t GAP_ConnClose(uint16_t gap_handle) {
     /* Check if we have a connection ID */
     if (p_ccb->con_state != GAP_CCB_STATE_LISTENING) {
       if (p_ccb->transport == BT_TRANSPORT_LE) {
-        L2CA_DisconnectLECocReq(p_ccb->connection_id);
+        if (!L2CA_DisconnectLECocReq(p_ccb->connection_id)) {
+          log::warn("Unable to request L2CAP disconnect le_coc peer:{} cid:{}",
+                    p_ccb->rem_dev_address, p_ccb->connection_id);
+        }
       } else {
         L2CA_DisconnectReq(p_ccb->connection_id);
       }
@@ -601,7 +609,10 @@ static void gap_connect_ind(const RawAddress& bd_addr, uint16_t l2cap_cid,
 
     /* Disconnect because it is an unexpected connection */
     if (BTM_UseLeLink(bd_addr)) {
-      L2CA_DisconnectLECocReq(l2cap_cid);
+      if (!L2CA_DisconnectLECocReq(l2cap_cid)) {
+        log::warn("Unable to request L2CAP disconnect le_coc peer:{} cid:{}",
+                  bd_addr, l2cap_cid);
+      }
     } else {
       L2CA_DisconnectReq(l2cap_cid);
     }
@@ -644,7 +655,7 @@ static void gap_checks_con_flags(tGAP_CCB* p_ccb) {
     tGAP_CB_DATA* cb_data_ptr = nullptr;
     tGAP_CB_DATA cb_data;
     uint16_t l2cap_remote_cid;
-    if (IS_FLAG_ENABLED(bt_socket_api_l2cap_cid) &&
+    if (com::android::bluetooth::flags::bt_socket_api_l2cap_cid() &&
         L2CA_GetPeerChannelId(p_ccb->connection_id, &l2cap_remote_cid)) {
       cb_data.l2cap_cids.local_cid = p_ccb->connection_id;
       cb_data.l2cap_cids.remote_cid = l2cap_remote_cid;
@@ -998,4 +1009,12 @@ void gap_attr_db_init(void);
 void GAP_Init(void) {
   gap_conn_init();
   gap_attr_db_init();
+
+  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    bluetooth::shim::EncKeyMaterialInterface* enc_key_material_instance;
+    bluetooth::shim::init_enc_key_material_manager();
+    enc_key_material_instance =
+        bluetooth::shim::get_enc_key_material_instance();
+    enc_key_material_instance->GetEncKeyMaterial();
+  }
 }

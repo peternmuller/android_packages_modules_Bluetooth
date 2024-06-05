@@ -17,11 +17,11 @@
 
 #include "state_machine.h"
 
-#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/functional/callback.h>
 #include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include "bta_gatt_queue.h"
 #include "btm_iso_api.h"
@@ -522,7 +522,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
   void notifyLeAudioHealth(
       LeAudioDeviceGroup* group,
       bluetooth::le_audio::LeAudioHealthGroupStatType stat) {
-    if (!IS_FLAG_ENABLED(leaudio_enable_health_based_actions)) {
+    if (!com::android::bluetooth::flags::
+            leaudio_enable_health_based_actions()) {
       return;
     }
 
@@ -854,7 +855,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    if (IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+    if (com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
       if (group->dsa_.active &&
           (group->dsa_.mode == DsaMode::ISO_SW ||
            group->dsa_.mode == DsaMode::ISO_HW) &&
@@ -942,7 +943,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         ases_pair.source->cis_state = CisState::DISCONNECTING;
         do_disconnect = true;
       }
-    } else if (IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+    } else if (com::android::bluetooth::flags::
+                   leaudio_dynamic_spatial_audio()) {
       if (group->dsa_.active &&
           leAudioDevice->GetDsaDataPathState() == DataPathState::REMOVING) {
         log::info("DSA data path removed");
@@ -1040,6 +1042,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     group->ReloadAudioDirections();
     group->UpdateAudioContextAvailability();
     group->InvalidateCachedConfigurations();
+    group->InvalidateGroupStrategy();
 
     /* If group is in Idle and not transitioning, update the current group
      * audio context availability which could change due to disconnected group
@@ -1111,7 +1114,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void applyDsaDataPath(LeAudioDeviceGroup* group, LeAudioDevice* leAudioDevice,
                         uint16_t conn_hdl) {
-    if (!IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+    if (!com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
       return;
     }
 
@@ -1336,7 +1339,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       value |= bluetooth::hci::iso_manager::kRemoveIsoDataPathDirectionOutput;
       ases_pair.source->data_path_state = DataPathState::REMOVING;
     } else {
-      if (IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+      if (com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
         if (leAudioDevice->GetDsaDataPathState() == DataPathState::CONFIGURED) {
           value |=
               bluetooth::hci::iso_manager::kRemoveIsoDataPathDirectionOutput;
@@ -1668,7 +1671,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void ApplyDsaParams(LeAudioDeviceGroup* group,
                       bluetooth::hci::iso_manager::cig_create_params& param) {
-    if (!IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+    if (!com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
       return;
     }
 
@@ -2269,7 +2272,13 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       conf.target_latency = ase->target_latency;
       conf.target_phy = group->GetTargetPhy(ase->direction);
       conf.codec_id = ase->codec_id;
-      conf.codec_config = ase->codec_config.RawPacket();
+
+      if (!ase->vendor_codec_config.empty()) {
+        log::debug("Using vendor codec configuration.");
+        conf.codec_config = ase->vendor_codec_config;
+      } else {
+        conf.codec_config = ase->codec_config.RawPacket();
+      }
       confs.push_back(conf);
 
       msg_stream << "ASE_ID " << +conf.ase_id << ",";
@@ -2347,6 +2356,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         log::debug( "Using server preferred Phy: {}", out_cfg.phy);
       }
     };
+
+    log::debug("ase state: {}", static_cast<int>(ase->state));
 
     /* ase contain current ASE state. New state is in "arh" */
     switch (ase->state) {
@@ -2554,6 +2565,12 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
+        if (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
+          log::info("Cancel watchdog");
+          cancel_watchdog_if_needed(group->group_id_);
+          return;
+        }
+
         log::info("Autonomous change, from: {} to {}",
                   ToString(group->GetState()),
                   ToString(group->GetTargetState()));
@@ -2653,6 +2670,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
       return;
     }
+
+    log::debug("ase state: {}", static_cast<int>(ase->state));
 
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED: {
@@ -3152,6 +3171,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED:
         SetAseState(leAudioDevice, ase,
@@ -3226,6 +3247,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
       return;
     }
+
+    log::debug("ase state: {}", static_cast<int>(ase->state));
 
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_QOS_CONFIGURED:
@@ -3351,6 +3374,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
         /* TODO: Disable */
@@ -3423,6 +3448,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
+    log::debug("ase state: {}", static_cast<int>(ase->state));
+
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_DISABLING:
       case AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED:
@@ -3448,9 +3475,15 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         bool remove_cig = true;
 
+        log::debug("cis_state: {}", static_cast<int>(ase->cis_state));
+        log::debug("data_path_state: {}", static_cast<int>(ase->data_path_state));
+
         /* Happens when bi-directional completive ASE releasing state came */
         if (ase->cis_state == CisState::DISCONNECTING) break;
-        if ((ase->cis_state == CisState::CONNECTED ||
+
+        if (ase->data_path_state == DataPathState::CONFIGURED) {
+          RemoveDataPathByCisHandle(leAudioDevice, ase->cis_conn_hdl);
+        } else if ((ase->cis_state == CisState::CONNECTED ||
              ase->cis_state == CisState::CONNECTING) &&
             ase->data_path_state == DataPathState::IDLE) {
           DisconnectCisIfNeeded(group, leAudioDevice, ase);
@@ -3474,6 +3507,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       case AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING: {
         SetAseState(leAudioDevice, ase,
                     AseState::BTA_LE_AUDIO_ASE_STATE_RELEASING);
+
+        log::debug("cis_state: {}", static_cast<int>(ase->cis_state));
+        log::debug("data_path_state: {}", static_cast<int>(ase->data_path_state));
 
         /* Happens when bi-directional completive ASE releasing state came */
         if (ase->cis_state == CisState::DISCONNECTING) break;

@@ -15,8 +15,8 @@
  */
 #include "hci/distance_measurement_manager.h"
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 #include <math.h>
 
 #include <complex>
@@ -56,13 +56,13 @@ static constexpr uint8_t kMode0Steps =
     0x03;  // Maximum number of mode-0 steps to increase success subevent rate
 static constexpr uint8_t kChannelMapRepetition = 0x01;  // No repetition
 static constexpr uint8_t kCh3cJump = 0x03;              // Skip 3 Channels
-static constexpr uint16_t kMaxProcedureLen = 0xFFFF;    // 40.959375s
+static constexpr uint16_t kMaxProcedureLen = 0x4E20;    // 12.5s
 static constexpr uint16_t kMinProcedureInterval = 0x01;
 static constexpr uint16_t kMaxProcedureInterval = 0xFF;
 static constexpr uint16_t kMaxProcedureCount = 0x01;
 static constexpr uint32_t kMinSubeventLen = 0x0004E2;         // 1250us
 static constexpr uint32_t kMaxSubeventLen = 0x3d0900;         // 4s
-static constexpr uint8_t kToneAntennaConfigSelection = 0x07;  // 2x2
+static constexpr uint8_t kToneAntennaConfigSelection = 0x00;  // 1x1
 static constexpr uint8_t kTxPwrDelta = 0x00;
 static constexpr uint8_t kProcedureDataBufferSize = 0x10;  // Buffer size of Procedure data
 static constexpr uint16_t kMtuForRasData = 507;            // 512 - 5
@@ -142,7 +142,7 @@ struct DistanceMeasurementManager::impl {
     hci_layer_->RegisterLeEventHandler(
         hci::SubeventCode::TRANSMIT_POWER_REPORTING,
         handler_->BindOn(this, &impl::on_transmit_power_reporting));
-    if (!IS_FLAG_ENABLED(channel_sounding_in_stack)) {
+    if (!com::android::bluetooth::flags::channel_sounding_in_stack()) {
       log::info("IS_FLAG_ENABLED channel_sounding_in_stack: false");
       return;
     }
@@ -201,7 +201,7 @@ struct DistanceMeasurementManager::impl {
   void start_distance_measurement_with_cs(
       const Address& cs_remote_address, uint16_t connection_handle, uint16_t interval) {
     log::info("connection_handle: {}, address: {}", connection_handle, cs_remote_address);
-    if (!IS_FLAG_ENABLED(channel_sounding_in_stack)) {
+    if (!com::android::bluetooth::flags::channel_sounding_in_stack()) {
       log::error("Channel Sounding is not enabled");
       distance_measurement_callbacks_->OnDistanceMeasurementStartFail(
           cs_remote_address, REASON_INTERNAL_ERROR, METHOD_CS);
@@ -774,7 +774,7 @@ struct DistanceMeasurementManager::impl {
     }
   }
 
-  void handle_remote_data(const Address& address, const std::vector<uint8_t> raw_data) {
+  void handle_remote_data(const Address address, const std::vector<uint8_t> raw_data) {
     uint16_t connection_handle = acl_manager_->HACK_GetLeHandle(address);
     log::debug(
         "address:{}, connection_handle 0x{:04x}, size:{}",
@@ -938,7 +938,7 @@ struct DistanceMeasurementManager::impl {
               double i_value = get_iq_value(tone_data.tone_data_[k].i_sample_);
               double q_value = get_iq_value(tone_data.tone_data_[k].q_sample_);
               uint8_t tone_quality_indicator = tone_data.tone_data_[k].tone_quality_indicator_;
-              log::debug(
+              log::verbose(
                   "antenna_path {}, {:f}, {:f}", (uint16_t)(antenna_path + 1), i_value, q_value);
               if (role == CsRole::INITIATOR) {
                 procedure_data->tone_pct_initiator[antenna_path].emplace_back(i_value, q_value);
@@ -1427,7 +1427,7 @@ void DistanceMeasurementManager::StopDistanceMeasurement(
 }
 
 void DistanceMeasurementManager::HandleRemoteData(
-    const Address& address, const std::vector<uint8_t> raw_data) {
+    const Address& address, const std::vector<uint8_t>& raw_data) {
   CallOn(pimpl_.get(), &impl::handle_remote_data, address, raw_data);
 }
 

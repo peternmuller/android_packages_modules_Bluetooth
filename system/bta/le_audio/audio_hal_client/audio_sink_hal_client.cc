@@ -45,7 +45,6 @@ class SinkImpl : public LeAudioSinkAudioHalClient {
              DsaModes dsa_modes) override;
   void Stop();
   size_t SendData(uint8_t* data, uint16_t size) override;
-  void ConfirmSuspendRequest() override;
   void ConfirmStreamingRequest() override;
   void CancelStreamingRequest() override;
   void UpdateRemoteDelay(uint16_t remote_delay_ms) override;
@@ -259,16 +258,6 @@ size_t SinkImpl::SendData(uint8_t* data, uint16_t size) {
   return bytes_written;
 }
 
-void SinkImpl::ConfirmSuspendRequest() {
-  if ((halSourceInterface_ == nullptr) ||
-      (le_audio_source_hal_state != HAL_STARTED)) {
-    log::error("Audio HAL Audio source was not started!");
-    return;
-  }
-
-  halSourceInterface_->ConfirmSuspendRequest();
-}
-
 void SinkImpl::ConfirmStreamingRequest() {
   if ((halSourceInterface_ == nullptr) ||
       (le_audio_source_hal_state != HAL_STARTED)) {
@@ -277,7 +266,7 @@ void SinkImpl::ConfirmStreamingRequest() {
   }
 
   log::info("");
-  if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
+  if (com::android::bluetooth::flags::leaudio_start_stream_race_fix()) {
     halSourceInterface_->ConfirmStreamingRequestV2();
   } else {
     halSourceInterface_->ConfirmStreamingRequest();
@@ -314,7 +303,7 @@ void SinkImpl::CancelStreamingRequest() {
   }
 
   log::info("");
-  if (IS_FLAG_ENABLED(leaudio_start_stream_race_fix)) {
+  if (com::android::bluetooth::flags::leaudio_start_stream_race_fix()) {
     halSourceInterface_->CancelStreamingRequestV2();
   } else {
     halSourceInterface_->CancelStreamingRequest();

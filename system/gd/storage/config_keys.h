@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #pragma once
@@ -58,8 +62,6 @@
 #define BTIF_STORAGE_KEY_HID_DESCRIPTOR "HidDescriptor"
 #define BTIF_STORAGE_KEY_HID_DEVICE_CABLED "HidDeviceCabled"
 #define BTIF_STORAGE_KEY_HID_PRODUCT_ID "HidProductId"
-#define BTIF_STORAGE_KEY_HID_REPORT "HidReport"
-#define BTIF_STORAGE_KEY_HID_REPORT_VERSION "HidReportVersion"
 #define BTIF_STORAGE_KEY_HID_SSR_MAX_LATENCY "HidSSRMaxLatency"
 #define BTIF_STORAGE_KEY_HID_SSR_MIN_TIMEOUT "HidSSRMinTimeout"
 #define BTIF_STORAGE_KEY_HID_SUB_CLASS "HidSubClass"
@@ -67,6 +69,8 @@
 #define BTIF_STORAGE_KEY_HID_VERSION "HidVersion"
 #define BTIF_STORAGE_KEY_HID_DB_VERSION "HidDbVersion"
 #define BTIF_STORAGE_KEY_HID_RECONNECT_ALLOWED "HidReConnectAllowed"
+#define BTIF_STORAGE_KEY_HOGP_REPORT "HidReport"
+#define BTIF_STORAGE_KEY_HOGP_REPORT_VERSION "HidReportVersion"
 #define BTIF_STORAGE_KEY_HOGP_RECONNECT_ALLOWED "HogpReConnectAllowed"
 #define BTIF_STORAGE_KEY_HOGP_APP_ID "HogpAppId"
 #define BTIF_STORAGE_KEY_HOGP_ATTR_MASK "HogpAttrMask"
@@ -124,3 +128,5 @@
 #define BTIF_STORAGE_KEY_VENDOR_ID "VendorId"
 #define BTIF_STORAGE_KEY_VENDOR_ID_SOURCE "VendorIdSource"
 #define BTIF_STORAGE_KEY_VERSION "ProductVersion"
+#define BTIF_STORAGE_KEY_ENCR_DATA_CCCD "EncryptedDataKeyCCCD"
+#define BTIF_STORAGE_KEY_ENCR_DATA "EncKeyMaterial"

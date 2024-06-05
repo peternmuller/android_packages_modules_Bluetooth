@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 /******************************************************************************
@@ -25,35 +29,40 @@
 
 #define LOG_TAG "bt_bta_gattc"
 
-#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/strings/stringprintf.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include "bta/gatt/bta_gattc_int.h"
 #include "bta/include/bta_api.h"
 #include "btif/include/btif_debug_conn.h"
 #include "btif/include/btif_storage.h"
+#include "device/include/interop.h"
 #include "hardware/bt_gatt_types.h"
 #include "hci/controller_interface.h"
 #include "internal_include/bt_trace.h"
 #include "main/shim/entry.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
+#include "stack/btm/btm_dev.h"
+#include "stack/btm/btm_int_types.h"
+#include "stack/gatt/gatt_int.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_ble_api_types.h"
 #include "stack/include/btm_sec_api.h"
+#include "stack/include/gap_api.h"
 #include "stack/include/l2c_api.h"
 #include "stack/include/main_thread.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
-#include "device/include/interop.h"
 
 using base::StringPrintf;
 using bluetooth::Uuid;
 using namespace bluetooth;
 
+extern tBTM_CB btm_cb;
 /*****************************************************************************
  *  Constants
  ****************************************************************************/
@@ -360,7 +369,7 @@ void bta_gattc_open_error(tBTA_GATTC_CLCB* p_clcb,
 
 void bta_gattc_open_fail(tBTA_GATTC_CLCB* p_clcb,
                          const tBTA_GATTC_DATA* p_data) {
-  if (IS_FLAG_ENABLED(enumerate_gatt_errors) &&
+  if (com::android::bluetooth::flags::enumerate_gatt_errors() &&
       p_data->int_conn.reason == GATT_CONN_TIMEOUT) {
     log::warn(
         "Connection timed out after 30 seconds. conn_id=0x{:x}. Return "
@@ -709,7 +718,7 @@ void bta_gattc_disc_close(tBTA_GATTC_CLCB* p_clcb,
   log::verbose("Discovery cancel conn_id=0x{:x}", p_clcb->bta_conn_id);
 
   if (p_clcb->disc_active ||
-      (IS_FLAG_ENABLED(gatt_rediscover_on_canceled) &&
+      (com::android::bluetooth::flags::gatt_rediscover_on_canceled() &&
        (p_clcb->request_during_discovery ==
             BTA_GATTC_DISCOVER_REQ_READ_DB_HASH ||
         p_clcb->request_during_discovery ==
@@ -925,7 +934,7 @@ void bta_gattc_continue_with_version_and_cache_known(
     tBTA_GATTC_CLCB* p_clcb, RobustCachingSupport cache_support,
     bool is_svc_chg) {
   if (cache_support == RobustCachingSupport::UNSUPPORTED ||
-      (IS_FLAG_ENABLED(skip_unknown_robust_caching) &&
+      (com::android::bluetooth::flags::skip_unknown_robust_caching() &&
        cache_support == RobustCachingSupport::UNKNOWN)) {
     // Skip initial DB hash read if no DB hash is known, or if
     // we have strong reason (due to interop,
@@ -1007,6 +1016,12 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
     tBTA_GATTC bta_gattc;
     bta_gattc.remote_bda = p_clcb->p_srcb->server_bda;
     (*p_clcb->p_rcb->p_cback)(BTA_GATTC_SRVC_DISC_DONE_EVT, &bta_gattc);
+  }
+
+  if (com::android::bluetooth::flags::encrypted_advertising_data() &&
+      (p_clcb->status == GATT_SUCCESS) && p_clcb->p_srcb &&
+      btm_sec_is_a_bonded_dev(p_clcb->p_srcb->server_bda)) {
+    GAP_BleGetEncKeyMaterialInfo(p_clcb->p_srcb->server_bda);
   }
 }
 

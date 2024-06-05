@@ -19,9 +19,7 @@
 #define LOG_TAG "bta_ag_cmd"
 
 #include <bluetooth/log.h>
-
-#include <android_bluetooth_flags.h>
-#include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <cstdint>
 #include <cstring>
@@ -283,7 +281,12 @@ static void bta_ag_send_result(tBTA_AG_SCB* p_scb, size_t code,
 
   /* send to RFCOMM */
   uint16_t len = 0;
-  PORT_WriteData(p_scb->conn_handle, buf, (uint16_t)(p - buf), &len);
+  if (PORT_WriteData(p_scb->conn_handle, buf, (uint16_t)(p - buf), &len) !=
+      PORT_SUCCESS) {
+    log::warn(
+        "Unable to write RFCOMM data peer:{} handle:{} len_exp:{} len_act:{}",
+        p_scb->peer_addr, p_scb->conn_handle, (uint16_t)(p - buf), len);
+  }
 }
 
 /*******************************************************************************
@@ -1405,6 +1408,16 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
         break;
       }
       if (!bta_ag_is_sco_open_allowed(p_scb, "BTA_AG_LOCAL_EVT_BCC")) {
+        bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_ALLOWED);
+        break;
+      }
+      if (!p_scb->inband_enabled &&
+           p_scb->callsetup_ind == BTA_AG_CALLSETUP_INCOMING &&
+           !(p_scb->call_ind || p_scb->callheld_ind)) {
+        log::warn(
+            "Sending error for AT+BCC received when call is in ringing state"
+            " and in-band ringtone is disabled for {} device",
+            p_scb->peer_addr.ToStringForLogging());
         bta_ag_send_error(p_scb, BTA_AG_ERR_OP_NOT_ALLOWED);
         break;
       }

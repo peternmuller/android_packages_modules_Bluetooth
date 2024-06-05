@@ -17,9 +17,9 @@
 
 #include "devices.h"
 
-#include <android_bluetooth_flags.h>
 #include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include "acl_api.h"
 #include "bta_gatt_queue.h"
@@ -257,6 +257,7 @@ bool LeAudioDevice::ConfigureAses(
 
   if (!ase) {
     log::error("Unable to find an ASE to configure");
+    PrintDebugState();
     return false;
   }
 
@@ -265,7 +266,8 @@ bool LeAudioDevice::ConfigureAses(
       (direction == types::kLeAudioDirectionSink) ? snk_pacs_ : src_pacs_;
   for (size_t i = 0; i < ase_configs.size() && ase; ++i) {
     auto const& ase_cfg = ase_configs.at(i);
-    if (!utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
+    if (utils::IsCodecUsingLtvFormat(ase_cfg.codec.id) &&
+        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
       return false;
     }
   }
@@ -283,13 +285,15 @@ bool LeAudioDevice::ConfigureAses(
                              : src_audio_locations_;
 
   // Before we activate the ASEs, make sure we have the right configuration
+  // Check for matching PACs only if we know that the LTV format is being used.
   uint8_t max_required_ase_per_dev = ase_configs.size() / num_of_devices +
                                      (ase_configs.size() % num_of_devices);
   int needed_ase = std::min((int)(max_required_ase_per_dev),
                             (int)(ase_configs.size() - active_ases));
   for (int i = 0; i < needed_ase; ++i) {
     auto const& ase_cfg = ase_configs.at(i);
-    if (!utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
+    if (utils::IsCodecUsingLtvFormat(ase_cfg.codec.id) &&
+        !utils::GetConfigurationSupportedPac(pacs, ase_cfg.codec)) {
       log::error("No matching PAC found. Stop the activation.");
       return false;
     }
@@ -331,6 +335,7 @@ bool LeAudioDevice::ConfigureAses(
       ase->target_latency = ase_cfg.qos.target_latency;
       ase->codec_id = ase_cfg.codec.id;
       ase->codec_config = ase_cfg.codec.params;
+      ase->vendor_codec_config = ase_cfg.codec.vendor_params;
       ase->channel_count = ase_cfg.codec.channel_count_per_iso_stream;
       if (ase->codec_id.coding_format == types::kLeAudioCodingFormatLC3) {
         /* Let's choose audio channel allocation if not set */
@@ -412,6 +417,74 @@ LeAudioDevice::~LeAudioDevice(void) {
   this->ClearPACs();
 }
 
+void LeAudioDevice::ParseHeadtrackingCodec(
+    const struct types::acs_ac_record& pac) {
+  if (!com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
+    return;
+  }
+
+  if (pac.codec_id == types::kLeAudioCodecHeadtracking) {
+    log::info("Headtracking supported");
+
+    // Assume LE-ISO is supported if metadata is not available
+    dsa_.modes = {
+        DsaMode::DISABLED,
+        DsaMode::ISO_SW,
+        DsaMode::ISO_HW,
+    };
+
+    if (!com::android::bluetooth::flags::headtracker_codec_capability()) {
+      return;
+    }
+
+    /*
+     * Android Headtracker Codec Metadata description
+     *   length: 5
+     *   type: 0xFF
+     *   value: {
+     *     vendorId: 0x00E0 (Google)
+     *     vendorSpecificMetadata: {
+     *       length: 1
+     *       type: 1 (Headtracker supported transports)
+     *       value: x
+     *     }
+     *   }
+     */
+    std::vector<uint8_t> ltv = pac.metadata;
+    if (ltv.size() < 7) {
+      log::info("Headtracker codec does not have metadata");
+      return;
+    }
+
+    if (ltv[0] < 5 || ltv[1] != types::kLeAudioMetadataTypeVendorSpecific ||
+        ltv[2] != (types::kLeAudioVendorCompanyIdGoogle & 0xFF) ||
+        ltv[3] != (types::kLeAudioVendorCompanyIdGoogle >> 8) ||
+        ltv[4] != types::kLeAudioMetadataHeadtrackerTransportLen ||
+        ltv[5] != types::kLeAudioMetadataHeadtrackerTransportVal) {
+      log::warn("Headtracker codec metadata invalid");
+      return;
+    }
+
+    uint8_t supported_transports = ltv[6];
+    DsaModes dsa_modes = {DsaMode::DISABLED};
+
+    if ((supported_transports &
+         types::kLeAudioMetadataHeadtrackerTransportLeAcl) != 0) {
+      log::debug("Headtracking supported over LE-ACL");
+      dsa_modes.push_back(DsaMode::ACL);
+    }
+
+    if ((supported_transports &
+         types::kLeAudioMetadataHeadtrackerTransportLeIso) != 0) {
+      log::debug("Headtracking supported over LE-ISO");
+      dsa_modes.push_back(DsaMode::ISO_SW);
+      dsa_modes.push_back(DsaMode::ISO_HW);
+    }
+
+    dsa_.modes = dsa_modes;
+  }
+}
+
 void LeAudioDevice::RegisterPACs(
     std::vector<struct types::acs_ac_record>* pac_db,
     std::vector<struct types::acs_ac_record>* pac_recs) {
@@ -444,18 +517,7 @@ void LeAudioDevice::RegisterPACs(
               << base::HexEncode(pac.metadata.data(), pac.metadata.size());
     log::debug("{}", debug_str.str());
 
-    if (IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
-      if (pac.codec_id == types::kLeAudioCodecHeadtracking) {
-        log::info("Headtracking supported");
-        /* Todo: Set DSA modes according to the codec configuration */
-        dsa_.modes = {
-            DsaMode::DISABLED,
-            DsaMode::ISO_SW,
-            DsaMode::ISO_HW,
-        };
-        /* Todo: Remove the headtracking codec from the list */
-      }
-    }
+    ParseHeadtrackingCodec(pac);
   }
 
   pac_db->insert(pac_db->begin(), pac_recs->begin(), pac_recs->end());

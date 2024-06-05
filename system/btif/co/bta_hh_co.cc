@@ -18,7 +18,7 @@
 
 #include "bta_hh_co.h"
 
-#include <android_bluetooth_flags.h>
+#include <com_android_bluetooth_flags.h>
 #include <fcntl.h>
 #include <linux/uhid.h>
 #include <poll.h>
@@ -385,7 +385,8 @@ static int uhid_fd_poll(btif_hh_device_t* p_dev,
   int counter = 0;
 
   do {
-    if (IS_FLAG_ENABLED(break_uhid_polling_early) && !p_dev->hh_keep_polling) {
+    if (com::android::bluetooth::flags::break_uhid_polling_early() &&
+        !p_dev->hh_keep_polling) {
       log::debug("Polling stopped");
       return -1;
     }
@@ -399,7 +400,7 @@ static int uhid_fd_poll(btif_hh_device_t* p_dev,
     ret = poll(pfds.data(), pfds.size(), BTA_HH_UHID_POLL_PERIOD_MS);
   } while (ret == -1 && errno == EINTR);
 
-  if (!IS_FLAG_ENABLED(break_uhid_polling_early)) {
+  if (!com::android::bluetooth::flags::break_uhid_polling_early()) {
     if (ret == 0) {
       log::debug("Polling timed out, attempt to read (old behavior)");
       return 1;
@@ -624,8 +625,8 @@ void bta_hh_co_close(btif_hh_device_t* p_dev) {
  ******************************************************************************/
 void bta_hh_co_data(uint8_t dev_handle, uint8_t* p_rpt, uint16_t len,
                     tBTA_HH_PROTO_MODE mode, uint8_t sub_class,
-                    uint8_t ctry_code,
-                    UNUSED_ATTR const tAclLinkSpec& link_spec, uint8_t app_id) {
+                    uint8_t ctry_code, const tAclLinkSpec& /* link_spec */,
+                    uint8_t app_id) {
   btif_hh_device_t* p_dev;
 
   log::verbose(
@@ -871,25 +872,25 @@ void bta_hh_co_get_rpt_rsp(uint8_t dev_handle, uint8_t status,
  ******************************************************************************/
 void bta_hh_le_co_rpt_info(const tAclLinkSpec& link_spec,
                            tBTA_HH_RPT_CACHE_ENTRY* p_entry,
-                           UNUSED_ATTR uint8_t app_id) {
+                           uint8_t /* app_id */) {
   unsigned idx = 0;
 
   std::string addrstr = link_spec.addrt.bda.ToString();
   const char* bdstr = addrstr.c_str();
 
-  size_t len = btif_config_get_bin_length(bdstr, BTIF_STORAGE_KEY_HID_REPORT);
+  size_t len = btif_config_get_bin_length(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT);
   if (len >= sizeof(tBTA_HH_RPT_CACHE_ENTRY) && len <= sizeof(sReportCache)) {
-    btif_config_get_bin(bdstr, BTIF_STORAGE_KEY_HID_REPORT,
+    btif_config_get_bin(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT,
                         (uint8_t*)sReportCache, &len);
     idx = len / sizeof(tBTA_HH_RPT_CACHE_ENTRY);
   }
 
   if (idx < BTA_HH_NV_LOAD_MAX) {
     memcpy(&sReportCache[idx++], p_entry, sizeof(tBTA_HH_RPT_CACHE_ENTRY));
-    btif_config_set_bin(bdstr, BTIF_STORAGE_KEY_HID_REPORT,
+    btif_config_set_bin(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT,
                         (const uint8_t*)sReportCache,
                         idx * sizeof(tBTA_HH_RPT_CACHE_ENTRY));
-    btif_config_set_int(bdstr, BTIF_STORAGE_KEY_HID_REPORT_VERSION,
+    btif_config_set_int(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT_VERSION,
                         BTA_HH_CACHE_REPORT_VERSION);
     log::verbose("Saving report; dev={}, idx={}", link_spec, idx);
   }
@@ -913,19 +914,19 @@ void bta_hh_le_co_rpt_info(const tAclLinkSpec& link_spec,
  ******************************************************************************/
 tBTA_HH_RPT_CACHE_ENTRY* bta_hh_le_co_cache_load(const tAclLinkSpec& link_spec,
                                                  uint8_t* p_num_rpt,
-                                                 UNUSED_ATTR uint8_t app_id) {
+                                                 uint8_t app_id) {
   std::string addrstr = link_spec.addrt.bda.ToString();
   const char* bdstr = addrstr.c_str();
 
-  size_t len = btif_config_get_bin_length(bdstr, BTIF_STORAGE_KEY_HID_REPORT);
+  size_t len = btif_config_get_bin_length(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT);
   if (!p_num_rpt || len < sizeof(tBTA_HH_RPT_CACHE_ENTRY)) return NULL;
 
   if (len > sizeof(sReportCache)) len = sizeof(sReportCache);
-  btif_config_get_bin(bdstr, BTIF_STORAGE_KEY_HID_REPORT,
+  btif_config_get_bin(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT,
                       (uint8_t*)sReportCache, &len);
 
   int cache_version = -1;
-  btif_config_get_int(bdstr, BTIF_STORAGE_KEY_HID_REPORT_VERSION,
+  btif_config_get_int(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT_VERSION,
                       &cache_version);
 
   if (cache_version != BTA_HH_CACHE_REPORT_VERSION) {
@@ -952,11 +953,11 @@ tBTA_HH_RPT_CACHE_ENTRY* bta_hh_le_co_cache_load(const tAclLinkSpec& link_spec,
  *
  ******************************************************************************/
 void bta_hh_le_co_reset_rpt_cache(const tAclLinkSpec& link_spec,
-                                  UNUSED_ATTR uint8_t app_id) {
+                                  uint8_t /* app_id */) {
   std::string addrstr = link_spec.addrt.bda.ToString();
   const char* bdstr = addrstr.c_str();
 
-  btif_config_remove(bdstr, BTIF_STORAGE_KEY_HID_REPORT);
-  btif_config_remove(bdstr, BTIF_STORAGE_KEY_HID_REPORT_VERSION);
+  btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT);
+  btif_config_remove(bdstr, BTIF_STORAGE_KEY_HOGP_REPORT_VERSION);
   log::verbose("Reset cache for bda {}", link_spec);
 }

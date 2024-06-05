@@ -26,10 +26,10 @@
 
 #include "stack/btm/btm_sec.h"
 
-#include <android_bluetooth_flags.h>
 #include <base/functional/bind.h>
 #include <base/strings/stringprintf.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -68,6 +68,7 @@
 #include "stack/include/btm_status.h"
 #include "stack/include/hci_error_code.h"
 #include "stack/include/l2cap_security_interface.h"
+#include "stack/include/l2cdefs.h"
 #include "stack/include/main_thread.h"
 #include "stack/include/smp_api.h"
 #include "stack/include/stack_metrics_logging.h"
@@ -734,7 +735,8 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
   /* Finished if connection is active and already paired */
   if (((p_dev_rec->hci_handle != HCI_INVALID_HANDLE) &&
        transport == BT_TRANSPORT_BR_EDR &&
-       (p_dev_rec->sec_rec.sec_flags & BTM_SEC_AUTHENTICATED)) ||
+       (p_dev_rec->sec_rec.sec_flags & BTM_SEC_AUTHENTICATED) &&
+       (btm_get_bond_type_dev(bd_addr) == BOND_TYPE_PERSISTENT)) ||
       ((p_dev_rec->ble_hci_handle != HCI_INVALID_HANDLE) &&
        transport == BT_TRANSPORT_LE &&
        (p_dev_rec->sec_rec.sec_flags & BTM_SEC_LE_AUTHENTICATED))) {
@@ -877,7 +879,7 @@ tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr, tBLE_ADDR_TYPE addr_type,
       (transport == BT_TRANSPORT_BR_EDR &&
        (dev_type & BT_DEVICE_TYPE_BREDR) == 0)) {
     log::warn("Requested transport and supported transport don't match");
-    if (!IS_FLAG_ENABLED(pairing_on_unknown_transport)) {
+    if (!com::android::bluetooth::flags::pairing_on_unknown_transport()) {
       return BTM_ILLEGAL_ACTION;
     }
   }
@@ -2530,6 +2532,20 @@ void btm_sec_rmt_host_support_feat_evt(const RawAddress bd_addr,
  ******************************************************************************/
 void btm_io_capabilities_req(RawAddress p) {
   if (btm_sec_is_a_bonded_dev(p)) {
+    if (com::android::bluetooth::flags::key_missing_classic_device()) {
+      log::warn(
+          "Incoming bond request, but {} is already bonded (notifying user)",
+          p);
+      bta_dm_remote_key_missing(p);
+
+      auto p_dev_rec = btm_find_dev(p);
+      if (p_dev_rec != NULL) {
+        btm_sec_disconnect(p_dev_rec->hci_handle, HCI_ERR_AUTH_FAILURE,
+                           "btm_io_capabilities_req Security failure");
+      }
+      return;
+    }
+
     log::warn("Incoming bond request, but {} is already bonded (removing)", p);
     bta_dm_process_remove_device(p);
   }
@@ -3907,14 +3923,25 @@ void btm_sec_disconnected(uint16_t handle, tHCI_REASON reason,
   const tBT_TRANSPORT transport =
       (handle == p_dev_rec->hci_handle) ? BT_TRANSPORT_BR_EDR : BT_TRANSPORT_LE;
 
+  bool pairing_transport_matches = true;
+  if (com::android::bluetooth::flags::
+          cancel_pairing_only_on_disconnected_transport()) {
+    tBT_TRANSPORT pairing_transport =
+        (btm_sec_cb.pairing_flags & BTM_PAIR_FLAGS_LE_ACTIVE) == 0
+            ? BT_TRANSPORT_BR_EDR
+            : BT_TRANSPORT_LE;
+    pairing_transport_matches = (transport == pairing_transport);
+  }
+
   /* clear unused flags */
   p_dev_rec->sm4 &= BTM_SM4_TRUE;
 
   /* If we are in the process of bonding we need to tell client that auth failed
    */
   const uint8_t old_pairing_flags = btm_sec_cb.pairing_flags;
-  if ((btm_sec_cb.pairing_state != BTM_PAIR_STATE_IDLE) &&
-      (btm_sec_cb.pairing_bda == p_dev_rec->bd_addr)) {
+  if (btm_sec_cb.pairing_state != BTM_PAIR_STATE_IDLE &&
+      btm_sec_cb.pairing_bda == p_dev_rec->bd_addr &&
+      pairing_transport_matches) {
     log::debug("Disconnected while pairing process active handle:0x{:04x}",
                handle);
     btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_IDLE);
@@ -4000,6 +4027,31 @@ void btm_sec_disconnected(uint16_t handle, tHCI_REASON reason,
                                        : BTM_SEC_STATE_DISCONNECTING_BLE;
     return;
   }
+
+  if (com::android::bluetooth::flags::
+          cancel_pairing_only_on_disconnected_transport()) {
+    if (btm_sec_cb.pairing_state != BTM_PAIR_STATE_IDLE &&
+        btm_sec_cb.pairing_bda == p_dev_rec->bd_addr &&
+        !pairing_transport_matches) {
+      log::debug("Disconnection on the other transport while pairing");
+      return;
+    }
+
+    if (p_dev_rec->sec_rec.sec_state == BTM_SEC_STATE_LE_ENCRYPTING &&
+        transport != BT_TRANSPORT_LE) {
+      log::debug("Disconnection on the other transport while encrypting LE");
+      return;
+    }
+
+    if ((p_dev_rec->sec_rec.sec_state == BTM_SEC_STATE_AUTHENTICATING ||
+         p_dev_rec->sec_rec.sec_state == BTM_SEC_STATE_ENCRYPTING) &&
+        transport != BT_TRANSPORT_BR_EDR) {
+      log::debug(
+          "Disconnection on the other transport while encrypting BR/EDR");
+      return;
+    }
+  }
+
   p_dev_rec->sec_rec.sec_state = BTM_SEC_STATE_IDLE;
   p_dev_rec->sec_rec.security_required = BTM_SEC_NONE;
 

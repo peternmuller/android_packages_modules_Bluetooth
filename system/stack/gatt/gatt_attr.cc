@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 /******************************************************************************
@@ -24,6 +28,7 @@
  ******************************************************************************/
 
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <deque>
 #include <map>
@@ -31,13 +36,16 @@
 #include "base/functional/callback.h"
 #include "btif/include/btif_storage.h"
 #include "eatt/eatt.h"
+#include "gap_api.h"
 #include "gatt_api.h"
 #include "gatt_int.h"
+#include "gd/common/init_flags.h"
+#include "device/include/interop.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
 #include "os/log.h"
 #include "os/logging/log_adapter.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
+#include "stack/btm/btm_int_types.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_sec_api.h"
@@ -47,6 +55,8 @@
 using base::StringPrintf;
 using bluetooth::Uuid;
 using namespace bluetooth;
+
+extern tBTM_CB btm_cb;
 
 #define BLE_GATT_SVR_SUP_FEAT_EATT_BITMASK 0x01
 
@@ -72,9 +82,9 @@ static std::map<uint16_t, std::deque<gatt_op_cb_data>> OngoingOps;
 
 static void gatt_request_cback(uint16_t conn_id, uint32_t trans_id,
                                uint8_t op_code, tGATTS_DATA* p_data);
-static void gatt_connect_cback(UNUSED_ATTR tGATT_IF gatt_if,
-                               const RawAddress& bda, uint16_t conn_id,
-                               bool connected, tGATT_DISCONN_REASON reason,
+static void gatt_connect_cback(tGATT_IF /* gatt_if */, const RawAddress& bda,
+                               uint16_t conn_id, bool connected,
+                               tGATT_DISCONN_REASON reason,
                                tBT_TRANSPORT transport);
 static void gatt_disc_res_cback(uint16_t conn_id, tGATT_DISC_TYPE disc_type,
                                 tGATT_DISC_RES* p_data);
@@ -91,6 +101,7 @@ static bool gatt_sr_is_robust_caching_enabled();
 static bool read_sr_supported_feat_req(
     uint16_t conn_id, base::OnceCallback<void(const RawAddress&, uint8_t)> cb);
 static bool read_sr_sirk_req(
+    const RawAddress&,
     uint16_t conn_id,
     base::OnceCallback<void(tGATT_STATUS status, const RawAddress&,
                             uint8_t sirk_type, Octet16& sirk)>
@@ -349,9 +360,9 @@ static void gatt_request_cback(uint16_t conn_id, uint32_t trans_id,
  * Returns          void
  *
  ******************************************************************************/
-static void gatt_connect_cback(UNUSED_ATTR tGATT_IF gatt_if,
-                               const RawAddress& bda, uint16_t conn_id,
-                               bool connected, tGATT_DISCONN_REASON reason,
+static void gatt_connect_cback(tGATT_IF /* gatt_if */, const RawAddress& bda,
+                               uint16_t conn_id, bool connected,
+                               tGATT_DISCONN_REASON reason,
                                tBT_TRANSPORT transport) {
   log::verbose("from {} connected: {}, conn_id: 0x{:x}", bda, connected,
                conn_id);
@@ -612,6 +623,12 @@ static void gatt_cl_op_cmpl_cback(uint16_t conn_id, tGATTC_OPTYPE op,
     } else {
       log::debug("Not interested in that write response");
     }
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (status == GATT_SUCCESS && (cl_op_uuid == GATT_UUID_CLIENT_SUP_FEAT)) {
+        tGATT_PROFILE_CLCB* p_clcb = gatt_profile_find_clcb_by_conn_id(conn_id);
+        if (p_clcb != NULL) GAP_BleGetEncKeyMaterialInfo(p_clcb->bda);
+      }
+    }
     return;
   }
 
@@ -806,6 +823,7 @@ static bool read_sr_supported_feat_req(
 }
 
 static bool read_sr_sirk_req(
+    const RawAddress& peer_bda,
     uint16_t conn_id,
     base::OnceCallback<void(tGATT_STATUS status, const RawAddress&,
                             uint8_t sirk_type, Octet16& sirk)>
@@ -818,10 +836,19 @@ static bool read_sr_sirk_req(
 
   param.service.uuid = bluetooth::Uuid::From16Bit(GATT_UUID_CSIS_SIRK);
 
-  if (GATTC_Read(conn_id, GATT_READ_CHAR_VALUE, &param) != GATT_SUCCESS) {
-    log::error("Read GATT Support features GATT_Read Failed, conn_id: {}",
-               static_cast<int>(conn_id));
-    return false;
+  if (interop_match_addr(INTEROP_DISABLE_SIRK_READ_BY_TYPE, &peer_bda)){
+    if (GATTC_Read(conn_id, GATT_READ_CHAR_VALUE, &param) != GATT_SUCCESS) {
+      log::error("Read GATT Support features GATT_Read Failed, conn_id: {}",
+                static_cast<int>(conn_id));
+      return false;
+    }
+  }
+  else{
+    if (GATTC_Read(conn_id, GATT_READ_BY_TYPE, &param) != GATT_SUCCESS) {
+      log::error("Read GATT Support features GATT_Read Failed, conn_id: {}",
+                static_cast<int>(conn_id));
+      return false;
+    }
   }
 
   gatt_op_cb_data cb_data;
@@ -915,7 +942,7 @@ bool gatt_cl_read_sirk_req(
     OngoingOps[conn_id] = std::deque<gatt_op_cb_data>();
   }
 
-  return read_sr_sirk_req(conn_id, std::move(cb));
+  return read_sr_sirk_req(peer_bda, conn_id, std::move(cb));
 }
 
 /*******************************************************************************

@@ -23,8 +23,8 @@
  *  This file contains SDP utility functions
  *
  ******************************************************************************/
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <array>
 #include <cstdint>
@@ -40,7 +40,6 @@
 #include "device/include/interop.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
-#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
 #include "stack/include/avrc_api.h"
@@ -52,6 +51,7 @@
 #include "stack/include/btm_sec_api_types.h"
 #include "stack/include/sdpdefs.h"
 #include "stack/include/stack_metrics_logging.h"
+#include "stack/sdp/internal/sdp_api.h"
 #include "stack/sdp/sdpint.h"
 #include "storage/config_keys.h"
 #include "types/bluetooth/uuid.h"
@@ -59,15 +59,6 @@
 
 using bluetooth::Uuid;
 using namespace bluetooth;
-
-bool SDP_FindProtocolListElemInRec(const tSDP_DISC_REC* p_rec,
-                                   uint16_t layer_uuid,
-                                   tSDP_PROTOCOL_ELEM* p_elem);
-tSDP_DISC_ATTR* SDP_FindAttributeInRec(const tSDP_DISC_REC* p_rec,
-                                       uint16_t attr_id);
-uint16_t SDP_GetDiRecord(uint8_t getRecordIndex,
-                         tSDP_DI_GET_RECORD* device_info,
-                         const tSDP_DISCOVERY_DB* p_db);
 
 static const uint8_t sdp_base_uuid[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                         0x10, 0x00, 0x80, 0x00, 0x00, 0x80,
@@ -399,7 +390,7 @@ tCONN_CB* sdpu_allocate_ccb(void) {
   for (xx = 0, p_ccb = sdp_cb.ccb; xx < SDP_MAX_CONNECTIONS; xx++, p_ccb++) {
     if (p_ccb->con_state == SDP_STATE_IDLE) {
       alarm_t* alarm = p_ccb->sdp_conn_timer;
-      memset(p_ccb, 0, sizeof(tCONN_CB));
+      *p_ccb = {};
       p_ccb->sdp_conn_timer = alarm;
       return (p_ccb);
     }
@@ -460,7 +451,7 @@ void sdpu_release_ccb(tCONN_CB& ccb) {
  * Returns          returns cid if any active sdp connection, else 0.
  *
  ******************************************************************************/
-uint16_t sdpu_get_active_ccb_cid(const RawAddress& remote_bd_addr) {
+uint16_t sdpu_get_active_ccb_cid(const RawAddress& bd_addr) {
   uint16_t xx;
   tCONN_CB* p_ccb;
 
@@ -470,7 +461,7 @@ uint16_t sdpu_get_active_ccb_cid(const RawAddress& remote_bd_addr) {
         (p_ccb->con_state == SDP_STATE_CFG_SETUP) ||
         (p_ccb->con_state == SDP_STATE_CONNECTED)) {
       if (p_ccb->con_flags & SDP_FLAGS_IS_ORIG &&
-          p_ccb->device_address == remote_bd_addr) {
+          p_ccb->device_address == bd_addr) {
         return p_ccb->connection_id;
       }
     }
@@ -995,7 +986,8 @@ uint8_t* sdpu_get_len_from_type(uint8_t* p, uint8_t* p_end, uint8_t type,
 
   switch (type & 7) {
     case SIZE_ONE_BYTE:
-      if (IS_FLAG_ENABLED(stack_sdp_detect_nil_property_type)) {
+      if (com::android::bluetooth::flags::
+              stack_sdp_detect_nil_property_type()) {
         // Return NIL type if appropriate
         *p_len = (type == 0) ? 0 : sizeof(uint8_t);
       } else {
@@ -1654,6 +1646,19 @@ void sdpu_set_avrc_target_features(const tSDP_ATTRIBUTE* p_attr,
     log::info("Set CoverArt Feature");
     p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION - 1] |=
         AVRCP_CA_SUPPORT_BITMASK;
+  }
+
+  if (avrcp_version >= AVRC_REV_1_4 && interop_match_addr(
+       INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS, bdaddr)) {
+    log::error("device found in PLAYER_APPLICATION_SETTING_CMDS BL");
+    log::error("Show player app settings not supported");
+    p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION] &=
+            ~AVRCP_PLAYER_APP_SETTINGS_SUPPORT_BITMASK;
+  } else {
+     log::info("device NOT found in PLAYER_APPLICATION_SETTING_CMDS BL");
+     log::info("Show player app settings supported");
+     p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION] |=
+            AVRCP_PLAYER_APP_SETTINGS_SUPPORT_BITMASK;
   }
 }
 

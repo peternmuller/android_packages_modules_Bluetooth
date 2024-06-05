@@ -22,8 +22,8 @@
  *
  ******************************************************************************/
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <cstdint>
 #include <cstring>
@@ -466,7 +466,10 @@ void bta_ag_rfc_close(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
   }
   /* else close port and deallocate scb */
   else {
-    RFCOMM_RemoveServer(p_scb->conn_handle);
+    if (RFCOMM_RemoveServer(p_scb->conn_handle) != PORT_SUCCESS) {
+      log::warn("Unable to remove RFCOMM server peer:{} handle:{}",
+                p_scb->peer_addr, p_scb->conn_handle);
+    };
     bta_ag_scb_dealloc(p_scb);
   }
 }
@@ -589,7 +592,7 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
       log::info(
           "close outgoing connection before accepting {} with conn_handle={}",
           ag_scb.peer_addr, ag_scb.conn_handle);
-      if (!IS_FLAG_ENABLED(close_rfcomm_instead_of_reset)) {
+      if (!com::android::bluetooth::flags::close_rfcomm_instead_of_reset()) {
         // Fail the outgoing connection to clean up any upper layer states
         bta_ag_rfc_fail(&ag_scb, tBTA_AG_DATA::kEmpty);
       }
@@ -602,7 +605,7 @@ void bta_ag_rfc_acp_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
               "RFCOMM_RemoveConnection failed for {}, handle {}, error {}",
               dev_addr, ag_scb.conn_handle, status);
         }
-      } else if (IS_FLAG_ENABLED(reset_after_collision)) {
+      } else if (com::android::bluetooth::flags::reset_after_collision()) {
         // As no existing outgoing rfcomm connection, then manual reset current
         // state, and use the incoming one
         bta_ag_rfc_fail(&ag_scb, tBTA_AG_DATA::kEmpty);
@@ -916,8 +919,11 @@ void bta_ag_handle_collision(tBTA_AG_SCB* p_scb,
                              const tBTA_AG_DATA& /* data */) {
   /* Cancel SDP if it had been started. */
   if (p_scb->p_disc_db) {
-    get_legacy_stack_sdp_api()->service.SDP_CancelServiceSearch(
-        p_scb->p_disc_db);
+    if (!get_legacy_stack_sdp_api()->service.SDP_CancelServiceSearch(
+            p_scb->p_disc_db)) {
+      log::warn("Unable to cancel SDP service discovery search peer:{}",
+                p_scb->peer_addr);
+    }
     bta_ag_free_db(p_scb, tBTA_AG_DATA::kEmpty);
   }
 

@@ -67,9 +67,6 @@ class TimestampedStringCircularBuffer
 /* Define the Device Management control structure
  */
 typedef struct tBTM_DEVCB {
-  tBTM_VS_EVT_CB* p_vend_spec_cb[BTM_MAX_VSE_CALLBACKS]; /* Register for vendor
-                                                            specific events  */
-
   alarm_t* read_local_name_timer; /* Read local name timer */
   tBTM_CMPL_CB* p_rln_cmpl_cb;    /* Callback function to be called when  */
                                   /* read local name function complete    */
@@ -88,10 +85,6 @@ typedef struct tBTM_DEVCB {
                                           /* timer */
   tBTM_CMPL_CB* p_automatic_flush_timeout_cmpl_cb; /* Callback function to be */
   /* called when read Automatic Flush Timeout function completes */
-
-  alarm_t* read_link_quality_timer;
-  tBTM_CMPL_CB* p_link_qual_cmpl_cb; /* Callback function to be called when  */
-                                     /* read link quality function completes */
 
   tBTM_CMPL_CB* p_flow_spec_cmpl_cb; /* Callback function to be called when  */
                                      /* flow spec function completes         */
@@ -114,7 +107,6 @@ typedef struct tBTM_DEVCB {
         alarm_new("btm.read_failed_contact_counter_timer");
     read_automatic_flush_timeout_timer =
         alarm_new("btm.read_automatic_flush_timeout_timer");
-    read_link_quality_timer = alarm_new("btm.read_link_quality_timer");
     read_tx_power_timer = alarm_new("btm.read_tx_power_timer");
   }
 
@@ -123,7 +115,6 @@ typedef struct tBTM_DEVCB {
     alarm_free(read_rssi_timer);
     alarm_free(read_failed_contact_counter_timer);
     alarm_free(read_automatic_flush_timeout_timer);
-    alarm_free(read_link_quality_timer);
     alarm_free(read_tx_power_timer);
   }
 } tBTM_DEVCB;
@@ -163,9 +154,6 @@ typedef struct tBTM_CB {
 
   fixed_queue_t* sec_pending_q{nullptr}; /* pending sequrity requests in
                                             tBTM_SEC_QUEUE_ENTRY format */
-
-  // BQR Receiver
-  tBTM_BT_QUALITY_REPORT_RECEIVER* p_bqr_report_receiver{nullptr};
 
 #define BTM_CODEC_TYPE_MAX_RECORDS 32
   tBTM_BT_DYNAMIC_AUDIO_BUFFER_CB

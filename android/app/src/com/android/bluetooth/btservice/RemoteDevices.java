@@ -862,7 +862,7 @@ public class RemoteDevices {
         BluetoothDevice bdDevice = getDevice(address);
         DeviceProperties deviceProperties;
         if (bdDevice == null) {
-            debugLog("Added new device property");
+            debugLog("Added new device property, device=" + bdDevice);
             deviceProperties = addDeviceProperties(address);
             bdDevice = getDevice(address);
         } else {
@@ -879,7 +879,7 @@ public class RemoteDevices {
             val = values[j];
             if (val.length > 0) {
                 synchronized (mObject) {
-                    debugLog("Property type: " + type);
+                    debugLog("Update property, device=" + bdDevice + ", type: " + type);
                     switch (type) {
                         case AbstractionLayer.BT_PROPERTY_BDNAME:
                             final String newName = new String(val);
@@ -911,7 +911,11 @@ public class RemoteDevices {
                         case AbstractionLayer.BT_PROPERTY_CLASS_OF_DEVICE:
                             final int newBluetoothClass = Utils.byteArrayToInt(val);
                             if (newBluetoothClass == deviceProperties.getBluetoothClass()) {
-                                debugLog("Skip class update for " + bdDevice);
+                                debugLog(
+                                        "Skip class update, device="
+                                                + bdDevice
+                                                + ", cod=0x"
+                                                + Integer.toHexString(newBluetoothClass));
                                 break;
                             }
                             deviceProperties.setBluetoothClass(newBluetoothClass);
@@ -924,7 +928,11 @@ public class RemoteDevices {
                                     intent,
                                     BLUETOOTH_CONNECT,
                                     Utils.getTempBroadcastOptions().toBundle());
-                            debugLog("Remote class is:" + newBluetoothClass);
+                            debugLog(
+                                    "Remote class update, device="
+                                            + bdDevice
+                                            + ", cod=0x"
+                                            + Integer.toHexString(newBluetoothClass));
                             break;
                         case AbstractionLayer.BT_PROPERTY_UUIDS:
                             final ParcelUuid[] newUuids = Utils.byteArrayToUuid(val);
@@ -1249,7 +1257,7 @@ public class RemoteDevices {
                             + Utils.getRedactedAddressStringFromByte(address));
             return;
         }
-        Log.d(TAG, "keyMissingCallback device: " + bluetoothDevice);
+        Log.i(TAG, "keyMissingCallback device: " + bluetoothDevice);
 
         if (bluetoothDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
             if (!Flags.keyMissingBroadcast()) {
@@ -1271,7 +1279,11 @@ public class RemoteDevices {
 
     void fetchUuids(BluetoothDevice device, int transport) {
         if (mSdpTracker.contains(device)) {
-            // SDP Skip fetch UUIDs if cached
+            debugLog(
+                    "Skip fetch UUIDs are they are already cached peer:"
+                            + device
+                            + " transport:"
+                            + transport);
             MetricsLogger.getInstance().cacheCount(
                     BluetoothProtoEnums.SDP_FETCH_UUID_SKIP_ALREADY_CACHED, 1);
             return;
@@ -1281,7 +1293,7 @@ public class RemoteDevices {
         DeviceProperties deviceProperties = getDeviceProperties(device);
         if (deviceProperties != null && deviceProperties.isBonding()
                 && getDeviceProperties(device).getUuids() == null) {
-            // SDP Skip fetch UUIDs due to bonding
+            debugLog("Skip fetch UUIDs due to bonding peer:" + device + " transport:" + transport);
             MetricsLogger.getInstance().cacheCount(
                     BluetoothProtoEnums.SDP_FETCH_UUID_SKIP_ALREADY_BONDED, 1);
             return;
@@ -1295,7 +1307,11 @@ public class RemoteDevices {
 
         // Uses cached UUIDs if we are bonding. If not, we fetch the UUIDs with SDP.
         if (deviceProperties == null || !deviceProperties.isBonding()) {
-            // SDP Invoked native code to spin up SDP cycle
+            debugLog(
+                    "Invoking core stack to spin up SDP cycle peer:"
+                            + device
+                            + " transport:"
+                            + transport);
             mAdapterService
                     .getNative()
                     .getRemoteServices(Utils.getBytesFromAddress(device.getAddress()), transport);

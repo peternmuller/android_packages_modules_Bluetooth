@@ -12,11 +12,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "hci/le_scanning_manager.h"
 
-#include <android_bluetooth_flags.h>
+#include <com_android_bluetooth_flags.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -283,6 +287,8 @@ class MockCallbacks : public bluetooth::hci::ScanningCallback {
   MOCK_METHOD(void, OnPeriodicSyncLost, (uint16_t));
   MOCK_METHOD(void, OnPeriodicSyncTransferred, (int, uint8_t, Address));
   MOCK_METHOD(void, OnBigInfoReport, (uint16_t, bool));
+  MOCK_METHOD(
+      bool, OnFetchPseudoAddressFromIdentityAddress, (Address, uint8_t, Address*), (override));
 } mock_callbacks_;
 
 class LeScanningManagerTest : public ::testing::Test {
@@ -406,7 +412,7 @@ TEST_F(LeScanningManagerTest, legacy_adv_scan_ind_report_with_scan_response) {
 
   // The 'connectable' bit should NOT be set.
   uint16_t extended_event_type = kLegacy | kScannable | kScanResponse;
-  if (!IS_FLAG_ENABLED(fix_nonconnectable_scannable_advertisement)) {
+  if (!com::android::bluetooth::flags::fix_nonconnectable_scannable_advertisement()) {
     extended_event_type |= kConnectable;
   }
   EXPECT_CALL(mock_callbacks_, OnScanResult(extended_event_type, _, _, _, _, _, _, _, _, _));
@@ -465,7 +471,7 @@ TEST_F(LeScanningManagerExtendedTest, is_nonstandard_phy_supported_test) {
   auto command_view = LeSetExtendedScanParametersView::Create(
       LeScanningCommandView::Create(test_hci_layer_->GetCommand()));
   ASSERT_TRUE(command_view.IsValid());
-  if (IS_FLAG_ENABLED(phy_to_native)) {
+  if (com::android::bluetooth::flags::phy_to_native()) {
     ASSERT_EQ(command_view.GetScanningPhys(), scan_phy);
     ASSERT_EQ(command_view.GetParameters().size(), static_cast<size_t>(1));
   }
@@ -481,7 +487,7 @@ TEST_F(LeScanningManagerExtendedTest, is_multiple_phy_supported_test) {
   auto command_view = LeSetExtendedScanParametersView::Create(
       LeScanningCommandView::Create(test_hci_layer_->GetCommand()));
   ASSERT_TRUE(command_view.IsValid());
-  if (IS_FLAG_ENABLED(phy_to_native)) {
+  if (com::android::bluetooth::flags::phy_to_native()) {
     ASSERT_EQ(command_view.GetScanningPhys(), scan_phy);
     ASSERT_EQ(command_view.GetParameters().size(), static_cast<size_t>(2));
   }

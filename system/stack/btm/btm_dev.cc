@@ -26,8 +26,8 @@
 
 #include "stack/btm/btm_dev.h"
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <string>
 
@@ -62,6 +62,7 @@ constexpr char kBtmLogTag[] = "BOND";
 }
 
 static void wipe_secrets_and_remove(tBTM_SEC_DEV_REC* p_dev_rec) {
+  p_dev_rec->sm4 = BTM_SM4_UNKNOWN;
   p_dev_rec->sec_rec.link_key.fill(0);
   memset(&p_dev_rec->sec_rec.ble_keys, 0, sizeof(tBTM_SEC_BLE_KEYS));
   list_remove(btm_sec_cb.sec_dev_rec, p_dev_rec);
@@ -125,7 +126,7 @@ void BTM_SecAddDevice(const RawAddress& bd_addr, DEV_CLASS dev_class,
   p_dev_rec->sec_rec.link_key_type = key_type;
   p_dev_rec->sec_rec.pin_code_length = pin_length;
 
-  if (IS_FLAG_ENABLED(correct_bond_type_of_loaded_devices)) {
+  if (com::android::bluetooth::flags::correct_bond_type_of_loaded_devices()) {
     p_dev_rec->sec_rec.bond_type = BOND_TYPE_PERSISTENT;
   }
 

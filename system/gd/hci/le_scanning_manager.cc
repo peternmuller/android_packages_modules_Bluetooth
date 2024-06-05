@@ -12,11 +12,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #include "hci/le_scanning_manager.h"
 
-#include <android_bluetooth_flags.h>
+#include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <memory>
 #include <unordered_map>
@@ -29,7 +34,6 @@
 #include "hci/le_periodic_sync_manager.h"
 #include "hci/le_scanning_interface.h"
 #include "hci/le_scanning_reassembler.h"
-#include "hci/vendor_specific_event_manager.h"
 #include "module.h"
 #include "os/handler.h"
 #include "os/log.h"
@@ -157,6 +161,11 @@ class NullScanningCallback : public ScanningCallback {
   void OnBigInfoReport(uint16_t /* sync_handle */, bool /* encrypted */) {
     log::info("OnBigInfoReport in NullScanningCallback");
   };
+
+  bool OnFetchPseudoAddressFromIdentityAddress(Address, uint8_t, Address*) {
+    log::info("OnFetchPseudoAddressFromIdentityAddress in NullScanningCallback");
+    return false;
+  }
 };
 
 enum class BatchScanState {
@@ -195,13 +204,11 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
       HciLayer* hci_layer,
       Controller* controller,
       AclManager* acl_manager,
-      VendorSpecificEventManager* vendor_specific_event_manager,
       storage::StorageModule* storage_module) {
     module_handler_ = handler;
     hci_layer_ = hci_layer;
     controller_ = controller;
     acl_manager_ = acl_manager;
-    vendor_specific_event_manager_ = vendor_specific_event_manager;
     storage_module_ = storage_module;
     le_address_manager_ = acl_manager->GetLeAddressManager();
     le_scanning_interface_ = hci_layer_->GetLeScanningInterface(
@@ -230,10 +237,12 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
         controller_->SupportsBlePeriodicAdvertisingSyncTransferSender();
     total_num_of_advt_tracked_ = controller->GetVendorCapabilities().total_num_of_advt_tracked_;
     if (is_batch_scan_supported_) {
-      vendor_specific_event_manager_->RegisterEventHandler(
-          VseSubeventCode::BLE_THRESHOLD, handler->BindOn(this, &LeScanningManager::impl::on_storage_threshold_breach));
-      vendor_specific_event_manager_->RegisterEventHandler(
-          VseSubeventCode::BLE_TRACKING, handler->BindOn(this, &LeScanningManager::impl::on_advertisement_tracking));
+      hci_layer_->RegisterVendorSpecificEventHandler(
+          VseSubeventCode::BLE_THRESHOLD,
+          handler->BindOn(this, &LeScanningManager::impl::on_storage_threshold_breach));
+      hci_layer_->RegisterVendorSpecificEventHandler(
+          VseSubeventCode::BLE_TRACKING,
+          handler->BindOn(this, &LeScanningManager::impl::on_advertisement_tracking));
     }
     scanners_ = std::vector<Scanner>(kMaxAppNum + 1);
     for (size_t i = 0; i < scanners_.size(); i++) {
@@ -377,7 +386,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
           extended_event_type = transform_to_extended_event_type({.legacy = true});
           break;
         case AdvertisingEventType::SCAN_RESPONSE:
-          if (IS_FLAG_ENABLED(fix_nonconnectable_scannable_advertisement)) {
+          if (com::android::bluetooth::flags::fix_nonconnectable_scannable_advertisement()) {
             // We don't know if the initial advertising report was connectable or not.
             // LeScanningReassembler fixes the connectable field.
             extended_event_type = transform_to_extended_event_type(
@@ -466,6 +475,48 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
         scanning_reassembler_.ProcessAdvertisingReport(
             event_type, address_type, address, advertising_sid, advertising_data);
 
+// KEYSTONE(Ieb17e4e4d07b1f390cd069f3b31407bc568b6109,b/342401986)
+//    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+//      if (processed_report.has_value() &&
+//          scanning_decrypter_.ContainsEncryptedData(
+//              processed_report->data.data(), processed_report->data.size())) {
+//        Address pseudo_address;
+//        bool pseudoAddresssAvailable = scanning_callbacks_->OnFetchPseudoAddressFromIdentityAddress(
+//            address, address_type, &pseudo_address);
+//        if (pseudoAddresssAvailable) {
+//          auto enc_key_material =
+//              storage_module_->GetBin(pseudo_address.ToString(), BTIF_STORAGE_KEY_ENCR_DATA)
+//                  .value_or(std::vector<uint8_t>{});
+//          if (enc_key_material.size() > 0) {
+//            std::vector<uint8_t> decrypted_data;
+//            bool is_decrypt_success = false;
+//            is_decrypt_success = scanning_decrypter_.ExtractEncryptedData(
+//                processed_report->data, enc_key_material, &decrypted_data);
+//            if (!is_decrypt_success) {
+//              log::info(
+//                  "Decryption FAILED ENC_KEY_MATERIAL {}",
+//                  base::HexEncode(enc_key_material.data(), enc_key_material.size()).c_str());
+//            } else {
+//              processed_report->data = decrypted_data;
+//              log::info(
+//                  "Decryption succesfully  addr: {} , pseudo_address: {} data: {}",
+//                  address.ToString().c_str(),
+//                  pseudo_address.ToString().c_str(),
+//                  base::HexEncode(processed_report->data.data(), processed_report->data.size())
+//                      .c_str());
+//            }
+//          } else {
+//            log::info(
+//                "enc_key_material size is <= 0  addr: {} , pseudo_address: {}",
+//                address.ToString().c_str(),
+//                pseudo_address.ToString().c_str());
+//          }
+//        } else {
+//          log::info("pseudo_address not available {}", address.ToString().c_str());
+//        }
+//      }
+//    }
+
     if (processed_report.has_value()) {
       switch (address_type) {
         case (uint8_t)AddressType::PUBLIC_DEVICE_ADDRESS:
@@ -478,9 +529,10 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
           break;
       }
 
-      const uint16_t result_event_type = IS_FLAG_ENABLED(fix_nonconnectable_scannable_advertisement)
-                                             ? processed_report->extended_event_type
-                                             : event_type;
+      const uint16_t result_event_type =
+          com::android::bluetooth::flags::fix_nonconnectable_scannable_advertisement()
+              ? processed_report->extended_event_type
+              : event_type;
 
       scanning_callbacks_->OnScanResult(
           result_event_type,
@@ -696,7 +748,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
     le_scan_type_ = scan_type;
     interval_ms_ = scan_interval;
     window_ms_ = scan_window;
-    if (IS_FLAG_ENABLED(phy_to_native)) phy_ = scan_phy;
+    if (com::android::bluetooth::flags::phy_to_native()) phy_ = scan_phy;
     scanning_callbacks_->OnSetScannerParameterComplete(scanner_id, ScanningCallback::SUCCESS);
   }
 
@@ -1700,7 +1752,6 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
   HciLayer* hci_layer_;
   Controller* controller_;
   AclManager* acl_manager_;
-  VendorSpecificEventManager* vendor_specific_event_manager_;
   storage::StorageModule* storage_module_;
   LeScanningInterface* le_scanning_interface_;
   LeAddressManager* le_address_manager_;
@@ -1738,7 +1789,6 @@ LeScanningManager::LeScanningManager() {
 
 void LeScanningManager::ListDependencies(ModuleList* list) const {
   list->add<HciLayer>();
-  list->add<VendorSpecificEventManager>();
   list->add<Controller>();
   list->add<AclManager>();
   list->add<storage::StorageModule>();
@@ -1750,7 +1800,6 @@ void LeScanningManager::Start() {
       GetDependency<HciLayer>(),
       GetDependency<Controller>(),
       GetDependency<AclManager>(),
-      GetDependency<VendorSpecificEventManager>(),
       GetDependency<storage::StorageModule>());
 }
 

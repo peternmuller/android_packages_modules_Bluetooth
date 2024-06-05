@@ -134,8 +134,6 @@ struct btm_client_interface_t btm_client_interface = {
             .BTM_IsAACFrameCtrlEnabled = BTM_IsAACFrameCtrlEnabled,
             .BTM_GetScramblingSupportedFreqs = BTM_GetScramblingSupportedFreqs,
             .BTM_IsQHSPhySupported = BTM_IsQHSPhySupported,
-            .BTM_RegisterForQleCigLatencyChangedEvt =
-                BTM_RegisterForQleCigLatencyChangedEvt,
             .BTM_SetPowerBackOffState = BTM_SetPowerBackOffState,
         }
 

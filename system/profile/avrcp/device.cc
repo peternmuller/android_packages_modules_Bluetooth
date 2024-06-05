@@ -35,6 +35,8 @@
 #include "packet/avrcp/set_addressed_player.h"
 #include "packet/avrcp/set_player_application_setting_value.h"
 #include "types/raw_address.h"
+#include "device/include/interop.h"
+#include "btif/include/btif_storage.h"
 
 extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);
 extern bool btif_av_both_enable(void);
@@ -127,6 +129,21 @@ void Device::VendorPacketHandler(uint8_t label,
   if (pkt->GetCType() == CType::NOT_IMPLEMENTED) {
     return;
   }
+
+   if (interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
+             &address_)) {
+     CommandPdu event = pkt->GetCommandPdu();
+     if (event == CommandPdu::LIST_PLAYER_APPLICATION_SETTING_ATTRIBUTES ||
+         event == CommandPdu::LIST_PLAYER_APPLICATION_SETTING_VALUES ||
+         event == CommandPdu::GET_CURRENT_PLAYER_APPLICATION_SETTING_VALUE ||
+         event == CommandPdu::SET_PLAYER_APPLICATION_SETTING_VALUE) {
+        log::error("Device is BL for Player app settings");
+        auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
+                                                   Status::INVALID_COMMAND);
+        send_message(label, false, std::move(response));
+        return;
+     }
+   }
 
   if (pkt->GetCType() >= CType::ACCEPTED) {
     switch (pkt->GetCommandPdu()) {
@@ -419,7 +436,12 @@ void Device::HandleGetCapabilities(
       response->AddEvent(Event::TRACK_CHANGED);
       response->AddEvent(Event::PLAYBACK_POS_CHANGED);
       if (player_settings_interface_ != nullptr) {
+        if(interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
+             &address_)) {
+           log::error("Device in BL for PLAYER_APPLICATION_SETTING, don't show in capability");
+        } else {
         response->AddEvent(Event::PLAYER_APPLICATION_SETTING_CHANGED);
+        }
       }
 
       if (!avrcp13_compatibility_) {
@@ -469,12 +491,24 @@ void Device::HandleNotification(
 
     case Event::PLAYBACK_POS_CHANGED: {
       play_pos_interval_ = pkt->GetInterval();
+      if (play_pos_interval_ < 3) {
+        play_pos_interval_ = 3;
+      }
+      log::info("play_pos_interval = {}", play_pos_interval_);
       media_interface_->GetPlayStatus(
           base::Bind(&Device::PlaybackPosNotificationResponse,
                      weak_ptr_factory_.GetWeakPtr(), label, true));
     } break;
 
     case Event::PLAYER_APPLICATION_SETTING_CHANGED: {
+        if (interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
+            &address_)) {
+          log::error("Device in BL for Player app settings, return");
+          auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
+                                                   Status::INVALID_COMMAND);
+          send_message(label, false, std::move(response));
+        return;
+       }
       if (player_settings_interface_ == nullptr) {
         log::error("Player Settings Interface not initialized.");
         auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
@@ -1700,6 +1734,11 @@ void Device::HandleNowPlayingUpdate() {
 void Device::HandlePlayerSettingChanged(std::vector<PlayerAttribute> attributes,
                                         std::vector<uint8_t> values) {
   log::verbose("");
+  if (interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
+        &address_)) {
+    log::error("Device in BL for Player app settings, return");
+    return;
+  }
   if (!player_setting_changed_.first) {
     log::warn("Device is not registered for player settings updates");
     return;

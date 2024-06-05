@@ -286,7 +286,7 @@ UNUSED_ATTR static void A2DP_ParseMplHeaderSbc(uint8_t* p_src, bool* p_frag,
   }
 }
 
-const char* A2DP_CodecNameSbc(UNUSED_ATTR const uint8_t* p_codec_info) {
+const char* A2DP_CodecNameSbc(const uint8_t* /* p_codec_info */) {
   return "SBC";
 }
 
@@ -684,14 +684,14 @@ int A2DP_GetSinkTrackChannelTypeSbc(const uint8_t* p_codec_info) {
   return -1;
 }
 
-bool A2DP_GetPacketTimestampSbc(UNUSED_ATTR const uint8_t* p_codec_info,
+bool A2DP_GetPacketTimestampSbc(const uint8_t* /* p_codec_info */,
                                 const uint8_t* p_data, uint32_t* p_timestamp) {
   *p_timestamp = *(const uint32_t*)p_data;
   return true;
 }
 
-bool A2DP_BuildCodecHeaderSbc(UNUSED_ATTR const uint8_t* p_codec_info,
-                              BT_HDR* p_buf, uint16_t frames_per_packet) {
+bool A2DP_BuildCodecHeaderSbc(const uint8_t* /* p_codec_info */, BT_HDR* p_buf,
+                              uint16_t frames_per_packet) {
   // this doesn't happen in real life, but keeps fuzzer happy
   if (p_buf->len - p_buf->offset < A2DP_SBC_MPL_HDR_LEN) {
     return false;
@@ -719,7 +719,8 @@ std::string A2DP_CodecInfoStringSbc(const uint8_t* p_codec_info) {
 
   a2dp_status = A2DP_ParseInfoSbc(&sbc_cie, p_codec_info, true);
   if (a2dp_status != A2DP_SUCCESS) {
-    res << "A2DP_ParseInfoSbc fail: " << loghex(a2dp_status);
+    res << "A2DP_ParseInfoSbc fail: "
+        << loghex(static_cast<uint8_t>(a2dp_status));
     return res.str();
   }
 
@@ -802,18 +803,25 @@ bool A2DP_AdjustCodecSbc(uint8_t* p_codec_info) {
               cfg_cie.max_bitpool, A2DP_SBC_MAX_BITPOOL);
     cfg_cie.max_bitpool = A2DP_SBC_MAX_BITPOOL;
   }
+  if (cfg_cie.min_bitpool > cfg_cie.max_bitpool) {
+    log::warn("min bitpool value received for SBC"
+             " is more than DUT supported Max bitpool "
+             " Updated the SBC codec max bitpool from {} to {}",
+             cfg_cie.max_bitpool, cfg_cie.min_bitpool);
+    cfg_cie.max_bitpool = cfg_cie.min_bitpool;
+  }
 
   return (A2DP_BuildInfoSbc(AVDT_MEDIA_TYPE_AUDIO, &cfg_cie, p_codec_info) ==
           A2DP_SUCCESS);
 }
 
 btav_a2dp_codec_index_t A2DP_SourceCodecIndexSbc(
-    UNUSED_ATTR const uint8_t* p_codec_info) {
+    const uint8_t* /* p_codec_info */) {
   return BTAV_A2DP_CODEC_INDEX_SOURCE_SBC;
 }
 
 btav_a2dp_codec_index_t A2DP_SinkCodecIndexSbc(
-    UNUSED_ATTR const uint8_t* p_codec_info) {
+    const uint8_t* /* p_codec_info */) {
   return BTAV_A2DP_CODEC_INDEX_SINK_SBC;
 }
 
@@ -1414,11 +1422,11 @@ bool A2dpCodecConfigSbcBase::setCodecConfig(const uint8_t* p_peer_codec_info,
     result_config_cie.max_bitpool = peer_info_cie.max_bitpool;
   if (result_config_cie.min_bitpool > result_config_cie.max_bitpool) {
     log::error(
-        "cannot match min/max bitpool: local caps min/max = 0x{:x}/0x{:x} peer "
-        "info min/max = 0x{:x}/0x{:x}",
+        "result_min bitpool > max bitpool, make both = min:  "
+        "local caps min/max = 0x{:x}/0x{:x} peer info min/max = 0x{:x}/0x{:x}",
         p_a2dp_sbc_caps->min_bitpool, p_a2dp_sbc_caps->max_bitpool,
         peer_info_cie.min_bitpool, peer_info_cie.max_bitpool);
-    goto fail;
+    result_config_cie.max_bitpool = result_config_cie.min_bitpool;
   }
 
   if (A2DP_BuildInfoSbc(AVDT_MEDIA_TYPE_AUDIO, &result_config_cie,

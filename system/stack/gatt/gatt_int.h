@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #ifndef GATT_INT_H
@@ -333,6 +337,7 @@ typedef struct {
   tGATT_STATUS gatt_status;
   uint8_t sirk_type;
   Octet16 sirk;
+  bool is_read_enc_key_pending;
 
   bool in_use;
   uint8_t tcb_idx;

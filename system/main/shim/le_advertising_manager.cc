@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * ​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
- *
  */
 
 #define LOG_TAG "bt_shim_advertiser"
 
 #include "le_advertising_manager.h"
 
+#include <base/logging.h>
+#include <base/strings/string_number_conversions.h>
 #include <bluetooth/log.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bt_gatt.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <vector>
 
@@ -35,6 +37,7 @@
 #include "main/shim/entry.h"
 #include "main/shim/helpers.h"
 #include "stack/include/btm_log_history.h"
+#include "stack/include/gap_api.h"
 #include "stack/include/main_thread.h"
 #include "types/raw_address.h"
 #include "utils.h"
@@ -48,6 +51,35 @@ using bluetooth::hci::OwnAddressType;
 using bluetooth::shim::parse_gap_data;
 using std::vector;
 using namespace bluetooth;
+
+namespace bluetooth {
+namespace shim {
+
+class EncKeyMaterialInterfaceImpl
+    : public EncKeyMaterialInterface,
+      public bluetooth::hci::EncKeyMaterialCallback {
+ public:
+  ~EncKeyMaterialInterfaceImpl() override{};
+  void GetEncKeyMaterial() {
+    log::info("in shim layer");
+    bluetooth::shim::GetAdvertising()->GetEncKeyMaterial();
+  }
+
+  void Init() {
+    bluetooth::shim::GetAdvertising()->RegisterEncKeyMaterialCallback(this);
+  }
+
+  void OnGetEncKeyMaterial(std::vector<uint8_t> temp, uint16_t attr_uuid) {
+    tGAP_BLE_ATTR_VALUE* temp_attr = new tGAP_BLE_ATTR_VALUE;
+    std::copy(temp.begin(), temp.begin() + 16,
+              temp_attr->enc_key_material.session_key);
+    std::copy(temp.begin() + 16, temp.end(),
+              temp_attr->enc_key_material.init_vector);
+    GAP_BleAttrDBUpdate(attr_uuid, temp_attr);
+  }
+};
+}  // namespace shim
+}  // namespace bluetooth
 
 namespace {
 constexpr char kBtmLogTag[] = "ADV";
@@ -107,12 +139,21 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
   }
 
   void SetData(int advertiser_id, bool set_scan_rsp, vector<uint8_t> data,
-               vector<uint8_t> data_enc, StatusCallback /* cb */) override {
+               vector<uint8_t> data_encrypt, StatusCallback cb) override {
     log::info("in shim layer");
     std::vector<GapData> advertising_data = {};
     parse_gap_data(data, advertising_data);
-    bluetooth::shim::GetAdvertising()->SetData(advertiser_id, set_scan_rsp,
-                                               advertising_data);
+
+    if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+      bluetooth::shim::GetAdvertising()->SetData(advertiser_id, set_scan_rsp,
+                                                 advertising_data);
+    } else {
+      std::vector<GapData> advertising_data_encrypt = {};
+      parse_gap_data(data_encrypt, advertising_data_encrypt);
+      bluetooth::shim::GetAdvertising()->SetData(advertiser_id, set_scan_rsp,
+                                                 advertising_data,
+                                                 advertising_data_encrypt);
+    }
   }
 
   void Enable(uint8_t advertiser_id, bool enable, StatusCallback /* cb */,
@@ -142,18 +183,19 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
         set_terminated_callback, bluetooth::shim::GetGdShimHandler());
   }
 
-  void StartAdvertisingSet(uint8_t client_id, int reg_id, IdTxPowerStatusCallback register_cb,
-                              AdvertiseParameters params,
-                              std::vector<uint8_t> advertise_data,
-                              std::vector<uint8_t> advertise_data_enc,
-                              std::vector<uint8_t> scan_response_data,
-                              std::vector<uint8_t> scan_response_data_enc,
-                              PeriodicAdvertisingParameters periodic_params,
-                              std::vector<uint8_t> periodic_data,
-                              std::vector<uint8_t> periodic_data_enc,
-                              uint16_t duration, uint8_t maxExtAdvEvents,
-                              std::vector<uint8_t> enc_key_value,
-                              IdStatusCallback /* timeout_cb */) {
+  void StartAdvertisingSet(uint8_t client_id, int reg_id,
+                           IdTxPowerStatusCallback /* register_cb */,
+                           AdvertiseParameters params,
+                           std::vector<uint8_t> advertise_data,
+                           std::vector<uint8_t> advertise_data_enc,
+                           std::vector<uint8_t> scan_response_data,
+                           std::vector<uint8_t> scan_response_data_enc,
+                           PeriodicAdvertisingParameters periodic_params,
+                           std::vector<uint8_t> periodic_data,
+                           std::vector<uint8_t> periodic_data_enc,
+                           uint16_t duration, uint8_t maxExtAdvEvents,
+                           std::vector<uint8_t> enc_key_value,
+                           IdStatusCallback timeout_cb) {
     log::info("in shim layer");
 
     bluetooth::hci::AdvertisingConfig config{};
@@ -164,6 +206,13 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
     parse_gap_data(advertise_data, config.advertisement);
     parse_gap_data(scan_response_data, config.scan_response);
     parse_gap_data(periodic_data, config.periodic_data);
+
+    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      config.enc_key_value = enc_key_value;
+      parse_gap_data(advertise_data_enc, config.advertisement_enc);
+      parse_gap_data(scan_response_data_enc, config.scan_response_enc);
+      parse_gap_data(periodic_data_enc, config.periodic_data_enc);
+    }
 
     // if registered by native client, add the register id
     if (client_id != kAdvertiserClientIdJni) {
@@ -195,13 +244,21 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
   }
 
   void SetPeriodicAdvertisingData(int advertiser_id, std::vector<uint8_t> data,
-                                  std::vector<uint8_t> data_enc,
+                                  std::vector<uint8_t> data_encrypt,
                                   StatusCallback /* cb */) override {
     log::info("in shim layer");
     std::vector<GapData> advertising_data = {};
     parse_gap_data(data, advertising_data);
-    bluetooth::shim::GetAdvertising()->SetPeriodicData(advertiser_id,
-                                                       advertising_data);
+
+    if (!true) {
+      bluetooth::shim::GetAdvertising()->SetPeriodicData(advertiser_id,
+                                                         advertising_data);
+    } else {
+      std::vector<GapData> advertising_data_encrypt = {};
+      parse_gap_data(data_encrypt, advertising_data_encrypt);
+      bluetooth::shim::GetAdvertising()->SetPeriodicData(
+          advertiser_id, advertising_data, advertising_data_encrypt);
+    }
   }
 
   void SetPeriodicAdvertisingEnable(int advertiser_id, bool enable,
@@ -438,5 +495,21 @@ BleAdvertiserInterface* bluetooth::shim::get_ble_advertiser_instance() {
 void bluetooth::shim::init_advertising_manager() {
   static_cast<BleAdvertiserInterfaceImpl*>(
       bluetooth::shim::get_ble_advertiser_instance())
+      ->Init();
+}
+
+bluetooth::shim::EncKeyMaterialInterface* enc_key_material_instance = nullptr;
+
+bluetooth::shim::EncKeyMaterialInterface*
+bluetooth::shim::get_enc_key_material_instance() {
+  if (enc_key_material_instance == nullptr) {
+    enc_key_material_instance =
+        new bluetooth::shim::EncKeyMaterialInterfaceImpl();
+  }
+  return enc_key_material_instance;
+}
+void bluetooth::shim::init_enc_key_material_manager() {
+  static_cast<bluetooth::shim::EncKeyMaterialInterface*>(
+      bluetooth::shim::get_enc_key_material_instance())
       ->Init();
 }

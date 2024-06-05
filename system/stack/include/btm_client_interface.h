@@ -102,8 +102,6 @@ struct btm_client_interface_t {
                                         uint16_t tx_pdu_length);
     void (*BTM_BleReadControllerFeatures)(
         tBTM_BLE_CTRL_FEATURES_CBACK* p_vsc_cback);
-    void (*BTM_BleSetConnScanParams)(uint32_t scan_interval,
-                                     uint32_t scan_window);
     void (*BTM_BleSetPhy)(const RawAddress& bd_addr, uint8_t tx_phys,
                           uint8_t rx_phys, uint16_t phy_options);
     void (*BTM_BleSetPrefConnParams)(const RawAddress& bd_addr,
@@ -171,8 +169,6 @@ struct btm_client_interface_t {
     uint8_t* (*BTM_GetScramblingSupportedFreqs)(uint8_t* number_of_freqs);
     bool (*BTM_IsQHSPhySupported)(const RawAddress& bda,
                                   tBT_TRANSPORT transport);
-    void (*BTM_RegisterForQleCigLatencyChangedEvt)(
-        tBTM_VS_EVT_CB* qle_cig_latency_changed_cb);
     void (*BTM_SetPowerBackOffState)(bool status);
   } vendor;
 };

@@ -47,6 +47,7 @@ import android.view.Display;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.BluetoothAdapterProxy;
+import com.android.bluetooth.flags.Flags;
 import com.android.bluetooth.gatt.FilterParams;
 import com.android.bluetooth.gatt.GattObjectsFactory;
 import com.android.bluetooth.gatt.GattServiceConfig;
@@ -719,7 +720,16 @@ public class ScanManager {
             if (packages == null || packages.length == 0) {
                 return;
             }
-            int importance = mActivityManager.getPackageImportance(packages[0]);
+            int importance = ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED;
+            if (Flags.leScanUseUidForImportance()) {
+                for (String packageName : packages) {
+                    importance =
+                            Math.min(
+                                    importance, mActivityManager.getPackageImportance(packageName));
+                }
+            } else {
+                importance = mActivityManager.getPackageImportance(packages[0]);
+            }
             boolean isForeground =
                     importance
                             <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
@@ -800,6 +810,12 @@ public class ScanManager {
                     mScanNative.isForceDowngradedScanClient(client)
                             ? SCAN_MODE_FORCE_DOWNGRADED
                             : scanMode;
+            Log.d(
+                    TAG,
+                    "Scan mode update during screen on from "
+                            + client.scanModeApp
+                            + " to "
+                            + getMinScanMode(scanMode, maxScanMode));
             return client.updateScanMode(getMinScanMode(scanMode, maxScanMode));
         }
 
@@ -821,7 +837,9 @@ public class ScanManager {
             if (!mScanNative.isDowngradedScanClient(client)) {
                 return false;
             }
-            client.stats.setScanDowngrade(client.scannerId, false);
+            if (client.stats != null) {
+                client.stats.setScanDowngrade(client.scannerId, false);
+            }
             Log.d(TAG, "revertDowngradeScanModeFromMaxDuty() for " + client);
             if (mScreenOn) {
                 return updateScanModeScreenOn(client);
@@ -1333,7 +1351,8 @@ public class ScanManager {
         }
 
         void regularScanTimeout(ScanClient client) {
-            if (!isExemptFromScanTimeout(client) && client.stats.isScanningTooLong()) {
+            if (!isExemptFromScanTimeout(client)
+                    && (client.stats == null || client.stats.isScanningTooLong())) {
                 Log.d(TAG, "regularScanTimeout - client scan time was too long");
                 if (client.filters == null || client.filters.isEmpty()) {
                     Log.w(TAG,
@@ -1352,8 +1371,10 @@ public class ScanManager {
                     int maxScanMode = SCAN_MODE_FORCE_DOWNGRADED;
                     client.updateScanMode(getMinScanMode(scanMode, maxScanMode));
                 }
-                client.stats.setScanTimeout(client.scannerId);
-                client.stats.recordScanTimeoutCountMetrics();
+                if (client.stats != null) {
+                    client.stats.setScanTimeout(client.scannerId);
+                    client.stats.recordScanTimeoutCountMetrics();
+                }
             }
 
             // The scan should continue for background scans
@@ -1496,7 +1517,9 @@ public class ScanManager {
                                     TAG,
                                     "No hardware resources for onfound/onlost filter "
                                             + trackEntries);
-                            client.stats.recordTrackingHwFilterNotAvailableCountMetrics();
+                            if (client.stats != null) {
+                                client.stats.recordTrackingHwFilterNotAvailableCountMetrics();
+                            }
                             try {
                                 mScanHelper.onScanManagerErrorCallback(
                                         scannerId, ScanCallback.SCAN_FAILED_INTERNAL_ERROR);
@@ -1595,7 +1618,9 @@ public class ScanManager {
                 return true;
             }
             if (client.filters.size() > mFilterIndexStack.size()) {
-                client.stats.recordHwFilterNotAvailableCountMetrics();
+                if (client.stats != null) {
+                    client.stats.recordHwFilterNotAvailableCountMetrics();
+                }
                 return true;
             }
             return false;

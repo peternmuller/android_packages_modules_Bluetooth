@@ -317,18 +317,6 @@ package android.bluetooth {
     field public static final int FILTER_TYPE_TRANSFER = 2; // 0x2
   }
 
-  public final class BluetoothGatt implements android.bluetooth.BluetoothProfile {
-    method @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean bleSubrateRequest(int, int, int, int, int);
-    method @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean requestSubrateMode(int);
-    field public static final int SUBRATE_REQUEST_MODE_BALANCED = 0; // 0x0
-    field public static final int SUBRATE_REQUEST_MODE_HIGH = 1; // 0x1
-    field public static final int SUBRATE_REQUEST_MODE_LOW_POWER = 2; // 0x2
-  }
-
-  public abstract class BluetoothGattCallback {
-    method public void onSubrateChange(android.bluetooth.BluetoothGatt, int, int, int, int, int);
-  }
-
   public final class BluetoothHapClient implements java.lang.AutoCloseable android.bluetooth.BluetoothProfile {
     method public void close();
     method protected void finalize();
@@ -1440,16 +1428,12 @@ package android.bluetooth.le {
   }
 
   public final class ScanSettings implements android.os.Parcelable {
-    method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int getRssiHighThreshold();
-    method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public int getRssiLowThreshold();
     field public static final int SCAN_MODE_AMBIENT_DISCOVERY = 3; // 0x3
     field public static final int SCAN_RESULT_TYPE_ABBREVIATED = 1; // 0x1
     field public static final int SCAN_RESULT_TYPE_FULL = 0; // 0x0
   }
 
   public static final class ScanSettings.Builder {
-    method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public android.bluetooth.le.ScanSettings.Builder setRssiHighThreshold(int);
-    method @RequiresPermission(allOf={android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_PRIVILEGED}) public android.bluetooth.le.ScanSettings.Builder setRssiLowThreshold(int);
     method public android.bluetooth.le.ScanSettings.Builder setScanResultType(int);
   }
 

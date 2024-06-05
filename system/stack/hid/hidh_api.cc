@@ -36,7 +36,6 @@
 #include "internal_include/bt_target.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
-#include "osi/include/osi.h"  // UNUSED_ATTR
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/sdpdefs.h"
@@ -73,8 +72,10 @@ tHID_STATUS HID_HostGetSDPRecord(const RawAddress& addr,
 
   hh_cb.p_sdp_db = p_db;
   Uuid uuid_list = Uuid::From16Bit(UUID_SERVCLASS_HUMAN_INTERFACE);
-  get_legacy_stack_sdp_api()->service.SDP_InitDiscoveryDb(p_db, db_len, 1,
-                                                          &uuid_list, 0, NULL);
+  if (!get_legacy_stack_sdp_api()->service.SDP_InitDiscoveryDb(
+          p_db, db_len, 1, &uuid_list, 0, NULL)) {
+    log::warn("Unable to initialize SDP service discovery db peer:{}", addr);
+  };
 
   if (get_legacy_stack_sdp_api()->service.SDP_ServiceSearchRequest(
           addr, p_db, hidh_search_callback)) {
@@ -82,6 +83,7 @@ tHID_STATUS HID_HostGetSDPRecord(const RawAddress& addr,
     hh_cb.sdp_busy = true;
     return HID_SUCCESS;
   } else {
+    log::warn("Unable to start SDP service search request peer:{}", addr);
     log_counter_metrics(
         android::bluetooth::CodePathCounterKeyEnum::HIDH_ERR_NO_RESOURCES_SDP,
         1);
@@ -114,7 +116,7 @@ void hidh_get_str_attr(tSDP_DISC_REC* p_rec, uint16_t attr_id, uint16_t max_len,
     str[0] = '\0';
 }
 
-static void hidh_search_callback(UNUSED_ATTR const RawAddress& bd_addr,
+static void hidh_search_callback(const RawAddress& /* bd_addr */,
                                  tSDP_RESULT sdp_result) {
   tSDP_DISCOVERY_DB* p_db = hh_cb.p_sdp_db;
   tSDP_DISC_REC* p_rec;

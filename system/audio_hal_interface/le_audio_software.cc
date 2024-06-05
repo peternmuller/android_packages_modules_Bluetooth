@@ -19,8 +19,8 @@
 
 #include "le_audio_software.h"
 
-#include <android_bluetooth_flags.h>
 #include <bluetooth/log.h>
+#include <com_android_bluetooth_flags.h>
 
 #include <unordered_map>
 #include <vector>
@@ -209,15 +209,6 @@ void LeAudioClientInterface::Sink::StartSession() {
       return;
     }
     get_aidl_client_interface(is_broadcaster_)->StartSession();
-  }
-}
-
-void LeAudioClientInterface::Sink::ConfirmSuspendRequest() {
-  LOG(INFO) << __func__;
-  if (HalVersionManager::GetHalTransport() ==
-      BluetoothAudioHalTransport::AIDL) {
-    get_aidl_client_interface(is_broadcaster_)
-        ->StreamSuspended(aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
   }
 }
 
@@ -579,15 +570,6 @@ void LeAudioClientInterface::Source::ReconfigurationComplete() {
     //        StreamSuspended() with SUCCESS_FINISHED ack code.
     aidl::le_audio::LeAudioSourceTransport::interface->StreamSuspended(
         aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
-  }
-}
-
-void LeAudioClientInterface::Source::ConfirmSuspendRequest() {
-  LOG(INFO) << __func__;
-  if (HalVersionManager::GetHalTransport() ==
-      BluetoothAudioHalTransport::AIDL) {
-    aidl::le_audio::LeAudioSourceTransport::interface->StreamSuspended(
-         aidl::BluetoothAudioCtrlAck::SUCCESS_FINISHED);
   }
 }
 
@@ -1031,7 +1013,7 @@ bool LeAudioClientInterface::ReleaseSource(
 }
 
 void LeAudioClientInterface::SetAllowedDsaModes(DsaModes dsa_modes) {
-  if (!IS_FLAG_ENABLED(leaudio_dynamic_spatial_audio)) {
+  if (!com::android::bluetooth::flags::leaudio_dynamic_spatial_audio()) {
     return;
   }
 
