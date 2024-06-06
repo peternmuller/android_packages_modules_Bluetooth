@@ -487,7 +487,6 @@ public final class BluetoothA2dp implements BluetoothProfile {
      * @return the connected device that is active or null if no device is active
      * @hide
      */
-    @SystemApi
     // @UnsupportedAppUsage(trackingBug = 171933273)
     @Nullable
     @RequiresLegacyBluetoothPermission
