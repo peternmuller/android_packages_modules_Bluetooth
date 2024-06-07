@@ -2862,6 +2862,10 @@ public class BassClientService extends ProfileService {
         Map<BluetoothDevice, Integer> sourcesToRemove = new HashMap<>();
 
         for (BluetoothDevice device : getConnectedDevices()) {
+            if (!store && mPausedBroadcastSinks.contains(device)) {
+                Log.w(TAG, "Remove cached broadcast sink: " + device);
+                mPausedBroadcastSinks.remove(device);
+            }
             for (BluetoothLeBroadcastReceiveState receiveState : getAllSources(device)) {
                 /* Check if local/last broadcast is the synced one. Invalid broadcast ID means
                  * that all receivers should be considered.
