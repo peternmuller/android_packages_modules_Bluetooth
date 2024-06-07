@@ -470,6 +470,17 @@ public class A2dpService extends ProfileService {
         return true;
     }
 
+    /**
+     * Informs AVRCP of a disconnection from A2DP
+     *
+     * <p>This is already done in {@link #connectionStateChanged}, but there is no state changed in
+     * case of incoming connection rejection.
+     */
+    public void disconnectAvrcp(BluetoothDevice device) {
+        mFactory.getAvrcpTargetService()
+            .handleA2dpConnectionStateChanged(device, BluetoothProfile.STATE_DISCONNECTED);
+    }
+
     List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
         List<BluetoothDevice> devices = new ArrayList<>();
         if (states == null) {
