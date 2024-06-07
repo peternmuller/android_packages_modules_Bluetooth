@@ -1461,7 +1461,6 @@ cc_test {
         },
     },
     header_libs: ["libbluetooth_headers"],
-    cflags: ["-Wno-unused-parameter"],
 }
 
 // EATT unit tests
@@ -1568,6 +1567,7 @@ cc_test {
     ],
     srcs: [
         ":BluetoothHalSources_hci_host",
+        ":BluetoothHalSources_ranging_host",
         ":BluetoothOsSources_host",
         ":OsiCompatSources",
         ":TestCommonMainHandler",

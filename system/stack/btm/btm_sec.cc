@@ -63,6 +63,7 @@
 #include "stack/include/btm_ble_addr.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_privacy.h"
+#include "stack/include/btm_client_interface.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/btm_sec_api.h"
 #include "stack/include/btm_status.h"
@@ -954,7 +955,10 @@ tBTM_STATUS BTM_SecBondCancel(const RawAddress& bd_addr) {
         return BTM_CMD_STARTED;
       }
       if (btm_sec_cb.pairing_state == BTM_PAIR_STATE_GET_REM_NAME) {
-        BTM_CancelRemoteDeviceName();
+        if (get_btm_client_interface().peer.BTM_CancelRemoteDeviceName() !=
+            BTM_SUCCESS) {
+          log::warn("Unable to cancel RNR");
+        }
         btm_sec_cb.pairing_flags |= BTM_PAIR_FLAGS_WE_CANCEL_DD;
         return BTM_CMD_STARTED;
       }
@@ -1363,7 +1367,14 @@ void BTM_PasskeyReqReply(tBTM_STATUS res, const RawAddress& bd_addr,
  *                  LM
  *
  ******************************************************************************/
-void BTM_ReadLocalOobData(void) { btsnd_hcic_read_local_oob_data(); }
+void BTM_ReadLocalOobData(void) {
+  if (com::android::bluetooth::flags::use_local_oob_extended_command() &&
+      bluetooth::shim::GetController()->SupportsSecureConnections()) {
+    btsnd_hcic_read_local_oob_extended_data();
+  } else {
+    btsnd_hcic_read_local_oob_data();
+  }
+}
 
 /*******************************************************************************
  *
@@ -2152,7 +2163,7 @@ void btm_sec_dev_reset(void) {
                    "only controllers with SSP is supported");
 
   /* set the default IO capabilities */
-  btm_sec_cb.devcb.loc_io_caps = btif_storage_get_local_io_caps();
+  btm_sec_cb.devcb.loc_io_caps = BTM_IO_CAP_IO;
   /* add mx service to use no security */
   BTM_SetSecurityLevel(false, "RFC_MUX", BTM_SEC_SERVICE_RFC_MUX,
                        BTM_SEC_NONE, BT_PSM_RFCOMM, BTM_SEC_PROTO_RFCOMM, 0);

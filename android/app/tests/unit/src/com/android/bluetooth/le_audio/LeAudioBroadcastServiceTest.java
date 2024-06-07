@@ -973,6 +973,7 @@ public class LeAudioBroadcastServiceTest {
 
     @Test
     public void testInCallDrivenBroadcastSwitch() {
+        mSetFlagsRule.disableFlags(Flags.FLAG_LEAUDIO_USE_AUDIO_MODE_LISTENER);
         int groupId = 1;
         int broadcastId = 243;
         byte[] code = {0x00, 0x01, 0x00, 0x02};
@@ -1071,6 +1072,16 @@ public class LeAudioBroadcastServiceTest {
         /* Active group should become the one that was active before broadcasting */
         int activeGroup = mService.getActiveGroupId();
         Assert.assertEquals(activeGroup, groupId);
+
+        /* Imitate group change request by Bluetooth Sink HAL suspend request */
+        create_event =
+                new LeAudioStackEvent(LeAudioStackEvent.EVENT_TYPE_UNICAST_MONITOR_MODE_STATUS);
+        create_event.valueInt1 = LeAudioStackEvent.DIRECTION_SINK;
+        create_event.valueInt2 = LeAudioStackEvent.STATUS_LOCAL_STREAM_SUSPENDED;
+        mService.messageFromNative(create_event);
+
+        /* Device should not be inactivated if in IN_CALL audio mode */
+        verify(mLeAudioNativeInterface, times(1)).groupSetActive(eq(LE_AUDIO_GROUP_ID_INVALID));
 
         /* Imitate setting device not in call */
         mService.handleAudioModeChange(AudioManager.MODE_NORMAL);

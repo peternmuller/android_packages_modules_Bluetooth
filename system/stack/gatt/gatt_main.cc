@@ -130,7 +130,9 @@ void gatt_init(void) {
   // clients exist
   fixed_reg.default_idle_tout = L2CAP_NO_IDLE_TIMEOUT;
 
-  L2CA_RegisterFixedChannel(L2CAP_ATT_CID, &fixed_reg);
+  if (!L2CA_RegisterFixedChannel(L2CAP_ATT_CID, &fixed_reg)) {
+    log::error("Unable to register L2CAP ATT fixed channel");
+  }
 
   gatt_cb.over_br_enabled =
       osi_property_get_bool("bluetooth.gatt.over_bredr.enabled", true);
@@ -269,7 +271,10 @@ bool gatt_disconnect(tGATT_TCB* p_tcb) {
 
   if (p_tcb->att_lcid == L2CAP_ATT_CID) {
     if (ch_state == GATT_CH_OPEN) {
-      L2CA_RemoveFixedChnl(L2CAP_ATT_CID, p_tcb->peer_bda);
+      if (!L2CA_RemoveFixedChnl(L2CAP_ATT_CID, p_tcb->peer_bda)) {
+        log::warn("Unable to remove L2CAP ATT fixed channel peer:{}",
+                  p_tcb->peer_bda);
+      }
       gatt_set_ch_state(p_tcb, GATT_CH_CLOSING);
     } else {
       if (bluetooth::common::init_flags::
@@ -789,7 +794,9 @@ static void gatt_l2cif_connect_ind_cback(const RawAddress& bd_addr,
 
   /* If we reject the connection, send DisconnectReq */
   if (result != L2CAP_CONN_OK) {
-    L2CA_DisconnectReq(lcid);
+    if (!L2CA_DisconnectReq(lcid)) {
+      log::warn("Unable to disconnect L2CAP peer:{} cid:{}", bd_addr, lcid);
+    }
     return;
   }
 
@@ -883,7 +890,9 @@ void gatt_l2cif_disconnect_ind_cback(uint16_t lcid, bool ack_needed) {
 }
 
 static void gatt_l2cif_disconnect(uint16_t lcid) {
-  L2CA_DisconnectReq(lcid);
+  if (!L2CA_DisconnectReq(lcid)) {
+    log::warn("Unable to disconnect L2CAP cid:{}", lcid);
+  }
 
   /* look up clcb for this channel */
   tGATT_TCB* p_tcb = gatt_find_tcb_by_cid(lcid);
@@ -1081,8 +1090,12 @@ void gatt_send_srv_chg_ind(const RawAddress& peer_bda) {
   uint8_t* p = handle_range;
   UINT16_TO_STREAM(p, sGATT_DEFAULT_START_HANDLE);
   UINT16_TO_STREAM(p, sGATT_LAST_HANDLE);
-  GATTS_HandleValueIndication(conn_id, gatt_cb.handle_of_h_r,
-                              GATT_SIZE_OF_SRV_CHG_HNDL_RANGE, handle_range);
+  if (GATTS_HandleValueIndication(conn_id, gatt_cb.handle_of_h_r,
+                                  GATT_SIZE_OF_SRV_CHG_HNDL_RANGE,
+                                  handle_range) != GATT_SUCCESS) {
+    log::warn("Unable to handle GATT service value indication conn_id:{}",
+              conn_id);
+  }
 }
 
 /** Check sending service chnaged Indication is required or not if required then

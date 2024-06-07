@@ -412,8 +412,8 @@ tCONN_CB* sdpu_allocate_ccb(void) {
 void sdpu_callback(tCONN_CB& ccb, tSDP_REASON reason) {
   if (ccb.p_cb) {
     (ccb.p_cb)(ccb.device_address, reason);
-  } else if (ccb.p_cb2) {
-    (ccb.p_cb2)(ccb.device_address, reason, ccb.user_data);
+  } else if (ccb.complete_callback) {
+    ccb.complete_callback.Run(ccb.device_address, reason);
   }
 }
 
@@ -739,7 +739,9 @@ void sdpu_build_n_send_error(tCONN_CB* p_ccb, uint16_t trans_num,
   p_buf->len = p_rsp - p_rsp_start;
 
   /* Send the buffer through L2CAP */
-  L2CA_DataWrite(p_ccb->connection_id, p_buf);
+  if (L2CA_DataWrite(p_ccb->connection_id, p_buf) != L2CAP_DW_SUCCESS) {
+    log::warn("Unable to write L2CAP data cid:{}", p_ccb->connection_id);
+  }
 }
 
 /*******************************************************************************
