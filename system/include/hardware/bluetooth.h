@@ -342,12 +342,7 @@ typedef enum {
    */
   BT_PROPERTY_LOCAL_LE_FEATURES,
 
-  /**
-   * Description - Local Input/Output Capabilities for classic Bluetooth
-   * Access mode - GET and SET
-   * Data Type - bt_io_cap_t.
-   */
-  BT_PROPERTY_LOCAL_IO_CAPS,
+  BT_PROPERTY_RESERVED_0E,
 
   BT_PROPERTY_RESERVED_0F,
 
@@ -373,6 +368,8 @@ typedef enum {
    * Data Type - bt_vendor_product_info_t.
    */
   BT_PROPERTY_VENDOR_PRODUCT_INFO,
+
+  BT_PROPERTY_RESERVED_0x14,
 
   /**
    * Description - ASHA capability.

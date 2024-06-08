@@ -100,6 +100,7 @@ struct btm_client_interface_t btm_client_interface = {
 
     .local =
         {
+            .BTM_ReadLocalDeviceName = BTM_ReadLocalDeviceName,
             .BTM_ReadLocalDeviceNameFromController =
                 BTM_ReadLocalDeviceNameFromController,
             .BTM_SetLocalDeviceName = BTM_SetLocalDeviceName,

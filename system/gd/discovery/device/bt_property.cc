@@ -40,12 +40,13 @@ std::string bt_property_type_text(const bt_property_type_t& type) {
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_RSSI);
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_VERSION_INFO);
     CASE_RETURN_TEXT(BT_PROPERTY_LOCAL_LE_FEATURES);
-    CASE_RETURN_TEXT(BT_PROPERTY_LOCAL_IO_CAPS);
+    CASE_RETURN_TEXT(BT_PROPERTY_RESERVED_0E);
     CASE_RETURN_TEXT(BT_PROPERTY_RESERVED_0F);
     CASE_RETURN_TEXT(BT_PROPERTY_DYNAMIC_AUDIO_BUFFER);
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_IS_COORDINATED_SET_MEMBER);
     CASE_RETURN_TEXT(BT_PROPERTY_APPEARANCE);
     CASE_RETURN_TEXT(BT_PROPERTY_VENDOR_PRODUCT_INFO);
+    CASE_RETURN_TEXT(BT_PROPERTY_RESERVED_0x14);
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_ASHA_CAPABILITY);
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_ASHA_TRUNCATED_HISYNCID);
     CASE_RETURN_TEXT(BT_PROPERTY_REMOTE_MODEL_NUM);
@@ -182,11 +183,8 @@ std::string bt_property_text(const bt_property_t& property) {
               ->le_periodic_advertising_sync_transfer_recipient_supported,
           ((bt_local_le_features_t*)property.val)->adv_filter_extended_features_mask);
 
-    case BT_PROPERTY_LOCAL_IO_CAPS:
-      return base::StringPrintf(
-          "type:%s local_io_caps:%d",
-          bt_property_type_text(property.type).c_str(),
-          *(bt_io_cap_t*)property.val);
+    case BT_PROPERTY_RESERVED_0E:
+      return base::StringPrintf("type:%s", bt_property_type_text(property.type).c_str());
 
     case BT_PROPERTY_RESERVED_0F:
       return base::StringPrintf("type:%s", bt_property_type_text(property.type).c_str());
@@ -214,6 +212,9 @@ std::string bt_property_text(const bt_property_t& property) {
           ((bt_vendor_product_info_t*)property.val)->vendor_id,
           ((bt_vendor_product_info_t*)property.val)->product_id,
           ((bt_vendor_product_info_t*)property.val)->version);
+
+    case BT_PROPERTY_RESERVED_0x14:
+      return base::StringPrintf("type:%s", bt_property_type_text(property.type).c_str());
 
     case BT_PROPERTY_REMOTE_ASHA_CAPABILITY:
       return base::StringPrintf(
@@ -335,9 +336,6 @@ std::shared_ptr<RemoteVersionInfo> RemoteVersionInfo::Create(const bt_remote_ver
 }
 std::shared_ptr<LocalLeFeatures> LocalLeFeatures::Create(const bt_local_le_features_t& features) {
   return std::make_shared<LocalLeFeatures>(LocalLeFeatures(features));
-}
-std::shared_ptr<LocalIOCaps> LocalIOCaps::Create(const bt_io_cap_t& caps) {
-  return std::make_shared<LocalIOCaps>(LocalIOCaps(caps));
 }
 std::shared_ptr<RemoteIsCoordinatedSetMember> RemoteIsCoordinatedSetMember::Create(
     const bool& is_set_member) {

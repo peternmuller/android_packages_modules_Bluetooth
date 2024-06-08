@@ -245,7 +245,10 @@ void BTA_dm_on_hw_on() {
   log::info("Read default class of device [0x{:x}, 0x{:x}, 0x{:x}]",
             dev_class[0], dev_class[1], dev_class[2]);
 
-  get_btm_client_interface().local.BTM_SetDeviceClass(dev_class);
+  if (get_btm_client_interface().local.BTM_SetDeviceClass(dev_class) !=
+      BTM_SUCCESS) {
+    log::warn("Unable to set local device class:{}", dev_class_text(dev_class));
+  }
 
   /* load BLE local information: ID keys, ER if available */
   Octet16 er;
@@ -289,8 +292,10 @@ void BTA_dm_on_hw_on() {
      which forces
      the DM_ENABLE_EVT to be sent only after all the init steps are complete
      */
-  get_btm_client_interface().local.BTM_ReadLocalDeviceNameFromController(
-      bta_dm_local_name_cback);
+  if (get_btm_client_interface().local.BTM_ReadLocalDeviceNameFromController(
+          bta_dm_local_name_cback) != BTM_CMD_STARTED) {
+    log::warn("Unable to read local device name from controller");
+  }
 
   bta_sys_rm_register(bta_dm_rm_cback);
 
@@ -309,14 +314,26 @@ void BTA_dm_on_hw_on() {
 void bta_dm_disable() {
   /* Set l2cap idle timeout to 0 (so BTE immediately disconnects ACL link after
    * last channel is closed) */
-  L2CA_SetIdleTimeoutByBdAddr(RawAddress::kAny, 0, BT_TRANSPORT_BR_EDR);
-  L2CA_SetIdleTimeoutByBdAddr(RawAddress::kAny, 0, BT_TRANSPORT_LE);
+  if (!L2CA_SetIdleTimeoutByBdAddr(RawAddress::kAny, 0, BT_TRANSPORT_BR_EDR)) {
+    log::warn(
+        "Unable to set L2CAP idle timeout peer:{} transport:{} timeout:{}",
+        RawAddress::kAny, BT_TRANSPORT_BR_EDR, 0);
+  }
+  if (!L2CA_SetIdleTimeoutByBdAddr(RawAddress::kAny, 0, BT_TRANSPORT_LE)) {
+    log::warn(
+        "Unable to set L2CAP idle timeout peer:{} transport:{} timeout:{}",
+        RawAddress::kAny, BT_TRANSPORT_LE, 0);
+  }
 
   /* disable all active subsystems */
   bta_sys_disable();
 
-  BTM_SetDiscoverability(BTM_NON_DISCOVERABLE);
-  BTM_SetConnectability(BTM_NON_CONNECTABLE);
+  if (BTM_SetDiscoverability(BTM_NON_DISCOVERABLE) != BTM_SUCCESS) {
+    log::warn("Unable to disable classic BR/EDR discoverability");
+  }
+  if (BTM_SetConnectability(BTM_NON_CONNECTABLE) != BTM_SUCCESS) {
+    log::warn("Unable to disable classic BR/EDR connectability");
+  }
 
   bta_dm_disable_pm();
   if (com::android::bluetooth::flags::separate_service_and_device_discovery()) {
@@ -404,8 +421,10 @@ static void bta_dm_wait_for_acl_to_drain_cback(void* data) {
 
 /** Sets local device name */
 void bta_dm_set_dev_name(const std::vector<uint8_t>& name) {
-  get_btm_client_interface().local.BTM_SetLocalDeviceName(
-      (const char*)name.data());
+  if (get_btm_client_interface().local.BTM_SetLocalDeviceName(
+          (const char*)name.data()) != BTM_CMD_STARTED) {
+    log::warn("Unable to set local device name");
+  }
   bta_dm_set_eir((char*)name.data());
 }
 
@@ -416,31 +435,37 @@ bool BTA_DmSetVisibility(bt_scan_mode_t mode) {
 
   switch (mode) {
     case BT_SCAN_MODE_NONE:
-      disc_mode_param = BTA_DM_NON_DISC;
-      conn_mode_param = BTA_DM_NON_CONN;
+      disc_mode_param = BTM_NON_DISCOVERABLE;
+      conn_mode_param = BTM_NON_CONNECTABLE;
       break;
 
     case BT_SCAN_MODE_CONNECTABLE:
-      disc_mode_param = BTA_DM_NON_DISC;
-      conn_mode_param = BTA_DM_CONN;
+      disc_mode_param = BTM_NON_DISCOVERABLE;
+      conn_mode_param = BTM_CONNECTABLE;
       break;
 
     case BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE:
-      disc_mode_param = BTA_DM_GENERAL_DISC;
-      conn_mode_param = BTA_DM_CONN;
+      disc_mode_param = BTM_GENERAL_DISCOVERABLE;
+      conn_mode_param = BTM_CONNECTABLE;
       break;
 
     case BT_SCAN_MODE_CONNECTABLE_LIMITED_DISCOVERABLE:
-      disc_mode_param = BTA_DM_LIMITED_DISC;
-      conn_mode_param = BTA_DM_CONN;
+      disc_mode_param = BTM_LIMITED_DISCOVERABLE;
+      conn_mode_param = BTM_CONNECTABLE;
       break;
 
     default:
       return false;
   }
 
-  BTM_SetDiscoverability(disc_mode_param);
-  BTM_SetConnectability(conn_mode_param);
+  if (BTM_SetDiscoverability(disc_mode_param) != BTM_SUCCESS) {
+    log::warn("Unable to set classic BR/EDR discoverability 0x{:04x}",
+              disc_mode_param);
+  }
+  if (BTM_SetConnectability(conn_mode_param) != BTM_SUCCESS) {
+    log::warn("Unable to set classic BR/EDR connectability 0x{:04x}",
+              conn_mode_param);
+  }
   return true;
 }
 void bta_dm_process_remove_device_no_callback(const RawAddress& bd_addr) {
@@ -487,7 +512,10 @@ void bta_dm_remove_device(const RawAddress& bd_addr) {
         peer_device.conn_state = BTA_DM_UNPAIRING;
 
         /* Make sure device is not in acceptlist before we disconnect */
-        GATT_CancelConnect(0, bd_addr, false);
+        if (!GATT_CancelConnect(0, bd_addr, false)) {
+          log::warn("Unable to cancel GATT connect peer:{} is_direct:{}",
+                    bd_addr, false);
+        }
 
         btm_remove_acl(bd_addr, peer_device.transport);
         log::verbose("transport: {}", peer_device.transport);
@@ -540,7 +568,10 @@ void bta_dm_remove_device(const RawAddress& bd_addr) {
         log::info("Remove ACL of address {}", other_address);
 
         /* Make sure device is not in acceptlist before we disconnect */
-        GATT_CancelConnect(0, bd_addr, false);
+        if (!GATT_CancelConnect(0, bd_addr, false)) {
+          log::warn("Unable to cancel GATT connect peer:{} is_direct:{}",
+                    bd_addr, false);
+        }
 
         btm_remove_acl(other_address, peer_device.transport);
         break;
@@ -597,7 +628,20 @@ static void handle_role_change(const RawAddress& bd_addr, tHCI_ROLE new_role,
       /* more than one connections and the AV connection is role switched
        * to peripheral
        * switch it back to central and remove the switch policy */
-      get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(bd_addr);
+      const tBTM_STATUS status =
+          get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(
+              bd_addr);
+      switch (status) {
+        case BTM_SUCCESS:
+          log::debug("Role policy already set to central peer:{}", bd_addr);
+          break;
+        case BTM_CMD_STARTED:
+          log::debug("Role policy started to central peer:{}", bd_addr);
+          break;
+        default:
+          log::warn("Unable to set role policy to central peer:{}", bd_addr);
+          break;
+      }
       need_policy_change = true;
     } else if (p_bta_dm_cfg->avoid_scatter && (new_role == HCI_ROLE_CENTRAL)) {
       /* if the link updated to be central include AV activities, remove
@@ -832,8 +876,23 @@ static void bta_dm_check_av() {
                 p_dev->info_text());
       if ((p_dev->conn_state == BTA_DM_CONNECTED) && p_dev->is_av_active()) {
         /* make central and take away the role switch policy */
-        get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(
-            p_dev->peer_bdaddr);
+        const tBTM_STATUS status =
+            get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(
+                p_dev->peer_bdaddr);
+        switch (status) {
+          case BTM_SUCCESS:
+            log::debug("Role policy already set to central peer:{}",
+                       p_dev->peer_bdaddr);
+            break;
+          case BTM_CMD_STARTED:
+            log::debug("Role policy started to central peer:{}",
+                       p_dev->peer_bdaddr);
+            break;
+          default:
+            log::warn("Unable to set role policy to central peer:{}",
+                      p_dev->peer_bdaddr);
+            break;
+        }
         /* else either already central or can not switch for some reasons */
         get_btm_client_interface().link_policy.BTM_block_role_switch_for(
             p_dev->peer_bdaddr);
@@ -977,8 +1036,23 @@ static void bta_dm_adjust_roles(bool delay_role_switch) {
           if (bta_dm_cb.device_list.peer_device[i].pref_role !=
                   BTA_PERIPHERAL_ROLE_ONLY &&
               !delay_role_switch) {
-            get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(
-                bta_dm_cb.device_list.peer_device[i].peer_bdaddr);
+            const tBTM_STATUS status =
+                get_btm_client_interface().link_policy.BTM_SwitchRoleToCentral(
+                    bta_dm_cb.device_list.peer_device[i].peer_bdaddr);
+            switch (status) {
+              case BTM_SUCCESS:
+                log::debug("Role policy already set to central peer:{}",
+                           bta_dm_cb.device_list.peer_device[i].peer_bdaddr);
+                break;
+              case BTM_CMD_STARTED:
+                log::debug("Role policy started to central peer:{}",
+                           bta_dm_cb.device_list.peer_device[i].peer_bdaddr);
+                break;
+              default:
+                log::warn("Unable to set role policy to central peer:{}",
+                          bta_dm_cb.device_list.peer_device[i].peer_bdaddr);
+                break;
+            }
           } else {
             alarm_set_on_mloop(bta_dm_cb.switch_delay_timer,
                                BTA_DM_SWITCH_DELAY_TIMER_MS,
@@ -1231,7 +1305,9 @@ static void bta_dm_set_eir(char* local_name) {
   if (free_eir_length)
     UINT8_TO_STREAM(p, 0); /* terminator of significant part */
 
-  get_btm_client_interface().eir.BTM_WriteEIR(p_buf);
+  if (get_btm_client_interface().eir.BTM_WriteEIR(p_buf) != BTM_SUCCESS) {
+    log::warn("Unable to write EIR data");
+  }
 }
 
 /*******************************************************************************
@@ -1595,7 +1671,9 @@ void bta_dm_allow_wake_by_hid(
   // If there are any entries in the classic hid list, we should also make
   // the adapter connectable for classic.
   if (classic_hid_devices.size() > 0) {
-    BTM_SetConnectability(BTA_DM_CONN);
+    if (BTM_SetConnectability(BTM_CONNECTABLE) != BTM_SUCCESS) {
+      log::warn("Unable to enable classic BR/EDR connectability");
+    }
   }
 
   bluetooth::shim::BTM_AllowWakeByHid(std::move(classic_hid_devices),
@@ -1694,8 +1772,10 @@ void bta_dm_ble_subrate_request(const RawAddress& bd_addr, uint16_t subrate_min,
                                 uint16_t subrate_max, uint16_t max_latency,
                                 uint16_t cont_num, uint16_t timeout) {
     // Logging done in l2c_ble.cc
-    L2CA_SubrateRequest(bd_addr, subrate_min, subrate_max, max_latency,
-                        cont_num, timeout);
+    if (!L2CA_SubrateRequest(bd_addr, subrate_min, subrate_max, max_latency,
+                             cont_num, timeout)) {
+      log::warn("Unable to set L2CAP ble subrating peer:{}", bd_addr);
+    }
 }
 
 namespace bluetooth {

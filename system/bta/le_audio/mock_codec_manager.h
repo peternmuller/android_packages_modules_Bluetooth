@@ -22,6 +22,11 @@
 
 #include "codec_manager.h"
 
+namespace bluetooth::le_audio {
+class LeAudioSinkAudioHalClient;
+class LeAudioSourceAudioHalClient;
+}  // namespace bluetooth::le_audio
+
 class MockCodecManager {
  public:
   static MockCodecManager* GetInstance();
@@ -37,6 +42,19 @@ class MockCodecManager {
   MOCK_METHOD((bool), IsDualBiDirSwbSupported, (), (const));
   MOCK_METHOD((bool), IsAptxAdaptiveLeSupported, (), (const));
   MOCK_METHOD((bool), IsAptxAdaptiveLeXSupported, (), (const));
+
+  MOCK_METHOD(
+      (bool), UpdateActiveUnicastAudioHalClient,
+      (::bluetooth::le_audio::LeAudioSourceAudioHalClient *
+           source_unicast_client,
+       ::bluetooth::le_audio::LeAudioSinkAudioHalClient* sink_unicast_client,
+       bool is_active));
+
+  MOCK_METHOD((bool), UpdateActiveBroadcastAudioHalClient,
+              (::bluetooth::le_audio::LeAudioSourceAudioHalClient *
+                   source_broadcast_client,
+               bool is_active));
+
   MOCK_METHOD(
       (void), UpdateActiveAudioConfig,
       (const bluetooth::le_audio::types::BidirectionalPair<

@@ -241,9 +241,8 @@ class BluetoothServiceBinder extends IBluetoothManager.Stub {
         return true;
     }
 
-    @Override
-    public boolean isBleScanAlwaysAvailable() {
-        return mBluetoothManagerService.isBleScanAlwaysAvailable();
+    public boolean isBleScanAvailable() {
+        return mBluetoothManagerService.isBleScanAvailable();
     }
 
     @Override
