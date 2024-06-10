@@ -218,7 +218,8 @@ AudioContexts GetAudioContextsFromSinkMetadata(
         audioSourceToStr(track.source), track.source, track.gain,
         track.dest_device, track.dest_device_address);
 
-    if (track.source == AUDIO_SOURCE_MIC) {
+    if (track.source == AUDIO_SOURCE_MIC ||
+        track.source == AUDIO_SOURCE_CAMCORDER ) {
       track_context = LeAudioContextType::LIVE;
 
     } else if (track.source == AUDIO_SOURCE_VOICE_COMMUNICATION) {

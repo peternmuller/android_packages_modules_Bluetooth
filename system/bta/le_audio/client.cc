@@ -1409,6 +1409,9 @@ class LeAudioClientImpl : public LeAudioClient {
       //Below to ensure CIS termination before updating to app about inactive.
       if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
         defer_notify_inactive_until_stop_ = true;
+        //Race condition between Reconfigure(due to, MetadataUpdate)
+        //and groupsetactive to null
+        group->ClearPendingConfiguration();
       }
 
       groupSetAndNotifyInactive();
@@ -5205,13 +5208,15 @@ class LeAudioClientImpl : public LeAudioClient {
                is_releasing_for_reconfiguration ? "True" : "False");
     log::debug("is_ongoing_call_on_other_direction={}",
                is_ongoing_call_on_other_direction ? "True" : "False");
+    log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
 
     if (remote_metadata.get(remote_other_direction)
             .test_any(kLeAudioContextAllBidir) &&
         !is_streaming_other_direction) {
       log::debug(
-          "The other direction is not streaming bidirectional, ignore that "
-          "context.");
+            "The other direction is not streaming bidirectional, ignore that "
+            "context.");
       remote_metadata.get(remote_other_direction).clear();
     }
 
@@ -6018,6 +6023,9 @@ class LeAudioClientImpl : public LeAudioClient {
          * Clean state and if Audio HAL is waiting, cancel the request
          * so Audio HAL can Resume again.
          */
+        if (group->IsSuspendedForReconfiguration()) {
+          group->ClearSuspendedForReconfiguration();
+        }
         CancelStreamingRequest();
         ReconfigurationComplete(previously_active_directions);
       } break;
@@ -6034,11 +6042,14 @@ class LeAudioClientImpl : public LeAudioClient {
         if (sw_dec_right) sw_dec_right.reset();
         CleanCachedMicrophoneData();
 
+        log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
         if (group) {
           //handleAsymmetricPhyForUnicast(group);
           UpdateLocationsAndContextsAvailability(group);
           if (group->IsPendingConfiguration()) {
             SuspendedForReconfiguration();
+            group->SetSuspendedForReconfiguration();
             auto remote_direction =
                 kLeAudioContextAllRemoteSource.test(configuration_context_type_)
                     ? bluetooth::le_audio::types::kLeAudioDirectionSource
@@ -6064,6 +6075,9 @@ class LeAudioClientImpl : public LeAudioClient {
             log::info("Clear pending configuration flag for group {}",
                       group->group_id_);
             group->ClearPendingConfiguration();
+            stream_setup_end_timestamp_ = 0;
+            stream_setup_start_timestamp_ = 0;
+            CancelStreamingRequest();
           } else {
             log::info("sink_monitor_mode_: {}, defer_notify_inactive_until_stop_: {}, "
                       "defer_notify_active_until_stop_: {}, defer_source_suspend_ack_until_stop_: {}, "
@@ -6092,12 +6106,28 @@ class LeAudioClientImpl : public LeAudioClient {
               CheckAndNotifyGroupInactive(group_id);
               defer_notify_inactive_until_stop_ = false;
             }
+
+            stream_setup_end_timestamp_ = 0;
+            stream_setup_start_timestamp_ = 0;
+            if (group->IsSuspendedForReconfiguration()) {
+               group->ClearSuspendedForReconfiguration();
+               // Check which directions were suspended
+               uint8_t prev_active_directions = 0;
+               if (audio_sender_state_ >= AudioState::READY_TO_START) {
+                 prev_active_directions |=
+                     bluetooth::le_audio::types::kLeAudioDirectionSink;
+               }
+               if (audio_receiver_state_ >= AudioState::READY_TO_START) {
+                 prev_active_directions |=
+                     bluetooth::le_audio::types::kLeAudioDirectionSource;
+               }
+               CancelStreamingRequest();
+               ReconfigurationComplete(prev_active_directions);
+            } else {
+               CancelStreamingRequest();
+            }
           }
         }
-
-        stream_setup_end_timestamp_ = 0;
-        stream_setup_start_timestamp_ = 0;
-        CancelStreamingRequest();
 
         if (group) {
           NotifyUpperLayerGroupTurnedIdleDuringCall(group->group_id_);

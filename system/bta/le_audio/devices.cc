@@ -400,6 +400,7 @@ void LeAudioDevice::SetConnectionState(DeviceConnectState state) {
 }
 
 DeviceConnectState LeAudioDevice::GetConnectionState(void) {
+  log::debug("connection_state_: {}", bluetooth::common::ToString(connection_state_));
   return connection_state_;
 }
 

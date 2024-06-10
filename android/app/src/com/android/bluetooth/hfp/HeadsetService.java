@@ -1384,6 +1384,7 @@ public class HeadsetService extends ProfileService {
      */
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public boolean setActiveDevice(BluetoothDevice device) {
+        boolean deferConnectAudio = false;
         Log.i(TAG, "setActiveDevice: device=" + device + ", " + Utils.getUidPidString());
         if (device == null) {
             removeActiveDevice();
@@ -1415,6 +1416,7 @@ public class HeadsetService extends ProfileService {
                 if (leAudioService != null
                         && !leAudioService.getConnectedDevices().isEmpty()
                         && Flags.leaudioResumeActiveAfterHfpHandover()) {
+                    deferConnectAudio = true;
                     Log.i(TAG, "Make sure no le audio device active for HFP handover.");
                     leAudioService.setInactiveForHfpHandover(mActiveDevice);
                 }
@@ -1450,6 +1452,7 @@ public class HeadsetService extends ProfileService {
                  */
                 LeAudioService leAudioService = mFactory.getLeAudioService();
                 if (leAudioService != null && !Flags.leaudioResumeActiveAfterHfpHandover()) {
+                    deferConnectAudio = true;
                     Log.i(TAG, "Make sure there is no le audio device active.");
                     leAudioService.setInactiveForHfpHandover(mActiveDevice);
                 }
@@ -1467,17 +1470,22 @@ public class HeadsetService extends ProfileService {
                     // Audio Framework will handle audio transition
                     return true;
                 }
-                int connectStatus = connectAudio(mActiveDevice);
-                if (connectStatus != BluetoothStatusCodes.SUCCESS) {
-                    Log.e(TAG, "setActiveDevice: fail to connectAudio to " + mActiveDevice
-                            + " with status code " + connectStatus);
-                    if (previousActiveDevice == null) {
-                        removeActiveDevice();
-                    } else {
-                        mActiveDevice = previousActiveDevice;
-                        mNativeInterface.setActiveDevice(previousActiveDevice);
+
+                Log.i(TAG, "setActiveDevice: deferConnectAudio: " + deferConnectAudio);
+                if (!deferConnectAudio || !(SystemProperties.getBoolean(
+                           "persist.bluetooth.leaudio.notify.idle.during.call", false))) {
+                    int connectStatus = connectAudio(mActiveDevice);
+                    if (connectStatus != BluetoothStatusCodes.SUCCESS) {
+                        Log.e(TAG, "setActiveDevice: fail to connectAudio to " + mActiveDevice
+                                + " with status code " + connectStatus);
+                        if (previousActiveDevice == null) {
+                            removeActiveDevice();
+                        } else {
+                            mActiveDevice = previousActiveDevice;
+                            mNativeInterface.setActiveDevice(previousActiveDevice);
+                        }
+                        return false;
                     }
-                    return false;
                 }
             } else {
                 if (Utils.isScoManagedByAudioEnabled()) {
