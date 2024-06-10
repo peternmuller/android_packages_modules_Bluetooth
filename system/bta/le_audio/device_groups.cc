@@ -1587,6 +1587,7 @@ bool LeAudioDeviceGroup::ConfigureAses(
     const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists) {
   bool reuse_cis_id =
       GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED;
+  log::info("reuse_cis_id: {}", reuse_cis_id);
 
   /* TODO For now: set ase if matching with first pac.
    * 1) We assume as well that devices will match requirements in order
@@ -1712,6 +1713,8 @@ LeAudioDeviceGroup::GetConfiguration(LeAudioContextType context_type) const {
     is_valid = valid_config_pair.first;
     conf = valid_config_pair.second.get();
   }
+
+  log::info(" is_valid: {}", is_valid);
   if (!is_valid || (conf == nullptr)) {
     UpdateAudioSetConfigurationCache(context_type);
   }
@@ -1852,6 +1855,7 @@ void LeAudioDeviceGroup::RemoveCisFromStreamIfNeeded(
 }
 
 bool LeAudioDeviceGroup::IsPendingConfiguration(void) const {
+  log::info(" pending_config: {}", stream_conf.pending_configuration);
   return stream_conf.pending_configuration;
 }
 
@@ -1861,6 +1865,20 @@ void LeAudioDeviceGroup::SetPendingConfiguration(void) {
 
 void LeAudioDeviceGroup::ClearPendingConfiguration(void) {
   stream_conf.pending_configuration = false;
+}
+
+bool LeAudioDeviceGroup::IsSuspendedForReconfiguration(void) const {
+  log::info(" suspended_for_reconfig_: {}",
+                                      suspended_for_reconfig_);
+  return suspended_for_reconfig_;
+}
+
+void LeAudioDeviceGroup::SetSuspendedForReconfiguration(void) {
+  suspended_for_reconfig_ = true;
+}
+
+void LeAudioDeviceGroup::ClearSuspendedForReconfiguration(void) {
+  suspended_for_reconfig_ = false;
 }
 
 void LeAudioDeviceGroup::Disable(int gatt_if) {
