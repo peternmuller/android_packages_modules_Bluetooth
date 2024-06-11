@@ -390,6 +390,13 @@ inline bool is_broadcaster_session(SessionType session_type) {
   return false;
 }
 
+bool is_aidl_v4plus() {
+  return HalVersionManager::GetHalTransport() ==
+             BluetoothAudioHalTransport::AIDL &&
+         HalVersionManager::GetHalVersion() >=
+             BluetoothAudioHalVersion::VERSION_AIDL_V4;
+}
+
 LeAudioSinkTransport::LeAudioSinkTransport(SessionType session_type,
                                            StreamCallbacks stream_cb)
     : IBluetoothSinkTransportInstance(session_type, (AudioConfiguration){}) {
@@ -827,8 +834,15 @@ AudioConfiguration offload_config_to_hal_audio_config(
           .octetsPerFrame = static_cast<int32_t>(offload_config.octets_per_frame),
           .blocksPerSdu = static_cast<int8_t>(offload_config.blocks_per_sdu),
       };
+
+      auto peer_delay = offload_config.peer_delay_ms * 1000;
+      if (!is_aidl_v4plus()) {
+          log::info("AIDL Version <= V3");
+          peer_delay /= 1000;
+      }
+
       LeAudioConfiguration ucast_config = {
-          .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+          .peerDelayUs = static_cast<int32_t>(peer_delay),
           .leAudioCodecConfig = LeAudioCodecConfiguration(lc3_config)};
 
       for (auto& [handle, location, state] : offload_config.stream_map) {
@@ -854,9 +868,16 @@ AudioConfiguration offload_config_to_hal_audio_config(
       lc3q_config.vendorCodecType = VendorCodecType::LC3Q;
       lc3q_config.codecSpecificData = vs_metadata;
       vendor_config.extension.setParcelable(lc3q_config);
+
+      auto peer_delay = offload_config.peer_delay_ms * 1000;
+      if (!is_aidl_v4plus()) {
+          log::info("AIDL Version <= V3");
+          peer_delay /= 1000;
+      }
+
       LeAudioConfiguration ucast_config = {
        .codecType = CodecType::VENDOR,
-       .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+       .peerDelayUs = static_cast<int32_t>(peer_delay),
        .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
       for (auto& [handle, location, state] : offload_config.stream_map) {
         ucast_config.streamMap.push_back({
@@ -899,9 +920,16 @@ AudioConfiguration offload_config_to_hal_audio_config(
     }
     aptx_config.codecSpecificData = vs_metadata;
     vendor_config.extension.setParcelable(aptx_config);
+
+    auto peer_delay = offload_config.peer_delay_ms * 1000;
+    if (!is_aidl_v4plus()) {
+        log::info("AIDL Version <= V3");
+        peer_delay /= 1000;
+    }
+
     LeAudioConfiguration ucast_config = {
      .codecType = CodecType::VENDOR,
-     .peerDelayUs = static_cast<int32_t>(offload_config.peer_delay_ms * 1000),
+     .peerDelayUs = static_cast<int32_t>(peer_delay),
      .leAudioCodecConfig = LeAudioCodecConfiguration(vendor_config)};
     for (auto& [handle, location, state] : offload_config.stream_map) {
       ucast_config.streamMap.push_back({
