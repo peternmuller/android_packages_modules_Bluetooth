@@ -58,13 +58,17 @@ void get_cis_count(LeAudioContextType context_type,
       bluetooth::common::ToString(context_type), static_cast<int>(strategy),
       avail_group_ase_snk_cnt, avail_group_ase_src_count, expected_device_cnt);
 
-  bool is_bidirectional = types::kLeAudioContextAllBidir.test(context_type);
-
-  bool is_leX_codec = false;
+  bool is_bidirectional = false, is_leX_codec = false;
 
   if (conf->confs.sink.size() > 0) {
     if (conf->confs.sink[0].codec.id == set_configurations::LeAudioCodecIdAptxLeX)
       is_leX_codec = true;
+  }
+
+  if (is_leX_codec) {
+     is_bidirectional = types::kLeAudioContextLibrettoBidir.test(context_type);
+  } else {
+     is_bidirectional = types::kLeAudioContextAllBidir.test(context_type);
   }
 
   if((strategy == types::LeAudioConfigurationStrategy::STEREO_TWO_CISES_PER_DEVICE) &&
