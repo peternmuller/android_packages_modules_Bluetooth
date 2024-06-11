@@ -933,9 +933,12 @@ class LeAudioClientImpl : public LeAudioClient {
           UnicastMonitorModeStatus::STREAMING_REQUESTED);
     }
 
-    send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+    auto device = group->GetFirstDevice();
+    if (device) {
+      send_vs_cmd(device->GetBdAddress(),
         static_cast<uint16_t>(configuration_context_type),
         group->GetFirstDevice()->snk_pacs_);
+    }
 
     bool result = groupStateMachine_->StartStream(
         group, configuration_context_type, remote_contexts, ccids);
@@ -5448,14 +5451,6 @@ class LeAudioClientImpl : public LeAudioClient {
       }
     }
 
-    auto addr = group->GetFirstDevice()->GetBdAddress();
-    log::debug("RawAddress address: {}", addr);
-    LeAudioDevice* leAudioDevice = leAudioDevices_.FindByAddress(addr);
-    if (leAudioDevice) {
-        send_vs_cmd(addr, static_cast<uint16_t>(new_config_context),
-            group->GetFirstDevice()->snk_pacs_);
-    }
-
     /* Note that the remote device metadata was so far unfiltered when it comes
      * to group context availability, or multiple contexts support flag, so that
      * we could choose the correct configuration for the use case. Now we can
@@ -5501,6 +5496,13 @@ class LeAudioClientImpl : public LeAudioClient {
           "Checking whether to change configuration context from {} to {}",
           ToString(configuration_context_type_),
           ToString(new_configuration_context));
+
+      auto device = group->GetFirstDevice();
+      if (device) {
+        send_vs_cmd(device->GetBdAddress(),
+          static_cast<uint16_t>(new_configuration_context),
+          group->GetFirstDevice()->snk_pacs_);
+      }
 
       LeAudioLogHistory::Get()->AddLogHistory(
           kLogAfCallBt, active_group_id_, RawAddress::kEmpty,
