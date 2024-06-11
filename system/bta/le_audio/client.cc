@@ -1118,7 +1118,16 @@ class LeAudioClientImpl : public LeAudioClient {
     return in_voip_call_;
   }
 
+  bool IsInIdle() override {
+    log::info("audio_sender_state_: {}, audio_receiver_state_: {}",
+                        audio_sender_state_, audio_receiver_state_);
+    return audio_sender_state_ == AudioState::IDLE &&
+           audio_receiver_state_ == AudioState::IDLE;
+  }
+
   bool IsInStreaming() override {
+    log::info("audio_sender_state_: {}, audio_receiver_state_: {}",
+                        audio_sender_state_, audio_receiver_state_);
     return audio_sender_state_ == AudioState::STARTED ||
            audio_receiver_state_ == AudioState::STARTED;
   }
@@ -6669,6 +6678,13 @@ bool LeAudioClient::IsLeAudioClientInStreaming(void) {
     return false;
   }
   return instance->IsInStreaming();
+}
+
+bool LeAudioClient::IsLeAudioClientInIdle(void) {
+  if (!instance) {
+    return false;
+  }
+  return instance->IsInIdle();
 }
 
 LeAudioClient* LeAudioClient::Get() {
