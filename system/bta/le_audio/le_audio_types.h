@@ -1471,6 +1471,7 @@ static constexpr uint32_t kChannelAllocationStereo =
 
 /* Declarations */
 void get_cis_count(types::LeAudioContextType context_type,
+                   std::shared_ptr<const set_configurations::AudioSetConfiguration> conf,
                    int expected_device_cnt,
                    types::LeAudioConfigurationStrategy strategy,
                    int group_ase_snk_cnt, int group_ase_src_count,
