@@ -43,7 +43,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Provides Device Group details.
  *
- * {@see BluetoothDeviceGroup}
  * @hide
  *
  */
