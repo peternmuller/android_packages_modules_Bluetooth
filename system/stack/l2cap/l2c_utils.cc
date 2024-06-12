@@ -1472,6 +1472,14 @@ tL2C_CCB* l2cu_allocate_ccb(tL2C_LCB* p_lcb, uint16_t cid, bool is_eatt) {
   return p_ccb;
 }
 
+void l2cu_reset_lcb_timeout(uint16_t handle) {
+  tL2C_LCB* p_lcb = l2cu_find_lcb_by_handle(handle);
+  if (p_lcb != nullptr) {
+    log::debug("idle_timeout reset");
+    p_lcb->idle_timeout = 0;
+  }
+}
+
 /*******************************************************************************
  *
  * Function         l2cu_start_post_bond_timer

@@ -63,6 +63,11 @@ bool l2cu_set_acl_priority(const RawAddress& /* bd_addr */,
   inc_func_call_count(__func__);
   return false;
 }
+
+void l2cu_reset_lcb_timeout(uint16_t /* handle */) {
+  inc_func_call_count(__func__);
+}
+
 bool l2cu_start_post_bond_timer(uint16_t /* handle */) {
   inc_func_call_count(__func__);
   return false;
