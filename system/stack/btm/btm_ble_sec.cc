@@ -1654,6 +1654,10 @@ tBTM_STATUS btm_proc_smp_cback(tSMP_EVT event, const RawAddress& bd_addr,
 
           if (res != BTM_SUCCESS && p_data->cmplt.reason != SMP_CONN_TOUT) {
             log::verbose("Pairing failed - prepare to remove ACL");
+            if (p_data->cmplt.reason == SMP_RSP_TIMEOUT &&
+                gatt_num_app_hold_links(bd_addr, BT_TRANSPORT_LE) == 0) {
+              l2cu_reset_lcb_timeout(p_dev_rec->ble_hci_handle);
+            }
             l2cu_start_post_bond_timer(p_dev_rec->ble_hci_handle);
           }
 

@@ -603,22 +603,41 @@ class BtifAvSource {
       const std::vector<btav_a2dp_codec_config_t>& codec_preferences,
       std::promise<void> peer_ready_promise) {
     // Restart the session if the codec for the active peer is updated
-
-    bool aptX_mode_switch = false;
+    A2dpCodecConfig* current_codec = bta_av_get_a2dp_current_codec();
+    bool aptX_mode_switch = true;
     uint16_t cs4 = 0;
     for (auto cp : codec_preferences) {
-      if (cp.codec_specific_4 > 0 &&
-            cp.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
-          aptX_mode_switch = true;
-          cs4 = cp.codec_specific_4;
-          BTA_AvUpdateAptxData(cs4);
-          log::info("Mode switch for Aptx mode change call");
+      if (cp.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+        btav_a2dp_codec_config_t codec_config;
+        codec_config = current_codec->getCodecConfig();
+        if((codec_config.sample_rate == cp.sample_rate) &&
+          (codec_config.bits_per_sample == cp.bits_per_sample) &&
+          (codec_config.channel_mode == cp.channel_mode)) {
+          aptX_mode_switch = false;
+          log::info("Mode switch couldn't happen for Aptx mode");
           break;
+        } else {
+          log::info("Mode switch for Aptx mode change call");
+          aptX_mode_switch = true;
+          if(cp.codec_specific_4 > 0) {
+            cs4 = cp.codec_specific_4;
+            BTA_AvUpdateAptxData(cs4);
+            log::info("16bit update for AptX AD");
+          } else {
+            log::info("16bit update for AptX AD is not required");
+          }
+        }
+      } else {
+        log::info("Codec is not Aptx AD");
+        continue;
       }
-      log::info("Mode switch couldn't happen for Aptx mode");
+    }
+    if(!aptX_mode_switch) {
+      log::info("Aptx Mode didn't change, returning.");
+      return;
     }
 
-    if (!peer_address.IsEmpty() && active_peer_ == peer_address  && !aptX_mode_switch) {
+    if (!peer_address.IsEmpty() && active_peer_ == peer_address  && aptX_mode_switch) {
       btif_a2dp_source_end_session(active_peer_);
     }
 
