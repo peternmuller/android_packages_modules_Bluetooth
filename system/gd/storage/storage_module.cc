@@ -137,15 +137,9 @@ void StorageModule::SaveImmediately() {
 #endif
   }
   // 2. write in-memory config to disk, if failed, backup can still be used
-#ifndef TARGET_FLOSS
-  log::assert_that(
-      LegacyConfigFile::FromPath(config_file_path_).Write(pimpl_->cache_),
-      "assert failed: LegacyConfigFile::FromPath(config_file_path_).Write(pimpl_->cache_)");
-#else
   if (!LegacyConfigFile::FromPath(config_file_path_).Write(pimpl_->cache_)) {
     log::error("Unable to write config file to disk");
   }
-#endif
   // 3. now write back up to disk as well
   if (!LegacyConfigFile::FromPath(config_backup_path_).Write(pimpl_->cache_)) {
     log::error("Unable to write backup config file");
