@@ -244,6 +244,7 @@ final class A2dpStateMachine extends StateMachine {
                     } else {
                         // Reject the connection and stay in Disconnected state itself
                         Log.w(TAG, "Incoming A2DP Connecting request rejected: " + mDevice);
+                        mA2dpService.disconnectAvrcp(mDevice);
                         mA2dpNativeInterface.disconnectA2dp(mDevice);
                     }
                     break;
@@ -479,6 +480,7 @@ final class A2dpStateMachine extends StateMachine {
                     } else {
                         // Reject the connection and stay in Disconnecting state
                         Log.w(TAG, "Incoming A2DP Connecting request rejected: " + mDevice);
+                        mA2dpService.disconnectAvrcp(mDevice);
                         mA2dpNativeInterface.disconnectA2dp(mDevice);
                     }
                     break;
