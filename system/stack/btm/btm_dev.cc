@@ -255,6 +255,11 @@ tBTM_SEC_DEV_REC* btm_sec_alloc_dev(const RawAddress& bd_addr) {
 
   tBTM_SEC_DEV_REC* p_dev_rec = btm_sec_allocate_dev_rec();
 
+  if (!p_dev_rec) {
+    log::warn("device record allocation failed bd_addr:{}", bd_addr);
+    return NULL;
+  }
+
   log::debug("Allocated device record bd_addr:{}", bd_addr);
 
   /* Check with the BT manager if details about remote device are known */
