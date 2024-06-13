@@ -186,6 +186,19 @@ static void qbce_link_power_ctrl_vse_cb(
       bytes.size(), bytes.data());
 }
 
+static void register_vs_event() {
+  auto handler = bluetooth::shim::GetGdShimHandler();
+  bluetooth::shim::GetHciLayer()->RegisterVendorSpecificEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_EVENT,
+      handler->Bind(cpp::qbce_vse_cb));
+  bluetooth::shim::GetHciLayer()->RegisterVendorSpecificEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_PARAM_REPORT_EVENT,
+      handler->Bind(cpp::qbce_param_report_vse_cb));
+  bluetooth::shim::GetHciLayer()->RegisterVendorSpecificEventHandler(
+      bluetooth::hci::VseSubeventCode::QBCE_VS_LINK_POWER_CTRL_EVENT,
+      handler->Bind(cpp::qbce_link_power_ctrl_vse_cb));
+}
+
 void OnTransmitPacketCommandComplete(command_complete_cb complete_callback,
                                      void* context,
                                      bluetooth::hci::CommandCompleteView view) {
@@ -433,6 +446,7 @@ void bluetooth::shim::hci_on_reset_complete() {
     cpp::register_le_event(subevent_code);
   }
 
+  cpp::register_vs_event();
   cpp::register_for_iso();
 }
 
