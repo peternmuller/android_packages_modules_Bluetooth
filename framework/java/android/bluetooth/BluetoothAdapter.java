@@ -113,7 +113,8 @@ import java.util.function.BiFunction;
  * create a {@link BluetoothServerSocket} to listen for incoming RFComm connection requests with
  * {@link #listenUsingRfcommWithServiceRecord(String, UUID)}; listen for incoming L2CAP
  * Connection-oriented Channels (CoC) connection requests with {@link #listenUsingL2capChannel()};
- * or start a scan for Bluetooth LE devices with {@link #startLeScan(LeScanCallback callback)}.
+ * or start a scan for Bluetooth LE devices with {@link BluetoothLeScanner#startScan(ScanCallback)}
+ * using the scanner from {@link #getBluetoothLeScanner()}.
  *
  * <p>This class is thread safe. <div class="special reference">
  *
@@ -4017,20 +4018,6 @@ public final class BluetoothAdapter {
                                 }
                             }
                         }
-                        synchronized (mBluetoothConnectionCallbackExecutorMap) {
-                            if (!mBluetoothConnectionCallbackExecutorMap.isEmpty()) {
-                                try {
-                                    mService.registerBluetoothConnectionCallback(
-                                            mConnectionCallback, mAttributionSource);
-                                } catch (RemoteException e) {
-                                    Log.e(
-                                            TAG,
-                                            "onBluetoothServiceUp: Failed to register "
-                                                    + "bluetooth connection callback",
-                                            e);
-                                }
-                            }
-                        }
                         synchronized (mBluetoothQualityReportReadyCallbackExecutorMap) {
                             if (!mBluetoothQualityReportReadyCallbackExecutorMap.isEmpty()) {
                                 try {
@@ -4045,6 +4032,7 @@ public final class BluetoothAdapter {
                     } finally {
                         mServiceLock.readLock().unlock();
                     }
+                    registerBluetoothConnectionCallbackIfNeeded();
                 }
 
                 public void onBluetoothServiceDown() {
@@ -4913,7 +4901,7 @@ public final class BluetoothAdapter {
     }
 
     @SuppressLint("AndroidFrameworkBluetoothPermission")
-    private final IBluetoothConnectionCallback mConnectionCallback =
+    private final IBluetoothConnectionCallback mBluetoothConnectionCallback =
             new IBluetoothConnectionCallback.Stub() {
                 @Override
                 public void onDeviceConnected(BluetoothDevice device) {
@@ -4969,27 +4957,37 @@ public final class BluetoothAdapter {
             }
 
             if (mBluetoothConnectionCallbackExecutorMap.isEmpty()) {
-                // If the callback map is empty, we register the service-to-app callback
-                mServiceLock.readLock().lock();
-                try {
-                    if (mService == null) {
-                        return false;
-                    }
-                    mService.registerBluetoothConnectionCallback(
-                            mConnectionCallback, mAttributionSource);
-                } catch (RemoteException e) {
-                    Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
-                    return false;
-                } finally {
-                    mServiceLock.readLock().unlock();
-                }
+                registerBluetoothConnectionCallback();
             }
 
-            // Adds the passed in callback to our map of callbacks to executors
             mBluetoothConnectionCallbackExecutorMap.put(callback, executor);
         }
 
         return true;
+    }
+
+    private void registerBluetoothConnectionCallback() {
+        mServiceLock.readLock().lock();
+        try {
+            if (mService == null) {
+                return;
+            }
+            mService.registerBluetoothConnectionCallback(
+                    mBluetoothConnectionCallback, mAttributionSource);
+        } catch (RemoteException e) {
+            Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
+        } finally {
+            mServiceLock.readLock().unlock();
+        }
+    }
+
+    private void registerBluetoothConnectionCallbackIfNeeded() {
+        synchronized (mBluetoothConnectionCallbackExecutorMap) {
+            if (mBluetoothConnectionCallbackExecutorMap.isEmpty()) {
+                return;
+            }
+            registerBluetoothConnectionCallback();
+        }
     }
 
     /**
@@ -5028,7 +5026,7 @@ public final class BluetoothAdapter {
                         return true;
                     }
                     mService.unregisterBluetoothConnectionCallback(
-                            mConnectionCallback, mAttributionSource);
+                            mBluetoothConnectionCallback, mAttributionSource);
                 } catch (RemoteException e) {
                     Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
                 } finally {
@@ -5476,7 +5474,7 @@ public final class BluetoothAdapter {
             }
         }
 
-        if (!mBluetoothConnectionCallbackExecutorMap.isEmpty()) {
+        if (!mAudioProfilesChangedCallbackExecutorMap.isEmpty()) {
             return BluetoothStatusCodes.SUCCESS;
         }
 
@@ -5668,7 +5666,7 @@ public final class BluetoothAdapter {
             }
         }
 
-        if (!mBluetoothConnectionCallbackExecutorMap.isEmpty()) {
+        if (!mBluetoothQualityReportReadyCallbackExecutorMap.isEmpty()) {
             return BluetoothStatusCodes.SUCCESS;
         }
 

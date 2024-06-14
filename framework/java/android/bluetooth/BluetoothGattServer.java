@@ -145,6 +145,8 @@ public final class BluetoothGattServer implements BluetoothProfile {
                                         + status
                                         + " serverIf="
                                         + serverIf
+                                        + " connected="
+                                        + connected
                                         + " device="
                                         + address);
                     }

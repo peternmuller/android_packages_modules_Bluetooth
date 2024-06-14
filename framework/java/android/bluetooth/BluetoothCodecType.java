@@ -179,7 +179,8 @@ public final class BluetoothCodecType implements Parcelable {
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS -> CODEC_ID_OPUS;
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE -> CODEC_ID_APTX_AD;
                     case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3,
-                            BluetoothCodecConfig.SOURCE_CODEC_TYPE_INVALID -> -1;
+                                    BluetoothCodecConfig.SOURCE_CODEC_TYPE_INVALID ->
+                            -1;
                     default -> -1;
                 };
         if (codecId == -1) {
