@@ -81,3 +81,4 @@ bool LeAudioClient::GetAsesForStorage(const RawAddress& addr,
 }
 bool LeAudioClient::IsLeAudioClientRunning() { return false; }
 bool LeAudioClient::IsLeAudioClientInStreaming() { return false; }
+bool LeAudioClient::IsLeAudioClientInIdle(void) { return false; }
