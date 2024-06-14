@@ -104,6 +104,7 @@ cc_library_shared {
         "lib-bt-packets-avrcp",
         "lib-bt-packets-base",
         "libFraunhoferAAC",
+        "libaconfig_storage_read_api_cc",
         "libaudio-a2dp-hw-utils",
         "libbase",
         "libbluetooth",
@@ -168,6 +169,7 @@ cc_library_shared {
         "com.android.btservices",
     ],
     min_sdk_version: "Tiramisu",
+    ldflags: ["-Wl,--allow-multiple-definition"],
 }
 
 cc_library {

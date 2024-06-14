@@ -66,11 +66,11 @@ class A2dpCodecConfig {
 
         AudioManager audioManager = mContext.getSystemService(AudioManager.class);
         if (audioManager == null) {
-          Log.w(TAG, "Can't obtain the codec offloading prefernece from null AudioManager");
-          return;
+            Log.w(TAG, "Can't obtain the codec offloading prefernece from null AudioManager");
+            return;
         }
-        mCodecConfigOffloading = audioManager.getHwOffloadFormatsSupportedForA2dp()
-                                             .toArray(mCodecConfigOffloading);
+        mCodecConfigOffloading =
+                audioManager.getHwOffloadFormatsSupportedForA2dp().toArray(mCodecConfigOffloading);
     }
 
     BluetoothCodecConfig[] codecConfigPriorities() {
@@ -81,23 +81,24 @@ class A2dpCodecConfig {
         return mCodecConfigOffloading;
     }
 
-    void setCodecConfigPreference(BluetoothDevice device,
-                                  BluetoothCodecStatus codecStatus,
-                                  BluetoothCodecConfig newCodecConfig) {
+    void setCodecConfigPreference(
+            BluetoothDevice device,
+            BluetoothCodecStatus codecStatus,
+            BluetoothCodecConfig newCodecConfig) {
         Objects.requireNonNull(codecStatus);
 
         // Check whether the codecConfig is selectable for this Bluetooth device.
         List<BluetoothCodecConfig> selectableCodecs = codecStatus.getCodecsSelectableCapabilities();
-        if (!selectableCodecs.stream().anyMatch(codec ->
-                codec.isMandatoryCodec())) {
+        if (!selectableCodecs.stream().anyMatch(codec -> codec.isMandatoryCodec())) {
             // Do not set codec preference to native if the selectableCodecs not contain mandatory
             // codec. The reason could be remote codec negotiation is not completed yet.
             Log.w(TAG, "setCodecConfigPreference: must have mandatory codec before changing.");
             return;
         }
         if (!codecStatus.isCodecConfigSelectable(newCodecConfig)) {
-            Log.w(TAG, "setCodecConfigPreference: invalid codec "
-                    + Objects.toString(newCodecConfig));
+            Log.w(
+                    TAG,
+                    "setCodecConfigPreference: invalid codec " + Objects.toString(newCodecConfig));
             return;
         }
 
@@ -131,8 +132,10 @@ class A2dpCodecConfig {
 
     void enableOptionalCodecs(BluetoothDevice device, BluetoothCodecConfig currentCodecConfig) {
         if (currentCodecConfig != null && !currentCodecConfig.isMandatoryCodec()) {
-            Log.i(TAG, "enableOptionalCodecs: already using optional codec "
-                    + BluetoothCodecConfig.getCodecName(currentCodecConfig.getCodecType()));
+            Log.i(
+                    TAG,
+                    "enableOptionalCodecs: already using optional codec "
+                            + BluetoothCodecConfig.getCodecName(currentCodecConfig.getCodecType()));
             return;
         }
 
@@ -175,8 +178,8 @@ class A2dpCodecConfig {
     }
 
     // Get the codec type of the highest priority of selectableCodecs and codecConfig.
-    private int getPrioitizedCodecType(BluetoothCodecConfig codecConfig,
-            List<BluetoothCodecConfig> selectableCodecs) {
+    private int getPrioitizedCodecType(
+            BluetoothCodecConfig codecConfig, List<BluetoothCodecConfig> selectableCodecs) {
         BluetoothCodecConfig prioritizedCodecConfig = codecConfig;
         for (BluetoothCodecConfig config : selectableCodecs) {
             if (prioritizedCodecConfig == null) {
@@ -198,62 +201,67 @@ class A2dpCodecConfig {
 
         int value;
         try {
-            value = SystemProperties.getInt(
-                "bluetooth.a2dp.source.sbc_priority.config",
-                resources.getInteger(R.integer.a2dp_source_codec_priority_sbc));
+            value =
+                    SystemProperties.getInt(
+                            "bluetooth.a2dp.source.sbc_priority.config",
+                            resources.getInteger(R.integer.a2dp_source_codec_priority_sbc));
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPrioritySbc = value;
         }
 
         try {
-            value = SystemProperties.getInt(
-                "bluetooth.a2dp.source.aac_priority.config",
-                resources.getInteger(R.integer.a2dp_source_codec_priority_aac));
+            value =
+                    SystemProperties.getInt(
+                            "bluetooth.a2dp.source.aac_priority.config",
+                            resources.getInteger(R.integer.a2dp_source_codec_priority_aac));
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPriorityAac = value;
         }
 
         try {
-            value = SystemProperties.getInt(
-                "bluetooth.a2dp.source.aptx_priority.config",
-                resources.getInteger(R.integer.a2dp_source_codec_priority_aptx));
+            value =
+                    SystemProperties.getInt(
+                            "bluetooth.a2dp.source.aptx_priority.config",
+                            resources.getInteger(R.integer.a2dp_source_codec_priority_aptx));
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPriorityAptx = value;
         }
 
         try {
-            value = SystemProperties.getInt(
-                "bluetooth.a2dp.source.aptx_hd_priority.config",
-                resources.getInteger(R.integer.a2dp_source_codec_priority_aptx_hd));
+            value =
+                    SystemProperties.getInt(
+                            "bluetooth.a2dp.source.aptx_hd_priority.config",
+                            resources.getInteger(R.integer.a2dp_source_codec_priority_aptx_hd));
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPriorityAptxHd = value;
         }
 
         try {
-            value = SystemProperties.getInt(
-                "bluetooth.a2dp.source.ldac_priority.config",
-                resources.getInteger(R.integer.a2dp_source_codec_priority_ldac));
+            value =
+                    SystemProperties.getInt(
+                            "bluetooth.a2dp.source.ldac_priority.config",
+                            resources.getInteger(R.integer.a2dp_source_codec_priority_ldac));
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPriorityLdac = value;
         }
 
@@ -262,8 +270,8 @@ class A2dpCodecConfig {
         } catch (NotFoundException e) {
             value = BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT;
         }
-        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED) && (value
-                < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
+        if ((value >= BluetoothCodecConfig.CODEC_PRIORITY_DISABLED)
+                && (value < BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)) {
             mA2dpSourceCodecPriorityOpus = value;
         }
 
@@ -322,14 +330,13 @@ class A2dpCodecConfig {
 
     public void switchCodecByBufferSize(
             BluetoothDevice device, boolean isLowLatency, int currentCodecType) {
-        if ((isLowLatency
-                && currentCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS)
+        if ((isLowLatency && currentCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS)
                 || (!isLowLatency
-                    && currentCodecType != BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS)) {
+                        && currentCodecType != BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS)) {
             return;
         }
         BluetoothCodecConfig[] codecConfigArray = assignCodecConfigPriorities();
-        for (int i = 0; i < codecConfigArray.length; i++){
+        for (int i = 0; i < codecConfigArray.length; i++) {
             BluetoothCodecConfig codecConfig = codecConfigArray[i];
             if (codecConfig.getCodecType() == BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS) {
                 if (isLowLatency) {
@@ -344,4 +351,3 @@ class A2dpCodecConfig {
         mA2dpNativeInterface.setCodecConfigPreference(device, codecConfigArray);
     }
 }
-
