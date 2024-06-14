@@ -32,6 +32,7 @@ tBTM_CB btm_cb;
 LeAudioClient* LeAudioClient::Get() { return nullptr; }
 bool LeAudioClient::IsLeAudioClientInStreaming() { return false; }
 bool LeAudioClient::IsLeAudioClientRunning() { return false; }
+bool LeAudioClient::IsLeAudioClientInIdle(void) { return false; }
 
 const RawAddress kRawAddress({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
 
