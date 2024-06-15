@@ -2093,7 +2093,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     else
       codec_ver = ase->codec_id.coding_format == bluetooth::le_audio::types::kLeAudioCodingFormatLC3 ?
                   (direction == bluetooth::le_audio::types::kLeAudioDirectionSink ?
-                  vendor_metadata[6] : vendor_metadata[7]) : vendor_metadata[7];
+                  vendor_metadata[6] : vendor_metadata[7]) : vendor_metadata[7] & 0x0F;
     vendor_datapath_config.insert(vendor_datapath_config.end(), &len, &len + 1);
     vendor_datapath_config.insert(vendor_datapath_config.end(), &type, &type + 1);
     vendor_datapath_config.insert(vendor_datapath_config.end(), &codec_ver, &codec_ver + 1);
