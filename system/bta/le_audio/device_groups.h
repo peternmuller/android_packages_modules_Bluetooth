@@ -193,7 +193,7 @@ class LeAudioDeviceGroup {
   bool IsSeamlessSupported(void);
   void DisableLeXCodec(bool status);
   void PopulateVendorMetadatabyDirection(types::LeAudioContextType context_type,
-                                         uint8_t direction, std::vector<uint8_t> pac_metadata,
+                                         uint8_t direction, types::LeAudioLtvMap pacs_metadata,
                                          const set_configurations::AseConfiguration& conf) const;
   bool HaveAllCisesDisconnected(void) const;
   void ClearAllCises(void);

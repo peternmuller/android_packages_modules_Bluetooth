@@ -32,6 +32,8 @@ class AudioSetConfigurationProvider {
   static void Cleanup();
   virtual const set_configurations::AudioSetConfigurations* GetConfigurations(
       ::bluetooth::le_audio::types::LeAudioContextType content_type) const;
+  virtual bool CheckEnhancedGamingConfig(
+      const set_configurations::AudioSetConfiguration& set_configuration) const;
   virtual bool CheckConfigurationIsBiDirSwb(
       const set_configurations::AudioSetConfiguration& set_configuration) const;
   virtual bool CheckConfigurationIsDualBiDirSwb(

@@ -47,6 +47,14 @@ bool CodecManager::IsDualBiDirSwbSupported(void) const {
   return pimpl_->IsDualBiDirSwbSupported();
 }
 
+bool CodecManager::IsEnhancedLeGamingSupported(void) const {
+  if (!pimpl_) {
+    return false;
+  }
+
+  return pimpl_->IsEnhancedLeGamingSupported();
+}
+
 bool CodecManager::IsAptxAdaptiveLeSupported(void) const {
   if (!pimpl_) {
     return false;
