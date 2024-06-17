@@ -151,6 +151,7 @@ public class BluetoothInCallService extends InCallService {
     private int mDsDaTwoIncomingCallsFlag = 0;
     private int mdsDaSelectPhoneAccountFlag = 0;
     private int mCallSwapPending = 0;
+    private int mDelayOutgoingUpdate = 0;
     private int conferenceCallInitiated = 0;
     public int mFirstIncomingCallId = -1;
     public int mSecondIncomingCallId = -1;
@@ -199,6 +200,8 @@ public class BluetoothInCallService extends InCallService {
     private int mMaxNumberOfCalls = 0;
 
     private boolean mEnableDsdaMode = false;
+
+    private boolean mDsDaEventsHadlingInProgress = false;
 
     private static final String ENABLE_DSDA_SUPPORT =
           "persist.bluetooth.init.dsda.support";
@@ -479,6 +482,7 @@ public class BluetoothInCallService extends InCallService {
             else
                updateheldCalls = 1;
 
+            mDsDaEventsHadlingInProgress = true;
             switch (msg.what) {
              case OUTGOING_INCOMING:
                  Log.d(TAG, "OUTGOING_INCOMING event");
@@ -728,6 +732,25 @@ public class BluetoothInCallService extends InCallService {
                           mDsdaActiveCalls = numActiveCalls;
                      }
                      mLastBtHeadsetState = temp_callState;
+                     if (mDelayOutgoingUpdate == 1) {
+                        mBluetoothHeadset.phoneStateChanged(
+                          0,
+                          1,
+                          CALL_STATE_DIALING,
+                          mDsDaRingingAddress,
+                          mDsDaRingingAddressType,
+                          mDsDaRingingName);
+                        mBluetoothHeadset.phoneStateChanged(
+                          0,
+                          1,
+                          CALL_STATE_ALERTING,
+                          mDsDaRingingAddress,
+                          mDsDaRingingAddressType,
+                          mDsDaRingingName);
+                          mDsDaOutgoingCalls++;
+                        mLastBtHeadsetState =  CALL_STATE_ALERTING;
+                        mDelayOutgoingUpdate = 0;
+                     }
                    }
                  }
              break;
@@ -797,9 +820,14 @@ public class BluetoothInCallService extends InCallService {
                    mLastBtHeadsetState = CALL_STATE_INCOMING;
                  }
              break;
+             case DSDS_EVENT:
+                Log.d(TAG, "DSDS_EVENT event");
+                updateHeadsetWithCallState(false);
+             break;
              default:
               break;
            }
+           mDsDaEventsHadlingInProgress = false;
         }
     };
 
@@ -1762,6 +1790,10 @@ public class BluetoothInCallService extends InCallService {
         // TODO: Should we be hardcoding this value to 2 or should we check if all top level calls
         //       are held?
         boolean callsPendingSwitch = (numHeldCalls == 2);
+        if (mEnableDsdaMode && callsPendingSwitch) {
+            callsPendingSwitch = false;
+            numHeldCalls = 1;
+        }
 
         // For conference calls which support swapping the active BluetoothCall within the
         // conference (namely CDMA calls) we need to expose that as a held BluetoothCall
@@ -1946,6 +1978,8 @@ public class BluetoothInCallService extends InCallService {
           (call.getState()  == Call.STATE_DIALING)) {
 
          if (activeCall != null && mDsdaActiveCalls == 1) {
+           mDelayOutgoingUpdate = 1;
+           mDsDaOutgoingCalls++;
            return;
          }
          mDsDaOutgoingCalls++;
@@ -2046,6 +2080,7 @@ public class BluetoothInCallService extends InCallService {
            Log.d(TAG, "Updated incoming call is ended");
            if ((mDsDaTwoIncomingCallsFlag == 0) &&
               (numHeldCalls <= 1) && (numOutgoingCalls == 0)) {
+               mDsdaIncomingCalls--;
                updateHeadsetWithDSDACallState(true, DSDS_EVENT);
                return;
            } else {
@@ -2204,6 +2239,7 @@ public class BluetoothInCallService extends InCallService {
                   Log.d(TAG, "when only 1 active call and moved to held call");
                   mDsdaActiveCalls = 0;
                   mDsDaHeldCalls++;
+                  mDelayOutgoingUpdate = 0;
                   updateHeadsetWithDSDACallState(true, DSDS_EVENT);
                 }
               }
@@ -2222,9 +2258,9 @@ public class BluetoothInCallService extends InCallService {
                else if (call.getState() == Call.STATE_DISCONNECTED) {
                  Log.d(TAG, "this event can come for either held or active call");
                  if ((numActiveCalls == 0) && (mDsdaActiveCalls == 1)) {
-                   Log.d(TAG, "active call ended event is received");
-                   updateHeadsetWithDSDACallState(true, DSDS_EVENT);
-                   mDsdaActiveCalls = 0;
+                   Log.d(TAG, "active call ended event is received. lets remove from oncallremoved");
+                   //updateHeadsetWithDSDACallState(true, DSDS_EVENT);
+                   //mDsdaActiveCalls = 0;
                  }
                  else if (numHeldCalls < mDsDaHeldCalls) {
                    if ((numHeldCalls > 0) && (mDsDaHeldCalls > 1)) {
@@ -2293,12 +2329,10 @@ public class BluetoothInCallService extends InCallService {
      }
 
      private void updateHeadsetWithDSDACallState(boolean force, int event) {
-      if (event == DSDS_EVENT ) {
+      if ((event == DSDS_EVENT) && (!mDsDaEventsHadlingInProgress)) {
           updateHeadsetWithCallState(force);
       } else {
-        if (mBluetoothHeadset != null) {
-           Log.e(TAG, "handleDSDA events in separate thread.");
-        }
+        Log.e(TAG, "handleDSDA events in separate thread.");
         Message msg = mHandler.obtainMessage();
         msg.what = event;
         mHandler.sendMessage(msg);
