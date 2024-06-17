@@ -2004,7 +2004,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
  ******************************************************************************/
 void btm_sec_conn_req(const RawAddress& bda, const DEV_CLASS dc) {
   tBTM_SEC_DEV_REC* p_dev_rec = nullptr;
-  tHCI_ROLE role = HCI_ROLE_CENTRAL;
+  tHCI_ROLE role = HCI_ROLE_UNKNOWN;
 
   if ((btm_sec_cb.pairing_state != BTM_PAIR_STATE_IDLE) &&
       (btm_sec_cb.pairing_flags & BTM_PAIR_FLAGS_WE_STARTED_DD) &&
@@ -2019,6 +2019,10 @@ void btm_sec_conn_req(const RawAddress& bda, const DEV_CLASS dc) {
   }
 
   /* accept the incoming connection from bonding device */
+  if (interop_match_addr(INTEROP_DISABLE_ROLE_SWITCH, &bda) || (BTM_GetNumBredrAclLinks() < 1))
+    role = HCI_ROLE_PERIPHERAL;
+  else
+    role = HCI_ROLE_CENTRAL;
   btsnd_hcic_accept_conn(bda, role);
 
   /* Host is not interested or approved connection.  Save BDA and DC and */
