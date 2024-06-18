@@ -51,6 +51,8 @@
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_types.h"
 #include "stack/include/bt_uuid16.h"
+#include "stack/include/btm_client_interface.h"
+#include "stack/include/btm_vendor_types.h"
 #include "types/raw_address.h"
 
 using namespace bluetooth;
@@ -1031,6 +1033,19 @@ bool BtaAvCo::ReportSourceCodecState(BtaAvCoPeer* p_peer) {
         p_peer->addr);
     return false;
   }
+
+  bool is_qhs_phy_supported = get_btm_client_interface().vendor.BTM_IsQHSPhySupported(
+      p_peer->addr, BT_TRANSPORT_BR_EDR);
+
+  if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE
+      && is_qhs_phy_supported) {
+    codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
+    codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_AVAILABLE;
+  } else {
+    codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
+    codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_NOT_AVAILABLE;
+  }
+
   log::info("peer {} codec_config={{}}", p_peer->addr, codec_config.ToString());
   btif_av_report_source_codec_state(p_peer->addr, codec_config,
                                     codecs_local_capabilities,
