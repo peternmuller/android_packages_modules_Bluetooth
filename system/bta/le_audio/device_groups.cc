@@ -1524,8 +1524,7 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
         }
 
         if (bluetooth::common::init_flags::leaudio_multicodec_support_is_enabled()) {
-          if (((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) ||
-              (ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe)) &&
+          if ((ent.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX) &&
               lex_codec_disabled.first) {
             log::info("Skipping LeX config as Lex is disabled");
             continue;

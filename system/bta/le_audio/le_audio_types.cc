@@ -244,7 +244,7 @@ uint32_t CodecConfigSetting::GetDataIntervalUs() const {
           switch (id.vendor_codec_id) {
             case types::kLeAudioCodingFormatAptxLe:
             case types::kLeAudioCodingFormatAptxLeX:
-              return params.GetAsCoreCodecConfig().frame_duration.value_or(0);
+              return params.GetAsCoreCodecConfig().GetFrameDurationUs();
             default:
               return 0;
           }
