@@ -40,6 +40,7 @@ class MockCodecManager {
   MOCK_METHOD((bluetooth::le_audio::types::CodecLocation), GetCodecLocation, (),
               (const));
   MOCK_METHOD((bool), IsDualBiDirSwbSupported, (), (const));
+  MOCK_METHOD((bool), IsEnhancedLeGamingSupported, (), (const));
   MOCK_METHOD((bool), IsAptxAdaptiveLeSupported, (), (const));
   MOCK_METHOD((bool), IsAptxAdaptiveLeXSupported, (), (const));
 

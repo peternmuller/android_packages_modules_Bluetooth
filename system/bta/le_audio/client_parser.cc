@@ -297,27 +297,10 @@ bool ParseAseCtpNotification(struct ctp_ntf& ntf, uint16_t len,
   return true;
 }
 
-void PrepareAseCtpAptxCodecConfig(std::vector<struct ctp_codec_conf>& confs) {
-  // TODO (b/330781955): codec_config changed from LeAudioLtvMap to std::vector<uint8_t>. Logic needs to be revised.
-  // for (auto& conf : confs) {
-  //    if (conf.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
-  //         (conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
-  //         conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
-  //      types::LeAudioLtvMap ltvmap;
-  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq,
-  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq).value());
-  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
-  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation).value());
-  //      conf.codec_config = ltvmap;
-  //    }
-  // }
-}
-
 bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
                               std::vector<uint8_t>& value) {
   if (confs_.size() == 0) return false;
   std::vector<struct ctp_codec_conf> confs = confs_;
-  PrepareAseCtpAptxCodecConfig(confs);
   std::stringstream conf_ents_str;
   size_t msg_len = std::accumulate(
       confs.begin(), confs.end(),
@@ -640,7 +623,10 @@ int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
   // To-DO: Remove once remote AAR4 pac records available
   TestLeXPacRecords(const_cast<uint8_t *>(value), rec.codec_id.vendor_codec_id);
 
-  rec.metadata.assign(value, value+metadata_len);
+  bool parsed;
+  rec.metadata =
+      types::LeAudioLtvMap::Parse(value, metadata_len, parsed);
+  if (!parsed) return -1;
 
   value += metadata_len;
   len -= metadata_len;

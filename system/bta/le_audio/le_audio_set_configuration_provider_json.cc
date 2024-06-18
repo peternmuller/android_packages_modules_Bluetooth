@@ -193,36 +193,27 @@ struct AudioSetConfigurationProviderJson {
 
     for (auto const& param : *flat_codec_specific_params) {
       auto const value = param->compound_value()->value();
-        codec.params.Add(
-            param->type(),
-            std::vector<uint8_t>(value->data(), value->data() + value->size()));
+      std::vector<uint8_t> value_raw(value->data(), value->data() + value->size());
+      codec.params.Add(param->type(),
+          std::vector<uint8_t>(value->data(), value->data() + value->size()));
+      if ((codec.id.coding_format == types::kLeAudioCodingFormatVendorSpecific) &&
+          ((codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
+          (codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {
+        codec.vendor_params.push_back(value_raw.size() + 1);
+        codec.vendor_params.push_back(param->type());
+        codec.vendor_params.insert(codec.vendor_params.end(), value_raw.begin(),
+                                   value_raw.end());
+      }
     }
 
     if (flat_codec_id->vendor_codec_id() == types::kLeAudioCodingFormatAptxLe ||
         flat_codec_id->vendor_codec_id() == types::kLeAudioCodingFormatAptxLeX) {
-      /* Cache all the codec specific parameters */
-      auto param = codec.params.Find(
-          fbs::le_audio::
-            AptxVendorCodecSpecificLtvGenericTypes_SUPPORTED_AUDIO_CHANNEL_ALLOCATION);
-      if (param) {
-                auto ptr = param->data();
-                  uint32_t audio_channel_allocation;
-
-                log::assert_that((param->size() == sizeof(audio_channel_allocation)), "invalid channel allocation value {}", (int)param->size());
-        STREAM_TO_UINT32(audio_channel_allocation, ptr);
-        codec.channel_count_per_iso_stream =
-                    std::bitset<32>(audio_channel_allocation).count();
-      } else {
-              // TODO: Add support for channel count in the json configurations file,
-              //       //       keeping support for the allocations for compatibility.
-      }
       codec.params.Add(codec_spec_conf::kLeAudioLtvTypeOctetsPerCodecFrame,
            UINT16_TO_VEC_UINT8(max_sdu));
       codec.params.Add(codec_spec_conf::kLeAudioLtvTypeFrameDuration,
-     (iso_interval == 10000) ?
-     UINT8_TO_VEC_UINT8(codec_spec_conf::kLeAudioCodecFrameDur10000us) :
-     UINT8_TO_VEC_UINT8(codec_spec_conf::kLeAudioCodecFrameDur15000us));
-
+      (iso_interval == 10000) ?
+      UINT8_TO_VEC_UINT8(codec_spec_conf::kLeAudioCodecFrameDur10000us) :
+      UINT8_TO_VEC_UINT8(codec_spec_conf::kLeAudioCodecFrameDur15000us));
     }
 
     return codec;
@@ -760,6 +751,31 @@ AudioSetConfigurationProvider::GetConfigurations(
         content_type);
 
   return nullptr;
+}
+
+bool AudioSetConfigurationProvider::CheckEnhancedGamingConfig(
+    const set_configurations::AudioSetConfiguration& set_configuration) const {
+
+  for (auto direction : {le_audio::types::kLeAudioDirectionSink,
+                         le_audio::types::kLeAudioDirectionSource}) {
+    for (const auto& conf : set_configuration.confs.get(direction)) {
+      if (conf.codec.id == bluetooth::le_audio::set_configurations::LeAudioCodecIdLc3
+          && !conf.vendor_metadata.value().vs_metadata.empty()) {
+        std::vector<uint8_t> vndr_metadata;
+        vndr_metadata.assign(conf.vendor_metadata.value().vs_metadata.begin(),
+                             conf.vendor_metadata.value().vs_metadata.end());
+        uint16_t company_id = conf.vendor_metadata.value().vendor_company_id;
+        uint8_t metadata_type = conf.vendor_metadata.value().vendor_metadata_type;
+        uint8_t encoder_version = vndr_metadata[0];
+        if (direction == le_audio::types::kLeAudioDirectionSink &&
+            company_id == types::kLeAudioVendorCompanyIdQualcomm &&
+            metadata_type == types::qcom_codec_metadata::kLeAudioCodecLC3QSupportedFeaturesMetadataType
+            && encoder_version == 2)
+          return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool AudioSetConfigurationProvider::CheckConfigurationIsBiDirSwb(

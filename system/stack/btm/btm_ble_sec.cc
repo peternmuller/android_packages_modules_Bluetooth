@@ -94,6 +94,11 @@ void BTM_SecAddBleDevice(const RawAddress& bd_addr, tBT_DEVICE_TYPE dev_type,
   if (!p_dev_rec) {
     p_dev_rec = btm_sec_allocate_dev_rec();
 
+    if (!p_dev_rec) {
+      log::warn("device record allocation failed bd_addr:{}", bd_addr);
+      return;
+    }
+
     p_dev_rec->bd_addr = bd_addr;
     p_dev_rec->hci_handle = BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_BR_EDR);
     p_dev_rec->ble_hci_handle = BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE);

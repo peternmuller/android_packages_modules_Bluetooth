@@ -189,15 +189,14 @@ GetAidlCodecSpecificConfigurationFromStack(
 
 std::optional<std::vector<
     std::optional<::aidl::android::hardware::bluetooth::audio::MetadataLtv>>>
-GetAidlMetadataFromStackFormat(const std::vector<uint8_t>& vec) {
-  if (vec.empty()) return std::nullopt;
+GetAidlMetadataFromStackFormat(
+    const ::bluetooth::le_audio::types::LeAudioLtvMap& in_ltvs) {
   std::vector<
       std::optional<::aidl::android::hardware::bluetooth::audio::MetadataLtv>>
       out_ltvs;
 
-  auto ltvs = ::bluetooth::le_audio::types::LeAudioLtvMap();
-  if (ltvs.Parse(vec.data(), vec.size())) {
-    auto stackMetadata = ltvs.GetAsLeAudioMetadata();
+  if (!in_ltvs.IsEmpty()) {
+    auto stackMetadata = in_ltvs.GetAsLeAudioMetadata();
 
     if (stackMetadata.preferred_audio_context) {
       out_ltvs.push_back(
@@ -241,6 +240,8 @@ GetAidlMetadataFromStackFormat(const std::vector<uint8_t>& vec) {
      *       are not sent over the AIDL interface as they are considered as
      *       irrelevant for the configuration process.
      */
+  } else {
+    return std::nullopt;
   }
   return out_ltvs;
 }

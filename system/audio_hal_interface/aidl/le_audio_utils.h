@@ -38,7 +38,8 @@ GetAidlCodecIdFromStackFormat(
 
 std::optional<std::vector<
     std::optional<::aidl::android::hardware::bluetooth::audio::MetadataLtv>>>
-GetAidlMetadataFromStackFormat(const std::vector<uint8_t>& vec);
+GetAidlMetadataFromStackFormat(
+    const ::bluetooth::le_audio::types::LeAudioLtvMap& in_ltvs);
 
 bluetooth::le_audio::types::LeAudioLtvMap GetStackMetadataFromAidlFormat(
     const std::vector<std::optional<

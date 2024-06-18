@@ -930,7 +930,7 @@ class StateMachineTestBase : public Test {
             },
         .codec_spec_caps = ltv_map,
         .codec_spec_caps_raw = ltv_map.RawPacket(),
-        .metadata = std::move(metadata),
+        .metadata = types::LeAudioLtvMap(),
     });
   }
 
