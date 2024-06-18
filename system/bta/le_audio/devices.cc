@@ -1379,8 +1379,11 @@ void LeAudioDevices::Cleanup(tGATT_IF client_if) {
     }
 
     if (connection_state == DeviceConnectState::CONNECTING_AUTOCONNECT) {
+      log::warn("Cancelling Gatt conn for both Direct and Background");
+      BTA_GATTC_CancelOpen(client_if, device->address_, true);
       BTA_GATTC_CancelOpen(client_if, device->address_, false);
     } else {
+      log::warn("Calling Gatt Close");
       BtaGattQueue::Clean(device->conn_id_);
       BTA_GATTC_Close(device->conn_id_);
       device->DisconnectAcl();

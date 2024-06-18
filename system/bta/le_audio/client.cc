@@ -1581,6 +1581,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Remove device from the background connect if it is there */
     BTA_GATTC_Close(leAudioDevice->conn_id_);
+    log::warn("Cancelling Gatt conn for both Direct and Background");
+    BTA_GATTC_CancelOpen(gatt_if_, address, true);
     BTA_GATTC_CancelOpen(gatt_if_, address, false);
     btif_storage_set_leaudio_autoconnect(address, false);
 
