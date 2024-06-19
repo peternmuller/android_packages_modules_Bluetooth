@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 #ifndef BTM_INT_TYPES_H
 #define BTM_INT_TYPES_H
@@ -146,6 +150,8 @@ typedef struct tBTM_CB {
   *****************************************************/
   tSCO_CB sco_cb;
 
+  bool encrypted_advertising_data_supported;
+
 #define BTM_SEC_MAX_RMT_NAME_CALLBACKS 2
   tBTM_RMT_NAME_CALLBACK* p_rmt_name_callback[BTM_SEC_MAX_RMT_NAME_CALLBACKS];
 
@@ -190,7 +196,7 @@ typedef struct tBTM_CB {
     btm_inq_vars.Init(); /* Inquiry Database and Structures */
     sco_cb.Init();       /* SCO Database and Structures (If included) */
     devcb.Init();
-
+    encrypted_advertising_data_supported = true;
     history_ = std::make_shared<TimestampedStringCircularBuffer>(
         kBtmLogHistoryBufferSize);
     bluetooth::log::assert_that(history_ != nullptr,

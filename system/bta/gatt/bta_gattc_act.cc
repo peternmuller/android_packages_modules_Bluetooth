@@ -63,6 +63,8 @@ using bluetooth::Uuid;
 using namespace bluetooth;
 
 extern tBTM_CB btm_cb;
+const bool kBtaEncryptedAdvertisingDataSupported = true;
+
 /*****************************************************************************
  *  Constants
  ****************************************************************************/
@@ -1026,7 +1028,7 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
     (*p_clcb->p_rcb->p_cback)(BTA_GATTC_SRVC_DISC_DONE_EVT, &bta_gattc);
   }
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data() &&
+  if (kBtaEncryptedAdvertisingDataSupported &&
       (p_clcb->status == GATT_SUCCESS) && p_clcb->p_srcb &&
       btm_sec_is_a_bonded_dev(p_clcb->p_srcb->server_bda)) {
     GAP_BleGetEncKeyMaterialInfo(p_clcb->p_srcb->server_bda);

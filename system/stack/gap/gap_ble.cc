@@ -56,6 +56,7 @@
 
 using bluetooth::Uuid;
 using namespace bluetooth;
+extern tBTM_CB btm_cb;
 
 void btm_ble_read_enc_key_cmpl(bool status, const RawAddress& bda,
                                uint16_t length, char* p_data);
@@ -181,7 +182,7 @@ tGATT_STATUS read_attr_value(uint16_t handle, tGATT_VALUE* p_value,
   for (const tGAP_ATTR& db_attr : gatt_attr) {
     const tGAP_BLE_ATTR_VALUE& attr_value = db_attr.attr_value;
     if (handle == db_attr.handle) {
-      if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (btm_cb.encrypted_advertising_data_supported) {
         if (is_long) {
           if (db_attr.uuid == GATT_UUID_GAP_DEVICE_NAME ||
               db_attr.uuid == GATT_UUID_GAP_ENC_KEY_MATERIAL) {
@@ -237,7 +238,7 @@ tGATT_STATUS read_attr_value(uint16_t handle, tGATT_VALUE* p_value,
           break;
         /* Encrypted Data Key Material*/
         case GATT_UUID_GAP_ENC_KEY_MATERIAL:
-          if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+          if (btm_cb.encrypted_advertising_data_supported) {
             uint8_t* p_encr_material = p;
             uint8_t* p_temp = p_encr_material;
 
@@ -322,7 +323,7 @@ void server_attr_request_cback(uint16_t conn_id, uint32_t trans_id,
     case GATTS_REQ_TYPE_WRITE_DESCRIPTOR:
       if (!p_data->write_req.need_rsp) ignore = true;
 
-      if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+      if (btm_cb.encrypted_advertising_data_supported) {
         status = proc_write_req(type, &p_data->write_req, conn_id);
       } else {
         status = proc_write_req(type, &p_data->write_req);
@@ -394,7 +395,7 @@ bool send_cl_read_request(tGAP_CLCB& clcb) {
   param.service.e_handle = 0xFFFF;
   param.service.auth_req = 0;
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+  if (btm_cb.encrypted_advertising_data_supported) {
     log::verbose(": req handle: 0x{:04x} ,  UUID: 0x{:04x}", req.handle, uuid);
     if (uuid == GATT_UUID_GAP_ENC_KEY_MATERIAL) {
       param.service.s_handle = req.handle;
@@ -463,7 +464,7 @@ void cl_op_cmpl(tGAP_CLCB& clcb, bool status, uint16_t len, uint8_t* p_name) {
 
   /* if no further activity is requested in callback, drop the link */
   if (clcb.connected) {
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (btm_cb.encrypted_advertising_data_supported) {
       if (!send_cl_request(clcb) &&
           (clcb.enc_key_stage <= GAP_ENC_KEY_CONNECTING)) {
         log::debug(" Calling GATT Disconnect");
@@ -497,7 +498,7 @@ void client_connect_cback(tGATT_IF, const RawAddress& bda, uint16_t conn_id,
     p_clcb->conn_id = conn_id;
     p_clcb->connected = true;
     /* start operation is pending */
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (btm_cb.encrypted_advertising_data_supported) {
       send_cl_request(*p_clcb);
     } else {
       send_cl_read_request(*p_clcb);
@@ -615,7 +616,7 @@ void client_cmpl_cback(uint16_t conn_id, tGATTC_OPTYPE op, tGATT_STATUS status,
       break;
   }
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+  if (btm_cb.encrypted_advertising_data_supported) {
     if (op == GATTC_OPTYPE_READ) {
       switch (op_type) {
         case GATT_UUID_GAP_ENC_KEY_MATERIAL:
@@ -769,7 +770,7 @@ void gap_attr_db_init(void) {
   Uuid addr_res_uuid = Uuid::From16Bit(GATT_UUID_GAP_CENTRAL_ADDR_RESOL);
   Uuid cccd_uuid = Uuid::From16Bit(GATT_UUID_CHAR_CLIENT_CONFIG);
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+  if (btm_cb.encrypted_advertising_data_supported) {
     Uuid encr_data_uuid = Uuid::From16Bit(GATT_UUID_GAP_ENC_KEY_MATERIAL);
     btgatt_db_element_t service[] = {
       {
@@ -946,7 +947,7 @@ void GAP_BleAttrDBUpdate(uint16_t attr_uuid, tGAP_BLE_ATTR_VALUE* p_value) {
           db_attr.attr_value.addr_resolution = p_value->addr_resolution;
           break;
         case GATT_UUID_GAP_ENC_KEY_MATERIAL:
-          if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+          if (btm_cb.encrypted_advertising_data_supported) {
             if (std::memcmp((const void*)&db_attr.attr_value.enc_key_material,
                             (const void*)&p_value->enc_key_material,
                             sizeof(tGAP_BLE_ENC_KEY_MATERIAL)) != 0) {

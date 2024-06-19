@@ -53,7 +53,7 @@ using base::StringPrintf;
 using bluetooth::Uuid;
 using namespace bluetooth;
 
-extern tBTM_CB btm_cb;
+const bool encrypted_advertising_data_supported_ = true;
 
 #define BLE_GATT_SVR_SUP_FEAT_EATT_BITMASK 0x01
 
@@ -639,7 +639,7 @@ static void gatt_cl_op_cmpl_cback(uint16_t conn_id, tGATTC_OPTYPE op,
     } else {
       log::debug("Not interested in that write response");
     }
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (encrypted_advertising_data_supported_) {
       if (status == GATT_SUCCESS && (cl_op_uuid == GATT_UUID_CLIENT_SUP_FEAT)) {
         tGATT_PROFILE_CLCB* p_clcb = gatt_profile_find_clcb_by_conn_id(conn_id);
         if (p_clcb != NULL) GAP_BleGetEncKeyMaterialInfo(p_clcb->bda);

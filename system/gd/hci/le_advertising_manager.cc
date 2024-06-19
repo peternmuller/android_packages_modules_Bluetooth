@@ -59,6 +59,7 @@ constexpr int64_t kLeAdvertisingTxPowerMin = -127;
 constexpr int64_t kLeAdvertisingTxPowerMax = 20;
 constexpr int64_t kLeTxPathLossCompMin = -128;
 constexpr int64_t kLeTxPathLossCompMax = 127;
+constexpr bool kEncryptedAdvertisingDataSupported = true;
 
 // system properties
 const std::string kLeTxPathLossCompProperty = "bluetooth.hardware.radio.le_tx_path_loss_comp_db";
@@ -533,13 +534,13 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       case (AdvertisingApiType::LEGACY): {
         if (config.advertising_type == AdvertisingType::ADV_IND ||
             config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
-          if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+          if (!kEncryptedAdvertisingDataSupported) {
             set_data(id, true, config.scan_response);
           } else {
             set_enc_data(id, true, config.scan_response, config.scan_response_enc);
           }
         }
-        if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+        if (!kEncryptedAdvertisingDataSupported) {
           set_data(id, false, config.advertisement);
         } else {
           set_enc_data(id, false, config.advertisement, config.advertisement_enc);
@@ -553,13 +554,13 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
       case (AdvertisingApiType::ANDROID_HCI): {
         if (config.advertising_type == AdvertisingType::ADV_IND ||
             config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
-          if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+          if (!kEncryptedAdvertisingDataSupported) {
             set_data(id, true, config.scan_response);
           } else {
             set_enc_data(id, true, config.scan_response, config.scan_response_enc);
           }
         }
-        if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+        if (!kEncryptedAdvertisingDataSupported) {
           set_data(id, false, config.advertisement);
         } else {
           set_enc_data(id, false, config.advertisement, config.advertisement_enc);
@@ -720,7 +721,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
             le_address_manager_->GetNextPrivateAddressIntervalMs());
       }
     }
-    if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (!kEncryptedAdvertisingDataSupported) {
       if (config.advertising_type == AdvertisingType::ADV_IND ||
           config.advertising_type == AdvertisingType::ADV_NONCONN_IND) {
         set_data(id, true, config.scan_response);
@@ -885,7 +886,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
 
     rotate_advertiser_address(advertiser_id);
 
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (kEncryptedAdvertisingDataSupported) {
       set_encrypted_advertiser_data(advertiser_id);
     }
 
@@ -933,7 +934,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     advertising_sets_[advertiser_id].directed = config.directed;
     advertising_sets_[advertiser_id].is_periodic = config.periodic_advertising_parameters.enable;
 
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (kEncryptedAdvertisingDataSupported) {
       advertising_sets_[advertiser_id].enc_key_value = config.enc_key_value;
     }
 
@@ -1581,8 +1582,8 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     uint16_t data_len = 0;
     // check data size
     for (size_t i = 0; i < data.size(); i++) {
-      if (data[i].size() > kLeMaximumFragmentLength) {
-        log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+      if (data[i].size() > kLeMaximumGapDataLength) {
+        log::warn("AD data len shall not greater than {}", kLeMaximumGapDataLength);
       }
       data_len += data[i].size();
     }
@@ -1670,7 +1671,7 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
     ED_AD_Data.data_.insert(ED_AD_Data.data_.end(), out_tag.begin(), out_tag.end());
 
     str << "\nED AD Data: " << base::HexEncode(ED_AD_Data.data_.data(), ED_AD_Data.data_.size());
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (kEncryptedAdvertisingDataSupported) {
       log::info("{}", str.str().c_str());
     }
     /* Below we are forming the LTV for Encrypted Data */
@@ -1811,9 +1812,10 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         } break;
         case (AdvertisingApiType::EXTENDED): {
           uint16_t data_len = 0;
+
           for (size_t i = 0; i < data.size(); i++) {
-            if (data[i].size() > kLeMaximumFragmentLength) {
-              log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+            if (data[i].size() > kLeMaximumGapDataLength) {
+              log::warn("AD data len shall not greater than {}", kLeMaximumGapDataLength);
               if (advertising_callbacks_ != nullptr) {
                 if (set_scan_rsp) {
                   advertising_callbacks_->OnScanResponseDataSet(
@@ -2211,8 +2213,8 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         "Periodic Advertising Data {}",
         base::HexEncode(advertising_data.data(), advertising_data.size()).c_str());
     for (size_t i = 0; i < data.size(); i++) {
-      if (data[i].size() > kLeMaximumFragmentLength) {
-        log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+      if (data[i].size() > kLeMaximumGapDataLength) {
+        log::warn("AD data len shall not greater than {}", kLeMaximumGapDataLength);
         if (advertising_callbacks_ != nullptr) {
           advertising_callbacks_->OnPeriodicAdvertisingDataSet(
               advertiser_id, AdvertisingCallback::AdvertisingStatus::INTERNAL_ERROR);
@@ -2340,8 +2342,8 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
         uint16_t data_len = 0;
         // check data size
         for (size_t i = 0; i < data.size(); i++) {
-          if (data[i].size() > kLeMaximumFragmentLength) {
-            log::warn("AD data len shall not greater than {}", kLeMaximumFragmentLength);
+          if (data[i].size() > kLeMaximumGapDataLength) {
+            log::warn("AD data len shall not greater than {}", kLeMaximumGapDataLength);
             if (advertising_callbacks_ != nullptr) {
               if (set_scan_rsp) {
                 advertising_callbacks_->OnScanResponseDataSet(
