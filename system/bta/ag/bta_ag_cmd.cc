@@ -39,6 +39,7 @@
 #include "device/include/interop.h"
 #include "internal_include/bt_target.h"
 #include "internal_include/bt_trace.h"
+#include "osi/include/properties.h"
 #include "os/system_properties.h"
 #include "osi/include/compat.h"
 #include "btif/include/btif_storage.h"
@@ -1191,7 +1192,8 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       p_scb->peer_features = (uint16_t)int_arg;
 
       tBTA_AG_FEAT features = p_scb->features & BTA_AG_BRSF_FEAT_SPEC;
-      if (p_scb->peer_version < HFP_VERSION_1_7) {
+      if (p_scb->peer_version < HFP_VERSION_1_7 &&
+          !osi_property_get_bool("vendor.bt.pts.certification", false)) {
         p_scb->masked_features &= HFP_1_6_FEAT_MASK;
       }
 
