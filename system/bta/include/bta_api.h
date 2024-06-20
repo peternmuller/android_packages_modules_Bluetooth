@@ -289,7 +289,7 @@ typedef void(tBTA_DM_NAME_READ_CBACK)(RawAddress bd_addr,
                                       const BD_NAME bd_name);
 typedef void(tBTA_DM_DISC_CBACK)(RawAddress bd_addr,
                                  const std::vector<bluetooth::Uuid>& uuids,
-                                 tBTA_STATUS result);
+                                 tBTA_STATUS result, BD_NAME bd_name);
 struct service_discovery_callbacks {
   tBTA_DM_GATT_DISC_CBACK* on_gatt_results;
   tBTA_DM_DID_RES_CBACK* on_did_received;
