@@ -4978,6 +4978,8 @@ class LeAudioClientImpl : public LeAudioClient {
                ToString(local_metadata_context_types_.source));
     log::debug("local_metadata_context_types_.sink= {}",
                ToString(local_metadata_context_types_.sink));
+    log::debug("defer_notify_inactive_until_stop_: {}",
+               defer_notify_inactive_until_stop_);
 
     local_metadata_context_types_.sink =
         ChooseMetadataContextType(local_metadata_context_types_.sink);
@@ -4986,6 +4988,9 @@ class LeAudioClientImpl : public LeAudioClient {
 
     if (active_group_id_ == bluetooth::groups::kGroupUnknown) {
       log::warn(", cannot start streaming if no active group set");
+      return;
+    } else if (defer_notify_inactive_until_stop_) {
+      log::warn(", cannot start streaming as active group is de-activating");
       return;
     }
 
@@ -5137,6 +5142,8 @@ class LeAudioClientImpl : public LeAudioClient {
                ToString(local_metadata_context_types_.source));
     log::debug("local_metadata_context_types_.sink= {}",
                ToString(local_metadata_context_types_.sink));
+    log::debug("defer_notify_inactive_until_stop_: {}",
+               defer_notify_inactive_until_stop_);
 
     local_metadata_context_types_.sink =
         ChooseMetadataContextType(local_metadata_context_types_.sink);
@@ -5145,6 +5152,9 @@ class LeAudioClientImpl : public LeAudioClient {
 
     if (active_group_id_ == bluetooth::groups::kGroupUnknown) {
       log::warn(", cannot start streaming if no active group set");
+      return;
+    } else if (defer_notify_inactive_until_stop_) {
+      log::warn(", cannot start streaming as active group is de-activating");
       return;
     }
 
