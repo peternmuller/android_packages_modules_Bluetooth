@@ -87,14 +87,7 @@ public class HfpClientConnection extends Connection {
         setAudioModeIsVoip(false);
         Uri number = Uri.fromParts(PhoneAccount.SCHEME_TEL, mCurrentCall.getNumber(), null);
         setAddress(number, TelecomManager.PRESENTATION_ALLOWED);
-        setConnectionCapabilities(
-                CAPABILITY_SUPPORT_HOLD
-                        | CAPABILITY_MUTE
-                        | CAPABILITY_SEPARATE_FROM_CONFERENCE
-                        | CAPABILITY_DISCONNECT_FROM_CONFERENCE
-                        | (getState() == STATE_ACTIVE || getState() == STATE_HOLDING
-                                ? CAPABILITY_HOLD
-                                : 0));
+        setCapabilities();
     }
 
     public UUID getUUID() {
@@ -161,8 +154,7 @@ public class HfpClientConnection extends Connection {
                 setRinging();
                 break;
             case HfpClientCall.CALL_STATE_TERMINATED:
-                if (mPreviousCallState == HfpClientCall.CALL_STATE_INCOMING
-                        || mPreviousCallState == HfpClientCall.CALL_STATE_WAITING) {
+                if (mPreviousCallState == STATE_RINGING) {
                     close(DisconnectCause.MISSED);
                 } else if (mLocalDisconnect) {
                     close(DisconnectCause.LOCAL);
@@ -173,7 +165,26 @@ public class HfpClientConnection extends Connection {
             default:
                 Log.wtf(TAG, "[" + mDevice + "]Unexpected phone state " + state);
         }
-        mPreviousCallState = state;
+        // Hold capability is added in finishInitializing() only when call state is already
+        // active or held and then HFP client is connected, leading to the capability not being
+        // added when HFP client is already connected and we attempt to make a call. We reset
+        // the capabilities upon call state change, only for Active and Held states in order to
+        // add the Hold capability for these states.
+        if ((getState() == STATE_ACTIVE || getState() == STATE_HOLDING)
+                && !(mPreviousCallState == STATE_ACTIVE || mPreviousCallState == STATE_HOLDING)) {
+            setCapabilities();
+        }
+        mPreviousCallState = getState();
+    }
+
+    private void setCapabilities() {
+        setConnectionCapabilities(CAPABILITY_SUPPORT_HOLD
+                    | CAPABILITY_MUTE
+                    | CAPABILITY_SEPARATE_FROM_CONFERENCE
+                    | CAPABILITY_DISCONNECT_FROM_CONFERENCE
+                    | (getState() == STATE_ACTIVE || getState() == STATE_HOLDING
+                                ? CAPABILITY_HOLD
+                                : 0));
     }
 
     public synchronized void close(int cause) {
