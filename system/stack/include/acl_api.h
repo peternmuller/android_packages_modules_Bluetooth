@@ -182,6 +182,18 @@ tBTM_STATUS BTM_ReadTxPower(const RawAddress& remote_bda,
  ******************************************************************************/
 uint16_t BTM_GetNumAclLinks(void);
 
+/*******************************************************************************
+ *
+ * Function         BTM_GetNumBredrAclLinks
+ *
+ * Description      This function is called to count the number of
+ *                  BREDR ACL links that are active.
+ *
+ * Returns          uint16_t Number of active BREDR ACL links
+ *
+ ******************************************************************************/
+uint16_t BTM_GetNumBredrAclLinks(void);
+
 tBTM_STATUS BTM_FlowSpec(const RawAddress& addr, tBT_FLOW_SPEC* p_flow,
                     tBTM_CMPL_CB* p_cb);
 

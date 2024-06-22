@@ -1160,6 +1160,20 @@ uint16_t BTM_GetNumAclLinks(void) {
 
 /*******************************************************************************
  *
+ * Function         BTM_GetNumBredrAclLinks
+ *
+ * Description      This function is called to count the number of
+ *                  BREDR ACL links that are active.
+ *
+ * Returns          uint16_t Number of active BREDR ACL links
+ *
+ ******************************************************************************/
+uint16_t BTM_GetNumBredrAclLinks(void) {
+  return static_cast<uint16_t>(btm_cb.acl_cb_.NumberOfActiveBredrLinks());
+}
+
+/*******************************************************************************
+ *
  * Function         btm_get_acl_disc_reason_code
  *
  * Description      This function is called to get the disconnection reason code
