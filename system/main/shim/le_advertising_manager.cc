@@ -89,6 +89,7 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
                                    public bluetooth::hci::AdvertisingCallback {
  public:
   ~BleAdvertiserInterfaceImpl() override{};
+  const bool kEncryptedAdvertisingDataSupported = true;
 
   void Init() {
     // Register callback
@@ -144,7 +145,7 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
     std::vector<GapData> advertising_data = {};
     parse_gap_data(data, advertising_data);
 
-    if (!com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (!kEncryptedAdvertisingDataSupported) {
       bluetooth::shim::GetAdvertising()->SetData(advertiser_id, set_scan_rsp,
                                                  advertising_data);
     } else {
@@ -207,7 +208,7 @@ class BleAdvertiserInterfaceImpl : public BleAdvertiserInterface,
     parse_gap_data(scan_response_data, config.scan_response);
     parse_gap_data(periodic_data, config.periodic_data);
 
-    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+    if (kEncryptedAdvertisingDataSupported) {
       config.enc_key_value = enc_key_value;
       parse_gap_data(advertise_data_enc, config.advertisement_enc);
       parse_gap_data(scan_response_data_enc, config.scan_response_enc);

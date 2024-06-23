@@ -24,6 +24,7 @@
 #include <com_android_bluetooth_flags.h>
 #include <string.h>
 
+#include "btm_int_types.h"
 #include "gap_api.h"
 #include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
@@ -39,6 +40,7 @@
 #include "types/raw_address.h"
 
 using namespace bluetooth;
+extern tBTM_CB btm_cb;
 
 /* Define the GAP Connection Control Block */
 typedef struct {
@@ -1022,7 +1024,7 @@ void GAP_Init(void) {
   gap_conn_init();
   gap_attr_db_init();
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data()) {
+  if (btm_cb.encrypted_advertising_data_supported) {
     bluetooth::shim::EncKeyMaterialInterface* enc_key_material_instance;
     bluetooth::shim::init_enc_key_material_manager();
     enc_key_material_instance =
