@@ -205,12 +205,13 @@ public class BluetoothInCallService extends InCallService {
             new BluetoothProfile.ServiceListener() {
                 @Override
                 public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    Log.d(TAG, "onServiceConnected: profile: " + profile);
                     synchronized (LOCK) {
                         if (profile == BluetoothProfile.HEADSET) {
                             setBluetoothHeadset(
                                     new BluetoothHeadsetProxy((BluetoothHeadset) proxy));
                             if (!mEnableDsdaMode) {
-                              updateHeadsetWithCallState(true /* force */); 
+                              updateHeadsetWithCallState(true /* force */);
                             } else {
                               updateHeadsetWithDSDACallState(true, DSDS_EVENT);
                             }
@@ -225,6 +226,7 @@ public class BluetoothInCallService extends InCallService {
 
                 @Override
                 public void onServiceDisconnected(int profile) {
+                    Log.d(TAG, "onServiceDisconnected: profile: " + profile);
                     synchronized (LOCK) {
                         if (profile == BluetoothProfile.HEADSET) {
                             setBluetoothHeadset(null);
@@ -396,8 +398,6 @@ public class BluetoothInCallService extends InCallService {
     public IBinder onBind(Intent intent) {
         Log.i(TAG, "onBind. Intent: " + intent);
         IBinder binder = super.onBind(intent);
-        mTelephonyManager = getSystemService(TelephonyManager.class);
-        mTelecomManager = getSystemService(TelecomManager.class);
         return binder;
     }
 
@@ -1179,6 +1179,8 @@ public class BluetoothInCallService extends InCallService {
           }
           Log.w(TAG, "InCall service exit");
         }
+        mTelephonyManager = getSystemService(TelephonyManager.class);
+        mTelecomManager = getSystemService(TelecomManager.class);
     }
 
     @Override
