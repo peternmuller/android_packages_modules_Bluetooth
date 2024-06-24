@@ -2090,6 +2090,13 @@ public class LeAudioService extends ProfileService {
                         + mActiveAudioInDevice
                         + ", notifyAndUpdateInactiveOutDeviceOnly: "
                         + notifyAndUpdateInactiveOutDeviceOnly);
+        if (mActiveAudioOutDevice != null || mActiveAudioInDevice != null) {
+            LeAudioGroupDescriptor descriptor = getGroupDescriptor(groupId);
+            if (descriptor != null) {
+                Log.d(TAG, "updateActiveDevices: set active state active");
+                descriptor.setActiveState(ACTIVE_STATE_ACTIVE);
+            }
+        }
 
         if (isNewActiveOutDevice) {
             int volume = IBluetoothVolumeControl.VOLUME_CONTROL_UNKNOWN_VOLUME;
