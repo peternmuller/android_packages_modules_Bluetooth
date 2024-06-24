@@ -305,13 +305,14 @@ public class A2dpService extends ProfileService {
                 " has group size = " + CsipGroupSize);
 
         if (Utils.isDualModeAudioEnabled()) {
-            if (isCsipSupported && CsipGroupSize > 1) {
+            if (isCsipSupported && CsipGroupSize > 0) {
                 LeAudioService mLeAudio = LeAudioService.getLeAudioService();
                 if (mLeAudio != null) {
                     int connPolicy = mLeAudio.getConnectionPolicy(device);
                     if (connPolicy != BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
                         Log.e(TAG, "Disallow A2DP connect when dual mode enable for CSIP device "
                               + device);
+                        setConnectionPolicy(device, BluetoothProfile.CONNECTION_POLICY_FORBIDDEN);
                         return false;
                     }
                 }

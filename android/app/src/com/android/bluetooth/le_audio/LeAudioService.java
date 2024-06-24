@@ -4193,7 +4193,7 @@ public class LeAudioService extends ProfileService {
                 setAuthorizationForRelatedProfiles(device, true);
             }
             if (Utils.isDualModeAudioEnabled()) {
-                if (isCsipSupported && CsipGroupSize > 1) {
+                if (isCsipSupported && CsipGroupSize > 0) {
                     A2dpService mA2dp = A2dpService.getA2dpService();
                     if (mA2dp != null) {
                         mA2dp.disconnect(device);
@@ -4216,7 +4216,7 @@ public class LeAudioService extends ProfileService {
             setAuthorizationForRelatedProfiles(device, false);
             disconnect(device);
             if (Utils.isDualModeAudioEnabled()) {
-                if (isCsipSupported && CsipGroupSize > 1) {
+                if (isCsipSupported && CsipGroupSize > 0) {
                     A2dpService mA2dp = A2dpService.getA2dpService();
                     if (mA2dp != null) {
                         mA2dp.connect(device);
