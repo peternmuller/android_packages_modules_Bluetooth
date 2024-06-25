@@ -104,6 +104,11 @@
 #define BT_DEFAULT_BUFFER_SIZE (4096 + 16)
 #endif
 
+#ifndef OBX_LRG_DATA_BUF_SIZE
+#define OBX_LRG_DATA_BUF_SIZE (8080 + 26)
+#endif
+
+
 #ifndef BT_SMALL_BUFFER_SIZE
 #define BT_SMALL_BUFFER_SIZE 660
 #endif
