@@ -2472,7 +2472,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     BTA_GATTC_ServiceSearchRequest(
         leAudioDevice->conn_id_,
-        &bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
+        bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
   }
 
   void checkGroupConnectionStateAfterMemberDisconnect(int group_id) {
@@ -2776,7 +2776,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     BTA_GATTC_ServiceSearchRequest(
         leAudioDevice->conn_id_,
-        &bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
+        bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
   }
 
   void OnServiceChangeEvent(const RawAddress& address) {
@@ -2855,7 +2855,7 @@ class LeAudioClientImpl : public LeAudioClient {
     if (!leAudioDevice->known_service_handles_)
       BTA_GATTC_ServiceSearchRequest(
           leAudioDevice->conn_id_,
-          &bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
+          bluetooth::le_audio::uuid::kPublishedAudioCapabilityServiceUuid);
   }
 
   void disconnectInvalidDevice(LeAudioDevice* leAudioDevice,
