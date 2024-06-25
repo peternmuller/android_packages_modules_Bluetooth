@@ -61,6 +61,7 @@ class SourceImpl : public LeAudioSourceAudioHalClient {
              LeAudioSourceAudioHalClient::Callbacks* audioReceiver,
              DsaModes dsa_modes) override;
   void Stop() override;
+  void ConfirmSuspendRequest() override;
   void ConfirmStreamingRequest() override;
   void CancelStreamingRequest() override;
   void UpdateRemoteDelay(uint16_t remote_delay_ms) override;
@@ -396,6 +397,16 @@ void SourceImpl::Stop() {
 
   std::lock_guard<std::mutex> guard(audioSourceCallbacksMutex_);
   audioSourceCallbacks_ = nullptr;
+}
+
+void SourceImpl::ConfirmSuspendRequest() {
+  if ((halSinkInterface_ == nullptr) ||
+      (le_audio_sink_hal_state_ != HAL_STARTED)) {
+    log::error("Audio HAL Audio sink was not started!");
+    return;
+  }
+
+  halSinkInterface_->ConfirmSuspendRequest();
 }
 
 void SourceImpl::ConfirmStreamingRequest() {
