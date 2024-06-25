@@ -753,9 +753,9 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
         }
 
         /**
-         * Set the codecspecific1 for Bluetooth LE audio codec config.
+         * Set the codecSpecific1 for Bluetooth LE audio codec config.
          *
-         * @param codecspecific1 of this codec
+         * @param codecSpecific1 of this codec
          * @return the same Builder instance
          * @hide
          */
@@ -766,9 +766,9 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
         }
 
         /**
-         * Set the codecspecific2 for Bluetooth LE audio codec config.
+         * Set the codecSpecific2 for Bluetooth LE audio codec config.
          *
-         * @param codecspecific2 of this codec
+         * @param codecSpecific2 of this codec
          * @return the same Builder instance
          * @hide
          */
@@ -779,9 +779,9 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
         }
 
         /**
-         * Set the codecspecific3 for Bluetooth LE audio codec config.
+         * Set the codecSpecific3 for Bluetooth LE audio codec config.
          *
-         * @param codecspecific3 of this codec
+         * @param codecSpecific3 of this codec
          * @return the same Builder instance
          * @hide
          */
@@ -792,9 +792,9 @@ public final class BluetoothLeAudioCodecConfig implements Parcelable {
         }
 
         /**
-         * Set the codecspecific4 for Bluetooth LE audio codec config.
+         * Set the codecSpecific4 for Bluetooth LE audio codec config.
          *
-         * @param codecspecific4 of this codec
+         * @param codecSpecific4 of this codec
          * @return the same Builder instance
          * @hide
          */
