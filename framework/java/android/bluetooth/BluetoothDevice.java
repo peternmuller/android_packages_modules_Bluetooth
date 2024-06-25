@@ -2117,7 +2117,6 @@ public final class BluetoothDevice implements Parcelable, Attributable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
-        return;
     }
 
     /**

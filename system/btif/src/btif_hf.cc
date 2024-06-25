@@ -928,7 +928,7 @@ bt_status_t HeadsetInterface::Disconnect(RawAddress* bd_addr) {
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   BTA_AgClose(btif_hf_cb[idx].handle);
   return BT_STATUS_SUCCESS;
@@ -968,7 +968,7 @@ bt_status_t HeadsetInterface::DisconnectAudio(RawAddress* bd_addr) {
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   BTA_AgAudioClose(btif_hf_cb[idx].handle);
   return BT_STATUS_SUCCESS;
@@ -1055,7 +1055,7 @@ bt_status_t HeadsetInterface::VolumeControl(bthf_volume_type_t type, int volume,
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   tBTA_AG_RES_DATA ag_res = {};
   ag_res.num = static_cast<uint16_t>(volume);
@@ -1103,7 +1103,7 @@ bt_status_t HeadsetInterface::CopsResponse(const char* cops,
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   tBTA_AG_RES_DATA ag_res = {};
   /* Format the response */
@@ -1126,7 +1126,7 @@ bt_status_t HeadsetInterface::CindResponse(int svc, int num_active,
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   tBTA_AG_RES_DATA ag_res = {};
   // per the errata 2043, call=1 implies atleast one call is in progress
@@ -1155,7 +1155,7 @@ bt_status_t HeadsetInterface::FormattedAtResponse(const char* rsp,
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   /* Format the response and send */
   strncpy(ag_res.str, rsp, BTA_AG_AT_MAX_LEN);
@@ -1173,7 +1173,7 @@ bt_status_t HeadsetInterface::AtResponse(bthf_at_response_t response_code,
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   send_at_result(
       (response_code == BTHF_AT_RESPONSE_OK) ? BTA_AG_OK_DONE : BTA_AG_OK_ERROR,
@@ -1193,7 +1193,7 @@ bt_status_t HeadsetInterface::ClccResponse(
   }
   if (!is_connected(bd_addr)) {
     log::error("{} is not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   tBTA_AG_RES_DATA ag_res = {};
   /* Format the response */
@@ -1572,7 +1572,7 @@ bt_status_t HeadsetInterface::SendBsir(bool value, RawAddress* bd_addr) {
   }
   if (!is_connected(bd_addr)) {
     log::error("{} not connected", *bd_addr);
-    return BT_STATUS_FAIL;
+    return BT_STATUS_DEVICE_NOT_FOUND;
   }
   tBTA_AG_RES_DATA ag_result = {};
   ag_result.state = value;

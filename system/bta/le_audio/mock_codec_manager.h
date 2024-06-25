@@ -105,6 +105,7 @@ class MockCodecManager {
                uint8_t direction),
               (const));
   MOCK_METHOD((void), ClearCisConfiguration, (uint8_t direction));
+  MOCK_METHOD((bool), IsUsingCodecExtensibility, (), (const));
 
   MOCK_METHOD((void), Start, ());
   MOCK_METHOD((void), Stop, ());
