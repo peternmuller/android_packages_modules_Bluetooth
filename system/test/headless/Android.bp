@@ -129,6 +129,7 @@ cc_binary {
     shared_libs: [
         "vendor.qti.hardware.bluetooth.audio-V1-ndk",
         "libPlatformProperties",
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "libcutils", // property_get_bool
         "libhidlbase",
@@ -136,7 +137,6 @@ cc_binary {
         "liblog", // __android_log_print
         "libutils",
         "server_configurable_flags",
-        "libaconfig_storage_read_api_cc",
     ],
     header_libs: ["libbluetooth_headers"],
     target: {
