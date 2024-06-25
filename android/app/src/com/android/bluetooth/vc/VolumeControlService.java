@@ -997,8 +997,13 @@ public class VolumeControlService extends ProfileService {
                 return AudioManager.STREAM_VOICE_CALL;
             case AudioManager.MODE_RINGTONE:
                 if (Flags.leaudioVolumeChangeOnRingtoneFix()) {
-                    Log.d(TAG, " Update during ringtone applied to voice call");
-                    return AudioManager.STREAM_VOICE_CALL;
+                    LeAudioService leAudioService = mFactory.getLeAudioService();
+                    if (leAudioService != null && leAudioService.isBroadcastActive()) {
+                        Log.d(TAG, " Not apply ringtone to voice call if Broadcast active");
+                    } else {
+                        Log.d(TAG, " Update during ringtone applied to voice call");
+                        return AudioManager.STREAM_VOICE_CALL;
+                    }
                 }
                 // fall through
             case AudioManager.MODE_NORMAL:

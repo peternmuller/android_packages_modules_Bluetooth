@@ -103,4 +103,10 @@ int bta_av_co_get_encoder_effective_frame_size();
 // information.
 void btif_a2dp_codec_debug_dump(int fd);
 
+// Compares the given BD address family against the interop databse
+// and return if AAC can be selected as a codec for streaming or not
+//TRUE if AAC is allowed , FALSE otherwise
+bool bta_av_co_audio_is_aac_wl_enabled(const RawAddress *remote_bdaddr);
+
+
 #endif  // BTIF_AV_CO_H

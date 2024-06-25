@@ -50,6 +50,7 @@ import com.android.bluetooth.vc.VolumeControlService;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
+import com.android.bluetooth.btservice.InteropUtil;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -820,6 +821,9 @@ final class BondStateMachine extends StateMachine {
             hapClientService.setConnectionPolicy(
                     device, BluetoothProfile.CONNECTION_POLICY_UNKNOWN);
         }
+        Log.d(TAG, "Removing device " + device.getAddress() + " from Absolute Volume rejectlist");
+        InteropUtil.interopDatabaseRemoveAddr(
+             InteropUtil.InteropFeature.INTEROP_DISABLE_ABSOLUTE_VOLUME, device.getAddress());
     }
 
     private String state2str(int state) {

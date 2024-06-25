@@ -603,10 +603,19 @@ void Device::HandleVolumeChanged(
 
   if (volume_interface_ == nullptr) return;
 
+  if (interop_match_addr(INTEROP_DISABLE_ABSOLUTE_VOLUME, &address_)) {
+    log::info("Absolute volume disabled by IOP table");
+    log::info("don't acknowledge vol change from Remote");
+    return;
+  }
+
   if (pkt->GetCType() == CType::REJECTED) {
     // Disable Absolute Volume
     active_labels_.erase(label);
     volume_ = VOL_REGISTRATION_FAILED;
+    log::error("device rejected register Volume changed notification request.");
+    log::error("Putting Device in ABSOLUTE_VOLUME rejectlist");
+    interop_database_add(INTEROP_DISABLE_ABSOLUTE_VOLUME, &address_, 3);
     volume_interface_->DeviceConnected(GetAddress());
     return;
   }
