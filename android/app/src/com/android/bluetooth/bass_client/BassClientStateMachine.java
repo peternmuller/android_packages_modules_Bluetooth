@@ -257,19 +257,6 @@ public class BassClientStateMachine extends StateMachine {
 
     private void stopPendingSync() {
         log("stopPendingSync");
-        List<Integer> syncHandles = new ArrayList();
-        for (Map.Entry<Integer, PeriodicAdvertisingCallback> entry:
-                mPeriodicAdvCallbacksMap.entrySet()) {
-            int syncHandle = entry.getKey();
-            if (syncHandle != BassConstants.INVALID_SYNC_HANDLE) {
-                syncHandles.add(syncHandle);
-            }
-        }
-        for (Integer syncHandle: syncHandles) {
-            log("stopPendingSync: syncHandle = " + syncHandle);
-            cancelActiveSync(syncHandle);
-        }
-        mPeriodicAdvCallbacksMap.clear();
         mSourceSyncRequestsQueue.clear();
         removeMessages(SELECT_BCAST_SOURCE);
     }
