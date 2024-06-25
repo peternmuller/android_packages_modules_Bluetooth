@@ -1218,7 +1218,6 @@ public final class BluetoothGatt implements BluetoothProfile {
      *
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission.
      *
-     * @param device Remote device to connect to
      * @param autoConnect Whether to directly connect to the remote device (false) or to
      * automatically connect as soon as the remote device becomes available (true).
      * @param eattSupport specifies whether client app needs EATT channel for client operations.

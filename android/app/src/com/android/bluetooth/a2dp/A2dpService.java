@@ -95,9 +95,10 @@ public class A2dpService extends ProfileService {
     private final AudioManager mAudioManager;
     private final DatabaseManager mDatabaseManager;
     private final CompanionDeviceManager mCompanionDeviceManager;
+    private final Looper mLooper;
+    private final Handler mHandler;
 
     private HandlerThread mStateMachinesThread;
-    private Handler mHandler = null;
 
     @VisibleForTesting ServiceFactory mFactory = new ServiceFactory();
     private A2dpCodecConfig mA2dpCodecConfig;
@@ -135,19 +136,21 @@ public class A2dpService extends ProfileService {
             new AudioManagerAudioDeviceCallback();
 
     public A2dpService(AdapterService adapterService) {
-        this(adapterService, A2dpNativeInterface.getInstance());
+        this(adapterService, A2dpNativeInterface.getInstance(), Looper.getMainLooper());
     }
 
     @VisibleForTesting
-    A2dpService(AdapterService adapterService, A2dpNativeInterface nativeInterface) {
+    A2dpService(AdapterService adapterService, A2dpNativeInterface nativeInterface, Looper looper) {
         super(requireNonNull(adapterService));
         mAdapterService = adapterService;
         mNativeInterface = requireNonNull(nativeInterface);
         mDatabaseManager = requireNonNull(mAdapterService.getDatabase());
         mAudioManager = requireNonNull(getSystemService(AudioManager.class));
+        mLooper = requireNonNull(looper);
 
         // Some platform may not have the FEATURE_COMPANION_DEVICE_SETUP
         mCompanionDeviceManager = getSystemService(CompanionDeviceManager.class);
+        mHandler = new Handler(mLooper);
     }
 
     public static boolean isEnabled() {
@@ -179,10 +182,12 @@ public class A2dpService extends ProfileService {
 
         // Step 3: Start handler thread for state machines
         // Setup Handler.
-        mHandler = new Handler(Looper.getMainLooper());
         mStateMachines.clear();
-        mStateMachinesThread = new HandlerThread("A2dpService.StateMachines");
-        mStateMachinesThread.start();
+
+        if (!Flags.a2dpServiceLooper()) {
+            mStateMachinesThread = new HandlerThread("A2dpService.StateMachines");
+            mStateMachinesThread.start();
+        }
 
         // Step 4: Setup codec config
         mA2dpCodecConfig = new A2dpCodecConfig(this, mNativeInterface);
@@ -248,10 +253,8 @@ public class A2dpService extends ProfileService {
                 // Do not rethrow as we are shutting down anyway
             }
         }
-        if (mHandler != null) {
-            mHandler.removeCallbacksAndMessages(null);
-            mHandler = null;
-        }
+
+        mHandler.removeCallbacksAndMessages(null);
 
         // Step 2: Reset maximum number of connected audio devices
         mMaxConnectedAudioDevices = 1;
@@ -1137,7 +1140,10 @@ public class A2dpService extends ProfileService {
             Log.d(TAG, "Creating a new state machine for " + device);
             sm =
                     A2dpStateMachine.make(
-                            device, this, mNativeInterface, mStateMachinesThread.getLooper());
+                            device,
+                            this,
+                            mNativeInterface,
+                            Flags.a2dpServiceLooper() ? mLooper : mStateMachinesThread.getLooper());
             mStateMachines.put(device, sm);
             return sm;
         }
