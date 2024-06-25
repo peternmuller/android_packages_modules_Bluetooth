@@ -737,13 +737,6 @@ static void bta_dm_sdp_result(tBTA_DM_SDP_RESULT& sdp_event) {
       get_btm_client_interface().security.BTM_SecDeleteRmtNameNotifyCallback(
           &bta_dm_service_search_remname_cback);
 
-      BTM_LogHistory(
-          kBtmLogTag, bta_dm_search_cb.peer_bdaddr, "Discovery completed",
-          base::StringPrintf("Result:%s services_found:0x%x service_index:0x%d",
-                             sdp_result_text(sdp_result).c_str(),
-                             bta_dm_search_cb.services_found,
-                             bta_dm_search_cb.service_index));
-
       auto msg = std::make_unique<tBTA_DM_MSG>(tBTA_DM_SVC_RES{});
       auto& disc_result = std::get<tBTA_DM_SVC_RES>(*msg);
 
