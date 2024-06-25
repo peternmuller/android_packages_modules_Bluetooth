@@ -1308,6 +1308,7 @@ BT_HDR* l2c_fcr_get_next_xmit_sdu_seg(tL2C_CCB* p_ccb,
     if (p_buf->event == 0) {
       first_seg = true;
       sdu_len = p_buf->len;
+      max_pdu -= 2;          // send 2 bytes less in start pkt
     } else
       mid_seg = true;
 
@@ -1712,15 +1713,19 @@ uint8_t l2c_fcr_process_peer_cfg_req(tL2C_CCB* p_ccb, tL2CAP_CFG_INFO* p_cfg) {
         p_ccb->peer_cfg.fcs = p_cfg->fcs;
       }
 
-      max_retrans_size = BT_DEFAULT_BUFFER_SIZE - sizeof(BT_HDR) -
+      max_retrans_size = OBX_LRG_DATA_BUF_SIZE - sizeof(BT_HDR) -
                          L2CAP_MIN_OFFSET - L2CAP_SDU_LEN_OFFSET -
                          L2CAP_FCS_LEN;
+
+
 
       /* Ensure the MPS is not bigger than the MTU */
       if ((p_cfg->fcr.mps == 0) || (p_cfg->fcr.mps > p_ccb->peer_cfg.mtu)) {
         p_cfg->fcr.mps = p_ccb->peer_cfg.mtu;
         p_ccb->out_cfg_fcr_present = true;
       }
+
+      log::info("CFG: max_retrans_size {} (mps {})", max_retrans_size, p_cfg->fcr.mps);
 
       /* Ensure the MPS is not bigger than our retransmission buffer */
       if (p_cfg->fcr.mps > max_retrans_size) {
