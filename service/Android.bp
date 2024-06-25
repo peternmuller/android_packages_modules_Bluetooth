@@ -132,8 +132,6 @@ java_library {
         "service-bluetooth-pre-jarjar",
     ],
 
-    sdk_version: "system_server_current",
-
     jarjar_rules: ":bluetooth-jarjar-rules",
 
     optimize: {
@@ -147,6 +145,7 @@ java_library {
         "framework-bluetooth",
     ],
 
+    sdk_version: "system_server_current",
     min_sdk_version: "Tiramisu",
     apex_available: ["com.android.btservices"],
     visibility: ["//packages/modules/Bluetooth/apex"],

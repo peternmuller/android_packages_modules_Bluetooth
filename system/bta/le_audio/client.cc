@@ -1313,6 +1313,8 @@ class LeAudioClientImpl : public LeAudioClient {
       log::assert_that(true, "Both configs are invalid");
     }
 
+    L2CA_SetEcosystemBaseInterval(frame_duration_us / 1250);
+
     audio_framework_source_config.data_interval_us = frame_duration_us;
     le_audio_source_hal_client_->Start(audio_framework_source_config,
                                        audioSinkReceiver, dsa_modes);
@@ -4081,7 +4083,10 @@ class LeAudioClientImpl : public LeAudioClient {
     CleanCachedMicrophoneData();
   }
 
-  void StopAudio(void) { SuspendAudio(); }
+  void StopAudio(void) {
+    SuspendAudio();
+    L2CA_SetEcosystemBaseInterval(0 /* clear recommendation */);
+  }
 
   void printCurrentStreamConfiguration(int fd) {
     std::stringstream stream;

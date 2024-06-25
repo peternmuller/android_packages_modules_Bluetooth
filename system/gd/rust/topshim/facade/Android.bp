@@ -68,7 +68,6 @@ rust_defaults {
         "libbthalutils",
         "libbtif",
         "libbtif-core",
-        "libc++fs",
         "libchrome",
         "libevent",
         "libflatbuffers-cpp",
