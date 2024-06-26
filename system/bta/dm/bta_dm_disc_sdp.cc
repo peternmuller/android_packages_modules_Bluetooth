@@ -264,11 +264,6 @@ void bta_dm_sdp_result(tSDP_STATUS sdp_result, tBTA_DM_SDP_STATE* sdp_state) {
 
     /* callbacks */
     /* start next bd_addr if necessary */
-    BTM_LogHistory(kBtmLogTag, sdp_state->bd_addr, "Discovery completed",
-                   base::StringPrintf(
-                       "Result:%s services_found:0x%x service_index:0x%d",
-                       sdp_result_text(sdp_result).c_str(),
-                       sdp_state->services_found, sdp_state->service_index));
 
     // Copy the raw_data to the discovery result structure
     if (p_sdp_db != NULL && p_sdp_db->raw_used != 0 &&
