@@ -270,6 +270,8 @@ tRFC_EVENT rfc_parse_data(tRFC_MCB* p_rfc_mcb, MX_FRAME* p_frame,
 /* Call back functions from RFCOMM */
 void rfcomm_l2cap_if_init(void);
 
+void RFCOMM_BufDataInd(uint16_t lcid, BT_HDR* p_buf);
+
 void PORT_StartInd(tRFC_MCB* p_mcb);
 void PORT_StartCnf(tRFC_MCB* p_mcb, uint16_t result);
 

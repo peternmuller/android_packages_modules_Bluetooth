@@ -251,6 +251,10 @@ void rfc_mx_sm_state_wait_conn_cnf(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
         }
 
         rfc_mx_sm_execute(p_mcb, RFC_MX_EVENT_CONN_IND, nullptr);
+        if (p_mcb->pending_buf != nullptr) {
+          RFCOMM_BufDataInd(p_mcb->lcid, p_mcb->pending_buf);
+          p_mcb->pending_buf =  nullptr;
+        }
       } else {
         PORT_CloseInd(p_mcb);
       }
