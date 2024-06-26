@@ -69,6 +69,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 #include <a2dp_vendor.h>
 #include "types/raw_address.h"
 #include "a2dp_vendor_aptx_adaptive.h"
+#include "stack/include/btm_client_interface.h"
+#include "stack/include/btm_vendor_types.h"
 
 extern void btif_a2dp_source_encoder_init(void);
 
@@ -102,11 +104,9 @@ using CodecConfiguration =
 using CodecConfiguration_2_1 =
       vendor::qti::hardware::bluetooth_audio::V2_1::CodecConfiguration;
 using vendor::qti::hardware::bluetooth_audio::V2_1::ExtSampleRate;
-//using ::bluetooth::audio::AudioConfiguration;
 using vendor::qti::hardware::bluetooth_audio::V2_0::BitsPerSample;
 using bluetooth::audio::qti_hidl::BluetoothAudioCtrlAck;
 using vendor::qti::hardware::bluetooth_audio::V2_0::ChannelMode;
-//using ::bluetooth::audio::CodecConfiguration;
 using vendor::qti::hardware::bluetooth_audio::V2_0::PcmParameters;
 using vendor::qti::hardware::bluetooth_audio::V2_0::SampleRate;
 using vendor::qti::hardware::bluetooth_audio::V2_0::SessionType;
@@ -522,6 +522,33 @@ LdacQualityIndex a2dp_codec_to_hal_ldac_quality_index (
   }
 }
 
+static bool isScramblingEnabled() {
+  uint8_t num_supported_freqs = 0;
+  uint8_t *supported_frequencies =
+      get_btm_client_interface().vendor.BTM_GetScramblingSupportedFreqs(&num_supported_freqs);
+  if (num_supported_freqs == 0 || supported_frequencies == NULL) {
+    LOG(WARNING) << __func__ << ":scrambling unsupported";
+    return false;
+  }
+
+  A2dpCodecConfig* a2dp_config = bta_av_get_a2dp_current_codec();
+  if (a2dp_config == nullptr) {
+    LOG(WARNING) << __func__ << ": failure to get A2DP codec config";
+    return false;
+  }
+
+  btav_a2dp_codec_config_t current_codec = a2dp_config->getCodecConfig();
+  for (uint8_t i = 0; i < num_supported_freqs; i++) {
+    if (supported_frequencies[i] == (uint8_t)current_codec.sample_rate) {
+      LOG(WARNING) << __func__ << ":scrambling supported";
+      return true;
+    }
+  }
+
+  LOG(WARNING) << __func__ << ":scrambling unsupported";
+  return false;
+}
+
 bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
   A2dpCodecConfig* a2dp_config = bta_av_get_a2dp_current_codec();
   uint8_t p_codec_info[AVDT_CODEC_SIZE];
@@ -545,7 +572,7 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
   }
 
   // fill the scrambling support flag
-  codec_config->isScramblingEnabled = false;
+  codec_config->isScramblingEnabled = isScramblingEnabled();
 
   switch (current_codec.codec_type) {
     case BTAV_A2DP_CODEC_INDEX_SOURCE_SBC:
@@ -863,7 +890,6 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
       int samplerate = A2DP_GetTrackSampleRate(p_codec_info);
       int bits_per_sample = 16;
       codec_config->encodedAudioBitrate = (samplerate * bits_per_sample * 2)/4;
-      //codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
     } else {
       codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
     }
@@ -901,7 +927,7 @@ bool a2dp_get_selected_hal_codec_config_2_1(CodecConfiguration_2_1* codec_config
   }
 
   // fill the scrambling support flag
-  codec_config->isScramblingEnabled = false;
+  codec_config->isScramblingEnabled = isScramblingEnabled();
 
   switch (current_codec.codec_type) {
     case BTAV_A2DP_CODEC_INDEX_SOURCE_SBC:
@@ -1220,7 +1246,6 @@ bool a2dp_get_selected_hal_codec_config_2_1(CodecConfiguration_2_1* codec_config
       int samplerate = A2DP_GetTrackSampleRate(p_codec_info);
       int bits_per_sample = 16;
       codec_config->encodedAudioBitrate = (samplerate * bits_per_sample * 2)/4;
-      //codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
     } else {
       codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
     }
