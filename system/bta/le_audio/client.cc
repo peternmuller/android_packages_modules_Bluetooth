@@ -4341,8 +4341,10 @@ class LeAudioClientImpl : public LeAudioClient {
           defer_source_suspend_ack_until_stop_ = true;
           OnAudioSuspend();
         } else {
-          log::info("calling source ConfirmSuspendRequest in audio_sender_state_ idle");
-          le_audio_source_hal_client_->ConfirmSuspendRequest();
+          if (le_audio_source_hal_client_) {
+            log::info("calling source ConfirmSuspendRequest in audio_sender_state_ idle");
+            le_audio_source_hal_client_->ConfirmSuspendRequest();
+          }
         }
         return;
       case AudioState::READY_TO_RELEASE:
