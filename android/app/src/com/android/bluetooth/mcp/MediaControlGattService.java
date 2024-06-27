@@ -1581,6 +1581,18 @@ public class MediaControlGattService implements MediaControlGattServiceInterface
         if (getMediaStateChar() == MediaState.INACTIVE.getValue()) {
             resultStatus = Request.Results.MEDIA_PLAYER_INACTIVE;
         }
+        if(request.getOpcode() == Request.Opcodes.FAST_FORWARD ||
+               request.getOpcode() == Request.Opcodes.FAST_REWIND) {
+            Log.d(TAG, " Opcode is FAST_FORWARD or FAST_REWIND");
+            updateMediaStateChar(MediaState.SEEKING.getValue());
+            BluetoothGattCharacteristic characteristic =
+                    mCharacteristics.get(CharId.SEEKING_SPEED);
+            int intSpeed = SpeedFloatToCharacteristicIntValue(getSeekingSpeedChar());
+            characteristic.setValue(intSpeed, BluetoothGattCharacteristic.FORMAT_SINT8, 0);
+            if (isFeatureSupported(ServiceFeature.SEEKING_SPEED_NOTIFY)) {
+                notifyCharacteristic(characteristic, null);
+            }
+        }
 
         ByteBuffer bb = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN);
         bb.put((byte) request.getOpcode());

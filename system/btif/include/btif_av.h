@@ -29,9 +29,6 @@
 #include "include/hardware/bt_av.h"
 #include "types/raw_address.h"
 
-// #include "bta/include/bta_av_api.h"
-// #include "btif/include/btif_common.h"
-
 #define APTX_HQ 0X1000
 #define APTX_LL 0X2000
 #define APTX_ULL_S 0X4000
@@ -41,6 +38,11 @@
 
 #define APTX_HQ_LATENCY 2000
 #define APTX_LL_LATENCY 700
+
+#define QHS_SUPPORT_MASK 0x00000C00
+#define QHS_SUPPORT_NOT_AVAILABLE 0x00000400
+#define QHS_SUPPORT_AVAILABLE 0x00000800
+
 /**
  * Enum to represent the type of local a2dp profile.
  */
