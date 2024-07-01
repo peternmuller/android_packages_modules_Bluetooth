@@ -1553,6 +1553,15 @@ public class BluetoothInCallService extends InCallService {
             address = PhoneNumberUtils.stripSeparators(address);
         }
 
+        // Don't send host call information when IMS calls are conferenced
+        String subsNum = getSubscriberNumber();
+        if (subsNum != null && address != null) {
+           if (subsNum.equals(address)) {
+              Log.w(TAG, "return without sending host call in CLCC");
+              return;
+           }
+        }
+
         int addressType = address == null ? -1 : PhoneNumberUtils.toaFromString(address);
 
         if (shouldLog) {
@@ -1972,7 +1981,6 @@ public class BluetoothInCallService extends InCallService {
       Log.d(TAG, "processOnCallAdded Events");
       if ((call.getState()  == Call.STATE_CONNECTING) ||
           (call.getState()  == Call.STATE_DIALING)) {
-
          if (activeCall != null && mDsdaActiveCalls == 1) {
            mDelayOutgoingUpdate = 1;
            mDsDaOutgoingCalls++;
@@ -2251,7 +2259,8 @@ public class BluetoothInCallService extends InCallService {
                    (call.getState() == Call.STATE_SIMULATED_RINGING)) {
                  Log.d(TAG, "ignoring these call state events");
                }
-               else if (call.getState() == Call.STATE_DISCONNECTED) {
+               else if ((call.getState() == Call.STATE_DISCONNECTED) ||
+                        (call.getState() == Call.STATE_DISCONNECTING)) {
                  Log.d(TAG, "this event can come for either held or active call");
                  if ((numActiveCalls == 0) && (mDsdaActiveCalls == 1)) {
                    Log.d(TAG, "active call ended event is received. lets remove from oncallremoved");
