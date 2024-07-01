@@ -1610,3 +1610,29 @@ int A2DP_GetEecoderEffectiveFrameSize(const uint8_t* p_codec_info) {
              ? a2dp_encoder_interface->get_effective_frame_size()
              : 0;
 }
+
+uint8_t A2dp_SendSetConfigRspErrorCodeForPTS() {
+
+  log::info("");
+
+  char is_a2dp_pts_enable[PROPERTY_VALUE_MAX] = "false";
+  char value[PROPERTY_VALUE_MAX] = {'\0'};
+  uint8_t error_code = 0;
+
+  osi_property_get("persist.vendor.bt.a2dp.pts_enable", is_a2dp_pts_enable, "false");
+  log::info("is_a2dp_pts_enable: {}", is_a2dp_pts_enable);
+
+  osi_property_get("persist.vendor.bt.a2dp.set_config_error_code", value, "0");
+
+  int res = sscanf(value, "%hhu", &error_code);
+
+  log::info("res: {}", res);
+  log::info("error_code: {}", error_code);
+
+  if (!strncmp("true", is_a2dp_pts_enable, 4) &&
+      (res == 1) && (error_code != 0)) {
+    log::info("error_code : {}", error_code);
+    return error_code;
+  }
+  return error_code;
+}

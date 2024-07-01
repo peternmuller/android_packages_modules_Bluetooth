@@ -461,6 +461,7 @@ void BtaAvCo::ProcessSetConfig(tBTA_AV_HNDL bta_av_handle,
   tA2DP_STATUS status = A2DP_SUCCESS;
   uint8_t category = A2DP_SUCCESS;
   bool reconfig_needed = false;
+  uint8_t error_code = 0;
 
   log::verbose(
       "bta_av_handle=0x{:x} peer_address={} seid={} num_protect={} "
@@ -548,6 +549,15 @@ void BtaAvCo::ProcessSetConfig(tBTA_AV_HNDL bta_av_handle,
       category = AVDT_ASC_CODEC;
       status = A2DP_WRONG_CODEC;
     }
+  }
+
+  error_code = A2dp_SendSetConfigRspErrorCodeForPTS();
+  log::info(" status: {}, error_code: {}", status, error_code);
+
+  //error_code is valid for PTS only as of now.
+  if (error_code != 0) {
+    log::info("overwrite status for pts setconf rsp");
+    status = (tA2DP_STATUS)error_code;
   }
 
   if (status != A2DP_SUCCESS) {

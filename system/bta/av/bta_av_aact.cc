@@ -735,6 +735,23 @@ void bta_av_delay_co(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_av_do_disc_a2dp(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
+
+  //To Pass pTS TC A2DP/SRC/AVP/BI-10-C
+  /* After adding PTS dongle to the AAC whitelist,
+   * when PTS pops up a dialog to ask IUT to response a error code,
+   * (Please prepare the IUT to reject an AVDTP SET CONFIGURATION
+   * command with error code INVALID_OBJECT_TYPE, then press 'OK' to continue.)
+   * user needs to click the OK very quickly other wise the case will fail
+   * due to IUT will start discover and set config to PTS.*/
+
+  char is_pts_enable[PROPERTY_VALUE_MAX] = "false";
+  osi_property_get("persist.vendor.bt.a2dp.pts_enable", is_pts_enable, "false");
+  log::info("is_pts_enable: {}", is_pts_enable);
+  if (!strncmp("true", is_pts_enable, 4)) {
+    log::info(" Don't do a2dp discovery for PTS, return");
+    return;
+  }
+
   bool ok_continue = false;
   tA2DP_SDP_DB_PARAMS db_params;
   uint16_t attr_list[] = {ATTR_ID_SERVICE_CLASS_ID_LIST,
@@ -1888,11 +1905,12 @@ void bta_av_getcap_results(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  ******************************************************************************/
 void bta_av_setconfig_rej(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
   uint8_t avdt_handle = p_data->ci_setconfig.avdt_handle;
+  uint8_t error_code = p_data->ci_setconfig.err_code;
 
   bta_av_adjust_seps_idx(p_scb, avdt_handle);
-  log::info("sep_idx={} avdt_handle={} bta_handle=0x{:x}", p_scb->sep_idx,
-            p_scb->avdt_handle, p_scb->hndl);
-  AVDT_ConfigRsp(p_scb->avdt_handle, p_scb->avdt_label, AVDT_ERR_UNSUP_CFG, 0);
+  log::info("sep_idx={} avdt_handle={} bta_handle=0x{:x} error_code={}", p_scb->sep_idx,
+            p_scb->avdt_handle, p_scb->hndl, error_code);
+  AVDT_ConfigRsp(p_scb->avdt_handle, p_scb->avdt_label, error_code, 0);
 
   tBTA_AV bta_av_data = {
       .reject =
