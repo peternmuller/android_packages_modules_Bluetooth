@@ -34,7 +34,6 @@
 #define APTX_ULL_S 0X4000
 #define APTX_ULL 0X5000//for 16 bit source
 #define APTX_MODE_MASK 0X7000
-#define APTX_BATTERY_INFO 0X0F
 
 #define APTX_HQ_LATENCY 2000
 #define APTX_LL_LATENCY 700
@@ -290,9 +289,9 @@ void btif_av_set_low_latency(bool is_low_latency);
 /**
  * Update Codec Mode
  *
- * @param is_Gaming_Latency to set
+ * @param
  */
-void btif_av_update_codec_mode(bool is_Gaming_Latency);
+void btif_av_update_codec_mode();
 
 /**
  * Update Source Metadata
@@ -326,7 +325,7 @@ uint16_t btif_av_get_aptx_mode_info();
 /*
  * Updates the AptX Mode
  */
-void btif_av_update_aptx_mode_info(bool is_ll_enabled);
+void btif_av_update_aptx_mode_info();
 
 /**
  * Initiate an AV connection after 3s timeout to peer audio sink
