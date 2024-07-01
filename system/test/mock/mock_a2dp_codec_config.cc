@@ -89,6 +89,10 @@ int A2DP_GetEecoderEffectiveFrameSize(const uint8_t* p_codec_info) {
   inc_func_call_count(__func__);
   return 0;
 }
+uint8_t A2dp_SendSetConfigRspErrorCodeForPTS() {
+  inc_func_call_count(__func__);
+  return 0;
+}
 bool A2DP_IsPeerSinkCodecValid(const uint8_t* p_codec_info) {
   inc_func_call_count(__func__);
   return false;
