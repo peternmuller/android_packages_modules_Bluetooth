@@ -1986,6 +1986,12 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
+
+                    if (mLeAudioSuspended) {
+                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
+                        mAudioManager.setLeAudioSuspended(false);
+                        mLeAudioSuspended = false;
+                    }
                 }
 
                 handleAudioDeviceRemoved(
