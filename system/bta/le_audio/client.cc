@@ -109,8 +109,11 @@ using bluetooth::le_audio::types::DataPathState;
 using bluetooth::le_audio::types::hdl_pair;
 using bluetooth::le_audio::types::kDefaultScanDurationS;
 using bluetooth::le_audio::types::kLeAudioContextAllBidir;
+using bluetooth::le_audio::types::kLeAudioContextLibrettoBidir;
 using bluetooth::le_audio::types::kLeAudioContextAllRemoteSinkOnly;
+using bluetooth::le_audio::types::kLeAudioContextLibrettoSinkOnly;
 using bluetooth::le_audio::types::kLeAudioContextAllRemoteSource;
+using bluetooth::le_audio::types::kLeAudioContextLibrettoSource;
 using bluetooth::le_audio::types::kLeAudioContextAllTypesArray;
 using bluetooth::le_audio::types::LeAudioContextType;
 using bluetooth::le_audio::types::PublishedAudioCapabilities;
@@ -898,7 +901,9 @@ class LeAudioClientImpl : public LeAudioClient {
     /* Make sure we do not take the local sink metadata when only the local
      * source scenario is about to be started (e.g. MEDIA).
      */
-    if (!kLeAudioContextAllBidir.test(configuration_context_type)) {
+    auto kLeAudioContextBidir = IsLeXdevice(group)
+            ? kLeAudioContextLibrettoBidir : kLeAudioContextAllBidir;
+    if (!kLeAudioContextBidir.test(configuration_context_type)) {
       remote_contexts.source.clear();
     }
 
@@ -936,9 +941,9 @@ class LeAudioClientImpl : public LeAudioClient {
 
     auto device = group->GetFirstDevice();
     if (device) {
-      send_vs_cmd(device->GetBdAddress(),
-        static_cast<uint16_t>(configuration_context_type),
-        group->GetFirstDevice()->snk_pacs_);
+      auto is_lex_device = IsLeXdevice(group);
+      send_vs_cmd(group->GetFirstDevice()->GetBdAddress(),
+        static_cast<uint16_t>(configuration_context_type), is_lex_device);
     }
 
     bool result = groupStateMachine_->StartStream(
@@ -3527,6 +3532,23 @@ class LeAudioClientImpl : public LeAudioClient {
     }
   }
 
+  bool IsLeXdevice(LeAudioDeviceGroup* group) {
+    bool remote_support = false;
+    if (group) {
+      auto group_pacs = group->GetFirstDevice()->snk_pacs_;
+      for (auto& [handles, pacs_record] : group_pacs) {
+        for (auto& pac : pacs_record) {
+          if (pac.codec_id.vendor_codec_id ==
+              bluetooth::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+            remote_support = true;
+            break;
+          }
+        }
+      }
+    }
+    return remote_support;
+  }
+
   bool IsAseAcceptingAudioData(struct ase* ase) {
     if (ase == nullptr) return false;
     if (ase->state != AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) return false;
@@ -5191,6 +5213,12 @@ class LeAudioClientImpl : public LeAudioClient {
          IsDirectionAvailableForCurrentConfiguration(group,
                                                      remote_other_direction));
 
+    auto kLeAudioContextSinkOnly = IsLeXdevice(group)
+            ? kLeAudioContextLibrettoSinkOnly
+            : kLeAudioContextAllRemoteSinkOnly;
+    auto kLeAudioContextBidir = IsLeXdevice(group)
+            ? kLeAudioContextLibrettoBidir
+            : kLeAudioContextAllBidir;
     // Inject conversational when ringtone is played - this is required for all
     // the VoIP applications which are not using the telecom API.
     constexpr AudioContexts possible_voip_contexts =
@@ -5219,8 +5247,8 @@ class LeAudioClientImpl : public LeAudioClient {
     if (IsInCall() || IsInVoipCall()) {
       log::debug("In Call preference used: {}, voip call: {}", IsInCall(),
                  IsInVoipCall());
-      local_metadata_context_types_.sink.unset_all(kLeAudioContextAllBidir);
-      local_metadata_context_types_.source.unset_all(kLeAudioContextAllBidir);
+      local_metadata_context_types_.sink.unset_all(kLeAudioContextBidir);
+      local_metadata_context_types_.source.unset_all(kLeAudioContextBidir);
       local_metadata_context_types_.sink.set(
           LeAudioContextType::CONVERSATIONAL);
       local_metadata_context_types_.source.set(
@@ -5260,7 +5288,7 @@ class LeAudioClientImpl : public LeAudioClient {
                               ToString(configuration_context_type_));
 
     if (remote_metadata.get(remote_other_direction)
-            .test_any(kLeAudioContextAllBidir) &&
+            .test_any(kLeAudioContextBidir) &&
         !is_streaming_other_direction) {
       log::debug(
             "The other direction is not streaming bidirectional, ignore that "
@@ -5273,7 +5301,7 @@ class LeAudioClientImpl : public LeAudioClient {
      * metadata for the remote device.
      */
     if (remote_metadata.get(remote_direction)
-            .test_any(kLeAudioContextAllBidir)) {
+            .test_any(kLeAudioContextBidir)) {
       log::debug(
           "Aligning the other direction remote metadata to add this direction "
           "context");
@@ -5281,7 +5309,7 @@ class LeAudioClientImpl : public LeAudioClient {
       if (is_ongoing_call_on_other_direction) {
         /* Other direction is streaming and is in call */
         remote_metadata.get(remote_direction)
-            .unset_all(kLeAudioContextAllBidir);
+            .unset_all(kLeAudioContextBidir);
         remote_metadata.get(remote_direction)
             .set(LeAudioContextType::CONVERSATIONAL);
       } else {
@@ -5290,12 +5318,12 @@ class LeAudioClientImpl : public LeAudioClient {
           remote_metadata.get(remote_other_direction).clear();
         }
         remote_metadata.get(remote_other_direction)
-            .unset_all(kLeAudioContextAllBidir);
+            .unset_all(kLeAudioContextBidir);
         remote_metadata.get(remote_other_direction)
-            .unset_all(kLeAudioContextAllRemoteSinkOnly);
+            .unset_all(kLeAudioContextSinkOnly);
         remote_metadata.get(remote_other_direction)
             .set_all(remote_metadata.get(remote_direction) &
-                     ~kLeAudioContextAllRemoteSinkOnly);
+                     ~kLeAudioContextSinkOnly);
       }
     }
     log::debug("remote_metadata.source= {}", ToString(remote_metadata.source));
@@ -5310,7 +5338,7 @@ class LeAudioClientImpl : public LeAudioClient {
       if ((remote_metadata.get(remote_direction).none() &&
            remote_metadata.get(remote_other_direction).any()) ||
           remote_metadata.get(remote_other_direction)
-              .test_any(kLeAudioContextAllBidir)) {
+              .test_any(kLeAudioContextBidir)) {
         log::debug(
             "Aligning this direction remote metadata to add the other "
             "direction context");
@@ -5318,7 +5346,7 @@ class LeAudioClientImpl : public LeAudioClient {
          * with the other direction bidirectional context
          */
         remote_metadata.get(remote_direction)
-            .unset_all(kLeAudioContextAllBidir);
+            .unset_all(kLeAudioContextBidir);
         remote_metadata.get(remote_direction)
             .set_all(remote_metadata.get(remote_other_direction));
       }
@@ -5326,7 +5354,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Make sure that after alignment no sink only context leaks into the other
      * direction. */
-    remote_metadata.source.unset_all(kLeAudioContextAllRemoteSinkOnly);
+    remote_metadata.source.unset_all(kLeAudioContextSinkOnly);
 
     log::debug("remote_metadata.source= {}", ToString(remote_metadata.source));
     log::debug("remote_metadata.sink= {}", ToString(remote_metadata.sink));
@@ -5334,16 +5362,7 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type,
-    const bluetooth::le_audio::types::PublishedAudioCapabilities& group_pacs) {
-    bool remote_support = false;
-    for (auto& [handles, pacs_record] : group_pacs) {
-      for (auto& pac : pacs_record) {
-        if (pac.codec_id.vendor_codec_id == bluetooth::le_audio::types::kLeAudioCodingFormatAptxLeX) {
-          remote_support = true;
-          break;
-        }
-      }
-    }
+    bool remote_support) {
     if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
       uint8_t param[4] = {0};
       param[0] = VS_QHCI_USECASE_UPDATE;
@@ -5544,9 +5563,10 @@ class LeAudioClientImpl : public LeAudioClient {
 
       auto device = group->GetFirstDevice();
       if (device) {
+        auto is_lex_device = IsLeXdevice(group);
         send_vs_cmd(device->GetBdAddress(),
           static_cast<uint16_t>(new_configuration_context),
-          group->GetFirstDevice()->snk_pacs_);
+          is_lex_device);
       }
 
       LeAudioLogHistory::Get()->AddLogHistory(
@@ -6101,8 +6121,11 @@ class LeAudioClientImpl : public LeAudioClient {
           if (group->IsPendingConfiguration()) {
             SuspendedForReconfiguration();
             group->SetSuspendedForReconfiguration();
+            auto kLeAudioContextSource = IsLeXdevice(group)
+                    ? kLeAudioContextLibrettoSource
+                    : kLeAudioContextAllRemoteSource;
             auto remote_direction =
-                kLeAudioContextAllRemoteSource.test(configuration_context_type_)
+                kLeAudioContextSource.test(configuration_context_type_)
                     ? bluetooth::le_audio::types::kLeAudioDirectionSource
                     : bluetooth::le_audio::types::kLeAudioDirectionSink;
 
