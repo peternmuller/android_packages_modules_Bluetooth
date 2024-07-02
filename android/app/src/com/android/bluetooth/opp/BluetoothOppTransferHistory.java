@@ -57,6 +57,7 @@ import android.widget.ListView;
 import com.android.bluetooth.BluetoothMethodProxy;
 import com.android.bluetooth.BluetoothStatsLog;
 import com.android.bluetooth.R;
+import com.android.bluetooth.Utils;
 import com.android.bluetooth.content_profiles.ContentProfileErrorReportUtils;
 import com.android.bluetooth.flags.Flags;
 
@@ -87,6 +88,7 @@ public class BluetoothOppTransferHistory extends Activity
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        Utils.setEdgeToEdge(this);
         setContentView(R.layout.bluetooth_transfers_page);
         mListView = (ListView) findViewById(R.id.list);
         mListView.setEmptyView(findViewById(R.id.empty));
