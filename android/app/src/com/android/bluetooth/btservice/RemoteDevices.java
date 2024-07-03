@@ -497,7 +497,10 @@ public class RemoteDevices {
          */
         String getAlias() {
             synchronized (mObject) {
-                return mAlias;
+                if (mAlias == null)
+                    return mName;
+                else
+                    return mAlias;
             }
         }
 
@@ -1310,7 +1313,6 @@ public class RemoteDevices {
         }
 
         synchronized (mDevices) {
-            mDevices.remove(address);
             mDeviceQueue.remove(address); // Remove from LRU cache
 
             // Remove from dual mode device mappings
