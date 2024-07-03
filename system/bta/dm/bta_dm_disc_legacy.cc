@@ -924,8 +924,12 @@ static void bta_dm_disc_result(tBTA_DM_SVC_RES& disc_result) {
   /* if any BR/EDR service discovery has been done, report the event */
   if (!is_gatt_over_ble) {
     auto& r = disc_result;
+    const char* p_temp = get_btm_client_interface().security.BTM_SecReadDevName(
+    bta_dm_search_cb.peer_bdaddr);
+    if (p_temp != NULL)
+    strlcpy((char*)r.bd_name, p_temp, BD_NAME_LEN + 1);
     bta_dm_search_cb.service_search_cbacks.on_service_discovery_results(
-        r.bd_addr, r.uuids, r.result);
+        r.bd_addr, r.uuids, r.result, r.bd_name);
   }
 
   /* Services were discovered while device search is in progress.
