@@ -1772,8 +1772,9 @@ static void btif_merge_existing_uuids(RawAddress& addr, std::set<Uuid>* uuids) {
 
 static void btif_on_service_discovery_results(
     RawAddress bd_addr, const std::vector<bluetooth::Uuid>& uuids_param,
-    tBTA_STATUS result) {
-  bt_property_t prop;
+	tBTA_STATUS result, BD_NAME bd_name) {
+  int num_properties = 0;
+  bt_property_t prop[2];
   std::vector<uint8_t> property_value;
   std::set<Uuid> uuids;
   bool a2dp_sink_capable = false;
@@ -1804,8 +1805,8 @@ static void btif_on_service_discovery_results(
         btif_dm_pairing_cb_t::ServiceDiscoveryState::FINISHED;
   }
 
-  prop.type = BT_PROPERTY_UUIDS;
-  prop.len = 0;
+  prop[0].type = BT_PROPERTY_UUIDS;
+  prop[0].len = 0;
   if ((result == BTA_SUCCESS) && !uuids_param.empty()) {
     log::info("New UUIDs for {}:", bd_addr);
     for (const auto& uuid : uuids_param) {
@@ -1831,8 +1832,8 @@ static void btif_on_service_discovery_results(
         a2dp_sink_capable = true;
       }
     }
-    prop.val = (void*)property_value.data();
-    prop.len = Uuid::kNumBytes128 * uuids.size();
+    prop[0].val = (void*)property_value.data();
+    prop[0].len = Uuid::kNumBytes128 * uuids.size();
   }
 
   bool skip_reporting_wait_for_le = false;
@@ -1873,12 +1874,12 @@ static void btif_on_service_discovery_results(
         eir_uuids_cache.erase(uuids_iter);
       }
       if (num_eir_uuids > 0) {
-        prop.val = (void*)property_value.data();
-        prop.len = num_eir_uuids * Uuid::kNumBytes128;
+        prop[0].val = (void*)property_value.data();
+        prop[0].len = num_eir_uuids * Uuid::kNumBytes128;
       } else {
         log::warn("SDP failed and we have no EIR UUIDs to report either");
-        prop.val = &uuid;
-        prop.len = Uuid::kNumBytes128;
+        prop[0].val = &uuid;
+        prop[0].len = Uuid::kNumBytes128;
       }
     }
 
@@ -1898,9 +1899,24 @@ static void btif_on_service_discovery_results(
 
   if (!uuids_param.empty() || num_eir_uuids != 0) {
     /* Also write this to the NVRAM */
-    const bt_status_t ret =
-        btif_storage_set_remote_device_property(&bd_addr, &prop);
+    bt_status_t ret =
+        btif_storage_set_remote_device_property(&bd_addr, &prop[0]);
     ASSERTC(ret == BT_STATUS_SUCCESS, "storing remote services failed", ret);
+    num_properties++;
+
+  /* Remote name update */
+  if (!com::android::bluetooth::flags::
+          separate_service_and_device_discovery() &&
+      strnlen((const char*)bd_name, BD_NAME_LEN)) {
+    prop[1].type = BT_PROPERTY_BDNAME;
+    prop[1].val = bd_name;
+    prop[1].len = strnlen((char*)bd_name, BD_NAME_LEN);
+
+    ret = btif_storage_set_remote_device_property(&bd_addr, &prop[1]);
+    ASSERTC(ret == BT_STATUS_SUCCESS, "failed to save remote device property",
+            ret);
+    num_properties++;
+  }
 
     if (skip_reporting_wait_for_le) {
       log::info(
@@ -1916,7 +1932,7 @@ static void btif_on_service_discovery_results(
 
     /* Send the event to the BTIF */
     GetInterfaceToProfiles()->events->invoke_remote_device_properties_cb(
-        BT_STATUS_SUCCESS, bd_addr, 1, &prop);
+        BT_STATUS_SUCCESS, bd_addr, num_properties, prop);
   }
 }
 

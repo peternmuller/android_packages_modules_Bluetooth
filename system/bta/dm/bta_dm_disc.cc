@@ -52,6 +52,7 @@
 #include "stack/include/main_thread.h"
 #include "stack/include/sdp_status.h"
 #include "types/raw_address.h"
+#include "bta_dm_disc_int_legacy.h"
 
 #ifdef TARGET_FLOSS
 #include "stack/include/srvc_api.h"
@@ -322,6 +323,7 @@ static void bta_dm_read_dis_cmpl(const RawAddress& addr,
  ******************************************************************************/
 static void bta_dm_disc_result(tBTA_DM_SVC_RES& disc_result) {
   log::verbose("");
+  bta_dm_disc_legacy::tBTA_DM_SEARCH_CB bta_dm_search_cb;
 
   /* if any BR/EDR service discovery has been done, report the event */
   if (!disc_result.is_gatt_over_ble) {
@@ -334,8 +336,12 @@ static void bta_dm_disc_result(tBTA_DM_SVC_RES& disc_result) {
       bta_dm_discovery_cb.service_search_cbacks.on_gatt_results(
           r.bd_addr, BD_NAME{}, r.gatt_uuids, /* transport_le */ false);
     }
+    const char* p_temp = get_btm_client_interface().security.BTM_SecReadDevName(
+    bta_dm_search_cb.peer_bdaddr);
+    if (p_temp != NULL)
+    strlcpy((char*)r.bd_name, p_temp, BD_NAME_LEN + 1);
     bta_dm_discovery_cb.service_search_cbacks.on_service_discovery_results(
-        r.bd_addr, r.uuids, r.result);
+        r.bd_addr, r.uuids, r.result, r.bd_name);
   } else {
     bta_dm_discovery_cb.transports &= ~BT_TRANSPORT_LE;
     GAP_BleReadPeerPrefConnParams(bta_dm_discovery_cb.peer_bdaddr);
