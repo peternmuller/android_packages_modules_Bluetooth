@@ -2102,7 +2102,8 @@ public class LeAudioService extends ProfileService {
                         + mActiveAudioInDevice
                         + ", notifyAndUpdateInactiveOutDeviceOnly: "
                         + notifyAndUpdateInactiveOutDeviceOnly);
-        if (mActiveAudioOutDevice != null || mActiveAudioInDevice != null) {
+        if ((isActive == true) &&
+            (mActiveAudioOutDevice != null || mActiveAudioInDevice != null)) {
             LeAudioGroupDescriptor descriptor = getGroupDescriptor(groupId);
             if (descriptor != null) {
                 Log.d(TAG, "updateActiveDevices: set active state active");
