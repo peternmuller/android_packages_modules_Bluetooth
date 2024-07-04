@@ -329,6 +329,7 @@ struct tBTA_AG_SCB {
   tBTA_AG_HF_IND
       local_hf_indicators[BTA_AG_MAX_NUM_LOCAL_HF_IND]; /* Local supported
                                                     HF indicators */
+  bool is_vr_active;
 
   std::string ToString() const {
     return base::StringPrintf(
