@@ -2418,6 +2418,13 @@ public class BassClientService extends ProfileService {
         }
 
         if (leaudioBroadcastExtractPeriodicScannerFromStateMachine()) {
+            for (BluetoothDevice device : devices) {
+                if (getConnectionState(device) != BluetoothProfile.STATE_CONNECTED) {
+                    mCallbacks.notifySourceAddFailed(device, sourceMetadata,
+                            BluetoothStatusCodes.ERROR_REMOTE_LINK_ERROR);
+                    continue;
+                }
+            }
             List<Integer> activeSyncedSrc = getActiveSyncedSources();
             BluetoothDevice sourceDevice = sourceMetadata.getSourceDevice();
             if (!isLocalBroadcast(sourceMetadata)
