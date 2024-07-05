@@ -1071,7 +1071,6 @@ public final class BluetoothLeAudio implements BluetoothProfile, AutoCloseable {
      * @return the list of active devices. Returns empty list on error.
      * @hide
      */
-    @SystemApi
     @NonNull
     @RequiresLegacyBluetoothPermission
     @RequiresBluetoothConnectPermission
