@@ -31,8 +31,8 @@
 #include "hal/snoop_logger.h"
 #include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
+#include "main/shim/acl_api.h"
 #include "main/shim/entry.h"
-#include "os/log.h"
 #include "osi/include/allocator.h"
 #include "stack/btm/btm_sec.h"
 #include "stack/include/acl_api.h"
@@ -220,7 +220,7 @@ void l2cu_release_lcb(tL2C_LCB* p_lcb) {
       tL2CAP_SEC_DATA* p_buf =
           (tL2CAP_SEC_DATA*)fixed_queue_try_dequeue(p_lcb->le_sec_pending_q);
       if (p_buf->p_callback)
-        p_buf->p_callback(&p_lcb->remote_bd_addr, p_lcb->transport,
+        p_buf->p_callback(p_lcb->remote_bd_addr, p_lcb->transport,
                           p_buf->p_ref_data, BTM_DEV_RESET);
       osi_free(p_buf);
     }
@@ -1472,6 +1472,14 @@ tL2C_CCB* l2cu_allocate_ccb(tL2C_LCB* p_lcb, uint16_t cid, bool is_eatt) {
   return p_ccb;
 }
 
+void l2cu_reset_lcb_timeout(uint16_t handle) {
+  tL2C_LCB* p_lcb = l2cu_find_lcb_by_handle(handle);
+  if (p_lcb != nullptr) {
+    log::debug("idle_timeout reset");
+    p_lcb->idle_timeout = 0;
+  }
+}
+
 /*******************************************************************************
  *
  * Function         l2cu_start_post_bond_timer
@@ -2132,12 +2140,7 @@ uint8_t l2cu_get_num_hi_priority(void) {
  *
  ******************************************************************************/
 void l2cu_create_conn_after_switch(tL2C_LCB* p_lcb) {
-  const bool there_are_high_priority_channels =
-      (l2cu_get_num_hi_priority() > 0);
-
-  acl_create_classic_connection(p_lcb->remote_bd_addr,
-                                there_are_high_priority_channels,
-                                p_lcb->IsBonding());
+  bluetooth::shim::ACL_CreateClassicConnection(p_lcb->remote_bd_addr);
 
   alarm_set_on_mloop(p_lcb->l2c_lcb_timer, L2CAP_LINK_CONNECT_TIMEOUT_MS,
                      l2c_lcb_timer_timeout, p_lcb);

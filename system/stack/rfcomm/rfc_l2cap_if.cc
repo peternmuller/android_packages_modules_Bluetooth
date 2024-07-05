@@ -74,8 +74,11 @@ void rfcomm_l2cap_if_init(void) {
   p_l2c->pL2CA_TxComplete_Cb = NULL;
   p_l2c->pL2CA_Error_Cb = rfc_on_l2cap_error;
 
-  L2CA_Register(BT_PSM_RFCOMM, rfc_cb.rfc.reg_info, true /* enable_snoop */,
-                nullptr, L2CAP_MTU_SIZE, 0, 0);
+  if (!L2CA_Register(BT_PSM_RFCOMM, rfc_cb.rfc.reg_info,
+                     true /* enable_snoop */, nullptr, L2CAP_MTU_SIZE, 0, 0)) {
+    log::error("Unable to register with L2CAP profile RFCOMM psm:{}",
+               BT_PSM_RFCOMM);
+  }
 }
 
 /*******************************************************************************
@@ -121,7 +124,9 @@ void RFCOMM_ConnectInd(const RawAddress& bd_addr, uint16_t lcid,
   }
 
   if (p_mcb == nullptr) {
-    L2CA_DisconnectReq(lcid);
+    if (!L2CA_DisconnectReq(lcid)) {
+      log::warn("Unable to disconnect L2CAP cid:{}", lcid);
+    }
     return;
   }
   p_mcb->lcid = lcid;
@@ -157,7 +162,10 @@ void RFCOMM_ConnectCnf(uint16_t lcid, uint16_t result) {
 
       /* Peer gave up its connection request, make sure cleaning up L2CAP
        * channel */
-      L2CA_DisconnectReq(p_mcb->pending_lcid);
+      if (!L2CA_DisconnectReq(p_mcb->pending_lcid)) {
+        log::warn("Unable to send L2CAP disconnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      }
 
       p_mcb->pending_lcid = 0;
     }

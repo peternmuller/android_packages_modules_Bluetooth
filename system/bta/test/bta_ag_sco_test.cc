@@ -32,6 +32,7 @@ tBTM_CB btm_cb;
 LeAudioClient* LeAudioClient::Get() { return nullptr; }
 bool LeAudioClient::IsLeAudioClientInStreaming() { return false; }
 bool LeAudioClient::IsLeAudioClientRunning() { return false; }
+bool LeAudioClient::IsLeAudioClientInIdle(void) { return false; }
 
 const RawAddress kRawAddress({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
 
@@ -90,7 +91,13 @@ TEST_P(BtaAgScoParameterSelectionTest, create_pending_sco_cvsd) {
   };
 
   this->codec = ESCO_CODEC_UNKNOWN;
-  bta_ag_create_pending_sco(&scb, is_local);
+  if (is_local) {
+    bta_ag_create_sco(&scb, true);
+  } else {
+    // empty data, not used in the function
+    tBTM_ESCO_CONN_REQ_EVT_DATA data;
+    bta_ag_sco_conn_rsp(&scb, &data);
+  }
   if ((scb.features & BTA_AG_FEAT_ESCO_S4) &&
       (scb.peer_features & BTA_AG_PEER_FEAT_ESCO_S4)) {
     ASSERT_EQ(this->codec, ESCO_CODEC_CVSD_S4);

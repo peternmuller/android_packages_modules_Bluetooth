@@ -63,6 +63,8 @@ using bluetooth::Uuid;
 using namespace bluetooth;
 
 extern tBTM_CB btm_cb;
+const bool kBtaEncryptedAdvertisingDataSupported = true;
+
 /*****************************************************************************
  *  Constants
  ****************************************************************************/
@@ -247,8 +249,13 @@ void bta_gattc_deregister(tBTA_GATTC_RCB* p_clreg) {
     if (bta_gattc_cb.bg_track[i].cif_mask & ((tBTA_GATTC_CIF_MASK)1 << (p_clreg->client_if - 1))) {
       bta_gattc_mark_bg_conn(p_clreg->client_if,
                              bta_gattc_cb.bg_track[i].remote_bda, false);
-      GATT_CancelConnect(p_clreg->client_if,
-                         bta_gattc_cb.bg_track[i].remote_bda, false);
+      if (!GATT_CancelConnect(p_clreg->client_if,
+                              bta_gattc_cb.bg_track[i].remote_bda, false)) {
+        log::warn(
+            "Unable to cancel GATT connection client_if:{} peer:{} "
+            "is_direct:{}",
+            p_clreg->client_if, bta_gattc_cb.bg_track[i].remote_bda, false);
+      }
     }
   }
 
@@ -532,8 +539,11 @@ void bta_gattc_conn(tBTA_GATTC_CLCB* p_clcb, const tBTA_GATTC_DATA* p_data) {
     log::verbose("conn_id=0x{:x}", p_data->hdr.layer_specific);
     p_clcb->bta_conn_id = p_data->int_conn.hdr.layer_specific;
 
-    GATT_GetConnectionInfor(p_data->hdr.layer_specific, &gatt_if, p_clcb->bda,
-                            &p_clcb->transport);
+    if (!GATT_GetConnectionInfor(p_data->hdr.layer_specific, &gatt_if,
+                                 p_clcb->bda, &p_clcb->transport)) {
+      log::warn("Unable to get GATT connection information peer:{}",
+                p_clcb->bda);
+    }
   }
 
   p_clcb->p_srcb->connected = true;
@@ -1018,7 +1028,7 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
     (*p_clcb->p_rcb->p_cback)(BTA_GATTC_SRVC_DISC_DONE_EVT, &bta_gattc);
   }
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data() &&
+  if (kBtaEncryptedAdvertisingDataSupported &&
       (p_clcb->status == GATT_SUCCESS) && p_clcb->p_srcb &&
       btm_sec_is_a_bonded_dev(p_clcb->p_srcb->server_bda)) {
     GAP_BleGetEncKeyMaterialInfo(p_clcb->p_srcb->server_bda);
@@ -1552,7 +1562,12 @@ static bool bta_gattc_process_srvc_chg_ind(uint16_t conn_id,
       }
     }
     /* send confirmation here if this is an indication, it should always be */
-    GATTC_SendHandleValueConfirm(conn_id, p_notify->cid);
+    if (GATTC_SendHandleValueConfirm(conn_id, p_notify->cid) != GATT_SUCCESS) {
+      log::warn(
+          "Unable to send GATT client handle value confirmation conn_id:{} "
+          "cid:{}",
+          conn_id, p_notify->cid);
+    }
 
     /* if connection available, refresh cache by doing discovery now */
     if (p_clcb) {
@@ -1605,24 +1620,42 @@ static void bta_gattc_process_indicate(uint16_t conn_id, tGATTC_OPTYPE op,
 
   if (!GATT_GetConnectionInfor(conn_id, &gatt_if, remote_bda, &transport)) {
     log::error("indication/notif for unknown app");
-    if (op == GATTC_OPTYPE_INDICATION)
-      GATTC_SendHandleValueConfirm(conn_id, p_data->cid);
+    if (op == GATTC_OPTYPE_INDICATION) {
+      if (GATTC_SendHandleValueConfirm(conn_id, p_data->cid) != GATT_SUCCESS) {
+        log::warn(
+            "Unable to send GATT client handle value confirmation conn_id:{} "
+            "cid:{}",
+            conn_id, p_data->cid);
+      }
+    }
     return;
   }
 
   tBTA_GATTC_RCB* p_clrcb = bta_gattc_cl_get_regcb(gatt_if);
   if (p_clrcb == NULL) {
     log::error("indication/notif for unregistered app");
-    if (op == GATTC_OPTYPE_INDICATION)
-      GATTC_SendHandleValueConfirm(conn_id, p_data->cid);
+    if (op == GATTC_OPTYPE_INDICATION) {
+      if (GATTC_SendHandleValueConfirm(conn_id, p_data->cid) != GATT_SUCCESS) {
+        log::warn(
+            "Unable to send GATT client handle value confirmation conn_id:{} "
+            "cid:{}",
+            conn_id, p_data->cid);
+      }
+    }
     return;
   }
 
   tBTA_GATTC_SERV* p_srcb = bta_gattc_find_srcb(remote_bda);
   if (p_srcb == NULL) {
     log::error("indication/notif for unknown device, ignore");
-    if (op == GATTC_OPTYPE_INDICATION)
-      GATTC_SendHandleValueConfirm(conn_id, p_data->cid);
+    if (op == GATTC_OPTYPE_INDICATION) {
+      if (GATTC_SendHandleValueConfirm(conn_id, p_data->cid) != GATT_SUCCESS) {
+        log::warn(
+            "Unable to send GATT client handle value confirmation conn_id:{} "
+            "cid:{}",
+            conn_id, p_data->cid);
+      }
+    }
     return;
   }
 
@@ -1659,7 +1692,12 @@ static void bta_gattc_process_indicate(uint16_t conn_id, tGATTC_OPTYPE op,
   /* no one intersted and need ack? */
   else if (op == GATTC_OPTYPE_INDICATION) {
     log::verbose("no one interested, ack now");
-    GATTC_SendHandleValueConfirm(conn_id, p_data->cid);
+    if (GATTC_SendHandleValueConfirm(conn_id, p_data->cid) != GATT_SUCCESS) {
+      log::warn(
+          "Unable to send GATT client handle value confirmation conn_id:{} "
+          "cid:{}",
+          conn_id, p_data->cid);
+    }
   }
 }
 

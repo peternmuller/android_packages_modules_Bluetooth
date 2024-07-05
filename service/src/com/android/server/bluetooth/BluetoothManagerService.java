@@ -267,8 +267,7 @@ class BluetoothManagerService {
     private boolean mEnableExternal = false;
 
     // Map of apps registered to keep BLE scanning on.
-    private Map<IBinder, ClientDeathRecipient> mBleApps =
-            new ConcurrentHashMap<IBinder, ClientDeathRecipient>();
+    private Map<IBinder, ClientDeathRecipient> mBleApps = new ConcurrentHashMap<>();
 
     private final BluetoothAdapterState mState = new BluetoothAdapterState();
 
@@ -628,7 +627,11 @@ class BluetoothManagerService {
         mTryBindOnBindTimeout = false;
 
         // Observe BLE scan only mode settings change.
-        registerForBleScanModeChange();
+        if (Flags.respectBleScanSetting()) {
+            BleScanSettingListener.initialize(mLooper, mContentResolver, this::onBleScanDisabled);
+        } else {
+            registerForBleScanModeChange();
+        }
 
         // Disable ASHA if BLE is not supported, overriding any system property
         if (!isBleSupported(mContext)) {
@@ -701,6 +704,30 @@ class BluetoothManagerService {
         }
     }
 
+    private Unit onBleScanDisabled() {
+        if (mState.oneOf(STATE_OFF, STATE_BLE_TURNING_OFF)) {
+            Log.i(TAG, "onBleScanDisabled: Nothing to do, Bluetooth is already turning off");
+            return Unit.INSTANCE;
+        }
+        clearBleApps();
+        try {
+            mAdapter.unregAllGattClient(mContext.getAttributionSource());
+        } catch (RemoteException e) {
+            Log.e(TAG, "onBleScanDisabled: unregAllGattClient failed", e);
+        }
+        if (mState.oneOf(STATE_BLE_ON)) {
+            Log.i(TAG, "onBleScanDisabled: Shutting down BLE_ON mode");
+            try {
+                mAdapter.stopBle(mContext.getAttributionSource());
+            } catch (RemoteException e) {
+                Log.e(TAG, "onBleScanDisabled: stopBle failed", e);
+            }
+        } else {
+            Log.i(TAG, "onBleScanDisabled: Bluetooth is not in BLE_ON, staying on");
+        }
+        return Unit.INSTANCE;
+    }
+
     IBluetoothManager.Stub getBinder() {
         return mBinder;
     }
@@ -740,11 +767,7 @@ class BluetoothManagerService {
         BluetoothServerProxy.getInstance().setBluetoothPersistedState(mContentResolver, state);
     }
 
-    /**
-     * Returns true if the Bluetooth Adapter's name and address is locally cached
-     *
-     * @return
-     */
+    /** Returns true if the Bluetooth Adapter's name and address is locally cached */
     private boolean isNameAndAddressSet() {
         return mName != null && mAddress != null && mName.length() > 0 && mAddress.length() > 0;
     }
@@ -997,7 +1020,7 @@ class BluetoothManagerService {
         }
     }
 
-    boolean isBleScanAlwaysAvailable() {
+    boolean isBleScanAvailable() {
         if (Flags.airplaneModeXBleOn()) {
             if (AirplaneModeListener.isOn() && !mEnable) {
                 return false;
@@ -1007,13 +1030,20 @@ class BluetoothManagerService {
                 return false;
             }
         }
+        if (Flags.respectBleScanSetting()) {
+            if (SatelliteModeListener.isOn()) {
+                return false;
+            }
+            return BleScanSettingListener.isScanAllowed();
+        }
         try {
             return Settings.Global.getInt(
                             mContentResolver, Settings.Global.BLE_SCAN_ALWAYS_AVAILABLE)
                     != 0;
         } catch (SettingNotFoundException e) {
+            // The settings is considered as false by default.
+            return false;
         }
-        return false;
     }
 
     boolean isHearingAidProfileSupported() {
@@ -1037,7 +1067,7 @@ class BluetoothManagerService {
                 new ContentObserver(new Handler(mLooper)) {
                     @Override
                     public void onChange(boolean selfChange) {
-                        if (isBleScanAlwaysAvailable()) {
+                        if (isBleScanAvailable()) {
                             // Nothing to do
                             return;
                         }
@@ -1127,6 +1157,11 @@ class BluetoothManagerService {
             return false;
         }
 
+        if (Flags.respectBleScanSetting() && !BleScanSettingListener.isScanAllowed()) {
+            Log.d(TAG, "enableBle: not enabling - Scan mode is not allowed.");
+            return false;
+        }
+
         // TODO(b/262605980): enableBle/disableBle should be on handler thread
         updateBleAppCount(token, true, packageName);
 
@@ -1158,7 +1193,8 @@ class BluetoothManagerService {
          */
         updateBleAppCount(token, false, packageName);
 
-        if (isSatelliteModeOn()) {
+        // Remove this with flag, preventing a "disable" make no sense, even in satellite mode
+        if (!Flags.respectBleScanSetting() && isSatelliteModeOn()) {
             Log.d(TAG, "disableBle: not disabling - satellite mode is on.");
             return false;
         }
@@ -1248,7 +1284,9 @@ class BluetoothManagerService {
             }
             boolean airplaneDoesNotAllowBleOn =
                     Flags.airplaneModeXBleOn() && AirplaneModeListener.isOn();
-            if (!airplaneDoesNotAllowBleOn && isBleAppPresent()) {
+            boolean scanIsAllowed =
+                    !Flags.respectBleScanSetting() || BleScanSettingListener.isScanAllowed();
+            if (!airplaneDoesNotAllowBleOn && isBleAppPresent() && scanIsAllowed) {
                 // Need to stay at BLE ON. Disconnect all Gatt connections
                 Log.i(TAG, "sendBrEdrDownCallback: Staying in BLE_ON");
                 mAdapter.unregAllGattClient(mContext.getAttributionSource());
@@ -1378,55 +1416,60 @@ class BluetoothManagerService {
         mAdapterLock.writeLock().lock();
         try {
             mHandler.removeMessages(MESSAGE_BLUETOOTH_STATE_CHANGE);
-            if (mAdapter != null) {
-                try {
-                    mAdapter.unregisterCallback(
-                            mBluetoothCallback, mContext.getAttributionSource());
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Unable to unregister BluetoothCallback", e);
-                }
-
-                if (!Flags.explicitKillFromSystemServer()) {
-                    mAdapter = null;
-                    mContext.unbindService(mConnection);
-                    mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
-                    return;
-                }
-
-                CompletableFuture<Void> binderDead = new CompletableFuture<>();
-                try {
-                    mAdapter.getAdapterBinder()
-                            .asBinder()
-                            .linkToDeath(() -> binderDead.complete(null), 0);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Failed to linkToDeath", e);
-                    binderDead.complete(null);
-                }
-
-                // Unbind first to avoid receiving "onServiceDisconnected"
-                mContext.unbindService(mConnection);
-
-                try {
-                    // Force kill the bluetooth to make sure the process is not reused.
-                    // Note that in a perfect world, we should be able to re-init the same process.
-                    // Unfortunately, this require an heavy rework of the shutdown implementation
-                    // TODO: b/339501753 - Properly stop Bluetooth without killing it
-                    mAdapter.killBluetoothProcess();
-
-                    // if the kill throw, skip waiting as there is no bluetooth to wait for
-                    binderDead.get(1, TimeUnit.SECONDS);
-                } catch (android.os.DeadObjectException e) {
-                    // Reduce error -> info since Bluetooth may already be dead prior to this call
-                    Log.i(TAG, "Bluetooth already dead 💀");
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Unexpected error when calling killBluetoothProcess", e);
-                } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                    Log.e(TAG, "Bluetooth death not received in time", e);
-                }
-
-                mAdapter = null;
-                mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
+            if (mAdapter == null) {
+                return;
             }
+
+            try {
+                mAdapter.unregisterCallback(mBluetoothCallback, mContext.getAttributionSource());
+            } catch (RemoteException e) {
+                Log.e(TAG, "Unable to unregister BluetoothCallback", e);
+            }
+
+            if (!Flags.explicitKillFromSystemServer()) {
+                mAdapter = null;
+                mContext.unbindService(mConnection);
+                mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
+                return;
+            }
+
+            CompletableFuture<Void> binderDead = new CompletableFuture<>();
+            try {
+                mAdapter.getAdapterBinder()
+                        .asBinder()
+                        .linkToDeath(
+                                () -> {
+                                    Log.i(TAG, "Successfully received Bluetooth death");
+                                    binderDead.complete(null);
+                                },
+                                0);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Failed to linkToDeath", e);
+                binderDead.complete(null);
+            }
+
+            // Unbind first to avoid receiving unwanted "onServiceDisconnected"
+            mContext.unbindService(mConnection);
+
+            try {
+                // Force kill Bluetooth to make sure its process is not reused.
+                // Note: In a perfect world, we should be able to re-init the same process.
+                // Unfortunately, this requires an heavy rework of the Bluetooth app
+                // TODO: b/339501753 - Properly stop Bluetooth without killing it
+                mAdapter.killBluetoothProcess();
+
+                binderDead.get(1, TimeUnit.SECONDS);
+            } catch (android.os.DeadObjectException e) {
+                // Reduce exception to info and skip waiting (Bluetooth is dead as wanted)
+                Log.i(TAG, "Bluetooth already dead 💀");
+            } catch (RemoteException e) {
+                Log.e(TAG, "Unexpected RemoteException when calling killBluetoothProcess", e);
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                Log.e(TAG, "Bluetooth death not received correctly", e);
+            }
+
+            mAdapter = null;
+            mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
         } finally {
             mAdapterLock.writeLock().unlock();
         }

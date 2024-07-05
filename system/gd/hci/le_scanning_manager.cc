@@ -32,6 +32,7 @@
 #include "hci/hci_layer.h"
 #include "hci/hci_packets.h"
 #include "hci/le_periodic_sync_manager.h"
+#include "hci/le_scanning_decrypter.h"
 #include "hci/le_scanning_interface.h"
 #include "hci/le_scanning_reassembler.h"
 #include "module.h"
@@ -62,6 +63,7 @@ constexpr uint8_t kDirectedBit = 2;
 constexpr uint8_t kScanResponseBit = 3;
 constexpr uint8_t kLegacyBit = 4;
 constexpr uint8_t kDataStatusBits = 5;
+constexpr bool kEncryptedAdvertisingDataSupported = true;
 
 // system properties
 const std::string kLeRxPathLossCompProperty = "bluetooth.hardware.radio.le_rx_path_loss_comp_db";
@@ -475,47 +477,46 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
         scanning_reassembler_.ProcessAdvertisingReport(
             event_type, address_type, address, advertising_sid, advertising_data);
 
-// KEYSTONE(Ieb17e4e4d07b1f390cd069f3b31407bc568b6109,b/342401986)
-//    if (com::android::bluetooth::flags::encrypted_advertising_data()) {
-//      if (processed_report.has_value() &&
-//          scanning_decrypter_.ContainsEncryptedData(
-//              processed_report->data.data(), processed_report->data.size())) {
-//        Address pseudo_address;
-//        bool pseudoAddresssAvailable = scanning_callbacks_->OnFetchPseudoAddressFromIdentityAddress(
-//            address, address_type, &pseudo_address);
-//        if (pseudoAddresssAvailable) {
-//          auto enc_key_material =
-//              storage_module_->GetBin(pseudo_address.ToString(), BTIF_STORAGE_KEY_ENCR_DATA)
-//                  .value_or(std::vector<uint8_t>{});
-//          if (enc_key_material.size() > 0) {
-//            std::vector<uint8_t> decrypted_data;
-//            bool is_decrypt_success = false;
-//            is_decrypt_success = scanning_decrypter_.ExtractEncryptedData(
-//                processed_report->data, enc_key_material, &decrypted_data);
-//            if (!is_decrypt_success) {
-//              log::info(
-//                  "Decryption FAILED ENC_KEY_MATERIAL {}",
-//                  base::HexEncode(enc_key_material.data(), enc_key_material.size()).c_str());
-//            } else {
-//              processed_report->data = decrypted_data;
-//              log::info(
-//                  "Decryption succesfully  addr: {} , pseudo_address: {} data: {}",
-//                  address.ToString().c_str(),
-//                  pseudo_address.ToString().c_str(),
-//                  base::HexEncode(processed_report->data.data(), processed_report->data.size())
-//                      .c_str());
-//            }
-//          } else {
-//            log::info(
-//                "enc_key_material size is <= 0  addr: {} , pseudo_address: {}",
-//                address.ToString().c_str(),
-//                pseudo_address.ToString().c_str());
-//          }
-//        } else {
-//          log::info("pseudo_address not available {}", address.ToString().c_str());
-//        }
-//      }
-//    }
+    if (kEncryptedAdvertisingDataSupported) {
+      if (processed_report.has_value() &&
+          scanning_decrypter_.ContainsEncryptedData(
+              processed_report->data.data(), processed_report->data.size())) {
+        Address pseudo_address;
+        bool pseudoAddresssAvailable = scanning_callbacks_->OnFetchPseudoAddressFromIdentityAddress(
+            address, address_type, &pseudo_address);
+        if (pseudoAddresssAvailable) {
+          auto enc_key_material =
+              storage_module_->GetBin(pseudo_address.ToString(), BTIF_STORAGE_KEY_ENCR_DATA)
+                  .value_or(std::vector<uint8_t>{});
+          if (enc_key_material.size() > 0) {
+            std::vector<uint8_t> decrypted_data;
+            bool is_decrypt_success = false;
+            is_decrypt_success = scanning_decrypter_.ExtractEncryptedData(
+                processed_report->data, enc_key_material, &decrypted_data);
+            if (!is_decrypt_success) {
+              log::info(
+                  "Decryption FAILED ENC_KEY_MATERIAL {}",
+                  base::HexEncode(enc_key_material.data(), enc_key_material.size()).c_str());
+            } else {
+              processed_report->data = decrypted_data;
+              log::info(
+                  "Decryption succesfully  addr: {} , pseudo_address: {} data: {}",
+                  address.ToString().c_str(),
+                  pseudo_address.ToString().c_str(),
+                  base::HexEncode(processed_report->data.data(), processed_report->data.size())
+                      .c_str());
+            }
+          } else {
+            log::info(
+                "enc_key_material size is <= 0  addr: {} , pseudo_address: {}",
+                address.ToString().c_str(),
+                pseudo_address.ToString().c_str());
+          }
+        } else {
+          log::info("pseudo_address not available {}", address.ToString().c_str());
+        }
+      }
+    }
 
     if (processed_report.has_value()) {
       switch (address_type) {
@@ -626,6 +627,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
     if (scanners_[scanner_id].in_use) {
       scanners_[scanner_id].in_use = false;
       scanners_[scanner_id].app_uuid = Uuid::kEmpty;
+      log::debug("Unregister scanner successful, scannerId={}", scanner_id);
     } else {
       log::warn("Unregister scanner with unused scanner id");
     }
@@ -1764,6 +1766,7 @@ struct LeScanningManager::impl : public LeAddressManagerCallback {
   bool scan_on_resume_ = false;
   bool paused_ = false;
   LeScanningReassembler scanning_reassembler_;
+  LeScanningDecrypter scanning_decrypter_;
   bool is_filter_supported_ = false;
   bool is_ad_type_filter_supported_ = false;
   bool is_batch_scan_supported_ = false;

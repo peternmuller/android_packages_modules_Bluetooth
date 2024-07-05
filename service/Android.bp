@@ -24,6 +24,7 @@ filegroup {
         "src/AdapterBinder.kt",
         "src/AdapterState.kt",
         "src/AutoOnFeature.kt",
+        "src/BleScanSettingListener.kt",
         "src/BluetoothService.kt",
         "src/Log.kt",
         "src/RadioModeListener.kt",
@@ -37,12 +38,29 @@ filegroup {
 java_defaults {
     name: "service-bluetooth-buildflags",
     errorprone: {
+        enabled: true,
         javacflags: [
             "-Xep:AlreadyChecked:ERROR",
+            "-Xep:BadImport:ERROR",
+            "-Xep:CatchFail:ERROR",
             "-Xep:CheckReturnValue:ERROR",
             "-Xep:ClassCanBeStatic:ERROR",
+            "-Xep:EmptyBlockTag:ERROR",
+            "-Xep:EmptyCatch:ERROR",
             "-Xep:EqualsIncompatibleType:ERROR",
+            "-Xep:FutureReturnValueIgnored:ERROR",
+            "-Xep:InlineMeInliner:ERROR",
+            "-Xep:InvalidBlockTag:ERROR",
+            "-Xep:InvalidInlineTag:ERROR",
+            "-Xep:InvalidParam:ERROR",
+            "-Xep:MockNotUsedInProduction:ERROR",
+            "-Xep:NonApiType:ERROR",
+            "-Xep:NonCanonicalType:ERROR",
             "-Xep:ReferenceEquality:ERROR",
+            "-Xep:ReturnAtTheEndOfVoidFunction:ERROR",
+            "-Xep:StringCharset:ERROR",
+            "-Xep:UnnecessaryAssignment:ERROR",
+            "-Xep:UnnecessaryAsync:ERROR",
             "-Xep:UnusedMethod:ERROR",
             "-Xep:UnusedVariable:ERROR",
         ],
@@ -114,8 +132,6 @@ java_library {
         "service-bluetooth-pre-jarjar",
     ],
 
-    sdk_version: "system_server_current",
-
     jarjar_rules: ":bluetooth-jarjar-rules",
 
     optimize: {
@@ -129,6 +145,7 @@ java_library {
         "framework-bluetooth",
     ],
 
+    sdk_version: "system_server_current",
     min_sdk_version: "Tiramisu",
     apex_available: ["com.android.btservices"],
     visibility: ["//packages/modules/Bluetooth/apex"],
@@ -184,6 +201,8 @@ android_robolectric_test {
         "src/AdapterStateTest.kt",
         "src/AutoOnFeature.kt",
         "src/AutoOnFeatureTest.kt",
+        "src/BleScanSettingListener.kt",
+        "src/BleScanSettingListenerTest.kt",
         "src/Log.kt",
         "src/LogTest.kt",
         "src/RadioModeListener.kt",
@@ -211,7 +230,13 @@ android_robolectric_test {
         "truth",
     ],
 
-    sdk_version: "test_current",
+    libs: [
+        "framework-bluetooth.stubs.module_lib",
+        "framework-statsd.stubs.module_lib",
+    ],
+
+    sdk_version: "module_current",
     upstream: true,
     test_suites: ["general-tests"],
+    strict_mode: false,
 }

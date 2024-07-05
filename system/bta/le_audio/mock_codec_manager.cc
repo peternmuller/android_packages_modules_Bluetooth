@@ -47,6 +47,14 @@ bool CodecManager::IsDualBiDirSwbSupported(void) const {
   return pimpl_->IsDualBiDirSwbSupported();
 }
 
+bool CodecManager::IsEnhancedLeGamingSupported(void) const {
+  if (!pimpl_) {
+    return false;
+  }
+
+  return pimpl_->IsEnhancedLeGamingSupported();
+}
+
 bool CodecManager::IsAptxAdaptiveLeSupported(void) const {
   if (!pimpl_) {
     return false;
@@ -61,6 +69,25 @@ bool CodecManager::IsAptxAdaptiveLeXSupported(void) const {
   }
 
   return pimpl_->IsAptxAdaptiveLeXSupported();
+}
+
+bool CodecManager::UpdateActiveUnicastAudioHalClient(
+    LeAudioSourceAudioHalClient* source_unicast_client,
+    LeAudioSinkAudioHalClient* sink_unicast_client, bool is_active) {
+  if (pimpl_) {
+    return pimpl_->UpdateActiveUnicastAudioHalClient(
+        source_unicast_client, sink_unicast_client, is_active);
+  }
+  return true;
+}
+
+bool CodecManager::UpdateActiveBroadcastAudioHalClient(
+    LeAudioSourceAudioHalClient* source_broadcast_client, bool is_active) {
+  if (pimpl_) {
+    return pimpl_->UpdateActiveBroadcastAudioHalClient(source_broadcast_client,
+                                                       is_active);
+  }
+  return true;
 }
 
 void CodecManager::UpdateActiveAudioConfig(
@@ -162,6 +189,11 @@ void CodecManager::UpdateCisConfiguration(
 
 void CodecManager::ClearCisConfiguration(uint8_t direction) {
   if (pimpl_) return pimpl_->ClearCisConfiguration(direction);
+}
+
+bool CodecManager::IsUsingCodecExtensibility() const {
+  if (pimpl_) return pimpl_->IsUsingCodecExtensibility();
+  return false;
 }
 
 std::ostream& operator<<(

@@ -1191,21 +1191,21 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       /* store peer features */
       p_scb->peer_features = (uint16_t)int_arg;
 
-      tBTA_AG_FEAT features = p_scb->features & BTA_AG_BRSF_FEAT_SPEC;
       if (p_scb->peer_version < HFP_VERSION_1_7 &&
           !osi_property_get_bool("vendor.bt.pts.certification", false)) {
         p_scb->masked_features &= HFP_1_6_FEAT_MASK;
       }
 
+      if(interop_match_addr_or_name(INTEROP_DISABLE_CODEC_NEGOTIATION,
+          &p_scb->peer_addr, &btif_storage_get_remote_device_property)) {
+          log::verbose("disable codec negotiation, remote for blacklisted device");
+          p_scb->masked_features = p_scb->masked_features & ~(BTA_AG_FEAT_CODEC);
+          p_scb->peer_features = p_scb->peer_features & ~(BTA_AG_PEER_FEAT_CODEC);
+      }
+
       log::verbose("BRSF HF: 0x{:x}, phone: 0x{:x}", p_scb->peer_features,
                    p_scb->masked_features);
 
-      if(interop_match_addr_or_name(INTEROP_DISABLE_CODEC_NEGOTIATION,
-          &p_scb->peer_addr, &btif_storage_get_remote_device_property)) {
-          log::verbose("disable codec negotiation for phone, remote for blacklisted device");
-          features = features & ~(BTA_AG_FEAT_CODEC);
-          p_scb->peer_features = p_scb->peer_features & ~(BTA_AG_PEER_FEAT_CODEC);
-      }
       /* send BRSF, send OK */
       bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_BRSF, nullptr,
                          (int16_t)p_scb->masked_features);
@@ -1425,6 +1425,8 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       }
 
       bta_ag_send_ok(p_scb);
+      log::info("updating codec to initate codec negotiation again");
+      p_scb->codec_updated = true;
       bta_ag_sco_open(p_scb, tBTA_AG_DATA::kEmpty);
       break;
     }
@@ -2010,6 +2012,31 @@ void bta_ag_send_bcs(tBTA_AG_SCB* p_scb) {
   /* send +BCS */
   log::verbose("send +BCS codec is {}", codec_uuid);
   bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_BCS, nullptr, codec_uuid);
+}
+
+/*******************************************************************************
+ *
+ * Function         bta_ag_check_is_leaudio_in_idle
+ *
+ * Description      Check whether le-audio state is idle
+ *
+ * Returns          true if idle, false if not
+ *
+ ******************************************************************************/
+bool bta_ag_check_is_leaudio_in_idle() {
+#ifdef __ANDROID__
+  if (!LeAudioClient::IsLeAudioClientRunning()) {
+    log::info("le-audio instance not exists, go for sco connection");
+    return true;
+  }
+  bool is_leaudio_in_idle = LeAudioClient::Get()->IsLeAudioClientInIdle();
+  log::info("is_leaudio_in_idle: {}", is_leaudio_in_idle);
+  if (!is_leaudio_in_idle) {
+    log::info("Do not open SCO as C-I-S/C-I-G still existing.");
+    return false;
+  }
+#endif
+  return true;
 }
 
 /*******************************************************************************

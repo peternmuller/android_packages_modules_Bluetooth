@@ -297,27 +297,10 @@ bool ParseAseCtpNotification(struct ctp_ntf& ntf, uint16_t len,
   return true;
 }
 
-void PrepareAseCtpAptxCodecConfig(std::vector<struct ctp_codec_conf>& confs) {
-  // TODO (b/330781955): codec_config changed from LeAudioLtvMap to std::vector<uint8_t>. Logic needs to be revised.
-  // for (auto& conf : confs) {
-  //    if (conf.codec_id.coding_format == types::kLeAudioCodingFormatVendorSpecific &&
-  //         (conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe ||
-  //         conf.codec_id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX)) {
-  //      types::LeAudioLtvMap ltvmap;
-  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq,
-  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeSamplingFreq).value());
-  //      ltvmap.Add(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation,
-  //                conf.codec_config.Find(codec_spec_conf::qcom_codec_spec_conf::kLeAudioCodecAptxLeTypeAudioChannelAllocation).value());
-  //      conf.codec_config = ltvmap;
-  //    }
-  // }
-}
-
 bool PrepareAseCtpCodecConfig(const std::vector<struct ctp_codec_conf>& confs_,
                               std::vector<uint8_t>& value) {
   if (confs_.size() == 0) return false;
   std::vector<struct ctp_codec_conf> confs = confs_;
-  PrepareAseCtpAptxCodecConfig(confs);
   std::stringstream conf_ents_str;
   size_t msg_len = std::accumulate(
       confs.begin(), confs.end(),
@@ -568,18 +551,26 @@ bool PrepareAseCtpRelease(const std::vector<uint8_t>& ase_ids,
 
 namespace pacs {
 
-void TestSinkPacRecords(uint8_t *pp,  uint16_t codec) {
-  if (codec == 0x01AD) {
+void TestLeXPacRecords(uint8_t *pp,  uint16_t codec) {
+  if (codec == types::kLeAudioCodingFormatAptxLeX) {
     char new_values[PROPERTY_VALUE_MAX] = {'\0'};
-    int st, cv, fd, fm, pc;
-    osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, "0 41 0 1 5");
-    sscanf(new_values, "%x %x %x %x %x", &st, &cv, &fd, &fm, &pc);
-    *(pp+9) = 0x11;
-    *(pp+10) = st;
-    *(pp+11) = cv;
-    *(pp+12) = fd;
-    *(pp+13) = fm;
-    *(pp+14) = pc;
+    uint8_t sf, cv, fd, fb, pc;
+    const char *without_vs_feature = "0 41 0 1 5";
+    const char *with_vs_feature = "";
+    if (osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", false)) {
+      osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, with_vs_feature);
+    } else {
+      osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, without_vs_feature);
+    }
+    if (strlen(new_values) > 0) {
+      sscanf(new_values, "%x %x %x %x %x", &sf, &cv, &fd, &fb, &pc);
+      *(pp+9) = 0x11;
+      *(pp+10) = sf;
+      *(pp+11) = cv;
+      *(pp+12) = fd;
+      *(pp+13) = fb;
+      *(pp+14) = pc;
+    }
   }
 }
 
@@ -630,9 +621,12 @@ int ParseSinglePac(std::vector<struct acs_ac_record>& pac_recs, uint16_t len,
   }
 
   // To-DO: Remove once remote AAR4 pac records available
-  TestSinkPacRecords(const_cast<uint8_t *>(value), rec.codec_id.vendor_codec_id);
+  TestLeXPacRecords(const_cast<uint8_t *>(value), rec.codec_id.vendor_codec_id);
 
-  rec.metadata.assign(value, value+metadata_len);
+  bool parsed;
+  rec.metadata =
+      types::LeAudioLtvMap::Parse(value, metadata_len, parsed);
+  if (!parsed) return -1;
 
   value += metadata_len;
   len -= metadata_len;

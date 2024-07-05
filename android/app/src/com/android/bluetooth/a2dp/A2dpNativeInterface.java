@@ -39,9 +39,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * A2DP Native Interface to/from JNI.
- */
+/** A2DP Native Interface to/from JNI. */
 public class A2dpNativeInterface {
     private static final String TAG = A2dpNativeInterface.class.getSimpleName();
     private BluetoothAdapter mAdapter;
@@ -60,13 +58,13 @@ public class A2dpNativeInterface {
         if (mAdapter == null) {
             Log.wtf(TAG, "No Bluetooth Adapter Available");
         }
-        mAdapterService = Objects.requireNonNull(AdapterService.getAdapterService(),
-                "AdapterService cannot be null when A2dpNativeInterface init");
+        mAdapterService =
+                Objects.requireNonNull(
+                        AdapterService.getAdapterService(),
+                        "AdapterService cannot be null when A2dpNativeInterface init");
     }
 
-    /**
-     * Get singleton instance.
-     */
+    /** Get singleton instance. */
     public static A2dpNativeInterface getInstance() {
         synchronized (INSTANCE_LOCK) {
             if (sInstance == null) {
@@ -155,14 +153,12 @@ public class A2dpNativeInterface {
      * Sets the codec configuration preferences.
      *
      * @param device the remote Bluetooth device
-     * @param codecConfigArray an array with the codec configurations to
-     * configure.
+     * @param codecConfigArray an array with the codec configurations to configure.
      * @return true on success, otherwise false.
      */
-    public boolean setCodecConfigPreference(BluetoothDevice device,
-                                            BluetoothCodecConfig[] codecConfigArray) {
-        return setCodecConfigPreferenceNative(getByteAddress(device),
-                                              codecConfigArray);
+    public boolean setCodecConfigPreference(
+            BluetoothDevice device, BluetoothCodecConfig[] codecConfigArray) {
+        return setCodecConfigPreferenceNative(getByteAddress(device), codecConfigArray);
     }
 
     public void setStreamMode(boolean isGamingEnabled, boolean isLowLatencyEnabled) {
@@ -217,15 +213,18 @@ public class A2dpNativeInterface {
         sendMessageToService(event);
     }
 
-    private void onCodecConfigChanged(byte[] address,
+    private void onCodecConfigChanged(
+            byte[] address,
             BluetoothCodecConfig newCodecConfig,
             BluetoothCodecConfig[] codecsLocalCapabilities,
             BluetoothCodecConfig[] codecsSelectableCapabilities) {
         A2dpStackEvent event = new A2dpStackEvent(A2dpStackEvent.EVENT_TYPE_CODEC_CONFIG_CHANGED);
         event.device = getDevice(address);
-        event.codecStatus = new BluetoothCodecStatus(newCodecConfig,
-                                                     Arrays.asList(codecsLocalCapabilities),
-                                                     Arrays.asList(codecsSelectableCapabilities));
+        event.codecStatus =
+                new BluetoothCodecStatus(
+                        newCodecConfig,
+                        Arrays.asList(codecsLocalCapabilities),
+                        Arrays.asList(codecsSelectableCapabilities));
         Log.d(TAG, "onCodecConfigChanged: " + event);
         sendMessageToService(event);
     }
@@ -252,16 +251,21 @@ public class A2dpNativeInterface {
     }
 
     // Native methods that call into the JNI interface
-    private native void initNative(int maxConnectedAudioDevices,
-                                   BluetoothCodecConfig[] codecConfigPriorities,
-                                   BluetoothCodecConfig[] codecConfigOffloading);
+    private native void initNative(
+            int maxConnectedAudioDevices,
+            BluetoothCodecConfig[] codecConfigPriorities,
+            BluetoothCodecConfig[] codecConfigOffloading);
+
     private native void cleanupNative();
 
     private native BluetoothCodecType[] getSupportedCodecTypesNative();
 
     private native boolean connectA2dpNative(byte[] address);
+
     private native boolean disconnectA2dpNative(byte[] address);
+
     private native boolean setSilenceDeviceNative(byte[] address, boolean silence);
+
     private native boolean setActiveDeviceNative(byte[] address);
     private native boolean setCodecConfigPreferenceNative(byte[] address,
                 BluetoothCodecConfig[] codecConfigArray);

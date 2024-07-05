@@ -295,11 +295,11 @@ cc_library_static {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     cflags: [
-        "-Wno-unused-parameter",
         /* we export all classes, so change default visibility, instead of having EXPORT_SYMBOL on each class*/
         "-fvisibility=default",
     ],
     static_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbluetooth_core_rs",
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
@@ -426,6 +426,7 @@ cc_fuzz {
         "libbt_shim_ffi",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "server_configurable_flags",
     ],
 }
@@ -468,6 +469,7 @@ cc_fuzz {
         "gatt/*.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "server_configurable_flags",
     ],
     static_libs: [
@@ -517,6 +519,7 @@ cc_fuzz {
         "smp/*.cc", // add other sources files  (p256 related) under smp into this test
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "server_configurable_flags",
     ],
     static_libs: [
@@ -614,6 +617,7 @@ cc_fuzz {
         "fuzzers/avrc_fuzzer.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "server_configurable_flags",
     ],
     static_libs: [
@@ -674,6 +678,7 @@ cc_fuzz {
         "libbt_shim_ffi",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "liblog",
         "server_configurable_flags",
@@ -714,6 +719,7 @@ cc_test {
     shared_libs: [
         "libPlatformProperties",
         "libaaudio",
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -931,6 +937,7 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "libcutils",
         "server_configurable_flags",
@@ -1072,6 +1079,7 @@ cc_test {
         "test/gatt/gatt_sr_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "libcutils",
         "server_configurable_flags",
@@ -1371,6 +1379,7 @@ cc_test {
         "test/stack_gatt_sr_hash_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "libcutils",
         "server_configurable_flags",
@@ -1461,7 +1470,6 @@ cc_test {
         },
     },
     header_libs: ["libbluetooth_headers"],
-    cflags: ["-Wno-unused-parameter"],
 }
 
 // EATT unit tests
@@ -1568,6 +1576,7 @@ cc_test {
     ],
     srcs: [
         ":BluetoothHalSources_hci_host",
+        ":BluetoothHalSources_ranging_host",
         ":BluetoothOsSources_host",
         ":OsiCompatSources",
         ":TestCommonMainHandler",
@@ -1661,6 +1670,7 @@ cc_test {
         "libudrv-uipc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "server_configurable_flags",
     ],
@@ -1946,6 +1956,7 @@ cc_test {
         "libstatslog_bt",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libbinder_ndk",
         "libcrypto",
@@ -2037,6 +2048,7 @@ cc_test {
         "libstatslog_bt",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libbinder_ndk",
         "libcrypto",
@@ -2130,6 +2142,7 @@ cc_test {
         "libstatslog_bt",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libbinder_ndk",
         "libcrypto",
@@ -2201,6 +2214,8 @@ cc_test {
         "liblog",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
+        "libcrypto",
         "libcutils",
         "server_configurable_flags",
     ],

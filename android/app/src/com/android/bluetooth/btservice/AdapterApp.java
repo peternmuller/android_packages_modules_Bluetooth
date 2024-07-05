@@ -18,9 +18,11 @@ package com.android.bluetooth.btservice;
 import android.app.Application;
 import android.util.Log;
 
+import com.android.bluetooth.btservice.storage.BluetoothDatabaseU2VMigration;
+
 public class AdapterApp extends Application {
     private static final String TAG = "BluetoothAdapterApp";
-    //For Debugging only
+    // For Debugging only
     private static int sRefCount = 0;
 
     public AdapterApp() {
@@ -35,6 +37,13 @@ public class AdapterApp extends Application {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "onCreate");
+
+        try {
+            BluetoothDatabaseU2VMigration.run(this);
+        } catch (Exception e) {
+            Log.e(TAG, "U2VMigration failure: ", e);
+        }
+
         try {
             DataMigration.run(this);
         } catch (Exception e) {

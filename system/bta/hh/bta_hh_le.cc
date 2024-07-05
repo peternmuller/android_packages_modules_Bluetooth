@@ -658,7 +658,7 @@ static bool bta_hh_le_write_ccc(tBTA_HH_DEV_CB* p_cb, uint16_t char_handle,
 
 static bool bta_hh_le_write_rpt_clt_cfg(tBTA_HH_DEV_CB* p_cb);
 
-static void write_rpt_ctl_cfg_cb(uint16_t conn_id, tGATT_STATUS status,
+static void write_rpt_clt_cfg_cb(uint16_t conn_id, tGATT_STATUS status,
                                  uint16_t handle, uint16_t len,
                                  const uint8_t* value, void* data) {
   uint8_t srvc_inst_id;
@@ -666,6 +666,16 @@ static void write_rpt_ctl_cfg_cb(uint16_t conn_id, tGATT_STATUS status,
   tBTA_HH_DEV_CB* p_dev_cb = (tBTA_HH_DEV_CB*)data;
   const gatt::Characteristic* characteristic =
       BTA_GATTC_GetOwningCharacteristic(conn_id, handle);
+  if (characteristic == nullptr) {
+    log::error("Characteristic with handle {} not found clt cfg", handle);
+    return;
+  }
+  if (!characteristic->uuid.Is16Bit()) {
+    log::error("Unexpected len characteristic ID clt cfg: {}",
+               characteristic->uuid.ToString());
+    return;
+  }
+
   uint16_t char_uuid = bta_hh_get_uuid16(p_dev_cb, characteristic->uuid);
 
   srvc_inst_id = BTA_GATTC_GetOwningService(conn_id, handle)->handle;
@@ -706,7 +716,7 @@ static bool bta_hh_le_write_rpt_clt_cfg(tBTA_HH_DEV_CB* p_cb) {
     if (p_rpt->rpt_type == BTA_HH_RPTT_INPUT) {
       if (bta_hh_le_write_ccc(p_cb, p_rpt->char_inst_id,
                               GATT_CLT_CONFIG_NOTIFICATION,
-                              write_rpt_ctl_cfg_cb, p_cb)) {
+                              write_rpt_clt_cfg_cb, p_cb)) {
         p_cb->clt_cfg_idx = i;
         return true;
       }
@@ -948,7 +958,7 @@ static void bta_hh_le_pri_service_discovery(tBTA_HH_DEV_CB* p_cb) {
   /* in parallel */
   /* start primary service discovery for HID service */
   Uuid pri_srvc = Uuid::From16Bit(UUID_SERVCLASS_LE_HID);
-  BTA_GATTC_ServiceSearchRequest(p_cb->conn_id, &pri_srvc);
+  BTA_GATTC_ServiceSearchRequest(p_cb->conn_id, pri_srvc);
   return;
 }
 
@@ -961,12 +971,11 @@ static void bta_hh_le_pri_service_discovery(tBTA_HH_DEV_CB* p_cb) {
  * Returns          None
  *
  ******************************************************************************/
-static void bta_hh_le_encrypt_cback(const RawAddress* bd_addr,
-                                    tBT_TRANSPORT transport,
+static void bta_hh_le_encrypt_cback(RawAddress bd_addr, tBT_TRANSPORT transport,
                                     void* /* p_ref_data */,
                                     tBTM_STATUS result) {
   tAclLinkSpec link_spec;
-  link_spec.addrt.bda = *bd_addr;
+  link_spec.addrt.bda = bd_addr;
   link_spec.addrt.type = BLE_ADDR_PUBLIC;
   link_spec.transport = transport;
 
@@ -1415,8 +1424,11 @@ static void read_pref_conn_params_cb(uint16_t conn_id, tGATT_STATUS status,
 
   BTM_BleSetPrefConnParams(p_dev_cb->link_spec.addrt.bda, min_interval,
                            max_interval, latency, timeout);
-  L2CA_UpdateBleConnParams(p_dev_cb->link_spec.addrt.bda, min_interval,
-                           max_interval, latency, timeout, 0, 0);
+  if (!L2CA_UpdateBleConnParams(p_dev_cb->link_spec.addrt.bda, min_interval,
+                                max_interval, latency, timeout, 0, 0)) {
+    log::warn("Unable to update L2CAP ble connection params peer:{}",
+              p_dev_cb->link_spec.addrt.bda);
+  }
 }
 
 /*******************************************************************************
@@ -1621,7 +1633,6 @@ static void bta_hh_le_srvc_search_cmpl(tBTA_GATTC_SEARCH_CMPL* p_data) {
  ******************************************************************************/
 static void bta_hh_le_input_rpt_notify(tBTA_GATTC_NOTIFY* p_data) {
   tBTA_HH_DEV_CB* p_dev_cb = bta_hh_le_find_dev_cb_by_conn_id(p_data->conn_id);
-  uint8_t app_id;
   uint8_t* p_buf;
   tBTA_HH_LE_RPT* p_rpt;
 
@@ -1638,10 +1649,13 @@ static void bta_hh_le_input_rpt_notify(tBTA_GATTC_NOTIFY* p_data) {
     return;
   }
 
-  app_id = p_dev_cb->app_id;
-
   const gatt::Service* p_svc =
       BTA_GATTC_GetOwningService(p_dev_cb->conn_id, p_char->value_handle);
+
+  if (!p_char->uuid.Is16Bit()) {
+    log::error("Unexpected characteristic len: {}", p_char->uuid.ToString());
+    return;
+  }
 
   p_rpt = bta_hh_le_find_report_entry(p_dev_cb, p_svc->handle,
                                       bta_hh_get_uuid16(p_dev_cb, p_char->uuid),
@@ -1651,11 +1665,6 @@ static void bta_hh_le_input_rpt_notify(tBTA_GATTC_NOTIFY* p_data) {
                p_char->uuid.ToString(), p_char->value_handle);
     return;
   }
-
-  if (p_char->uuid == Uuid::From16Bit(GATT_UUID_HID_BT_MOUSE_INPUT))
-    app_id = BTA_HH_APP_ID_MI;
-  else if (p_char->uuid == Uuid::From16Bit(GATT_UUID_HID_BT_KB_INPUT))
-    app_id = BTA_HH_APP_ID_KB;
 
   log::verbose("report ID: {}", p_rpt->rpt_id);
 
@@ -1670,9 +1679,7 @@ static void bta_hh_le_input_rpt_notify(tBTA_GATTC_NOTIFY* p_data) {
     p_buf = p_data->value;
   }
 
-  bta_hh_co_data((uint8_t)p_dev_cb->hid_handle, p_buf, p_data->len,
-                 p_dev_cb->mode, 0, /* no sub class*/
-                 p_dev_cb->dscp_info.ctry_code, p_dev_cb->link_spec, app_id);
+  bta_hh_co_data((uint8_t)p_dev_cb->hid_handle, p_buf, p_data->len);
 
   if (p_buf != p_data->value) osi_free(p_buf);
 }
@@ -1835,6 +1842,10 @@ static void read_report_cb(uint16_t conn_id, tGATT_STATUS status,
     log::error("Unknown handle");
     return;
   }
+  if (!p_char->uuid.Is16Bit()) {
+    log::error("Unexpected characteristic len: {}", p_char->uuid.ToString());
+    return;
+  }
 
   uint16_t char_uuid = bta_hh_get_uuid16(p_dev_cb, p_char->uuid);
 
@@ -1921,6 +1932,10 @@ static void write_report_cb(uint16_t conn_id, tGATT_STATUS status,
       BTA_GATTC_GetCharacteristic(conn_id, handle);
 
   if (p_char == nullptr) return;
+  if (!p_char->uuid.Is16Bit()) {
+    log::error("Unexpected characteristic len: {}", p_char->uuid.ToString());
+    return;
+  }
 
   uint16_t uuid16 = bta_hh_get_uuid16(p_dev_cb, p_char->uuid);
   if (uuid16 != GATT_UUID_HID_REPORT && uuid16 != GATT_UUID_HID_BT_KB_INPUT &&
@@ -2344,8 +2359,6 @@ static bool bta_hh_le_iso_data_callback(const RawAddress& addr,
     return false;
   }
 
-  bta_hh_co_data(p_dev_cb->hid_handle, data, size, p_dev_cb->mode, 0,
-                 p_dev_cb->dscp_info.ctry_code, p_dev_cb->link_spec,
-                 BTA_HH_APP_ID_LE);
+  bta_hh_co_data(p_dev_cb->hid_handle, data, size);
   return true;
 }

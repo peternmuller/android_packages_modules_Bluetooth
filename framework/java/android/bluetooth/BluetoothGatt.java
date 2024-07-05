@@ -78,7 +78,6 @@ import java.util.List;
 import java.util.UUID;
 import android.annotation.SystemApi;
 
-
 /**
  * Public API for the Bluetooth GATT Profile.
  *
@@ -404,6 +403,7 @@ public final class BluetoothGatt implements BluetoothProfile {
                                 "onClientConnectionState() -"
                                         + (" status=" + status)
                                         + (" clientIf=" + clientIf)
+                                        + (" connected=" + connected)
                                         + (" device=" + address));
                     }
                     if (!address.equals(mDevice.getAddress())) {
@@ -1108,8 +1108,8 @@ public final class BluetoothGatt implements BluetoothProfile {
     /**
      * Register an application callback to start using GATT.
      *
-     * <p>This is an asynchronous call. The callback {@link BluetoothGattCallback#onAppRegistered}
-     * is used to notify success or failure if the function returns true.
+     * <p>This is an asynchronous call. If registration is successful, client connection will be
+     * initiated.
      *
      * @param callback GATT callback handler that will receive asynchronous callbacks.
      * @return If true, the callback will be called to notify success or failure, false on immediate
@@ -1125,8 +1125,8 @@ public final class BluetoothGatt implements BluetoothProfile {
     /**
      * Register an application callback to start using GATT.
      *
-     * <p>This is an asynchronous call. The callback {@link BluetoothGattCallback#onAppRegistered}
-     * is used to notify success or failure if the function returns true.
+     * <p>This is an asynchronous call. If registration is successful, client connection will be
+     * initiated.
      *
      * @param callback GATT callback handler that will receive asynchronous callbacks.
      * @param eattSupport indicate to allow for eatt support
@@ -1218,7 +1218,6 @@ public final class BluetoothGatt implements BluetoothProfile {
      *
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission.
      *
-     * @param device Remote device to connect to
      * @param autoConnect Whether to directly connect to the remote device (false) or to
      * automatically connect as soon as the remote device becomes available (true).
      * @param eattSupport specifies whether client app needs EATT channel for client operations.

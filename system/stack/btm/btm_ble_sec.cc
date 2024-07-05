@@ -94,6 +94,11 @@ void BTM_SecAddBleDevice(const RawAddress& bd_addr, tBT_DEVICE_TYPE dev_type,
   if (!p_dev_rec) {
     p_dev_rec = btm_sec_allocate_dev_rec();
 
+    if (!p_dev_rec) {
+      log::warn("device record allocation failed bd_addr:{}", bd_addr);
+      return;
+    }
+
     p_dev_rec->bd_addr = bd_addr;
     p_dev_rec->hci_handle = BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_BR_EDR);
     p_dev_rec->ble_hci_handle = BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE);
@@ -736,7 +741,7 @@ tBTM_STATUS btm_ble_start_sec_check(const RawAddress& bd_addr, uint16_t psm,
    */
   if (!p_serv_rec) {
     log::warn("PSM: {} no application registered", psm);
-    (*p_callback)(&bd_addr, BT_TRANSPORT_LE, p_ref_data, BTM_MODE_UNSUPPORTED);
+    (*p_callback)(bd_addr, BT_TRANSPORT_LE, p_ref_data, BTM_MODE_UNSUPPORTED);
     return BTM_ILLEGAL_VALUE;
   }
 
@@ -767,7 +772,7 @@ tBTM_STATUS btm_ble_start_sec_check(const RawAddress& bd_addr, uint16_t psm,
   switch (sec_act) {
     case BTM_SEC_OK:
       log::debug("Security met");
-      p_callback(&bd_addr, BT_TRANSPORT_LE, p_ref_data, BTM_SUCCESS);
+      p_callback(bd_addr, BT_TRANSPORT_LE, p_ref_data, BTM_SUCCESS);
       break;
 
     case BTM_SEC_ENCRYPT:
@@ -1357,7 +1362,7 @@ void btm_ble_link_encrypted(const RawAddress& bd_addr, uint8_t encr_enable) {
     btm_ble_notify_enc_cmpl(p_dev_rec->ble.pseudo_addr, encr_enable);
   }
 
-  if (com::android::bluetooth::flags::encrypted_advertising_data() && encr_enable &&
+  if (btm_cb.encrypted_advertising_data_supported && encr_enable &&
       btm_sec_is_a_bonded_dev(p_dev_rec->ble.pseudo_addr)) {
     size_t length =
         btif_storage_get_enc_key_material_length(&p_dev_rec->ble.pseudo_addr);
@@ -1654,6 +1659,10 @@ tBTM_STATUS btm_proc_smp_cback(tSMP_EVT event, const RawAddress& bd_addr,
 
           if (res != BTM_SUCCESS && p_data->cmplt.reason != SMP_CONN_TOUT) {
             log::verbose("Pairing failed - prepare to remove ACL");
+            if (p_data->cmplt.reason == SMP_RSP_TIMEOUT &&
+                gatt_num_app_hold_links(bd_addr, BT_TRANSPORT_LE) == 0) {
+              l2cu_reset_lcb_timeout(p_dev_rec->ble_hci_handle);
+            }
             l2cu_start_post_bond_timer(p_dev_rec->ble_hci_handle);
           }
 

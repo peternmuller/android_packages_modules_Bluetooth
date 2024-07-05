@@ -123,7 +123,8 @@ void rfc_mx_sm_execute(tRFC_MCB* p_mcb, tRFC_MX_EVENT event, void* p_data) {
  * Returns          void
  *
  ******************************************************************************/
-void rfc_mx_sm_state_idle(tRFC_MCB* p_mcb, tRFC_MX_EVENT event, void* p_data) {
+void rfc_mx_sm_state_idle(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
+                          void* /* p_data */) {
   switch (event) {
     case RFC_MX_EVENT_START_REQ: {
       /* Initialize L2CAP MTU */
@@ -216,7 +217,10 @@ void rfc_mx_sm_state_wait_conn_cnf(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
 
     case RFC_MX_EVENT_TIMEOUT:
       p_mcb->state = RFC_MX_STATE_IDLE;
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
 
       /* we gave up outgoing connection request then try peer's request */
       if (p_mcb->pending_lcid) {
@@ -294,7 +298,10 @@ void rfc_mx_sm_state_configure(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
     case RFC_MX_EVENT_TIMEOUT:
       log::error("L2CAP configuration timeout for {}", p_mcb->bd_addr);
       p_mcb->state = RFC_MX_STATE_IDLE;
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
 
       PORT_StartCnf(p_mcb, RFCOMM_ERROR);
       return;
@@ -357,7 +364,10 @@ void rfc_mx_sm_sabme_wait_ua(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
     case RFC_MX_EVENT_CONF_CNF: /* workaround: we don't support reconfig */
     case RFC_MX_EVENT_TIMEOUT:
       p_mcb->state = RFC_MX_STATE_IDLE;
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
 
       PORT_StartCnf(p_mcb, RFCOMM_ERROR);
       return;
@@ -422,7 +432,10 @@ void rfc_mx_sm_state_wait_sabme(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
     case RFC_MX_EVENT_CONF_CNF: /* workaround: we don't support reconfig */
     case RFC_MX_EVENT_TIMEOUT:
       p_mcb->state = RFC_MX_STATE_IDLE;
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
 
       PORT_CloseInd(p_mcb);
       return;
@@ -465,7 +478,10 @@ void rfc_mx_sm_state_connected(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
       /* If server wait for some time if client decide to reinitiate channel */
       rfc_send_ua(p_mcb, RFCOMM_MX_DLCI);
       if (p_mcb->is_initiator) {
-        L2CA_DisconnectReq(p_mcb->lcid);
+        if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+          log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                    p_mcb->bd_addr, p_mcb->lcid);
+        };
       }
       /* notify all ports that connection is gone */
       PORT_CloseInd(p_mcb);
@@ -496,7 +512,10 @@ void rfc_mx_sm_state_disc_wait_ua(tRFC_MCB* p_mcb, tRFC_MX_EVENT event,
     case RFC_MX_EVENT_UA:
     case RFC_MX_EVENT_DM:
     case RFC_MX_EVENT_TIMEOUT:
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
 
       if (p_mcb->restart_required) {
         /* Start Request was received while disconnecting.  Execute it again */
@@ -609,7 +628,10 @@ void rfc_on_l2cap_error(uint16_t lcid, uint16_t result) {
       log::error("disconnect L2CAP due to config failure for {}",
                  p_mcb->bd_addr);
       PORT_StartCnf(p_mcb, result);
-      L2CA_DisconnectReq(p_mcb->lcid);
+      if (!L2CA_DisconnectReq(p_mcb->lcid)) {
+        log::warn("Unable to send L2CAP disonnect request peer:{} cid:{}",
+                  p_mcb->bd_addr, p_mcb->lcid);
+      };
     }
     rfc_release_multiplexer_channel(p_mcb);
   }
@@ -625,7 +647,7 @@ void rfc_on_l2cap_error(uint16_t lcid, uint16_t result) {
  *                  on DLCI 0.  T1 is still running.
  *
  ******************************************************************************/
-static void rfc_mx_conf_cnf(tRFC_MCB* p_mcb, uint16_t result) {
+static void rfc_mx_conf_cnf(tRFC_MCB* p_mcb, uint16_t /* result */) {
   if (p_mcb->state == RFC_MX_STATE_CONFIGURE) {
     if (p_mcb->is_initiator) {
       p_mcb->state = RFC_MX_STATE_SABME_WAIT_UA;

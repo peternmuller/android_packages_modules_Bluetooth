@@ -23,6 +23,7 @@
 
 #include "hci/controller_interface.h"
 #include "main/shim/entry.h"
+#include "osi/include/properties.h"
 
 using namespace bluetooth;
 
@@ -370,6 +371,12 @@ enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
   log::assert_that(codec < ESCO_NUM_CODECS, "codec index {} > {}", (int)codec,
                    ESCO_NUM_CODECS);
 
+  if ((codec == ESCO_CODEC_LC3_T2) &&
+      osi_property_get_bool("vendor.bluetooth.sco.force_lc3_t1", false)) {
+    log::info("codec={}, force_lc3_t1 is true", (int)codec);
+    codec = ESCO_CODEC_LC3_T1;
+  }
+
   if (codec == ESCO_CODEC_LC3_T1 || codec == ESCO_CODEC_LC3_T2) {
     enh_esco_params_t param = default_esco_parameters[codec];
     param.input_coding_format.coding_format = ESCO_CODING_FORMAT_LC3;
@@ -424,26 +431,27 @@ enh_esco_params_t esco_parameters_for_codec(esco_codec_t codec, bool offload) {
     param.output_bandwidth = TXRX_64KBITS_RATE;
   }
 
-#if TARGET_FLOSS
-  esco_packet_types_t new_packet_types = param.packet_types;
-  if (codec == ESCO_CODEC_CVSD_S3 || codec == ESCO_CODEC_CVSD_S4 ||
-      codec == ESCO_CODEC_MSBC_T2 || codec == ESCO_CODEC_LC3_T2) {
-    new_packet_types =
-        (ESCO_PKT_TYPES_MASK_NO_3_EV3 | ESCO_PKT_TYPES_MASK_NO_2_EV5 |
-         ESCO_PKT_TYPES_MASK_NO_3_EV5);
-  } else if (codec == ESCO_CODEC_CVSD_S1) {
-    new_packet_types =
-        (ESCO_PKT_TYPES_MASK_EV3 | ESCO_PKT_TYPES_MASK_EV4 |
-         ESCO_PKT_TYPES_MASK_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV3 |
-         ESCO_PKT_TYPES_MASK_NO_2_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV5);
-  }
+  if (com::android::bluetooth::flags::fix_hfp_qual_1_9()) {
+    esco_packet_types_t new_packet_types = param.packet_types;
+    if (codec == ESCO_CODEC_CVSD_S3 || codec == ESCO_CODEC_CVSD_S4 ||
+        codec == ESCO_CODEC_MSBC_T2 || codec == ESCO_CODEC_LC3_T2) {
+      new_packet_types =
+          (ESCO_PKT_TYPES_MASK_NO_3_EV3 | ESCO_PKT_TYPES_MASK_NO_2_EV5 |
+           ESCO_PKT_TYPES_MASK_NO_3_EV5);
+    } else if (codec == ESCO_CODEC_CVSD_S1) {
+      new_packet_types =
+          (ESCO_PKT_TYPES_MASK_EV3 | ESCO_PKT_TYPES_MASK_EV4 |
+           ESCO_PKT_TYPES_MASK_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV3 |
+           ESCO_PKT_TYPES_MASK_NO_2_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV5);
+    }
 
-  if (param.packet_types != new_packet_types) {
-    log::info("Applying restricted packet types for codec %d: 0x%04x -> 0x%04x",
-              (int)codec, param.packet_types, new_packet_types);
-    param.packet_types = new_packet_types;
+    if (param.packet_types != new_packet_types) {
+      log::info(
+          "Applying restricted packet types for codec {}: 0x{:04x} -> 0x{:04x}",
+          (int)codec, param.packet_types, new_packet_types);
+      param.packet_types = new_packet_types;
+    }
   }
-#endif
 
   return param;
 }

@@ -45,6 +45,7 @@
 #include "hci/controller_interface.h"
 #include "internal_include/bt_target.h"
 #include "l2c_api.h"
+#include "main/shim/acl_api.h"
 #include "main/shim/entry.h"
 #include "main/shim/helpers.h"
 #include "osi/include/allocator.h"
@@ -63,6 +64,7 @@
 #include "stack/include/btm_ble_addr.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_ble_privacy.h"
+#include "stack/include/btm_client_interface.h"
 #include "stack/include/btm_log_history.h"
 #include "stack/include/btm_sec_api.h"
 #include "stack/include/btm_status.h"
@@ -72,6 +74,7 @@
 #include "stack/include/main_thread.h"
 #include "stack/include/smp_api.h"
 #include "stack/include/stack_metrics_logging.h"
+#include "types/bt_transport.h"
 #include "types/raw_address.h"
 
 namespace {
@@ -101,9 +104,7 @@ bool btm_ble_init_pseudo_addr(tBTM_SEC_DEV_REC* p_dev_rec,
 void bta_dm_remove_device(const RawAddress& bd_addr);
 void bta_dm_remote_key_missing(const RawAddress bd_addr);
 void bta_dm_process_remove_device(const RawAddress& bd_addr);
-void btm_inq_clear_ssp(void);
 
-static tBTM_STATUS btm_sec_execute_procedure(tBTM_SEC_DEV_REC* p_dev_rec);
 static bool btm_sec_start_get_name(tBTM_SEC_DEV_REC* p_dev_rec);
 static void btm_sec_wait_and_start_authentication(tBTM_SEC_DEV_REC* p_dev_rec);
 static void btm_sec_auth_timer_timeout(void* data);
@@ -798,6 +799,8 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
 
   /* If connection already exists... */
   if (BTM_IsAclConnectionUpAndHandleValid(bd_addr, transport)) {
+    log::debug("An ACL connection currently exists peer:{} transport:{}",
+               bd_addr, bt_transport_text(transport));
     btm_sec_wait_and_start_authentication(p_dev_rec);
 
     btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_WAIT_PIN_REQ);
@@ -806,12 +809,18 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
     l2cu_update_lcb_4_bonding(bd_addr, true);
     return (BTM_CMD_STARTED);
   }
+  log::debug("An ACL connection does not currently exist peer:{} transport:{}",
+             bd_addr, bt_transport_text(transport));
 
   log::verbose("sec mode: {} sm4:x{:x}", btm_sec_cb.security_mode,
                p_dev_rec->sm4);
   if (!bluetooth::shim::GetController()->SupportsSimplePairing() ||
       (p_dev_rec->sm4 == BTM_SM4_KNOWN)) {
-    if (btm_sec_check_prefetch_pin(p_dev_rec)) return (BTM_CMD_STARTED);
+    if (btm_sec_check_prefetch_pin(p_dev_rec)) {
+      log::debug("Class of device used to check for pin peer:{} transport:{}",
+                 bd_addr, bt_transport_text(transport));
+      return (BTM_CMD_STARTED);
+    }
   }
   if ((btm_sec_cb.security_mode == BTM_SEC_MODE_SP ||
        btm_sec_cb.security_mode == BTM_SEC_MODE_SC) &&
@@ -954,7 +963,10 @@ tBTM_STATUS BTM_SecBondCancel(const RawAddress& bd_addr) {
         return BTM_CMD_STARTED;
       }
       if (btm_sec_cb.pairing_state == BTM_PAIR_STATE_GET_REM_NAME) {
-        BTM_CancelRemoteDeviceName();
+        if (get_btm_client_interface().peer.BTM_CancelRemoteDeviceName() !=
+            BTM_SUCCESS) {
+          log::warn("Unable to cancel RNR");
+        }
         btm_sec_cb.pairing_flags |= BTM_PAIR_FLAGS_WE_CANCEL_DD;
         return BTM_CMD_STARTED;
       }
@@ -1025,8 +1037,6 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
     return BTM_WRONG_MODE;
   }
 
-  auto owned_bd_addr = base::Owned(new RawAddress(bd_addr));
-
   switch (transport) {
     case BT_TRANSPORT_BR_EDR:
       if (p_dev_rec->hci_handle == HCI_INVALID_HANDLE) {
@@ -1035,9 +1045,9 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
             "transport:{}",
             bd_addr, bt_transport_text(transport));
         if (p_callback) {
-          do_in_main_thread(
-              FROM_HERE, base::BindOnce(p_callback, std::move(owned_bd_addr),
-                                        transport, p_ref_data, BTM_WRONG_MODE));
+          do_in_main_thread(FROM_HERE,
+                            base::BindOnce(p_callback, bd_addr, transport,
+                                           p_ref_data, BTM_WRONG_MODE));
         }
         return BTM_WRONG_MODE;
       }
@@ -1048,8 +1058,8 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
             bd_addr, bt_transport_text(transport));
         if (p_callback) {
           do_in_main_thread(FROM_HERE,
-                            base::BindOnce(p_callback, std::move(owned_bd_addr),
-                                           transport, p_ref_data, BTM_SUCCESS));
+                            base::BindOnce(p_callback, bd_addr, transport,
+                                           p_ref_data, BTM_SUCCESS));
         }
         return BTM_SUCCESS;
       }
@@ -1062,9 +1072,9 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
             "transport:{}",
             bd_addr, bt_transport_text(transport));
         if (p_callback) {
-          do_in_main_thread(
-              FROM_HERE, base::BindOnce(p_callback, std::move(owned_bd_addr),
-                                        transport, p_ref_data, BTM_WRONG_MODE));
+          do_in_main_thread(FROM_HERE,
+                            base::BindOnce(p_callback, bd_addr, transport,
+                                           p_ref_data, BTM_WRONG_MODE));
         }
         return BTM_WRONG_MODE;
       }
@@ -1075,8 +1085,8 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
             bd_addr, bt_transport_text(transport));
         if (p_callback) {
           do_in_main_thread(FROM_HERE,
-                            base::BindOnce(p_callback, std::move(owned_bd_addr),
-                                           transport, p_ref_data, BTM_SUCCESS));
+                            base::BindOnce(p_callback, bd_addr, transport,
+                                           p_ref_data, BTM_SUCCESS));
         }
         return BTM_SUCCESS;
       }
@@ -1181,10 +1191,9 @@ tBTM_STATUS BTM_SetEncryption(const RawAddress& bd_addr,
         log::debug("Executing encryption callback peer:{} transport:{}",
                    bd_addr, bt_transport_text(transport));
         p_dev_rec->sec_rec.p_callback = nullptr;
-        do_in_main_thread(
-            FROM_HERE,
-            base::BindOnce(p_callback, std::move(owned_bd_addr), transport,
-                           p_dev_rec->sec_rec.p_ref_data, rc));
+        do_in_main_thread(FROM_HERE,
+                          base::BindOnce(p_callback, bd_addr, transport,
+                                         p_dev_rec->sec_rec.p_ref_data, rc));
       }
       break;
   }
@@ -1363,7 +1372,14 @@ void BTM_PasskeyReqReply(tBTM_STATUS res, const RawAddress& bd_addr,
  *                  LM
  *
  ******************************************************************************/
-void BTM_ReadLocalOobData(void) { btsnd_hcic_read_local_oob_data(); }
+void BTM_ReadLocalOobData(void) {
+  if (com::android::bluetooth::flags::use_local_oob_extended_command() &&
+      bluetooth::shim::GetController()->SupportsSecureConnections()) {
+    btsnd_hcic_read_local_oob_extended_data();
+  } else {
+    btsnd_hcic_read_local_oob_data();
+  }
+}
 
 /*******************************************************************************
  *
@@ -1576,7 +1592,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
           "rmt_support_for_sc={}, failing connection",
           local_supports_sc, p_dev_rec->SupportsSecureConnections());
       if (p_callback) {
-        (*p_callback)(&bd_addr, transport, (void*)p_ref_data,
+        (*p_callback)(bd_addr, transport, (void*)p_ref_data,
                       BTM_MODE4_LEVEL4_NOT_SUPPORTED);
       }
 
@@ -1640,7 +1656,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
         }
 
         if (p_callback)
-          (*p_callback)(&bd_addr, transport, (void*)p_ref_data, rc);
+          (*p_callback)(bd_addr, transport, (void*)p_ref_data, rc);
         return rc;
       }
     }
@@ -1707,7 +1723,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
           "peer should have initiated security process by now (SM4 to SM4)");
       p_dev_rec->sec_rec.p_callback = p_callback;
       p_dev_rec->sec_rec.sec_state = BTM_SEC_STATE_DELAY_FOR_ENC;
-      (*p_callback)(&bd_addr, transport, p_ref_data, rc);
+      (*p_callback)(bd_addr, transport, p_ref_data, rc);
 
       return BTM_SUCCESS;
     }
@@ -1739,7 +1755,7 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
     log::verbose("p_dev_rec={}, clearing callback. old p_callback={}",
                  fmt::ptr(p_dev_rec), fmt::ptr(p_dev_rec->sec_rec.p_callback));
     p_dev_rec->sec_rec.p_callback = NULL;
-    (*p_callback)(&bd_addr, transport, p_dev_rec->sec_rec.p_ref_data, rc);
+    (*p_callback)(bd_addr, transport, p_dev_rec->sec_rec.p_ref_data, rc);
   }
 
   return (rc);
@@ -1779,14 +1795,14 @@ tBTM_STATUS btm_sec_l2cap_access_req(const RawAddress& bd_addr, uint16_t psm,
   // If there is no application registered with this PSM do not allow connection
   if (!p_serv_rec) {
     log::warn("PSM: 0x{:04x} no application registered", psm);
-    (*p_callback)(&bd_addr, transport, p_ref_data, BTM_MODE_UNSUPPORTED);
+    (*p_callback)(bd_addr, transport, p_ref_data, BTM_MODE_UNSUPPORTED);
     return (BTM_MODE_UNSUPPORTED);
   }
 
   /* Services level0 by default have no security */
   if (psm == BT_PSM_SDP) {
     log::debug("No security required for SDP");
-    (*p_callback)(&bd_addr, transport, p_ref_data, BTM_SUCCESS_NO_SECURITY);
+    (*p_callback)(bd_addr, transport, p_ref_data, BTM_SUCCESS_NO_SECURITY);
     return (BTM_SUCCESS);
   }
 
@@ -1907,7 +1923,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
       }
       if (p_callback) {
         log::debug("Notifying client that security access has been granted");
-        (*p_callback)(&bd_addr, transport, p_ref_data, rc);
+        (*p_callback)(bd_addr, transport, p_ref_data, rc);
       }
     }
     return rc;
@@ -1925,7 +1941,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
           "remote_SC_support:{}",
           local_supports_sc, p_dev_rec->SupportsSecureConnections());
       if (p_callback)
-        (*p_callback)(&bd_addr, transport, (void*)p_ref_data,
+        (*p_callback)(bd_addr, transport, (void*)p_ref_data,
                       BTM_MODE4_LEVEL4_NOT_SUPPORTED);
 
       return (BTM_MODE4_LEVEL4_NOT_SUPPORTED);
@@ -1974,7 +1990,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
   if (rc != BTM_CMD_STARTED) {
     if (p_callback) {
       p_dev_rec->sec_rec.p_callback = NULL;
-      (*p_callback)(&bd_addr, transport, p_ref_data, rc);
+      (*p_callback)(bd_addr, transport, p_ref_data, rc);
     }
   }
 
@@ -1993,6 +2009,7 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
  ******************************************************************************/
 void btm_sec_conn_req(const RawAddress& bda, const DEV_CLASS dc) {
   tBTM_SEC_DEV_REC* p_dev_rec = nullptr;
+  tHCI_ROLE role = HCI_ROLE_UNKNOWN;
 
   if ((btm_sec_cb.pairing_state != BTM_PAIR_STATE_IDLE) &&
       (btm_sec_cb.pairing_flags & BTM_PAIR_FLAGS_WE_STARTED_DD) &&
@@ -2005,6 +2022,13 @@ void btm_sec_conn_req(const RawAddress& bda, const DEV_CLASS dc) {
     btsnd_hcic_reject_conn(bda, HCI_ERR_HOST_REJECT_DEVICE);
     return;
   }
+
+  /* accept the incoming connection from bonding device */
+  if (interop_match_addr(INTEROP_DISABLE_ROLE_SWITCH, &bda) || (BTM_GetNumBredrAclLinks() < 1))
+    role = HCI_ROLE_PERIPHERAL;
+  else
+    role = HCI_ROLE_CENTRAL;
+  btsnd_hcic_accept_conn(bda, role);
 
   /* Host is not interested or approved connection.  Save BDA and DC and */
   /* pass request to L2CAP */
@@ -2152,7 +2176,7 @@ void btm_sec_dev_reset(void) {
                    "only controllers with SSP is supported");
 
   /* set the default IO capabilities */
-  btm_sec_cb.devcb.loc_io_caps = btif_storage_get_local_io_caps();
+  btm_sec_cb.devcb.loc_io_caps = BTM_IO_CAP_IO;
   /* add mx service to use no security */
   BTM_SetSecurityLevel(false, "RFC_MUX", BTM_SEC_SERVICE_RFC_MUX,
                        BTM_SEC_NONE, BT_PSM_RFCOMM, BTM_SEC_PROTO_RFCOMM, 0);
@@ -2204,11 +2228,11 @@ void btm_sec_abort_access_req(const RawAddress& bd_addr) {
 static tBTM_STATUS btm_sec_dd_create_conn(tBTM_SEC_DEV_REC* p_dev_rec) {
   tBTM_STATUS status = l2cu_ConnectAclForSecurity(p_dev_rec->bd_addr);
   if (status == BTM_CMD_STARTED) {
+    btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_WAIT_PIN_REQ);
     /* If already connected, start pending security procedure */
     if (BTM_IsAclConnectionUp(p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR)) {
       return BTM_SUCCESS;
     }
-    btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_WAIT_PIN_REQ);
     return BTM_CMD_STARTED;
   } else if (status == BTM_NO_RESOURCES) {
     return BTM_NO_RESOURCES;
@@ -3364,8 +3388,14 @@ void btm_sec_encrypt_change(uint16_t handle, tHCI_STATUS status,
   if (transport == BT_TRANSPORT_LE) {
     if (status == HCI_ERR_KEY_MISSING || status == HCI_ERR_AUTH_FAILURE ||
         status == HCI_ERR_ENCRY_MODE_NOT_ACCEPTABLE) {
-      p_dev_rec->sec_rec.sec_flags &= ~(BTM_SEC_LE_LINK_KEY_KNOWN);
-      p_dev_rec->sec_rec.ble_keys.key_type = BTM_LE_KEY_NONE;
+      if (com::android::bluetooth::flags::
+              sec_dont_clear_keys_on_encryption_err()) {
+        log::error("{} encrypt failure status 0x{:x}", p_dev_rec->bd_addr,
+                   status);
+      } else {
+        p_dev_rec->sec_rec.sec_flags &= ~(BTM_SEC_LE_LINK_KEY_KNOWN);
+        p_dev_rec->sec_rec.ble_keys.key_type = BTM_LE_KEY_NONE;
+      }
     }
     p_dev_rec->sec_rec.sec_status = status;
     btm_ble_link_encrypted(p_dev_rec->ble.pseudo_addr, encr_enable);
@@ -3872,12 +3902,6 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle,
   /* the name, or if we are originator because some procedure can have */
   /* been scheduled while connection was down */
   log::debug("Is connection locally initiated:{}", p_dev_rec->is_originator);
-  if (!(p_dev_rec->sec_rec.sec_flags & BTM_SEC_NAME_KNOWN) ||
-      p_dev_rec->is_originator) {
-    res = btm_sec_execute_procedure(p_dev_rec);
-    if (res != BTM_CMD_STARTED)
-      btm_sec_dev_rec_cback_event(p_dev_rec, res, false);
-  }
 }
 
 tBTM_STATUS btm_sec_disconnect(uint16_t handle, tHCI_STATUS reason,
@@ -4060,7 +4084,7 @@ void btm_sec_disconnected(uint16_t handle, tHCI_REASON reason,
     /* when the peer device time out the authentication before
        we do, this call back must be reset here */
     p_dev_rec->sec_rec.p_callback = nullptr;
-    (*p_callback)(&p_dev_rec->bd_addr, transport, p_dev_rec->sec_rec.p_ref_data,
+    (*p_callback)(p_dev_rec->bd_addr, transport, p_dev_rec->sec_rec.p_ref_data,
                   BTM_ERR_PROCESSING);
     log::debug("Cleaned up pending security state device:{} transport:{}",
                p_dev_rec->bd_addr, bt_transport_text(transport));
@@ -4215,7 +4239,8 @@ void btm_sec_link_key_notification(const RawAddress& p_bda,
     /* If it is for bonding nothing else will follow, so we need to start name
      * resolution */
     if (we_are_bonding) {
-      SendRemoteNameRequest(p_bda);
+      bluetooth::shim::ACL_RemoteNameRequest(p_bda, HCI_PAGE_SCAN_REP_MODE_R1,
+                                             HCI_MANDATARY_PAGE_SCAN_MODE, 0);
     }
 
     log::verbose("rmt_io_caps:{}, sec_flags:x{:x}, dev_class[1]:x{:02x}",
@@ -4526,7 +4551,9 @@ void btm_sec_pin_code_request(const RawAddress p_bda) {
       /* We received PIN code request for the device with unknown name */
       /* it is not user friendly just to ask for the PIN without name */
       /* try to get name at first */
-      SendRemoteNameRequest(p_dev_rec->bd_addr);
+      bluetooth::shim::ACL_RemoteNameRequest(p_dev_rec->bd_addr,
+                                             HCI_PAGE_SCAN_REP_MODE_R1,
+                                             HCI_MANDATARY_PAGE_SCAN_MODE, 0);
     }
   }
 
@@ -4730,7 +4757,9 @@ static bool btm_sec_start_get_name(tBTM_SEC_DEV_REC* p_dev_rec) {
 
   /* 0 and NULL are as timeout and callback params because they are not used in
    * security get name case */
-  SendRemoteNameRequest(p_dev_rec->bd_addr);
+  bluetooth::shim::ACL_RemoteNameRequest(p_dev_rec->bd_addr,
+                                         HCI_PAGE_SCAN_REP_MODE_R1,
+                                         HCI_MANDATARY_PAGE_SCAN_MODE, 0);
   return true;
 }
 
@@ -4778,7 +4807,7 @@ static void btm_sec_auth_timer_timeout(void* data) {
   } else if (btm_dev_authenticated(p_dev_rec)) {
     log::info("device is already authenticated");
     if (p_dev_rec->sec_rec.p_callback) {
-      (*p_dev_rec->sec_rec.p_callback)(&p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR,
+      (*p_dev_rec->sec_rec.p_callback)(p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR,
                                        p_dev_rec->sec_rec.p_ref_data,
                                        BTM_SUCCESS);
     }
@@ -4887,7 +4916,6 @@ void tBTM_SEC_CB::change_pairing_state(tBTM_PAIRING_STATE new_state) {
 
     btm_restore_mode();
     btm_sec_check_pending_reqs();
-    btm_inq_clear_ssp();
 
     pairing_bda = RawAddress::kAny;
   } else {
@@ -4956,10 +4984,10 @@ void btm_sec_dev_rec_cback_event(tBTM_SEC_DEV_REC* p_dev_rec,
   p_dev_rec->sec_rec.p_callback = NULL;
   if (p_callback != nullptr) {
     if (is_le_transport) {
-      (*p_callback)(&p_dev_rec->ble.pseudo_addr, BT_TRANSPORT_LE,
+      (*p_callback)(p_dev_rec->ble.pseudo_addr, BT_TRANSPORT_LE,
                     p_dev_rec->sec_rec.p_ref_data, btm_status);
     } else {
-      (*p_callback)(&p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR,
+      (*p_callback)(p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR,
                     p_dev_rec->sec_rec.p_ref_data, btm_status);
     }
   }
@@ -5105,7 +5133,7 @@ static void btm_sec_check_pending_enc_req(tBTM_SEC_DEV_REC* p_dev_rec,
           (p_e->sec_act == BTM_BLE_SEC_ENCRYPT_MITM &&
            p_dev_rec->sec_rec.sec_flags & BTM_SEC_LE_AUTHENTICATED)) {
         if (p_e->p_callback)
-          (*p_e->p_callback)(&p_dev_rec->bd_addr, transport, p_e->p_ref_data,
+          (*p_e->p_callback)(p_dev_rec->bd_addr, transport, p_e->p_ref_data,
                              res);
         fixed_queue_try_remove_from_queue(btm_sec_cb.sec_pending_q, (void*)p_e);
         osi_free(p_e);

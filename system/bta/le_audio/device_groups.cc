@@ -810,6 +810,16 @@ LeAudioDeviceGroup::GetAudioSetConfigurationRequirements(
 
     for (auto direction :
          {types::kLeAudioDirectionSink, types::kLeAudioDirectionSource}) {
+      // Do not put any requirements on the Source if Sink only scenario is used
+      // Note: With the RINGTONE we should already prepare for a call.
+      if ((direction == types::kLeAudioDirectionSource) &&
+          ((types::kLeAudioContextAllRemoteSinkOnly.test(ctx_type) &&
+            (ctx_type != types::LeAudioContextType::RINGTONE)) ||
+           ctx_type == types::LeAudioContextType::UNSPECIFIED)) {
+        log::debug("Skipping the remote source requirements.");
+        continue;
+      }
+
       if (device->GetAseCount(direction) == 0) {
         log::warn("Device {} has no ASEs for direction: {}", device->address_,
                   (int)direction);
@@ -835,13 +845,17 @@ LeAudioDeviceGroup::GetAudioSetConfigurationRequirements(
                             DeviceDirectionRequirements>();
       }
 
-      // Pass the audio channel allocation requirement
-      auto locations = dev_locations.to_ulong();
+      // Pass the audio channel allocation requirement according to TMAP
+      auto locations = dev_locations.to_ulong() &
+                       (codec_spec_conf::kLeAudioLocationFrontLeft |
+                        codec_spec_conf::kLeAudioLocationFrontRight);
       CodecManager::UnicastConfigurationRequirements::
           DeviceDirectionRequirements config_req;
       config_req.params.Add(
           codec_spec_conf::kLeAudioLtvTypeAudioChannelAllocation,
           (uint32_t)locations);
+      config_req.target_latency =
+          utils::GetTargetLatencyForAudioContext(ctx_type);
       log::warn("Device {} pushes requirement, location: {}, direction: {}",
                 device->address_, (int)locations, (int)direction);
       direction_req->push_back(std::move(config_req));
@@ -1102,7 +1116,8 @@ void LeAudioDeviceGroup::CigConfiguration::GenerateCisIds(
   int group_size = group_->DesiredSize();
 
   set_configurations::get_cis_count(
-      context_type, group_size, group_->GetGroupSinkStrategy(),
+      context_type, group_->GetConfiguration(context_type), group_size,
+      group_->GetGroupSinkStrategy(),
       group_->GetAseCount(types::kLeAudioDirectionSink),
       group_->GetAseCount(types::kLeAudioDirectionSource), cis_count_bidir,
       cis_count_unidir_sink, cis_count_unidir_source,
@@ -1495,7 +1510,8 @@ bool LeAudioDeviceGroup::IsAudioSetConfigurationSupported(
                                : device->src_pacs_;
         const struct types::acs_ac_record* pac = NULL;
         if (utils::IsCodecUsingLtvFormat(ent.codec.id) &&
-            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec))) {
+            !(pac = utils::GetConfigurationSupportedPac(pacs, ent.codec,
+            ent.vendor_metadata, requirements.audio_context_type))) {
           log::debug(
               "Insufficient PAC for {}",
               direction == types::kLeAudioDirectionSink ? "sink" : "source");
@@ -1587,6 +1603,7 @@ bool LeAudioDeviceGroup::ConfigureAses(
     const types::BidirectionalPair<std::vector<uint8_t>>& ccid_lists) {
   bool reuse_cis_id =
       GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED;
+  log::info("reuse_cis_id: {}", reuse_cis_id);
 
   /* TODO For now: set ase if matching with first pac.
    * 1) We assume as well that devices will match requirements in order
@@ -1712,6 +1729,8 @@ LeAudioDeviceGroup::GetConfiguration(LeAudioContextType context_type) const {
     is_valid = valid_config_pair.first;
     conf = valid_config_pair.second.get();
   }
+
+  log::info(" is_valid: {}", is_valid);
   if (!is_valid || (conf == nullptr)) {
     UpdateAudioSetConfigurationCache(context_type);
   }
@@ -1852,6 +1871,7 @@ void LeAudioDeviceGroup::RemoveCisFromStreamIfNeeded(
 }
 
 bool LeAudioDeviceGroup::IsPendingConfiguration(void) const {
+  log::info(" pending_config: {}", stream_conf.pending_configuration);
   return stream_conf.pending_configuration;
 }
 
@@ -1861,6 +1881,20 @@ void LeAudioDeviceGroup::SetPendingConfiguration(void) {
 
 void LeAudioDeviceGroup::ClearPendingConfiguration(void) {
   stream_conf.pending_configuration = false;
+}
+
+bool LeAudioDeviceGroup::IsSuspendedForReconfiguration(void) const {
+  log::info(" suspended_for_reconfig_: {}",
+                                      suspended_for_reconfig_);
+  return suspended_for_reconfig_;
+}
+
+void LeAudioDeviceGroup::SetSuspendedForReconfiguration(void) {
+  suspended_for_reconfig_ = true;
+}
+
+void LeAudioDeviceGroup::ClearSuspendedForReconfiguration(void) {
+  suspended_for_reconfig_ = false;
 }
 
 void LeAudioDeviceGroup::Disable(int gatt_if) {
@@ -2174,16 +2208,13 @@ void LeAudioDeviceGroup::Dump(int fd, int active_group_id) const {
 }
 
 void LeAudioDeviceGroup::PopulateVendorMetadatabyDirection(LeAudioContextType context_type,
-                                       uint8_t direction, std::vector<uint8_t> pac_metadata,
+                                       uint8_t direction, types::LeAudioLtvMap pacs_metadata,
                                        const set_configurations::AseConfiguration& conf) const {
   std::vector<uint8_t> vendor_metadata;
-  bool parsed_ok = false;
-  auto pacs_metadata =
-      types::LeAudioLtvMap::Parse(pac_metadata.data(), pac_metadata.size(), parsed_ok);
-  auto vndr_metadata = pacs_metadata.Find(types::kLeAudioVendorSpecific);
-  if (vndr_metadata != std::nullopt && parsed_ok && !conf.vendor_metadata->vs_metadata.empty()) {
+  auto vndr_metadata = pacs_metadata.Find(types::kLeAudioMetadataTypeVendorSpecific);
+  if (vndr_metadata != std::nullopt && !conf.vendor_metadata->vs_metadata.empty()) {
     vendor_metadata = vndr_metadata.value();
-    vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioVendorSpecific);
+    vendor_metadata.insert(vendor_metadata.begin(), types::kLeAudioMetadataTypeVendorSpecific);
     vendor_metadata.insert(vendor_metadata.begin(), vendor_metadata.size() + 1);
     if (conf.codec.id.coding_format == types::kLeAudioCodingFormatLC3) {
       auto encoder_version_dut = conf.vendor_metadata->vs_metadata[0];
@@ -2195,7 +2226,7 @@ void LeAudioDeviceGroup::PopulateVendorMetadatabyDirection(LeAudioContextType co
       negotiated_decoder_version = std::min(decoder_version_dut, encoder_version_peer);
       vendor_metadata[6] = negotiated_encoder_version;
       vendor_metadata[7] = negotiated_decoder_version;
-    } else if (conf.codec.id.coding_format == types::kLeAudioVendorSpecific) {
+    } else if (conf.codec.id.coding_format == types::kLeAudioCodingFormatVendorSpecific) {
       if ((conf.codec.id.vendor_company_id == types::kLeAudioVendorCompanyIdQualcomm) &&
           ((conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLe) ||
           (conf.codec.id.vendor_codec_id == types::kLeAudioCodingFormatAptxLeX))) {

@@ -19,9 +19,7 @@ package com.android.bluetooth;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 
-/**
- * All the {@link ChangeId} used for Bluetooth App.
- */
+/** All the {@link ChangeId} used for Bluetooth App. */
 public class ChangeIds {
     /**
      * { Redacted }

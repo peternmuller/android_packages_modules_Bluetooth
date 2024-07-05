@@ -141,6 +141,10 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
 
     if (le_audio_source_hal_client_) {
       le_audio_source_hal_client_->Stop();
+      auto result =
+          CodecManager::GetInstance()->UpdateActiveBroadcastAudioHalClient(
+              le_audio_source_hal_client_.get(), false);
+      log::assert_that(result, "Could not update session in codec manager");
       le_audio_source_hal_client_.reset();
     }
   }
@@ -228,7 +232,8 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
           }
 
           // Check for non vendor LTVs
-          auto config_ltv = subgroup_config.GetBisCodecSpecData(bis_num);
+          auto config_ltv =
+              subgroup_config.GetBisCodecSpecData(bis_num, bis_cfg_idx);
           if (config_ltv) {
             // Remove the part which is common with the parent subgroup
             // parameters
@@ -578,11 +583,31 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
     // differs in codec configuration.
     CodecManager::BroadcastConfigurationRequirements requirements;
     for (auto& idx : subgroup_quality) {
-      requirements.subgroup_quality.push_back(
-          {ChooseConfigurationContextType(context_type), idx});
+      if (osi_property_get_bool("persist.vendor.btstack.bis_audio_config.enabled", true)
+          && !is_public) {
+        // Use high quality audio for non-public broadcast
+        requirements.subgroup_quality.push_back(
+            {ChooseConfigurationContextType(context_type), bluetooth::le_audio::QUALITY_HIGH});
+      } else {
+        requirements.subgroup_quality.push_back(
+            {ChooseConfigurationContextType(context_type), idx});
+      }
     }
-    auto config = CodecManager::GetInstance()->GetBroadcastConfig(requirements);
 
+    if (!le_audio_source_hal_client_) {
+      le_audio_source_hal_client_ =
+          LeAudioSourceAudioHalClient::AcquireBroadcast();
+      if (!le_audio_source_hal_client_) {
+        log::error("Could not acquire le audio");
+        return;
+      }
+      auto result =
+          CodecManager::GetInstance()->UpdateActiveBroadcastAudioHalClient(
+              le_audio_source_hal_client_.get(), true);
+      log::assert_that(result, "Could not update session in codec manager");
+    }
+
+    auto config = CodecManager::GetInstance()->GetBroadcastConfig(requirements);
     if (!config) {
       log::error("No valid broadcast offload config");
       callbacks_->OnBroadcastCreated(bluetooth::le_audio::kBroadcastIdInvalid,
@@ -695,6 +720,11 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
           log::error("Could not acquire le audio");
           return;
         }
+
+        auto result =
+            CodecManager::GetInstance()->UpdateActiveBroadcastAudioHalClient(
+                le_audio_source_hal_client_.get(), true);
+        log::assert_that(result, "Could not update session in codec manager");
       }
 
       broadcasts_[broadcast_id]->ProcessMessage(
@@ -725,6 +755,14 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
   void DestroyAudioBroadcast(uint32_t broadcast_id) override {
     log::info("Destroying broadcast_id={}", broadcast_id);
     broadcasts_.erase(broadcast_id);
+
+    if (broadcasts_.empty() && le_audio_source_hal_client_) {
+      auto result =
+          CodecManager::GetInstance()->UpdateActiveBroadcastAudioHalClient(
+              le_audio_source_hal_client_.get(), false);
+      log::assert_that(result, "Could not update session in codec manager");
+      le_audio_source_hal_client_.reset();
+    }
   }
 
   std::optional<bluetooth::le_audio::BroadcastMetadata> GetBroadcastMetadataOpt(
@@ -851,6 +889,10 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
                          "assert failed: broadcasts_.count(broadcast_id) != 0");
         broadcasts_[broadcast_id]->HandleHciEvent(HCI_BLE_TERM_BIG_CPL_EVT,
                                                   evt);
+        auto result =
+            CodecManager::GetInstance()->UpdateActiveBroadcastAudioHalClient(
+                le_audio_source_hal_client_.get(), false);
+        log::assert_that(result, "Could not update session in codec manager");
         le_audio_source_hal_client_.reset();
       } break;
       default:

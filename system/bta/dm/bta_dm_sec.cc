@@ -72,9 +72,6 @@ const tBTM_APPL_INFO bta_security = {
     .p_le_key_callback = &bta_dm_ble_id_key_cback,
     .p_sirk_verification_callback = &bta_dm_sirk_verifiction_cback};
 
-// Stores the local Input/Output Capabilities of the Bluetooth device.
-static uint8_t btm_local_io_caps;
-
 void btm_sec_on_hw_on() {
   tBTA_DM_SEC_CBACK* temp_sec_cback = bta_dm_sec_cb.p_sec_cback;
   bta_dm_sec_cb = {};
@@ -114,8 +111,6 @@ void bta_dm_sec_enable(tBTA_DM_SEC_CBACK* p_sec_cback) {
   previous one,
   it could be an error recovery mechanism */
   if (p_sec_cback != NULL) bta_dm_sec_cb.p_sec_cback = p_sec_cback;
-
-  btm_local_io_caps = btif_storage_get_local_io_caps();
 }
 
 void bta_dm_remote_key_missing(const RawAddress bd_addr) {
@@ -424,19 +419,15 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
   /* TODO_SP */
   switch (event) {
     case BTM_SP_IO_REQ_EVT:
-      if (btm_local_io_caps != BTM_IO_CAP_NONE) {
-        /* translate auth_req */
-        btif_dm_set_oob_for_io_req(&p_data->io_req.oob_data);
-        btif_dm_proc_io_req(&p_data->io_req.auth_req, p_data->io_req.is_orig);
-      }
+      /* translate auth_req */
+      btif_dm_set_oob_for_io_req(&p_data->io_req.oob_data);
+      btif_dm_proc_io_req(&p_data->io_req.auth_req, p_data->io_req.is_orig);
       log::verbose("io mitm: {} oob_data:{}", p_data->io_req.auth_req,
                    p_data->io_req.oob_data);
       break;
     case BTM_SP_IO_RSP_EVT:
-      if (btm_local_io_caps != BTM_IO_CAP_NONE) {
-        btif_dm_proc_io_rsp(p_data->io_rsp.bd_addr, p_data->io_rsp.io_cap,
-                            p_data->io_rsp.oob_data, p_data->io_rsp.auth_req);
-      }
+      btif_dm_proc_io_rsp(p_data->io_rsp.bd_addr, p_data->io_rsp.io_cap,
+                          p_data->io_rsp.oob_data, p_data->io_rsp.auth_req);
       break;
 
     case BTM_SP_CFM_REQ_EVT:
@@ -453,12 +444,6 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
         unlikely to receive key request, so skip this event */
     /*case BTM_SP_KEY_REQ_EVT: */
     case BTM_SP_KEY_NOTIF_EVT:
-      if (btm_local_io_caps == BTM_IO_CAP_NONE &&
-          BTM_SP_KEY_NOTIF_EVT == event) {
-        status = BTM_NOT_AUTHORIZED;
-        break;
-      }
-
       // TODO PleaseFix: This assignment only works with event
       // BTM_SP_KEY_NOTIF_EVT
       bta_dm_sec_cb.num_val = sec_event.key_notif.passkey =
@@ -525,9 +510,10 @@ static tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event,
       break;
 
     case BTM_SP_LOC_OOB_EVT:
+      // BR/EDR OOB pairing is not supported with Secure Connections
       btif_dm_proc_loc_oob(BT_TRANSPORT_BR_EDR,
                            (bool)(p_data->loc_oob.status == BTM_SUCCESS),
-                           p_data->loc_oob.c, p_data->loc_oob.r);
+                           p_data->loc_oob.c_192, p_data->loc_oob.r_192);
       break;
 
     case BTM_SP_RMT_OOB_EVT: {
@@ -770,7 +756,7 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
           sec_event.auth_cmpl.bd_name,
           get_btm_client_interface().security.BTM_SecReadDevName(bda));
 
-      if (p_data->complt.reason != HCI_SUCCESS) {
+      if (p_data->complt.reason != SMP_SUCCESS) {
         // TODO This is not a proper use of this type
         sec_event.auth_cmpl.fail_reason =
             static_cast<tHCI_STATUS>(BTA_DM_AUTH_CONVERT_SMP_CODE(
@@ -824,17 +810,17 @@ static uint8_t bta_dm_ble_smp_cback(tBTM_LE_EVT event, const RawAddress& bda,
  * Returns         None
  *
  ******************************************************************************/
-void bta_dm_encrypt_cback(const RawAddress* bd_addr, tBT_TRANSPORT transport,
+void bta_dm_encrypt_cback(RawAddress bd_addr, tBT_TRANSPORT transport,
                           void* /* p_ref_data */, tBTM_STATUS result) {
   tBTA_DM_ENCRYPT_CBACK* p_callback = nullptr;
-  tBTA_DM_PEER_DEVICE* device = find_connected_device(*bd_addr, transport);
+  tBTA_DM_PEER_DEVICE* device = find_connected_device(bd_addr, transport);
   if (device != nullptr) {
     p_callback = device->p_encrypt_cback;
     device->p_encrypt_cback = nullptr;
   }
 
   log::debug("Encrypted:{:c}, peer:{} transport:{} status:{} callback:{:c}",
-             result == BTM_SUCCESS ? 'T' : 'F', *bd_addr,
+             result == BTM_SUCCESS ? 'T' : 'F', bd_addr,
              bt_transport_text(transport), btm_status_text(result),
              (p_callback) ? 'T' : 'F');
 
@@ -857,7 +843,7 @@ void bta_dm_encrypt_cback(const RawAddress* bd_addr, tBT_TRANSPORT transport,
   }
 
   if (p_callback) {
-    (*p_callback)(*bd_addr, transport, bta_status);
+    (*p_callback)(bd_addr, transport, bta_status);
   }
 }
 
@@ -1071,8 +1057,6 @@ static void bta_dm_bond_retrail_cback(void* data) {
 namespace bluetooth {
 namespace legacy {
 namespace testing {
-void btm_set_local_io_caps(uint8_t io_caps) { ::btm_local_io_caps = io_caps; }
-
 tBTM_STATUS bta_dm_sp_cback(tBTM_SP_EVT event, tBTM_SP_EVT_DATA* p_data) {
   return ::bta_dm_sp_cback(event, p_data);
 }

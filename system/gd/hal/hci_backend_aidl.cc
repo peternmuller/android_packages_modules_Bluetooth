@@ -63,8 +63,6 @@ class AidlHciCallbacks : public ::aidl::android::hardware::bluetooth::BnBluetoot
 class AidlHci : public HciBackend {
  public:
   AidlHci(const char* service_name) {
-    common::StopWatch stop_watch(__func__);
-
     ::ndk::SpAIBinder binder(AServiceManager_waitForService(service_name));
     hci_ = aidl::android::hardware::bluetooth::IBluetoothHci::fromBinder(binder);
     log::assert_that(hci_ != nullptr, "Failed to retrieve AIDL interface.");
@@ -75,7 +73,7 @@ class AidlHci : public HciBackend {
           common::StopWatch::DumpStopWatchLog();
           // At shutdown, sometimes the HAL service gets killed before Bluetooth.
           std::this_thread::sleep_for(std::chrono::seconds(1));
-          log::fatal("The Bluetooth HAL died.");
+          log::error("The Bluetooth HAL died.");
         }));
 
     auto death_link = AIBinder_linkToDeath(hci_->asBinder().get(), death_recipient_.get(), this);

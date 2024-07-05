@@ -194,7 +194,6 @@ cc_library_static {
         "src/btif_gatt.cc",
         "src/btif_gatt_client.cc",
         "src/btif_gatt_server.cc",
-        "src/btif_gatt_test.cc",
         "src/btif_gatt_util.cc",
         "src/btif_iot_config.cc",
         "src/btif_keystore.cc",
@@ -291,6 +290,7 @@ cc_test {
     ],
     header_libs: ["libbluetooth_headers"],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -594,6 +594,7 @@ cc_test {
     ],
     header_libs: ["libbluetooth_headers"],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -631,7 +632,6 @@ cc_test {
         "libbtdevice",
         "libbtif",
         "libbtif-core",
-        "libc++fs",
         "libchrome",
         "libcom.android.sysprop.bluetooth.wrapped",
         "libevent",
@@ -717,6 +717,7 @@ cc_test {
     ],
     header_libs: ["libbluetooth_headers"],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -753,7 +754,6 @@ cc_test {
         "libbtdevice",
         "libbtif",
         "libbtif-core",
-        "libc++fs",
         "libchrome",
         "libcom.android.sysprop.bluetooth.wrapped",
         "libevent",

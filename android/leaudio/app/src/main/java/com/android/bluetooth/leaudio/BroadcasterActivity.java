@@ -31,6 +31,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.NumberPicker;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -83,6 +84,8 @@ public class BroadcasterActivity extends AppCompatActivity {
                                 alertView.findViewById(R.id.is_public_checkbox);
                         final EditText public_content =
                                 alertView.findViewById(R.id.broadcast_public_content_input);
+                        final Switch high_quality =
+                                alertView.findViewById(R.id.broadcast_high_quality);
                         // Add context type selector
                         contextPicker.setMinValue(1);
                         contextPicker.setMaxValue(
@@ -140,7 +143,10 @@ public class BroadcasterActivity extends AppCompatActivity {
                                                             contextPicker.getValue(),
                                                             publicCheckbox.isChecked(),
                                                             broadcast_name.getText().toString(),
-                                                            code_input_text.getText().toString());
+                                                            code_input_text.getText().toString(),
+                                                            high_quality.isChecked()
+                                                                    ? BluetoothLeBroadcastSubgroupSettings.QUALITY_HIGH
+                                                                    : BluetoothLeBroadcastSubgroupSettings.QUALITY_STANDARD);
 
                                             if (mViewModel.startBroadcast(broadcastSettings))
                                                 Toast.makeText(
@@ -159,7 +165,10 @@ public class BroadcasterActivity extends AppCompatActivity {
                                                             contextPicker.getValue(),
                                                             publicCheckbox.isChecked(),
                                                             broadcast_name.getText().toString(),
-                                                            code_input_text.getText().toString());
+                                                            code_input_text.getText().toString(),
+                                                            high_quality.isChecked()
+                                                            ? BluetoothLeBroadcastSubgroupSettings.QUALITY_HIGH
+                                                            : BluetoothLeBroadcastSubgroupSettings.QUALITY_STANDARD);
 
                                             if (mViewModel.startBroadcast(broadcastSettings)) {
                                                 // Save only if started successfully
@@ -404,50 +413,97 @@ public class BroadcasterActivity extends AppCompatActivity {
         itemsAdapter.updateBroadcastsMetadata(metadata.isEmpty() ? new ArrayList<>() : metadata);
 
         // Put a watch on updates
-        mViewModel.getBroadcastUpdateMetadataLive().observe(this, audioBroadcast -> {
-            itemsAdapter.updateBroadcastMetadata(audioBroadcast);
+        mViewModel
+                .getBroadcastUpdateMetadataLive()
+                .observe(
+                        this,
+                        audioBroadcast -> {
+                            itemsAdapter.updateBroadcastMetadata(audioBroadcast);
 
-            Toast.makeText(BroadcasterActivity.this,
-                    "Updated broadcast " + audioBroadcast.getBroadcastId(), Toast.LENGTH_SHORT)
-                    .show();
-        });
+                            Toast.makeText(
+                                            BroadcasterActivity.this,
+                                            "Updated broadcast " + audioBroadcast.getBroadcastId(),
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        });
 
         // Put a watch on any error reports
-        mViewModel.getBroadcastStatusMutableLive().observe(this, msg -> {
-            Toast.makeText(BroadcasterActivity.this, msg, Toast.LENGTH_SHORT).show();
-        });
+        mViewModel
+                .getBroadcastStatusMutableLive()
+                .observe(
+                        this,
+                        msg -> {
+                            Toast.makeText(BroadcasterActivity.this, msg, Toast.LENGTH_SHORT)
+                                    .show();
+                        });
 
         // Put a watch on broadcast playback states
-        mViewModel.getBroadcastPlaybackStartedMutableLive().observe(this, reasonAndBidPair -> {
-            Toast.makeText(BroadcasterActivity.this, "Playing broadcast " + reasonAndBidPair.second
-                    + ", reason " + reasonAndBidPair.first, Toast.LENGTH_SHORT).show();
+        mViewModel
+                .getBroadcastPlaybackStartedMutableLive()
+                .observe(
+                        this,
+                        reasonAndBidPair -> {
+                            Toast.makeText(
+                                            BroadcasterActivity.this,
+                                            "Playing broadcast "
+                                                    + reasonAndBidPair.second
+                                                    + ", reason "
+                                                    + reasonAndBidPair.first,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
 
-            itemsAdapter.updateBroadcastPlayback(reasonAndBidPair.second, true);
-        });
+                            itemsAdapter.updateBroadcastPlayback(reasonAndBidPair.second, true);
+                        });
 
-        mViewModel.getBroadcastPlaybackStoppedMutableLive().observe(this, reasonAndBidPair -> {
-            Toast.makeText(BroadcasterActivity.this, "Paused broadcast " + reasonAndBidPair.second
-                    + ", reason " + reasonAndBidPair.first, Toast.LENGTH_SHORT).show();
+        mViewModel
+                .getBroadcastPlaybackStoppedMutableLive()
+                .observe(
+                        this,
+                        reasonAndBidPair -> {
+                            Toast.makeText(
+                                            BroadcasterActivity.this,
+                                            "Paused broadcast "
+                                                    + reasonAndBidPair.second
+                                                    + ", reason "
+                                                    + reasonAndBidPair.first,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
 
-            itemsAdapter.updateBroadcastPlayback(reasonAndBidPair.second, false);
-        });
+                            itemsAdapter.updateBroadcastPlayback(reasonAndBidPair.second, false);
+                        });
 
-        mViewModel.getBroadcastAddedMutableLive().observe(this, broadcastId -> {
-            itemsAdapter.addBroadcasts(broadcastId);
+        mViewModel
+                .getBroadcastAddedMutableLive()
+                .observe(
+                        this,
+                        broadcastId -> {
+                            itemsAdapter.addBroadcasts(broadcastId);
 
-            Toast.makeText(BroadcasterActivity.this,
-                    "Broadcast was added broadcastId: " + broadcastId, Toast.LENGTH_SHORT).show();
-        });
+                            Toast.makeText(
+                                            BroadcasterActivity.this,
+                                            "Broadcast was added broadcastId: " + broadcastId,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        });
 
         // Put a watch on broadcast removal
-        mViewModel.getBroadcastRemovedMutableLive().observe(this, reasonAndBidPair -> {
-            itemsAdapter.removeBroadcast(reasonAndBidPair.second);
+        mViewModel
+                .getBroadcastRemovedMutableLive()
+                .observe(
+                        this,
+                        reasonAndBidPair -> {
+                            itemsAdapter.removeBroadcast(reasonAndBidPair.second);
 
-            Toast.makeText(
-                    BroadcasterActivity.this, "Broadcast was removed " + " broadcastId: "
-                            + reasonAndBidPair.second + ", reason: " + reasonAndBidPair.first,
-                    Toast.LENGTH_SHORT).show();
-        });
+                            Toast.makeText(
+                                            BroadcasterActivity.this,
+                                            "Broadcast was removed "
+                                                    + " broadcastId: "
+                                                    + reasonAndBidPair.second
+                                                    + ", reason: "
+                                                    + reasonAndBidPair.first,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        });
 
         // Prevent destruction when loses focus
         this.setFinishOnTouchOutside(false);
@@ -466,7 +522,8 @@ public class BroadcasterActivity extends AppCompatActivity {
             int contextTypeUI,
             boolean isPublic,
             String broadcastName,
-            String broadcastCode) {
+            String broadcastCode,
+            int preferredQuality) {
 
         final BluetoothLeAudioContentMetadata.Builder contentBuilder =
                 new BluetoothLeAudioContentMetadata.Builder();
@@ -496,6 +553,7 @@ public class BroadcasterActivity extends AppCompatActivity {
                 new BluetoothLeBroadcastSubgroupSettings.Builder()
                         .setContentMetadata(
                                 BluetoothLeAudioContentMetadata.fromRawBytes(stream.toByteArray()));
+        subgroupBuilder.setPreferredQuality(preferredQuality);
         BluetoothLeBroadcastSettings.Builder builder =
                 new BluetoothLeBroadcastSettings.Builder()
                         .setPublicBroadcast(isPublic)

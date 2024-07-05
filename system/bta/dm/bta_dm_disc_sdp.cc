@@ -264,11 +264,6 @@ void bta_dm_sdp_result(tSDP_STATUS sdp_result, tBTA_DM_SDP_STATE* sdp_state) {
 
     /* callbacks */
     /* start next bd_addr if necessary */
-    BTM_LogHistory(kBtmLogTag, sdp_state->bd_addr, "Discovery completed",
-                   base::StringPrintf(
-                       "Result:%s services_found:0x%x service_index:0x%d",
-                       sdp_result_text(sdp_result).c_str(),
-                       sdp_state->services_found, sdp_state->service_index));
 
     // Copy the raw_data to the discovery result structure
     if (p_sdp_db != NULL && p_sdp_db->raw_used != 0 &&
@@ -285,18 +280,15 @@ void bta_dm_sdp_result(tSDP_STATUS sdp_result, tBTA_DM_SDP_STATE* sdp_state) {
     }
 
     tBTA_STATUS result = BTA_SUCCESS;
-    auto services = sdp_state->services_found;
     // Piggy back the SCN over result field
     if (scn_found) {
       result = static_cast<tBTA_STATUS>((3 + sdp_state->peer_scn));
-      services |= BTA_USER_SERVICE_MASK;
 
       log::verbose("Piggy back the SCN over result field  SCN={}",
                    sdp_state->peer_scn);
     }
 
-    bta_dm_sdp_finished(sdp_state->bd_addr, result, services, uuid_list,
-                        gatt_uuids);
+    bta_dm_sdp_finished(sdp_state->bd_addr, result, uuid_list, gatt_uuids);
   } else {
     BTM_LogHistory(
         kBtmLogTag, sdp_state->bd_addr, "Discovery failed",
@@ -304,8 +296,7 @@ void bta_dm_sdp_result(tSDP_STATUS sdp_result, tBTA_DM_SDP_STATE* sdp_state) {
     log::error("SDP connection failed {}", sdp_status_text(sdp_result));
 
     /* not able to connect go to next device */
-    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_FAILURE,
-                        sdp_state->services_found);
+    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_FAILURE);
   }
 }
 
@@ -331,8 +322,7 @@ void bta_dm_sdp_find_services(tBTA_DM_SDP_STATE* sdp_state) {
   /* no more services to be discovered */
   if (sdp_state->service_index >= BTA_MAX_SERVICE_ID) {
     log::info("SDP - no more services to discover");
-    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_SUCCESS,
-                        sdp_state->services_found);
+    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_SUCCESS);
     return;
   }
 
@@ -371,8 +361,7 @@ void bta_dm_sdp_find_services(tBTA_DM_SDP_STATE* sdp_state) {
               sdp_state->bd_addr);
 
     sdp_state->service_index = BTA_MAX_SERVICE_ID;
-    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_SUCCESS,
-                        sdp_state->services_found);
+    bta_dm_sdp_finished(sdp_state->bd_addr, BTA_SUCCESS);
     return;
   }
 

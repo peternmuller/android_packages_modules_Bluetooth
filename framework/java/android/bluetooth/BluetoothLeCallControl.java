@@ -395,12 +395,14 @@ public final class BluetoothLeCallControl implements BluetoothProfile {
     /** @hide */
     @Override
     public void onServiceConnected(IBinder service) {
+        Log.d(TAG, "onServiceConnected");
         mService = IBluetoothLeCallControl.Stub.asInterface(service);
     }
 
     /** @hide */
     @Override
     public void onServiceDisconnected() {
+        Log.d(TAG, "onServiceDisconnected");
         mService = null;
     }
 

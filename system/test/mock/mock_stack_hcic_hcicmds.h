@@ -305,6 +305,16 @@ struct btsnd_hcic_read_local_oob_data {
 };
 extern struct btsnd_hcic_read_local_oob_data btsnd_hcic_read_local_oob_data;
 
+// Name: btsnd_hcic_read_local_oob_extended_data
+// Params: void
+// Return: void
+struct btsnd_hcic_read_local_oob_extended_data {
+  std::function<void(void)> body{[](void) {}};
+  void operator()(void) { body(); };
+};
+extern struct btsnd_hcic_read_local_oob_extended_data
+    btsnd_hcic_read_local_oob_extended_data;
+
 // Name: btsnd_hcic_read_name
 // Params: void
 // Return: void
@@ -341,6 +351,18 @@ struct btsnd_hcic_read_tx_power {
   void operator()(uint16_t handle, uint8_t type) { body(handle, type); };
 };
 extern struct btsnd_hcic_read_tx_power btsnd_hcic_read_tx_power;
+
+// Name: btsnd_hcic_accept_conn
+// Params: const RawAddress& dest, uint8_t role
+// Return: void
+struct btsnd_hcic_accept_conn {
+  std::function<void(const RawAddress& dest, uint8_t role)> body{
+      [](const RawAddress& /* dest */, uint8_t /* role */) {}};
+  void operator()(const RawAddress& dest, uint8_t role) {
+    body(dest, role);
+  };
+};
+extern struct btsnd_hcic_accept_conn btsnd_hcic_accept_conn;
 
 // Name: btsnd_hcic_reject_conn
 // Params: const RawAddress& dest, uint8_t reason

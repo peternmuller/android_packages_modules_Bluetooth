@@ -286,7 +286,7 @@ tCONN_CB* sdp_conn_originate(const RawAddress& bd_addr) {
   if (!bluetooth::common::init_flags::sdp_serialization_is_enabled() ||
       cid == 0) {
     p_ccb->con_state = SDP_STATE_CONN_SETUP;
-    cid = L2CA_ConnectReq2(BT_PSM_SDP, bd_addr, BTM_SEC_NONE);
+    cid = L2CA_ConnectReqWithSecurity(BT_PSM_SDP, bd_addr, BTM_SEC_NONE);
   } else {
     p_ccb->con_state = SDP_STATE_CONN_PEND;
     log::warn("SDP already active for peer {}. cid={:#0x}", bd_addr, cid);
@@ -323,7 +323,10 @@ void sdp_disconnect(tCONN_CB* p_ccb, tSDP_REASON reason) {
       sdpu_release_ccb(ccb);
       return;
     } else {
-      L2CA_DisconnectReq(ccb.connection_id);
+      if (!L2CA_DisconnectReq(ccb.connection_id)) {
+        log::warn("Unable to disconnect L2CAP peer:{} cid:{}",
+                  ccb.device_address, ccb.connection_id);
+      }
     }
   }
 
@@ -379,7 +382,10 @@ void sdp_conn_timer_timeout(void* data) {
   log::verbose("SDP - CCB timeout in state: {}  CID: 0x{:x}", ccb.con_state,
                ccb.connection_id);
 
-  L2CA_DisconnectReq(ccb.connection_id);
+  if (!L2CA_DisconnectReq(ccb.connection_id)) {
+    log::warn("Unable to disconnect L2CAP peer:{} cid:{}", ccb.device_address,
+              ccb.connection_id);
+  }
 
   sdpu_callback(ccb, SDP_CONN_FAILED);
   sdpu_clear_pend_ccb(ccb);
@@ -420,8 +426,9 @@ void sdp_init(void) {
   sdp_cb.reg_info.pL2CA_Error_Cb = sdp_on_l2cap_error;
 
   /* Now, register with L2CAP */
-  if (!L2CA_Register2(BT_PSM_SDP, sdp_cb.reg_info, true /* enable_snoop */,
-                      nullptr, SDP_MTU_SIZE, 0, BTM_SEC_NONE)) {
+  if (!L2CA_RegisterWithSecurity(BT_PSM_SDP, sdp_cb.reg_info,
+                                 true /* enable_snoop */, nullptr, SDP_MTU_SIZE,
+                                 0, BTM_SEC_NONE)) {
     log::error("SDP Registration failed");
   }
 }

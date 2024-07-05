@@ -94,7 +94,6 @@ cc_defaults {
         "libbte",
         "libbtif",
         "libbtif-core",
-        "libc++fs",
         "libcom.android.sysprop.bluetooth.wrapped",
         "libflatbuffers-cpp",
         "libg722codec",
@@ -140,6 +139,7 @@ cc_test {
         "libprotobuf-cpp-lite",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "server_configurable_flags",
     ],

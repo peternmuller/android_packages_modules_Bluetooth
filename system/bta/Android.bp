@@ -155,6 +155,9 @@ cc_library_static {
         "libcom.android.sysprop.bluetooth.wrapped",
         "liblc3",
     ],
+    shared_libs: [
+        "libcrypto",
+    ],
     generated_headers: [
         "LeAudioSetConfigSchemas_h",
     ],
@@ -210,6 +213,7 @@ cc_library_static {
     static_libs: [
         "bluetooth_flags_c_lib",
         "lib-bt-packets",
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libbluetooth_hci_pdl",
         "libbluetooth_log",
@@ -219,6 +223,9 @@ cc_library_static {
         "libcom.android.sysprop.bluetooth.wrapped",
         "libflatbuffers-cpp",
         "server_configurable_flags",
+    ],
+    shared_libs: [
+        "libcrypto",
     ],
     apex_available: [
         "com.android.btservices",
@@ -282,6 +289,7 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libcrypto",
         "libcutils",
         "libhidlbase",
@@ -296,6 +304,7 @@ cc_test {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "bluetooth_flags_c_lib",
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libbluetooth-types",
         "libbluetooth_crypto_toolbox",
@@ -371,6 +380,7 @@ cc_test {
         "BluetoothGeneratedDumpsysDataSchema_h",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "liblog",
@@ -411,10 +421,13 @@ cc_test {
         ":TestCommonMockFunctions",
         ":TestMockBtif",
         ":TestMockDevice",
+        ":TestMockMainShim",
+        ":TestMockMainShimEntry",
         ":TestMockStack",
         "test/bta_hf_client_security_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -432,6 +445,7 @@ cc_test {
         "libbt-audio-hal-interface",
         "libbt-bta",
         "libbt-bta-core",
+        "libbt-btu-main-thread",
         "libbt-common",
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
@@ -477,6 +491,7 @@ cc_test {
         "test/bta_rfcomm_scn_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libcutils",
@@ -533,6 +548,7 @@ cc_test {
         ":TestCommonMockFunctions",
         ":TestMockBtif",
         ":TestMockMainShimLeScanning",
+        ":TestMockStackBtmInterface",
         "csis/csis_client.cc",
         "csis/csis_client_test.cc",
         "gatt/database.cc",
@@ -544,6 +560,7 @@ cc_test {
         "test/common/btm_api_mock.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "liblog",
@@ -793,6 +810,7 @@ cc_test {
         ":TestStubOsi",
         ":TestMockStackBtm",
         "le_audio/broadcaster/broadcast_configuration_provider.cc",
+        "le_audio/broadcaster/broadcaster_types.cc",
         "le_audio/codec_manager.cc",
         "le_audio/codec_manager_test.cc",
         "le_audio/le_audio_set_configuration_provider_json.cc",
@@ -820,6 +838,7 @@ cc_test {
         "libbluetooth_crypto_toolbox",
         "libbluetooth_gd",
         "libbluetooth_log",
+        "libbt-audio-hal-interface",
         "libbt-common",
         "libbt-platform-protos-lite",
         "libbt_shim_bridge",
@@ -872,6 +891,7 @@ cc_test {
         ":TestMockLegacyHciInterface",
         ":TestMockMainShim",
         ":TestMockMainShimEntry",
+        ":TestMockStackBtmInterface",
         ":TestMockStackBtmIso",
         ":TestMockStackL2cap",
         ":TestStubOsi",
@@ -917,6 +937,7 @@ cc_test {
         "LeAudioSetConfigSchemas_h",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libhidlbase",
@@ -969,6 +990,7 @@ cc_test {
         ":TestMockBtaLeAudioHalVerifier",
         ":TestMockMainShim",
         ":TestMockMainShimEntry",
+        ":TestMockStackBtmInterface",
         ":TestMockStackBtmIso",
         ":TestMockStackL2cap",
         ":TestStubOsi",
@@ -1003,6 +1025,7 @@ cc_test {
         "test/common/mock_device_groups.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "libhidlbase",
@@ -1309,6 +1332,7 @@ cc_test {
         "test/bta_hh_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "liblog",
@@ -1380,6 +1404,7 @@ cc_test {
         "test/bta_jv_test.cc",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
         "libcrypto",
         "liblog",

@@ -18,7 +18,7 @@
  * A2DP Codecs Configuration
  */
 
-#define LOG_TAG "a2dp_codec"
+#define LOG_TAG "bluetooth-a2dp"
 
 #include <bluetooth/log.h>
 
@@ -179,8 +179,6 @@ int A2dpCodecConfig::getTrackBitRate() const {
   uint8_t p_codec_info[AVDT_CODEC_SIZE];
   memcpy(p_codec_info, ota_codec_config_, sizeof(ota_codec_config_));
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1070,8 +1068,6 @@ tA2DP_CODEC_TYPE A2DP_GetCodecType(const uint8_t* p_codec_info) {
 bool A2DP_IsSourceCodecValid(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
       return A2DP_IsSourceCodecValidSbc(p_codec_info);
@@ -1090,8 +1086,6 @@ bool A2DP_IsSourceCodecValid(const uint8_t* p_codec_info) {
 
 bool A2DP_IsSinkCodecValid(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1112,8 +1106,6 @@ bool A2DP_IsSinkCodecValid(const uint8_t* p_codec_info) {
 bool A2DP_IsPeerSourceCodecValid(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
       return A2DP_IsPeerSourceCodecValidSbc(p_codec_info);
@@ -1132,8 +1124,6 @@ bool A2DP_IsPeerSourceCodecValid(const uint8_t* p_codec_info) {
 
 bool A2DP_IsPeerSinkCodecValid(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1154,8 +1144,6 @@ bool A2DP_IsPeerSinkCodecValid(const uint8_t* p_codec_info) {
 bool A2DP_IsSinkCodecSupported(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
       return A2DP_IsSinkCodecSupportedSbc(p_codec_info);
@@ -1175,8 +1163,6 @@ bool A2DP_IsSinkCodecSupported(const uint8_t* p_codec_info) {
 
 bool A2DP_IsPeerSourceCodecSupported(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1219,8 +1205,6 @@ uint8_t A2DP_GetMediaType(const uint8_t* p_codec_info) {
 
 const char* A2DP_CodecName(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1290,8 +1274,6 @@ bool A2DP_CodecEquals(const uint8_t* p_codec_info_a,
 int A2DP_GetTrackSampleRate(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
       return A2DP_GetTrackSampleRateSbc(p_codec_info);
@@ -1311,8 +1293,6 @@ int A2DP_GetTrackSampleRate(const uint8_t* p_codec_info) {
 
 int A2DP_GetTrackBitsPerSample(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1334,8 +1314,6 @@ int A2DP_GetTrackBitsPerSample(const uint8_t* p_codec_info) {
 int A2DP_GetTrackChannelCount(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
       return A2DP_GetTrackChannelCountSbc(p_codec_info);
@@ -1355,8 +1333,6 @@ int A2DP_GetTrackChannelCount(const uint8_t* p_codec_info) {
 
 int A2DP_GetSinkTrackChannelType(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1422,8 +1398,6 @@ const tA2DP_ENCODER_INTERFACE* A2DP_GetEncoderInterface(
     const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   if (::bluetooth::audio::a2dp::provider::supports_codec(
           A2DP_SourceCodecIndex(p_codec_info))) {
     return A2DP_GetEncoderInterfaceExt(p_codec_info);
@@ -1449,8 +1423,6 @@ const tA2DP_ENCODER_INTERFACE* A2DP_GetEncoderInterface(
 const tA2DP_DECODER_INTERFACE* A2DP_GetDecoderInterface(
     const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   switch (codec_type) {
     case A2DP_MEDIA_CT_SBC:
@@ -1492,8 +1464,6 @@ bool A2DP_AdjustCodec(uint8_t* p_codec_info) {
 btav_a2dp_codec_index_t A2DP_SourceCodecIndex(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
 
-  log::verbose("codec_type = 0x{:x}", codec_type);
-
   auto ext_codec_index =
       bluetooth::audio::a2dp::provider::source_codec_index(p_codec_info);
   if (ext_codec_index.has_value()) {
@@ -1519,8 +1489,6 @@ btav_a2dp_codec_index_t A2DP_SourceCodecIndex(const uint8_t* p_codec_info) {
 
 btav_a2dp_codec_index_t A2DP_SinkCodecIndex(const uint8_t* p_codec_info) {
   tA2DP_CODEC_TYPE codec_type = A2DP_GetCodecType(p_codec_info);
-
-  log::verbose("codec_type = 0x{:x}", codec_type);
 
   auto ext_codec_index =
       bluetooth::audio::a2dp::provider::sink_codec_index(p_codec_info);

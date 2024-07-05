@@ -34,7 +34,6 @@
 #include "btm_sec_cb.h"
 #include "btm_sec_int_types.h"
 #include "hci/controller_interface.h"
-#include "internal_include/bt_target.h"
 #include "main/shim/btm_api.h"
 #include "main/shim/entry.h"
 #include "stack/btm/btm_int_types.h"
@@ -45,6 +44,7 @@
 #include "stack/include/bt_types.h"
 #include "stack/include/btm_api.h"
 #include "stack/include/btm_ble_privacy.h"
+#include "stack/include/btm_inq.h"
 #include "stack/include/hcidefs.h"
 #include "stack/include/l2cap_controller_interface.h"
 #include "types/raw_address.h"
@@ -296,10 +296,15 @@ static void decode_controller_support() {
   btm_sec_dev_reset();
 
   if (bluetooth::shim::GetController()->SupportsRssiWithInquiryResults()) {
-    if (bluetooth::shim::GetController()->SupportsExtendedInquiryResponse())
-      BTM_SetInquiryMode(BTM_INQ_RESULT_EXTENDED);
-    else
-      BTM_SetInquiryMode(BTM_INQ_RESULT_WITH_RSSI);
+    if (bluetooth::shim::GetController()->SupportsExtendedInquiryResponse()) {
+      if (BTM_SetInquiryMode(BTM_INQ_RESULT_EXTENDED) != BTM_SUCCESS) {
+        log::warn("Unable to set inquiry mode BTM_INQ_RESULT_EXTENDED");
+      }
+    } else {
+      if (BTM_SetInquiryMode(BTM_INQ_RESULT_WITH_RSSI) != BTM_SUCCESS) {
+        log::warn("Unable to set inquiry mode BTM_INQ_RESULT_WITH_RSSI");
+      }
+    }
   }
 
   l2cu_set_non_flushable_pbf(

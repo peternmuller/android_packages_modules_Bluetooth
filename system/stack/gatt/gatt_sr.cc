@@ -414,7 +414,15 @@ void gatt_process_exec_write_req(tGATT_TCB& tcb, uint16_t cid, uint8_t op_code,
   } else /* nothing needs to be executed , send response now */
   {
     log::error("gatt_process_exec_write_req: no prepare write pending");
-    gatt_send_error_rsp(tcb, cid, GATT_ERROR, GATT_REQ_EXEC_WRITE, 0, false);
+    uint16_t payload_size = gatt_tcb_get_payload_size(tcb, cid);
+    BT_HDR* p_rsp_msg = attp_build_sr_msg(tcb, GATT_RSP_EXEC_WRITE,
+                                          (tGATT_SR_MSG*)NULL, payload_size);
+    if (p_rsp_msg != NULL) {
+      tGATT_STATUS status_code = attp_send_sr_msg(tcb, cid, p_rsp_msg);
+      log::warn(
+          "gatt_process_exec_write_req: response sent : status_code = 0x{:x}",
+          (uint16_t)status_code);
+    }
   }
 }
 
@@ -854,7 +862,7 @@ static void gatts_process_mtu_req(tGATT_TCB& tcb, uint16_t cid, uint16_t len,
   gatt_sr_msg.mtu = gatt_get_local_mtu();
 
   log::info("MTU {} request from remote ({}), resulted MTU {}", mtu,
-            tcb.peer_bda.ToString(), tcb.payload_size);
+            tcb.peer_bda, tcb.payload_size);
 
   BTM_SetBleDataLength(tcb.peer_bda, tcb.payload_size + L2CAP_PKT_OVERHEAD);
 
@@ -1225,8 +1233,11 @@ static void gatts_chk_pending_ind(tGATT_TCB& tcb) {
   tGATT_VALUE* p_buf =
       (tGATT_VALUE*)fixed_queue_try_peek_first(tcb.pending_ind_q);
   if (p_buf != NULL) {
-    GATTS_HandleValueIndication(p_buf->conn_id, p_buf->handle, p_buf->len,
-                                p_buf->value);
+    if (GATTS_HandleValueIndication(p_buf->conn_id, p_buf->handle, p_buf->len,
+                                    p_buf->value) != GATT_SUCCESS) {
+      log::warn("Unable to send GATT server handle value conn_id:{}",
+                p_buf->conn_id);
+    }
     osi_free(fixed_queue_try_remove_from_queue(tcb.pending_ind_q, p_buf));
   }
 }

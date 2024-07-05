@@ -882,9 +882,25 @@ void btm_read_remote_version_complete(tHCI_STATUS status, uint16_t handle,
  ******************************************************************************/
 void btm_process_remote_ext_features(tACL_CONN* p_acl_cb,
                                      uint8_t max_page_number) {
-  log::assert_that(p_acl_cb != nullptr, "assert failed: p_acl_cb != nullptr");
+  uint8_t             status;
+  tBTM_SEC_DEV_REC* p_dev_rec;
+  CHECK(p_acl_cb != nullptr);
   if (!p_acl_cb->peer_lmp_feature_valid[max_page_number]) {
     log::warn("Checking remote features but remote feature read is incomplete");
+  }
+
+  p_dev_rec = btm_find_dev(p_acl_cb->remote_addr);
+
+  if (p_dev_rec == nullptr) {
+    log::warn("Unable to find p_dev_rec");
+    return;
+  }
+
+  if (!(p_dev_rec->sec_rec.sec_flags & BTM_SEC_NAME_KNOWN) || p_dev_rec->is_originator)
+  {
+    log::debug("Calling Next Security Procedure");
+    if ((status = btm_sec_execute_procedure (p_dev_rec)) != BTM_CMD_STARTED)
+      btm_sec_dev_rec_cback_event (p_dev_rec, status , FALSE);
   }
 
   bool ssp_supported =
@@ -1138,7 +1154,6 @@ bool BTM_IsAclConnectionUpAndHandleValid(const RawAddress& remote_bda,
                                          tBT_TRANSPORT transport) {
   tACL_CONN* p_acl = internal_.btm_bda_to_acl(remote_bda, transport);
   if (p_acl == nullptr) {
-    log::warn("Unable to find active acl");
     return false;
   }
   return p_acl->hci_handle != HCI_INVALID_HANDLE;
@@ -1156,6 +1171,20 @@ bool BTM_IsAclConnectionUpAndHandleValid(const RawAddress& remote_bda,
  ******************************************************************************/
 uint16_t BTM_GetNumAclLinks(void) {
   return static_cast<uint16_t>(btm_cb.acl_cb_.NumberOfActiveLinks());
+}
+
+/*******************************************************************************
+ *
+ * Function         BTM_GetNumBredrAclLinks
+ *
+ * Description      This function is called to count the number of
+ *                  BREDR ACL links that are active.
+ *
+ * Returns          uint16_t Number of active BREDR ACL links
+ *
+ ******************************************************************************/
+uint16_t BTM_GetNumBredrAclLinks(void) {
+  return static_cast<uint16_t>(btm_cb.acl_cb_.NumberOfActiveBredrLinks());
 }
 
 /*******************************************************************************
@@ -2420,12 +2449,6 @@ void btm_acl_disconnected(tHCI_STATUS status, uint16_t handle,
   /* Notify security manager */
   btm_sec_disconnected(handle, reason,
                        "stack::acl::btm_acl::btm_acl_disconnected");
-}
-
-void acl_create_classic_connection(const RawAddress& bd_addr,
-                                   bool /* there_are_high_priority_channels */,
-                                   bool /* is_bonding */) {
-  return bluetooth::shim::ACL_CreateClassicConnection(bd_addr);
 }
 
 void btm_connection_request(const RawAddress& bda,
