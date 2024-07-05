@@ -611,6 +611,9 @@ class HeadsetStateMachine extends StateMachine {
                     && mAdapterService.getBondState(mDevice) == BluetoothDevice.BOND_NONE) {
                 getHandler().post(() -> mHeadsetService.removeStateMachine(mDevice));
             }
+            if (mHeadsetService != null) {
+                mHeadsetService.clearPendingCallStates();
+            }
             mIsBlacklistedDevice = false;
             mIsRetrySco = false;
             mIsBlacklistedDeviceforRetrySCO = false;
@@ -964,6 +967,9 @@ class HeadsetStateMachine extends StateMachine {
         @Override
         public void enter() {
             super.enter();
+            if (mHeadsetService != null) {
+                mHeadsetService.clearPendingCallStates();
+            }
             sendMessageDelayed(CONNECT_TIMEOUT, mDevice, sConnectTimeoutMs);
             broadcastStateTransitions();
         }
@@ -1336,7 +1342,7 @@ class HeadsetStateMachine extends StateMachine {
                 // or the retry count reached MAX_RETRY_DISCONNECT_AUDIO.
                 mAudioDisconnectRetry = 0;
             }
-
+            mHeadsetService.processPendingCallStates();
             broadcastStateTransitions();
             logSuccessIfNeeded();
         }

@@ -3730,12 +3730,31 @@ static void btif_dm_ble_auth_cmpl_evt(tBTA_DM_AUTH_CMPL* p_auth_cmpl) {
 
       case BTA_DM_AUTH_SMP_CONN_TOUT: {
         if (!p_auth_cmpl->is_ctkd && btm_sec_is_a_bonded_dev(bd_addr)) {
-          log::warn(
-              "Bonded device addr={}, timed out - will not remove the keys",
-              bd_addr);
-          // Don't send state change to upper layers - otherwise Java think we
-          // unbonded, and will disconnect HID profile.
-          return;
+          uint8_t dev_type;
+          uint8_t addr_type;
+          BTM_ReadDevInfo(bd_addr, &dev_type, &addr_type);
+
+          if ((pairing_cb.state == BT_BOND_STATE_BONDING) &&
+              (dev_type == BT_DEVICE_TYPE_DUMO) &&
+              (addr_type == BLE_ADDR_PUBLIC) &&
+              !btm_sec_is_a_bonded_dev_by_transport(bd_addr, BT_TRANSPORT_LE)) {
+            btif_storage_remove_bonded_device(&bd_addr);
+            status = BT_STATUS_AUTH_FAILURE;
+            break;
+          } else if ((pairing_cb.state == BT_BOND_STATE_BONDING) &&
+                     btm_sec_is_a_bonded_dev_by_transport(bd_addr,
+                                                          BT_TRANSPORT_LE)) {
+            btif_storage_remove_bonded_device(&bd_addr);
+            status = BT_STATUS_AUTH_FAILURE;
+            break;
+          } else {
+            log::warn(
+                "Bonded device addr={}, timed out - will not remove the keys",
+                bd_addr);
+            // Don't send state change to upper layers - otherwise Java think we
+            // unbonded, and will disconnect HID profile.
+            return;
+          }
         }
         log::info(
             "Removing ble bonding keys on SMP_CONN_TOUT during crosskey: {}",

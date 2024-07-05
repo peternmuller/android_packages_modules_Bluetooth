@@ -732,6 +732,20 @@ bool btm_sec_is_a_bonded_dev(const RawAddress& bda);
 
 /*******************************************************************************
  *
+ * Function         btm_sec_is_a_bonded_dev
+ *
+ * Description       Is the specified device is a bonded device on a specific
+ *transport
+ *
+ * Returns          true - dev is bonded
+ *
+ ******************************************************************************/
+
+bool btm_sec_is_a_bonded_dev_by_transport(const RawAddress& bda,
+                                          uint8_t transport);
+
+/*******************************************************************************
+ *
  * Function         btm_sec_set_peer_sec_caps
  *
  * Description      This function is called to set sm4 and rmt_sec_caps fields
