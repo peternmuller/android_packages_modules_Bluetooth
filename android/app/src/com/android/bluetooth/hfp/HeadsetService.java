@@ -2096,8 +2096,9 @@ public class HeadsetService extends ProfileService {
         enforceCallingOrSelfPermission(MODIFY_PHONE_STATE, "Need MODIFY_PHONE_STATE permission");
         // DSDA scenario for back to back incoming calls.Queuing until SCO disconenction complete
         HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
-        if (stateMachine == null) {
-           Log.w(TAG, "HeadsetStateMachine is null.");
+        if (stateMachine == null ||
+            (mVirtualCallStarted || mVoiceRecognitionStarted)) {
+           Log.w(TAG, "HeadsetStateMachine is null or VOIP/VR in progress.");
            phoneStateChanged(numActive, numHeld, callState, number, type, name, isVirtualCall);
            return;
         }
@@ -2867,10 +2868,10 @@ public class HeadsetService extends ProfileService {
                  it.remove();
               }
           } else {
-                Log.d(TAG, "There are no pending call state changes");
-             }
+            Log.d(TAG, "There are no pending call state changes");
+          }
        }
-      mDelayDsDaindicators = false;
+       mDelayDsDaindicators = false;
     }
 
     void clearPendingCallStates() {
