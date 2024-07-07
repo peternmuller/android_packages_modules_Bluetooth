@@ -1342,7 +1342,10 @@ class HeadsetStateMachine extends StateMachine {
                 // or the retry count reached MAX_RETRY_DISCONNECT_AUDIO.
                 mAudioDisconnectRetry = 0;
             }
-            mHeadsetService.processPendingCallStates();
+            if (mPrevState == mAudioConnecting || mPrevState == mAudioOn
+                 || mPrevState == mAudioDisconnecting) {
+               mHeadsetService.processPendingCallStates();
+            }
             broadcastStateTransitions();
             logSuccessIfNeeded();
         }
