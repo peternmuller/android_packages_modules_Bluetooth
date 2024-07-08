@@ -1870,17 +1870,23 @@ struct LeAdvertisingManager::impl : public bluetooth::hci::LeAddressManagerCallb
             uint16_t sub_data_len = 0;
             Operation operation = Operation::FIRST_FRAGMENT;
 
-            for (size_t i = 0; i < data.size(); i++) {
-              if (sub_data_len + data[i].size() > kLeMaximumFragmentLength) {
-                send_data_fragment(advertiser_id, set_scan_rsp, sub_data, operation);
-                operation = Operation::INTERMEDIATE_FRAGMENT;
-                sub_data_len = 0;
-                sub_data.clear();
-              }
-              sub_data.push_back(data[i]);
-              sub_data_len += data[i].size();
+            std::vector<std::unique_ptr<packet::RawBuilder>> fragments;
+            packet::FragmentingInserter it(
+                kLeMaximumFragmentLength, std::back_insert_iterator(fragments));
+            for (auto gap_data : data) {
+              gap_data.Serialize(it);
             }
-            send_data_fragment(advertiser_id, set_scan_rsp, sub_data, Operation::LAST_FRAGMENT);
+            it.finalize();
+
+            for (size_t i = 0; i < fragments.size(); i++) {
+              send_data_fragment_with_raw_builder(
+                  advertiser_id,
+                  set_scan_rsp,
+                  std::move(fragments[i]),
+                  (i == fragments.size() - 1) ? Operation::LAST_FRAGMENT : operation);
+              operation = Operation::INTERMEDIATE_FRAGMENT;
+            }
+
             if (chained && adv_inst->started) {
               le_advertising_interface_->EnqueueCommand(
                   hci::LeSetExtendedAdvertisingEnableBuilder::Create(Enable::ENABLED, enabled_sets),
