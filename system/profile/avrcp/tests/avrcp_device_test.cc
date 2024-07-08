@@ -29,8 +29,12 @@
 #include "tests/avrcp/avrcp_test_packets.h"
 #include "tests/packet_test_helper.h"
 #include "types/raw_address.h"
+#include "btif/include/btif_av.h"
 
 bool btif_av_src_sink_coexist_enabled(void) { return true; }
+void btif_av_clear_remote_suspend_flag(A2dpType type) {return;}
+bool btif_av_stream_ready(const A2dpType local_a2dp_type) { return false; }
+void btif_av_stream_start(A2dpType type) {return;}
 
 namespace bluetooth {
 namespace avrcp {
