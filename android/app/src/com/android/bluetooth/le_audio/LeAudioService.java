@@ -4174,6 +4174,28 @@ public class LeAudioService extends ProfileService {
         }
     }
 
+    public boolean isCsipSupported(BluetoothDevice device) {
+        Log.d(TAG, "isCsipSupported: " + device);
+        boolean supportsCsip = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
+                                                      BluetoothUuid.COORDINATED_SET);
+        CsipSetCoordinatorService csipClient =
+                mServiceFactory.getCsipSetCoordinatorService();
+        int csipGroupSize = 1;
+        int grpId = -1;
+        if (supportsCsip && csipClient != null) {
+            grpId = csipClient.getGroupId(device, BluetoothUuid.CAP);
+            csipGroupSize = csipClient.getDesiredGroupSize(grpId);
+        }
+
+        Log.w(TAG, "Group size of device " + device + " with group id: " + grpId +
+                " has group size = " + csipGroupSize);
+        if (supportsCsip && csipGroupSize > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Set connection policy of the profile and connects it if connectionPolicy is {@link
      * BluetoothProfile#CONNECTION_POLICY_ALLOWED} or disconnects if connectionPolicy is {@link
@@ -4199,20 +4221,6 @@ public class LeAudioService extends ProfileService {
             return false;
         }
 
-        boolean isCsipSupported = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
-                                                      BluetoothUuid.COORDINATED_SET);
-        CsipSetCoordinatorService csipClient =
-                mServiceFactory.getCsipSetCoordinatorService();
-        int CsipGroupSize = 1;
-        int grpId = -1;
-        if (isCsipSupported && csipClient != null) {
-            grpId = csipClient.getGroupId(device, BluetoothUuid.CAP);
-            CsipGroupSize = csipClient.getDesiredGroupSize(grpId);
-        }
-
-        Log.w(TAG, "Group size of device " + device + " with group id: " + grpId +
-                " has group size = " + CsipGroupSize);
-
         if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
             setEnabledState(device, /* enabled= */ true);
             // Authorizes LEA GATT server services if already assigned to a group
@@ -4221,7 +4229,7 @@ public class LeAudioService extends ProfileService {
                 setAuthorizationForRelatedProfiles(device, true);
             }
             if (Utils.isDualModeAudioEnabled()) {
-                if (isCsipSupported && CsipGroupSize > 0) {
+                if (isCsipSupported(device)) {
                     A2dpService mA2dp = A2dpService.getA2dpService();
                     if (mA2dp != null) {
                         mA2dp.disconnect(device);
@@ -4244,7 +4252,7 @@ public class LeAudioService extends ProfileService {
             setAuthorizationForRelatedProfiles(device, false);
             disconnect(device);
             if (Utils.isDualModeAudioEnabled()) {
-                if (isCsipSupported && CsipGroupSize > 0) {
+                if (isCsipSupported(device)) {
                     A2dpService mA2dp = A2dpService.getA2dpService();
                     if (mA2dp != null) {
                         mA2dp.connect(device);
@@ -5172,7 +5180,8 @@ public class LeAudioService extends ProfileService {
      * @hide
      */
     public void setMetadataContext(int context_type) {
-        BluetoothDevice btDevice = mActiveAudioInDevice;
+        BluetoothDevice btDevice = mAdapterService.getActiveDeviceManager()
+                                                    .fetchLeAudioActiveDevice();
         Log.w(TAG, "setMetadataContext Type: " + context_type + " for device" + btDevice);
         mAdapterService
                 .getActiveDeviceManager()
