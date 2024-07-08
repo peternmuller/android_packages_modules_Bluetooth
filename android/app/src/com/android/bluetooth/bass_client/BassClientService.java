@@ -971,8 +971,9 @@ public class BassClientService extends ProfileService {
         log("getGroupManagedDeviceSources device: " + sink + " sourceId: " + sourceId);
         Map map = new HashMap<BluetoothDevice, Integer>();
 
+        log("getTargetDeviceList(): " + getTargetDeviceList(sink, true).size());
         if (mGroupManagedSources.containsKey(sink)
-                && mGroupManagedSources.get(sink).contains(sourceId)) {
+                && mGroupManagedSources.get(sink).contains(sourceId) || (getTargetDeviceList(sink, true).size() > 1)) {
             BassClientStateMachine stateMachine = getOrCreateStateMachine(sink);
             if (stateMachine == null) {
                 Log.e(TAG, "Can't get state machine for device: " + sink);
@@ -2418,6 +2419,13 @@ public class BassClientService extends ProfileService {
         }
 
         if (leaudioBroadcastExtractPeriodicScannerFromStateMachine()) {
+            for (BluetoothDevice device : devices) {
+                if (getConnectionState(device) != BluetoothProfile.STATE_CONNECTED) {
+                    mCallbacks.notifySourceAddFailed(device, sourceMetadata,
+                            BluetoothStatusCodes.ERROR_REMOTE_LINK_ERROR);
+                    continue;
+                }
+            }
             List<Integer> activeSyncedSrc = getActiveSyncedSources();
             BluetoothDevice sourceDevice = sourceMetadata.getSourceDevice();
             if (!isLocalBroadcast(sourceMetadata)
@@ -2862,6 +2870,10 @@ public class BassClientService extends ProfileService {
         Map<BluetoothDevice, Integer> sourcesToRemove = new HashMap<>();
 
         for (BluetoothDevice device : getConnectedDevices()) {
+            if (!store && mPausedBroadcastSinks.contains(device)) {
+                Log.w(TAG, "Remove cached broadcast sink: " + device);
+                mPausedBroadcastSinks.remove(device);
+            }
             for (BluetoothLeBroadcastReceiveState receiveState : getAllSources(device)) {
                 /* Check if local/last broadcast is the synced one. Invalid broadcast ID means
                  * that all receivers should be considered.
