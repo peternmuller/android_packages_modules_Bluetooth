@@ -189,6 +189,11 @@ void NotifyBondingCanceled(tBTM_STATUS /* btm_status */) {
   }
 }
 
+
+void btm_conn_proc_timer_timeout(void* /* data */) {
+  log::warn("btm_conn_proc_timer expired");
+}
+
 /*******************************************************************************
  *
  * Function         btm_dev_authenticated
@@ -3741,6 +3746,11 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle,
     }
   }
 
+  alarm_set_on_mloop(btm_cb.devcb.conn_proc_timer, BTM_SEC_CONN_PROC_TIMEOUT_MS,
+                       btm_conn_proc_timer_timeout, NULL);
+
+  log::warn("btm_conn_proc_timer_timeout started");
+
   p_dev_rec->device_type |= BT_DEVICE_TYPE_BREDR;
 
   addr_matched = (btm_sec_cb.pairing_bda == bda);
@@ -3957,12 +3967,17 @@ void btm_sec_disconnected(uint16_t handle, tHCI_REASON reason,
               hci_error_code_text(reason), handle, comment);
   }
 
+
+
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(handle);
   if (p_dev_rec == nullptr) {
     log::warn("Got disconnect for unknown device record handle:0x{:04x}",
               handle);
     return;
   }
+
+  alarm_set_on_mloop(btm_cb.devcb.conn_proc_timer, BTM_SEC_CONN_PROC_TIMEOUT_MS,
+                       btm_conn_proc_timer_timeout, NULL);
 
   const tBT_TRANSPORT transport =
       (handle == p_dev_rec->hci_handle) ? BT_TRANSPORT_BR_EDR : BT_TRANSPORT_LE;

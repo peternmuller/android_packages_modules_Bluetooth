@@ -41,6 +41,9 @@
 
 #define BTM_SEC_MAX_COLLISION_DELAY (5000)
 
+
+#define BTM_SEC_CONN_PROC_TIMEOUT_MS (5 * 1000)
+
 /*******************************************************************************
  *
  * Function         BTM_SecRegister
@@ -790,3 +793,6 @@ void btm_sec_cr_loc_oob_data_cback_event(const RawAddress& address,
 
 // Return DEV_CLASS of bda. If record doesn't exist, create one.
 DEV_CLASS btm_get_dev_class(const RawAddress& bda);
+
+
+
