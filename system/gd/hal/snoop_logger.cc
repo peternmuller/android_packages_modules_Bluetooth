@@ -278,6 +278,8 @@ constexpr uint16_t PROFILE_UUID_MAP = 0x1132;
 constexpr uint16_t PROFILE_UUID_HFP_HS = 0x1112;
 constexpr uint16_t PROFILE_UUID_HFP_HF = 0x111f;
 
+int64_t gmt_offset;
+int64_t tmp_gmt_offset;
 uint64_t htonll(uint64_t ll) {
   if constexpr (isLittleEndian) {
     return static_cast<uint64_t>(htonl(ll & 0xffffffff)) << 32 | htonl(ll >> 32);
@@ -1195,6 +1197,14 @@ void SnoopLogger::Capture(const HciPacket& immutable_packet, Direction direction
   uint64_t timestamp_us =
       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
+  if (gmt_offset >= 0) {
+    timestamp_us  += ((uint64_t) gmt_offset * 1000000LL);
+  } else {
+    /* when gmt_offset negative, adding offset to timestamp leads to
+     * integer overflow , we need to subtract positive offset to avoid overflow
+     */
+    timestamp_us -= ((uint64_t) tmp_gmt_offset * 1000000LL);
+  }
   std::bitset<32> flags = 0;
   switch (type) {
     case PacketType::CMD:
@@ -1321,6 +1331,15 @@ void SnoopLogger::ListDependencies(ModuleList* /* list */) const {
 
 void SnoopLogger::Start() {
   std::lock_guard<std::recursive_mutex> lock(file_mutex_);
+  time_t t = time(NULL);
+  struct tm tm_cur;
+  int len = 0;
+  localtime_r (&t, &tm_cur);
+  gmt_offset = tm_cur.tm_gmtoff;
+
+  if (gmt_offset < 0) {
+    tmp_gmt_offset = -gmt_offset;
+  }
   if (btsnoop_mode_ != kBtSnoopLogModeDisabled) {
     OpenNextSnoopLogFile();
 
