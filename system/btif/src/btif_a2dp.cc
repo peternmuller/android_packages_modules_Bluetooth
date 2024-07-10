@@ -115,6 +115,7 @@ bool btif_a2dp_on_started(const RawAddress& peer_addr,
         btif_a2dp_command_ack(A2DP_CTRL_ACK_SUCCESS);
         return true;
       }
+      btif_av_update_codec_mode();
       /* media task is auto-started upon UIPC connection of a2dp audiopath */
     }
   } else if (p_av_start->initiator) {
