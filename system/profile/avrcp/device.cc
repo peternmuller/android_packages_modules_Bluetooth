@@ -35,6 +35,8 @@
 #include "packet/avrcp/set_addressed_player.h"
 #include "packet/avrcp/set_player_application_setting_value.h"
 #include "types/raw_address.h"
+#include "osi/include/properties.h"
+#include "l2cdefs.h"
 #include "device/include/interop.h"
 #include "btif/include/btif_storage.h"
 #include "btif/include/btif_av.h"
@@ -872,6 +874,24 @@ void Device::GetElementAttributesResponse(
   auto get_element_attributes_pkt = pkt;
   auto attributes_requested =
       get_element_attributes_pkt->GetAttributesRequested();
+
+  //To Pass PTS TC AVCTP/TG/FRA/BV-02-C
+  /* After AVCTP connection is established with remote,
+   * PTS sends get element attribute for all elements,
+   * DUT should be able to send fragmented
+   * response. Here PTS was setting ctrl_mtu_= 45,
+   * due to which packets were getting dropped from the 'response'
+   * while sending to the stack. Changing ctrl_mtu_ to 672,
+   * so that no packet is dropped and fragmentation happens in the stack
+   */
+
+  bool is_pts_enable = osi_property_get_bool("persist.vendor.bt.a2dp.pts_enable",
+                                            false);
+  log::info("is_pts_enable: {}", is_pts_enable);
+  if(is_pts_enable) {
+    log::info("setting ctrl_mtu_ = 672(L2CAP_DEFAULT_MTU)");
+    ctrl_mtu_ = L2CAP_DEFAULT_MTU;
+  }
 
   auto response = GetElementAttributesResponseBuilder::MakeBuilder(ctrl_mtu_);
 
