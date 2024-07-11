@@ -320,10 +320,13 @@ class LeAudioDeviceGroup {
 
   inline void SetConfigurationContextType(
       types::LeAudioContextType context_type) {
+    log::debug("context_type = {}.", bluetooth::common::ToString(context_type));
     configuration_context_type_ = context_type;
   }
 
   inline types::LeAudioContextType GetConfigurationContextType(void) const {
+    log::debug("configuration_context_type_= {}.",
+                     bluetooth::common::ToString(configuration_context_type_));
     return configuration_context_type_;
   }
 

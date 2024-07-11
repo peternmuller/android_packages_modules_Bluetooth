@@ -1107,9 +1107,36 @@ class LeAudioClientImpl : public LeAudioClient {
                                                    ccid);
   }
 
+  void ProcessCallAvailbilityToUpdateMetadata(bool in_cs_or_voip_call) {
+    log::debug("in_cs_or_voip_call: {}", in_cs_or_voip_call);
+    if (in_cs_or_voip_call == true) {
+      log::info(
+        "active group_id: {}, IN: audio_receiver_state_: {}, "
+        "audio_sender_state_: {}",active_group_id_,
+        ToString(audio_receiver_state_), ToString(audio_sender_state_));
+
+      auto group = aseGroups_.FindById(active_group_id_);
+      if (!group) {
+        log::error("Invalid group: {}", static_cast<int>(active_group_id_));
+        return;
+      }
+
+      if (((audio_sender_state_ == AudioState::IDLE) &&
+           (audio_receiver_state_ == AudioState::IDLE)) ||
+          (audio_sender_state_ > AudioState::IDLE)) {
+        ReconfigureOrUpdateRemote(
+          group, bluetooth::le_audio::types::kLeAudioDirectionSink);
+      } else if (audio_receiver_state_ > AudioState::IDLE) {
+        ReconfigureOrUpdateRemote(
+           group, bluetooth::le_audio::types::kLeAudioDirectionSource);
+      }
+    }
+  }
+
   void SetInCall(bool in_call) override {
     log::debug("in_call: {}", in_call);
     in_call_ = in_call;
+    ProcessCallAvailbilityToUpdateMetadata(in_call);
   }
 
   bool IsInCall() override {
