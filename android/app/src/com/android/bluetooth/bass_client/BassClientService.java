@@ -1786,7 +1786,11 @@ public class BassClientService extends ProfileService {
                 mBluetoothLeScannerWrapper.stopScan(mSearchScanCallback);
                 mBluetoothLeScannerWrapper = null;
                 mSearchScanCallback = null;
-                clearAllSyncData();
+                // started timeout for canceling syncs instead of canceling syncs immediately
+                mHandler.removeMessages(MESSAGE_SYNC_TIMEOUT);
+                Log.d(TAG, "stopSearchingForSources: started timeout for canceling syncs");
+                mHandler.sendEmptyMessageDelayed(
+                        MESSAGE_SYNC_TIMEOUT, sSyncActiveTimeout.toMillis());
                 informConnectedDeviceAboutScanOffloadStop();
                 sEventLogger.logd(TAG, "stopSearchingForSources");
                 mCallbacks.notifySearchStopped(BluetoothStatusCodes.REASON_LOCAL_APP_REQUEST);
@@ -2263,15 +2267,27 @@ public class BassClientService extends ProfileService {
             if (listOfUuids.containsKey(BassConstants.BAAS_UUID)) {
                 byte[] bId = listOfUuids.get(BassConstants.BAAS_UUID);
                 broadcastId = BassUtils.parseBroadcastId(bId);
+                if (broadcastId == BassConstants.INVALID_BROADCAST_ID) {
+                    Log.w(TAG, "Invalid broadcast ID");
+                    mPeriodicAdvCallbacksMap.remove(BassConstants.INVALID_SYNC_HANDLE);
+                    handleSelectSourceRequest();
+                    return;
+                }
             }
             if (listOfUuids.containsKey(BassConstants.PUBLIC_BROADCAST_UUID)) {
                 byte[] pbAnnouncement = listOfUuids.get(BassConstants.PUBLIC_BROADCAST_UUID);
                 pbData = PublicBroadcastData.parsePublicBroadcastData(pbAnnouncement);
+                if (pbData == null) {
+                    Log.w(TAG, "Invalid public broadcast data");
+                    mPeriodicAdvCallbacksMap.remove(BassConstants.INVALID_SYNC_HANDLE);
+                    handleSelectSourceRequest();
+                    return;
+                }
             }
         }
 
-        if (broadcastId == BassConstants.INVALID_BROADCAST_ID || pbData == null) {
-            Log.w(TAG, "Invalid broadcast ID or public broadcast data");
+        if (broadcastId == BassConstants.INVALID_BROADCAST_ID && pbData == null) {
+            Log.w(TAG, "It is not BAP or PBP source");
             mPeriodicAdvCallbacksMap.remove(BassConstants.INVALID_SYNC_HANDLE);
             handleSelectSourceRequest();
             return;
