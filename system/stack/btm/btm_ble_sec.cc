@@ -1548,6 +1548,9 @@ void btm_ble_connected(const RawAddress& bda, uint16_t handle,
                        tBLE_ADDR_TYPE addr_type, bool addr_matched,
                        bool can_read_discoverable_characteristics) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
   log::info("Update timestamp for ble connection:{}", bda);
   // TODO() Why is timestamp a counter ?
