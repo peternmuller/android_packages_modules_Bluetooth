@@ -683,8 +683,21 @@ void BTA_AvSetCodecMode(tBTA_AV_HNDL handle, uint16_t enc_mode) {
 
 void BTA_AvUpdateAptxData(uint32_t data) {
   log::info("BTA_AvUpdateAptxData");
+  bool battery_info = (data & APTX_BATTERY_INFO);
   uint16_t aptx_mode = (uint16_t)(data & APTX_MODE_MASK);
-
+  if(aptx_mode == APTX_HQ) {
+    btif_av_update_codec_mode(false);
+  } else if(aptx_mode == APTX_LL) {
+    btif_av_update_codec_mode(true);
+  }
+  if(battery_info) {
+    tBTA_AV_APTX_DATA* p_buf_battery =
+        (tBTA_AV_APTX_DATA*)osi_malloc(sizeof(tBTA_AV_APTX_DATA));
+    p_buf_battery->type = 4;
+    p_buf_battery->data = (uint16_t)data;
+    p_buf_battery->hdr.event = BTA_AV_UPDATE_APTX_DATA_EVT;
+    bta_sys_sendmsg(p_buf_battery);
+  }
   /*APTX_ULL: 16 bit source*/
   if(aptx_mode == APTX_ULL || aptx_mode == APTX_ULL_S) {
     tBTA_AV_APTX_DATA* p_buf_ull =

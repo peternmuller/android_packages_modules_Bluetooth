@@ -38,7 +38,6 @@
 #include "device/include/interop.h"
 #include "btif/include/btif_storage.h"
 #include "btif/include/btif_av.h"
-#include "btif/include/btif_hf.h"
 
 extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);
 extern bool btif_av_both_enable(void);
@@ -947,11 +946,6 @@ void Device::MessageReceived(uint8_t label, std::shared_ptr<Packet> pkt) {
             [](base::WeakPtr<Device> d, PlayStatus s) {
               if (!d) return;
 
-              if (!bluetooth::headset::IsCallIdle()) {
-                log::warn("Ignore passthrough play during active Call");
-                return;
-              }
-
               if (!d->IsActive()) {
                 log::info("Setting {} to be the active device", d->address_);
                 d->media_interface_->SetActiveDevice(d->address_);
@@ -1730,10 +1724,8 @@ void Device::HandlePlayStatusUpdate() {
         if (s.state == PlayState::PLAYING) {
           log::info("Clear Remote Supend if already set");
           btif_av_clear_remote_suspend_flag(A2dpType::kSource);
-          if (bluetooth::headset::IsCallIdle() &&
-              (btif_av_stream_ready(A2dpType::kSource))) {
+          if (btif_av_stream_ready(A2dpType::kSource))
             btif_av_stream_start(A2dpType::kSource);
-          }
         }
       },
       weak_ptr_factory_.GetWeakPtr()));

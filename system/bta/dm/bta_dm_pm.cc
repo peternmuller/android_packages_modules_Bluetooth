@@ -33,7 +33,7 @@
 #include "bta/dm/bta_dm_int.h"
 #include "bta/include/bta_api.h"
 #include "bta/include/bta_dm_api.h"
-#include "bta/ag/bta_ag_int.h"
+//#include "bta/ag/bta_ag_int.h"
 #include "bta/sys/bta_sys.h"
 #include "btif/include/core_callbacks.h"
 #include "btif/include/stack_manager_t.h"
@@ -592,7 +592,7 @@ static void bta_dm_pm_cback(tBTA_SYS_CONN_STATUS status, const tBTA_SYS_ID id,
               interop_match_manufacturer(INTEROP_DISABLE_SNIFF_LINK_DURING_SCO, manufacturer));
           bool is_blacklisted_for_call =
              interop_match_addr_or_name(INTEROP_DISABLE_SNIFF_DURING_CALL, &peer_addr, &btif_storage_get_remote_device_property);
-          if ((id == BTA_ID_AG) && is_blacklisted &&
+          /*if ((id == BTA_ID_AG) && is_blacklisted &&
                !(is_blacklisted_for_call && bta_ag_is_call_present(&peer_addr))) {
              log::verbose("The device {} is blacklisted to disable sniff mode during SCO",
                              peer_addr.ToString().c_str());
@@ -602,7 +602,7 @@ static void bta_dm_pm_cback(tBTA_SYS_CONN_STATUS status, const tBTA_SYS_ID id,
              } else if (status == BTA_SYS_SCO_CLOSE) {
                  BTM_unblock_sniff_mode_for(peer_addr);
              }
-          }
+          }*/
        }
     }
 

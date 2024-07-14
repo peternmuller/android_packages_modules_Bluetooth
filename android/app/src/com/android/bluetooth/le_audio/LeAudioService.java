@@ -1596,7 +1596,7 @@ public class LeAudioService extends ProfileService {
         }
 
         if (device != null && mActiveAudioInDevice != null) {
-            LeAudioDeviceDescriptor deviceDescriptor = getDeviceDescriptor(mActiveAudioInDevice);
+            LeAudioDeviceDescriptor deviceDescriptor = getDeviceDescriptor(device);
             if (deviceDescriptor == null) {
                 Log.e(TAG, "updateActiveInDevice: No valid descriptor for device: " + device);
                 return false;
@@ -1663,7 +1663,7 @@ public class LeAudioService extends ProfileService {
         }
 
         if (device != null && mActiveAudioOutDevice != null) {
-            LeAudioDeviceDescriptor deviceDescriptor = getDeviceDescriptor(mActiveAudioOutDevice);
+            LeAudioDeviceDescriptor deviceDescriptor = getDeviceDescriptor(device);
             if (deviceDescriptor == null) {
                 Log.e(TAG, "updateActiveOutDevice: No valid descriptor for device: " + device);
                 return false;
@@ -2211,9 +2211,6 @@ public class LeAudioService extends ProfileService {
         }
 
         int currentlyActiveGroupId = getActiveGroupId();
-        Optional<Integer> broadcastId = getFirstNotStoppedBroadcastId();
-        boolean isBroadcastPlaying = (!broadcastId.isEmpty() && isPlaying(broadcastId.get()))
-                ? true: false;
         Log.d(
                 TAG,
                 "setActiveGroupWithDevice = "
@@ -2225,14 +2222,11 @@ public class LeAudioService extends ProfileService {
                         + ", hasFallbackDevice: "
                         + hasFallbackDevice
                         + ", mExposedActiveDevice: "
-                        + mExposedActiveDevice
-                        + ", isBroadcastPlaying: "
-                        + isBroadcastPlaying);
+                        + mExposedActiveDevice);
 
         if (isBroadcastActive()
                 && currentlyActiveGroupId == LE_AUDIO_GROUP_ID_INVALID
-                && (mUnicastGroupIdDeactivatedForBroadcastTransition != LE_AUDIO_GROUP_ID_INVALID
-                || isBroadcastPlaying)
+                && mUnicastGroupIdDeactivatedForBroadcastTransition != LE_AUDIO_GROUP_ID_INVALID
                 && groupId != LE_AUDIO_GROUP_ID_INVALID) {
             // If broadcast is ongoing and need to update unicast fallback active group
             // we need to update the cached group id and skip changing the active device

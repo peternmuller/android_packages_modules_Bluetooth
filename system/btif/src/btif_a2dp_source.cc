@@ -267,7 +267,6 @@ static void btif_a2dp_source_audio_feeding_update_event(
     const btav_a2dp_codec_config_t& codec_audio_config);
 static bool btif_a2dp_source_audio_tx_flush_req(void);
 static void btif_a2dp_source_audio_handle_timer(void);
-static void btif_a2dp_update_codec_mode_event(void);
 static uint32_t btif_a2dp_source_read_callback(uint8_t* p_buf, uint32_t len);
 static bool btif_a2dp_source_enqueue_callback(BT_HDR* p_buf, size_t frames_n,
                                               uint32_t bytes_read);
@@ -758,21 +757,6 @@ static void btif_a2dp_source_audio_feeding_update_event(
   log::info("state={}", btif_a2dp_source_cb.StateStr());
   if (!bta_av_co_set_codec_audio_config(codec_audio_config)) {
     log::error("cannot update codec audio feeding parameters");
-  }
-}
-
-void btif_a2dp_update_codec_mode() {
-  log::info("state={}", btif_a2dp_source_cb.StateStr());
-  if (btif_a2dp_source_cb.State() == BtifA2dpSource::kStateOff) return;
-
-  btif_a2dp_source_thread.DoInThread(
-      FROM_HERE, base::BindOnce(&btif_a2dp_update_codec_mode_event));
-}
-
-static void btif_a2dp_update_codec_mode_event() {
-  log::info("state={}", btif_a2dp_source_cb.StateStr());
-  if (bluetooth::audio::a2dp::is_hal_enabled()) {
-    bluetooth::audio::a2dp::setup_codec();
   }
 }
 

@@ -134,6 +134,4 @@ void btif_a2dp_source_debug_dump(int fd);
 void btif_a2dp_source_set_dynamic_audio_buffer_size(
     uint8_t dynamic_audio_buffer_size);
 
-// Update codec mode during streaming
-void btif_a2dp_update_codec_mode(void);
 #endif /* BTIF_A2DP_SOURCE_H */
