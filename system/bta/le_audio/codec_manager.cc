@@ -1268,7 +1268,7 @@ struct codec_manager_impl {
                   !osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", false)){
                 continue;
               }
-              if (ctx_type != types::LeAudioContextType::CONVERSATIONAL &&
+              if (software_audio_set_conf->name.ends_with("L_R") &&
                   !osi_property_get_bool("persist.bluetooth.leaudio_lex_l_r.enabled", false)){
                 continue;
               }
