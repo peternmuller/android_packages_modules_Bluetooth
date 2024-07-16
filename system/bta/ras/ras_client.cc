@@ -53,6 +53,7 @@ class RasClientImpl : public bluetooth::ras::RasClient {
     uint16_t latest_ranging_counter_ = 0;
     bool handling_on_demand_data_ = false;
     bool is_connected_ = false;
+    bool service_search_complete_ = false;
     std::vector<VendorSpecificCharacteristic> vendor_specific_characteristics_;
     uint8_t writeReplyCounter_ = 0;
     uint8_t writeReplySuccessCounter_ = 0;
@@ -236,11 +237,15 @@ class RasClientImpl : public bluetooth::ras::RasClient {
       }
     }
 
-    if (!service_found) {
+    if (tracker->service_search_complete_) {
+      log::info("Service search already completed, ignore");
+      return;
+    } else if (!service_found) {
       log::error("Can't find Ranging Service in the services list");
       return;
     } else {
       log::info("Found Ranging Service");
+      tracker->service_search_complete_ = true;
       ListCharacteristic(tracker);
     }
 
@@ -535,6 +540,7 @@ class RasClientImpl : public bluetooth::ras::RasClient {
   }
 
   void ListCharacteristic(std::shared_ptr<RasTracker> tracker) {
+    tracker->vendor_specific_characteristics_.clear();
     for (auto& characteristic : tracker->service_->characteristics) {
       bool vendor_specific =
           !IsRangingServiceCharacteristic(characteristic.uuid);
