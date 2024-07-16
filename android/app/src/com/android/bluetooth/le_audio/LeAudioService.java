@@ -1457,6 +1457,21 @@ public class LeAudioService extends ProfileService {
         }
     }
 
+    /**
+     * Checks if Broadcast instance is pending start
+     *
+     * @param broadcastId broadcast instance identifier
+     * @return true if if broadcast is pending start, false otherwise
+     */
+    public boolean isBroadcastPendingStart(int broadcastId) {
+        boolean ret = (mBroadcastIdPendingStart.isPresent()
+                && mBroadcastIdPendingStart.get().equals(broadcastId))
+                || (mDialingOutTimeoutEvent != null
+                && mDialingOutTimeoutEvent.mBroadcastId.equals(broadcastId));
+        Log.d(TAG, "isBroadcastPendingStart " + ret);
+        return ret;
+    }
+
     /** Return true if device is primary - is active or was active before switch to broadcast */
     public boolean isPrimaryDevice(BluetoothDevice device) {
         LeAudioDeviceDescriptor descriptor = mDeviceDescriptors.get(device);
