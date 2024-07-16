@@ -36,7 +36,6 @@
 #include "stack/include/l2cdefs.h"
 #include "stack/rfcomm/port_int.h"
 #include "stack/rfcomm/rfc_int.h"
-#include "stack/include/main_thread.h"
 #include "types/raw_address.h"
 
 using namespace bluetooth;
@@ -383,9 +382,7 @@ void RFCOMM_CongestionStatusInd(uint16_t lcid, bool is_congested) {
   } else {
     log::verbose("RFCOMM_CongestionStatusInd LCID:0x{:x}", lcid);
   }
-  do_in_main_thread(
-      FROM_HERE, base::BindOnce(rfc_process_l2cap_congestion,
-                                p_mcb, is_congested));
+  rfc_process_l2cap_congestion(p_mcb, is_congested);
 }
 
 /*******************************************************************************
