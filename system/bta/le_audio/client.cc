@@ -4449,6 +4449,8 @@ class LeAudioClientImpl : public LeAudioClient {
       return;
     }
 
+    log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
     /* Check if the device resume is allowed */
     if (!group->HasCodecConfigurationForDirection(
             configuration_context_type_,
@@ -4467,6 +4469,21 @@ class LeAudioClientImpl : public LeAudioClient {
                 ToHexString(configuration_context_type_));
       CancelLocalAudioSourceStreamingRequest();
       return;
+    }
+
+    //Without updatemetadata bt stack getting start from MM
+    /*
+     * In Bcacst -> Unicast switch, When either MT/MO call comes
+     * configuration_context_type_ bydefault set to Unspecified and
+     * remote_contexts set to conversational. This mimatch happens when config
+     * selected on configuration_context_type_(for Media) and
+     * enable op metadata(covsersational)
+     */
+
+    if ((IsInCall() || IsInVoipCall()) &&
+        configuration_context_type_ != LeAudioContextType::CONVERSATIONAL) {
+      ReconfigureOrUpdateRemote(
+               group, bluetooth::le_audio::types::kLeAudioDirectionSink);
     }
 
     log::debug(
