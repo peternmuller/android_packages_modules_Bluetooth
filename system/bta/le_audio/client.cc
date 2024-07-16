@@ -4292,8 +4292,26 @@ class LeAudioClientImpl : public LeAudioClient {
              ? bluetooth::le_audio::types::kLeAudioDirectionSource
              : bluetooth::le_audio::types::kLeAudioDirectionSink);
 
+    log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
+    log::debug( "remote_direction= {}",
+         (remote_direction == bluetooth::le_audio::types::kLeAudioDirectionSource
+             ? "Source" : "Sink"));
     auto remote_contexts =
         DirectionalRealignMetadataAudioContexts(group, remote_direction);
+
+    if (configuration_context_type_ == LeAudioContextType::LIVE &&
+        remote_direction == bluetooth::le_audio::types::kLeAudioDirectionSink) {
+      const auto is_sink_config_supported_curr_context =
+                     group->HasCodecConfigurationForDirection(
+                            configuration_context_type_, remote_direction);
+      log::debug("is_sink_config_supported_curr_context= {}.",
+                            ToString(is_sink_config_supported_curr_context));
+      if (is_sink_config_supported_curr_context) {
+        remote_contexts =
+          DirectionalRealignMetadataAudioContexts(group, local_direction);
+      }
+    }
     ApplyRemoteMetadataAudioContextPolicy(group, remote_contexts,
                                           remote_direction);
 
