@@ -46,6 +46,7 @@ class IBluetoothTransportInstance {
   AudioConfiguration GetAudioConfiguration() const { return audio_config_; }
 
   void UpdateAudioConfiguration(const AudioConfiguration& audio_config) {
+    log::error("AIDL: UpdateAudioConfiguration IBluetoothTransportInstance");
     switch (audio_config.getTag()) {
       case AudioConfiguration::pcmConfig:
         audio_config_.set<AudioConfiguration::pcmConfig>(
