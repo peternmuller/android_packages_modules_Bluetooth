@@ -287,6 +287,8 @@ translateToBtLeAudioCodecConfigSampleRate(uint32_t sample_rate) {
       return LE_AUDIO_SAMPLE_RATE_INDEX_44100HZ;
     case LeAudioCodecConfiguration::kSampleRate48000:
       return LE_AUDIO_SAMPLE_RATE_INDEX_48000HZ;
+    case LeAudioCodecConfiguration::kSampleRate96000:
+      return LE_AUDIO_SAMPLE_RATE_INDEX_96000HZ;
   }
 
   return LE_AUDIO_SAMPLE_RATE_INDEX_NONE;
@@ -337,6 +339,8 @@ void fillStreamParamsToBtLeAudioCodecConfig(
 
   auto config = confs.at(0).codec;
 
+  out_config.codec_type = translateBluetoothCodecFormatToCodecType(
+      config.id.coding_format, config.id.vendor_codec_id);
   out_config.sample_rate = translateToBtLeAudioCodecConfigSampleRate(
       config.GetSamplingFrequencyHz());
   out_config.bits_per_sample = translateToBtLeAudioCodecConfigBitPerSample(16);

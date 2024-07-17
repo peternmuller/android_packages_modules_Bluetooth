@@ -35,6 +35,7 @@
 #include "os/log.h"
 #include "osi/include/allocator.h"
 #include "osi/include/osi.h"
+#include "osi/include/properties.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_types.h"
 #include "types/raw_address.h"
@@ -648,7 +649,19 @@ void avdt_scb_hdl_setconfig_cmd(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
           p_scb->stream_config.scb_index);
     } else {
       p_data->msg.hdr.err_code = AVDT_ERR_UNSUP_CFG;
+
+      uint8_t error_code = 0;
+      error_code = A2dp_SendSetConfigRspErrorCodeForPTS();
+      log::info("error_code: {}", error_code);
+
+      //error_code is valid for PTS only as of now.
+      if (error_code != 0) {
+        log::info("Overwrite setconf errorcode passed by prop for PTS.");
+        p_data->msg.hdr.err_code = error_code;
+      }
+
       p_data->msg.hdr.err_param = 0;
+      log::info("called avdt_msg_send_rej()");
       avdt_msg_send_rej(avdt_ccb_by_idx(p_data->msg.hdr.ccb_idx),
                         p_data->msg.hdr.sig_id, &p_data->msg);
     }
@@ -1462,8 +1475,25 @@ void avdt_scb_cong_state(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
  * Returns          Nothing.
  *
  ******************************************************************************/
-void avdt_scb_rej_state(AvdtpScb* /* p_scb */, tAVDT_SCB_EVT* p_data) {
+void avdt_scb_rej_state(AvdtpScb*  p_scb, tAVDT_SCB_EVT* p_data) {
+
   p_data->msg.hdr.err_code = AVDT_ERR_BAD_STATE;
+  //To Pass PTS TC AVDTP/SRC/ACP/SIG/SMG/BI-23-C
+  /* After connection is established with the PTS,
+   * and PTS sends CLOSE with an invalid SEID,
+   * then DUT should reject it with
+   * Error_code = 0x12 (BAD_ACP_SEID)
+   */
+
+  bool is_pts_enable = osi_property_get_bool("persist.vendor.bt.a2dp.pts_enable",
+                                            false);
+  log::info("is_pts_enable: {}", is_pts_enable);
+
+  if(!p_scb->in_use && is_pts_enable){
+     log::info("p_scb is not in use, set p_data->msg.hdr.err_code = AVDT_ERR_SEID(12)");
+     p_data->msg.hdr.err_code = AVDT_ERR_SEID;
+  }
+
   p_data->msg.hdr.err_param = 0;
   avdt_msg_send_rej(avdt_ccb_by_idx(p_data->msg.hdr.ccb_idx),
                     p_data->msg.hdr.sig_id, &p_data->msg);

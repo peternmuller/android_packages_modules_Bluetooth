@@ -1573,7 +1573,7 @@ public class BluetoothInCallService extends InCallService {
           int heldcalls = mCallInfo.getNumHeldCalls();
           if (isPartOfConference == false) {
             if (state == CALL_STATE_HELD) {
-              if (heldcalls > 1) {
+              if ((heldcalls > 1) && (mCallSwapPending != 1)) {
                 isPartOfConference = true;
               }
             }

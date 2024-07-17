@@ -1998,6 +1998,12 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
+
+                    if (mLeAudioSuspended) {
+                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
+                        mAudioManager.setLeAudioSuspended(false);
+                        mLeAudioSuspended = false;
+                    }
                 }
 
                 handleAudioDeviceRemoved(
@@ -2102,7 +2108,8 @@ public class LeAudioService extends ProfileService {
                         + mActiveAudioInDevice
                         + ", notifyAndUpdateInactiveOutDeviceOnly: "
                         + notifyAndUpdateInactiveOutDeviceOnly);
-        if (mActiveAudioOutDevice != null || mActiveAudioInDevice != null) {
+        if ((isActive == true) &&
+            (mActiveAudioOutDevice != null || mActiveAudioInDevice != null)) {
             LeAudioGroupDescriptor descriptor = getGroupDescriptor(groupId);
             if (descriptor != null) {
                 Log.d(TAG, "updateActiveDevices: set active state active");

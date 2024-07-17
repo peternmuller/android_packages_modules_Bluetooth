@@ -505,6 +505,11 @@ static void hh_open_handler(tBTA_HH_CONN& conn) {
                  p_dev->link_spec.ToRedactedStringForLogging(),
                  bthh_connection_state_text(p_dev->dev_status));
       dev_status = p_dev->dev_status;
+    } else {
+      auto bdStr = conn.link_spec.addrt.bda.ToString();
+      if (btif_in_fetch_bonded_device(bdStr) == BT_STATUS_SUCCESS) {
+        dev_status = BTHH_CONN_STATE_ACCEPTING;
+      }
     }
 
     if (btif_hh_cb.pending_link_spec == conn.link_spec) {

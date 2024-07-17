@@ -1833,6 +1833,8 @@ void gatt_cleanup_upon_disc(const RawAddress& bda, tGATT_DISCONN_REASON reason,
   gatt_free_pending_ind(p_tcb);
   fixed_queue_free(p_tcb->sr_cmd.multi_rsp_q, NULL);
   p_tcb->sr_cmd.multi_rsp_q = NULL;
+  if (p_tcb->sr_cmd.p_rsp_msg)
+    osi_free_and_reset((void**)&p_tcb->sr_cmd.p_rsp_msg);
 
   gatt_le_disconnect_complete_notify_user(bda, reason, transport);
 

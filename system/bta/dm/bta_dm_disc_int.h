@@ -63,6 +63,7 @@ typedef struct {
   std::vector<bluetooth::Uuid> gatt_uuids;
   tBTA_STATUS result;
   tHCI_STATUS hci_status;
+  BD_NAME bd_name; /* Name of peer device. */
 } tBTA_DM_SVC_RES;
 
 using tBTA_DM_MSG = std::variant<tBTA_DM_API_DISCOVER, tBTA_DM_SVC_RES>;

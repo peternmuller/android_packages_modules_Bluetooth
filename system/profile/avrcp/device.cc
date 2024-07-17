@@ -37,6 +37,7 @@
 #include "types/raw_address.h"
 #include "device/include/interop.h"
 #include "btif/include/btif_storage.h"
+#include "btif/include/btif_av.h"
 
 extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);
 extern bool btif_av_both_enable(void);
@@ -1717,6 +1718,18 @@ void Device::HandleTrackUpdate() {
 
 void Device::HandlePlayStatusUpdate() {
   log::verbose("");
+
+  media_interface_->GetPlayStatus(base::Bind(
+      [](base::WeakPtr<Device> d, PlayStatus s) {
+        if (s.state == PlayState::PLAYING) {
+          log::info("Clear Remote Supend if already set");
+          btif_av_clear_remote_suspend_flag(A2dpType::kSource);
+          if (btif_av_stream_ready(A2dpType::kSource))
+            btif_av_stream_start(A2dpType::kSource);
+        }
+      },
+      weak_ptr_factory_.GetWeakPtr()));
+
   if (!play_status_changed_.first) {
     log::warn("Device is not registered for play status updates");
     return;

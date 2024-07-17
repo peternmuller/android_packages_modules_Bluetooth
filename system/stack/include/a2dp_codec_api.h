@@ -754,6 +754,8 @@ bool A2DP_Get_Aptx_AdaptiveR2_1_Supported();
 bool A2DP_Get_Aptx_AdaptiveR2_2_Supported();
 bool A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported();
 
+uint8_t A2dp_SendSetConfigRspErrorCodeForPTS();
+
 // Add enum-based flag operators to the btav_a2dp_codec_config_t fields
 #ifndef DEFINE_ENUM_FLAG_OPERATORS
 // Use NOLINT to suppress missing parentheses warnings around bitmask.

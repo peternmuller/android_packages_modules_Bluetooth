@@ -36,6 +36,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.BroadcastOptions;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -60,6 +61,10 @@ import android.permission.PermissionManager;
 import android.provider.DeviceConfig;
 import android.provider.Telephony;
 import android.util.Log;
+
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.graphics.Insets;
 
 import androidx.annotation.VisibleForTesting;
 
@@ -1322,5 +1327,21 @@ public final class Utils {
             }
         }
         return str;
+    }
+
+    public static void setEdgeToEdge(Activity activity) {
+
+        if(activity == null) {
+            Log.w(TAG,"setEdgeToEdge null");
+            return;
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(activity.findViewById(android.R.id.content),
+                (v, windowInsets) -> {
+                    Insets insets = windowInsets.getInsets(
+                            WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.ime()
+                                    | WindowInsetsCompat.Type.displayCutout());
+                    v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+                    return WindowInsetsCompat.CONSUMED;
+                });
     }
 }

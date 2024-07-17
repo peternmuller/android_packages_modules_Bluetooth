@@ -86,6 +86,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Iterator;
+
+
 
 /**
  * Provides Bluetooth Headset and Handsfree profile, as a service in the Bluetooth application.
@@ -169,9 +173,17 @@ public class HeadsetService extends ProfileService {
     private final Condition leStreamStatusSuspend = lock.newCondition();
     private static HeadsetService sHeadsetService;
     private static final int AUDIO_CONNECTION_DELAY_DEFAULT = 100;
+    private boolean mDelayDsDaindicators = false;
 
     @VisibleForTesting boolean mIsAptXSwbEnabled = false;
     @VisibleForTesting boolean mIsAptXSwbPmEnabled = false;
+
+    private final HeadsetCallState mDsDaCallIndicators =
+                  new HeadsetCallState(0, 0, 0, "", 0, "");
+
+    //ConcurrentLinkeQueue is used so that it is threadsafe
+     private ConcurrentLinkedQueue<HeadsetCallState> mDsDaDelayedCallStates =
+                             new ConcurrentLinkedQueue<HeadsetCallState>();
 
     @VisibleForTesting ServiceFactory mFactory = new ServiceFactory();
 
@@ -300,6 +312,7 @@ public class HeadsetService extends ProfileService {
     @Override
     public void cleanup() {
         Log.i(TAG, "cleanup");
+        clearPendingCallStates();
     }
 
     /**
@@ -769,7 +782,7 @@ public class HeadsetService extends ProfileService {
                 return;
             }
 
-            service.phoneStateChanged(numActive, numHeld, callState, number, type, name, false);
+            service.phoneStateChangedInternal(numActive, numHeld, callState, number, type, name, false);
         }
 
         @Override
@@ -1624,6 +1637,17 @@ public class HeadsetService extends ProfileService {
                 Log.w(TAG, "connectAudio: profile not connected");
                 return BluetoothStatusCodes.ERROR_PROFILE_NOT_CONNECTED;
             }
+            if (Utils.isDualModeAudioEnabled()) {
+                Bundle preferredAudioProfiles =
+                   mAdapterService.getPreferredAudioProfiles(device);
+                if (preferredAudioProfiles != null && !preferredAudioProfiles.isEmpty()
+                    && preferredAudioProfiles.getInt("audio_mode_duplex") ==
+                                                     BluetoothProfile.LE_AUDIO) {
+                    Log.w(TAG, "connectAudio: rejected SCO due to LE being"
+                                 + "preferred profile in DM");
+                    return BluetoothStatusCodes.NOT_ALLOWED;
+                }
+            }
             if (stateMachine.getAudioState() != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                 logD("connectAudio: audio is not idle for device " + device);
                 /**
@@ -2061,6 +2085,51 @@ public class HeadsetService extends ProfileService {
         }
     }
 
+    void phoneStateChangedInternal(
+             int numActive,
+             int numHeld,
+             int callState,
+             String number,
+             int type,
+             String name,
+             boolean isVirtualCall) {
+        enforceCallingOrSelfPermission(MODIFY_PHONE_STATE, "Need MODIFY_PHONE_STATE permission");
+        // DSDA scenario for back to back incoming calls.Queuing until SCO disconenction complete
+        HeadsetStateMachine stateMachine = mStateMachines.get(mActiveDevice);
+        if (stateMachine == null ||
+            (mVirtualCallStarted || mVoiceRecognitionStarted)) {
+           Log.w(TAG, "HeadsetStateMachine is null or VOIP/VR in progress.");
+           phoneStateChanged(numActive, numHeld, callState, number, type, name, isVirtualCall);
+           return;
+        }
+        if ((numActive == 0) && (numHeld == 0) && !mDelayDsDaindicators) {
+           if ((stateMachine.getAudioState() == BluetoothHeadset.STATE_AUDIO_CONNECTED) ||
+               (stateMachine.getAudioState() == BluetoothHeadset.STATE_AUDIO_CONNECTING)) {
+               if (callState == HeadsetHalConstants.CALL_STATE_INCOMING) {
+                  //add the entries to queue
+                  mDsDaCallIndicators.mNumActive = numActive;
+                  mDsDaCallIndicators.mNumHeld = numHeld;
+                  mDsDaCallIndicators.mCallState = callState;
+                  mDsDaCallIndicators.mNumber = number;
+                  mDsDaCallIndicators.mType = type;
+                  mDelayDsDaindicators = true;
+                  mDsDaDelayedCallStates.add(mDsDaCallIndicators);
+                  return;
+               }
+           }
+       } else if (mDelayDsDaindicators == true) {
+           //add the entries to queue
+           mDsDaCallIndicators.mNumActive = numActive;
+           mDsDaCallIndicators.mNumHeld = numHeld;
+           mDsDaCallIndicators.mCallState = callState;
+           mDsDaCallIndicators.mNumber = number;
+           mDsDaCallIndicators.mType = type;
+           mDsDaDelayedCallStates.add(mDsDaCallIndicators);
+           return;
+       }
+       phoneStateChanged(numActive, numHeld, callState, number, type, name, isVirtualCall);
+    }
+
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @VisibleForTesting
     void phoneStateChanged(
@@ -2073,8 +2142,8 @@ public class HeadsetService extends ProfileService {
             boolean isVirtualCall) {
         enforceCallingOrSelfPermission(MODIFY_PHONE_STATE, "Need MODIFY_PHONE_STATE permission");
         synchronized (mStateMachines) {
-            // Should stop all other audio mode in this case
-            if ((numActive + numHeld) > 0 || callState != HeadsetHalConstants.CALL_STATE_IDLE) {
+             // Should stop all other audio mode in this case
+             if ((numActive + numHeld) > 0 || callState != HeadsetHalConstants.CALL_STATE_IDLE) {
                 if (!isVirtualCall && mVirtualCallStarted) {
                     // stop virtual voice call if there is an incoming Telecom call update
                     stopScoUsingVirtualVoiceCall();
@@ -2785,6 +2854,33 @@ public class HeadsetService extends ProfileService {
     boolean isAptXSwbPmEnabled() {
         logD("isAptXSwbPmEnabled: " + mIsAptXSwbPmEnabled);
         return mIsAptXSwbPmEnabled;
+    }
+
+    void processPendingCallStates() {
+       logD("processPendingCallStates: ");
+       if (mDelayDsDaindicators) {
+          Iterator<HeadsetCallState> it = mDsDaDelayedCallStates.iterator();
+          if (it != null) {
+              while (it.hasNext()) {
+                 HeadsetCallState callState = it.next();
+                 phoneStateChanged(callState.mNumActive, callState.mNumHeld, callState.mCallState,
+                                   callState.mNumber, callState.mType, callState.mName, false);
+                 it.remove();
+              }
+          } else {
+            Log.d(TAG, "There are no pending call state changes");
+          }
+       }
+       mDelayDsDaindicators = false;
+    }
+
+    void clearPendingCallStates() {
+       logD("clearPendingCallStates: ");
+       while (mDsDaDelayedCallStates.isEmpty() != true)
+       {
+         mDsDaDelayedCallStates.poll();
+       }
+       mDelayDsDaindicators = false;
     }
 
     private static void logD(String message) {

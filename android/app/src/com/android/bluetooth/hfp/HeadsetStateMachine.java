@@ -611,6 +611,9 @@ class HeadsetStateMachine extends StateMachine {
                     && mAdapterService.getBondState(mDevice) == BluetoothDevice.BOND_NONE) {
                 getHandler().post(() -> mHeadsetService.removeStateMachine(mDevice));
             }
+            if (mHeadsetService != null) {
+                mHeadsetService.clearPendingCallStates();
+            }
             mIsBlacklistedDevice = false;
             mIsRetrySco = false;
             mIsBlacklistedDeviceforRetrySCO = false;
@@ -964,6 +967,9 @@ class HeadsetStateMachine extends StateMachine {
         @Override
         public void enter() {
             super.enter();
+            if (mHeadsetService != null) {
+                mHeadsetService.clearPendingCallStates();
+            }
             sendMessageDelayed(CONNECT_TIMEOUT, mDevice, sConnectTimeoutMs);
             broadcastStateTransitions();
         }
@@ -1336,7 +1342,10 @@ class HeadsetStateMachine extends StateMachine {
                 // or the retry count reached MAX_RETRY_DISCONNECT_AUDIO.
                 mAudioDisconnectRetry = 0;
             }
-
+            if (mPrevState == mAudioConnecting || mPrevState == mAudioOn
+                 || mPrevState == mAudioDisconnecting) {
+               mHeadsetService.processPendingCallStates();
+            }
             broadcastStateTransitions();
             logSuccessIfNeeded();
         }
@@ -1378,6 +1387,12 @@ class HeadsetStateMachine extends StateMachine {
                         transitionTo(mAudioConnecting);
                         break;
                     }
+
+                    if (mHeadsetService.isScoAcceptable(mDevice) != BluetoothStatusCodes.SUCCESS) {
+                        stateLogW("sco is not acceptable, device=" + mDevice);
+                        break;
+                    }
+
                     mSystemInterface.getAudioManager().setA2dpSuspended(true);
                     if (isAtLeastU()) {
                         mSystemInterface.getAudioManager().setLeAudioSuspended(true);
@@ -2166,17 +2181,27 @@ class HeadsetStateMachine extends StateMachine {
                 (mStateMachineCallState.mCallState == HeadsetHalConstants.CALL_STATE_INCOMING &&
                  callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE)) {
               Log.d(TAG, "Incoming call is accepted as Active or Held call");
-              mIsRetrySco = true;
-              RETRY_SCO_CONNECTION_DELAY =
+              if (mCurrentState == mAudioOn && !hasMessages(SCO_RETRIAL_NOT_REQ)) {
+                  Log.d(TAG,
+                      "not retry as audio is already on and SCO_RETRIAL_NOT_REQ is not there");
+              } else {
+                  mIsRetrySco = true;
+                  RETRY_SCO_CONNECTION_DELAY =
                       SystemProperties.getInt("persist.vendor.btstack.mt.retry_sco.interval", 2000);
+              }
            } else if ((callState.mNumActive == 0 && callState.mNumHeld == 0) &&
                      (mStateMachineCallState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE &&
                      (callState.mCallState == HeadsetHalConstants.CALL_STATE_DIALING ||
                      callState.mCallState == HeadsetHalConstants.CALL_STATE_ALERTING))) {
               Log.d(TAG, "Dialing or Alerting indication");
-              mIsRetrySco = true;
-              RETRY_SCO_CONNECTION_DELAY =
+              if (mCurrentState == mAudioOn && !hasMessages(SCO_RETRIAL_NOT_REQ)) {
+                  Log.d(TAG,
+                      "not retry as audio is already on and SCO_RETRIAL_NOT_REQ is not there");
+              } else {
+                  mIsRetrySco = true;
+                  RETRY_SCO_CONNECTION_DELAY =
                       SystemProperties.getInt("persist.vendor.btstack.mo.retry_sco.interval", 2000);
+              }
            }
         }
         mStateMachineCallState.mNumActive = callState.mNumActive;
