@@ -200,6 +200,11 @@ static bool is_connected(RawAddress* bd_addr) {
  *
  ******************************************************************************/
 static int btif_hf_idx_by_bdaddr(RawAddress* bd_addr) {
+  if (!bd_addr || bd_addr->IsEmpty()) {
+    log::debug("bd_addr is null or empty");
+    return BTIF_HF_INVALID_IDX;
+  }
+  log::verbose("bd_addr {}", *bd_addr);
   for (int i = 0; i < btif_max_hf_clients; ++i) {
     if (*bd_addr == btif_hf_cb[i].connected_bda) return i;
   }
