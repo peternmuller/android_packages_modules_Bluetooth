@@ -41,6 +41,7 @@
 #include "btif/include/btif_storage.h"
 #include "btif/include/btif_av.h"
 #include "btif/include/btif_hf.h"
+#include "bta/include/bta_le_audio_api.h"
 
 extern bool btif_av_peer_is_connected_sink(const RawAddress& peer_address);
 extern bool btif_av_both_enable(void);
@@ -141,11 +142,11 @@ void Device::VendorPacketHandler(uint8_t label,
          event == CommandPdu::LIST_PLAYER_APPLICATION_SETTING_VALUES ||
          event == CommandPdu::GET_CURRENT_PLAYER_APPLICATION_SETTING_VALUE ||
          event == CommandPdu::SET_PLAYER_APPLICATION_SETTING_VALUE) {
-        log::error("Device is BL for Player app settings");
-        auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
-                                                   Status::INVALID_COMMAND);
-        send_message(label, false, std::move(response));
-        return;
+       log::error("Device is BL for Player app settings");
+       auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
+                                                  Status::INVALID_COMMAND);
+       send_message(label, false, std::move(response));
+       return;
      }
    }
 
@@ -505,14 +506,14 @@ void Device::HandleNotification(
     } break;
 
     case Event::PLAYER_APPLICATION_SETTING_CHANGED: {
-        if (interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
-            &address_)) {
-          log::error("Device in BL for Player app settings, return");
-          auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
+      if (interop_match_addr(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS,
+          &address_)) {
+        log::error("Device in BL for Player app settings, return");
+        auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
                                                    Status::INVALID_COMMAND);
-          send_message(label, false, std::move(response));
+        send_message(label, false, std::move(response));
         return;
-       }
+      }
       if (player_settings_interface_ == nullptr) {
         log::error("Player Settings Interface not initialized.");
         auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
@@ -847,9 +848,9 @@ void Device::AddressedPlayerNotificationResponse(
 void Device::RejectNotification() {
   log::verbose("");
   Notification* rejectNotification[] = {&play_status_changed_, &track_changed_,
-                                        &play_pos_changed_,
-                                        &now_playing_changed_};
-  for (int i = 0; i < 4; i++) {
+                                        &play_pos_changed_, &now_playing_changed_,
+                                        &player_setting_changed_};
+  for (int i = 0; i < 5; i++) {
     uint8_t label = rejectNotification[i]->second;
     auto response = RejectBuilder::MakeBuilder(
         CommandPdu::REGISTER_NOTIFICATION, Status::ADDRESSED_PLAYER_CHANGED);
@@ -1748,9 +1749,12 @@ void Device::HandlePlayStatusUpdate() {
   media_interface_->GetPlayStatus(base::Bind(
       [](base::WeakPtr<Device> d, PlayStatus s) {
         if (s.state == PlayState::PLAYING) {
+          bool is_le_audio_in_idle = LeAudioClient::IsLeAudioClientRunning() ?
+              LeAudioClient::IsLeAudioClientInIdle() : false;
+          log::info("is_leaudio_in_idle: {}", is_le_audio_in_idle);
           log::info("Clear Remote Supend if already set");
           btif_av_clear_remote_suspend_flag(A2dpType::kSource);
-          if (bluetooth::headset::IsCallIdle() &&
+          if (bluetooth::headset::IsCallIdle() && is_le_audio_in_idle &&
               (btif_av_stream_ready(A2dpType::kSource))) {
             btif_av_stream_start(A2dpType::kSource);
           }
