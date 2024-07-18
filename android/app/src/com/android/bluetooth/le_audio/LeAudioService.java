@@ -1326,7 +1326,10 @@ public class LeAudioService extends ProfileService {
             return;
         }
 
-        if (mUnicastGroupIdDeactivatedForBroadcastTransition != LE_AUDIO_GROUP_ID_INVALID) {
+        if (getLeadDeviceForTheGroup(mUnicastGroupIdDeactivatedForBroadcastTransition) == null) {
+            Log.w(TAG, "stopBroadcast: No valid unicast device for group ID "
+                    + mUnicastGroupIdDeactivatedForBroadcastTransition);
+        } else {
             mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE,
                     AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
         }
