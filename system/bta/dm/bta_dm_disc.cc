@@ -705,7 +705,9 @@ static void btm_dm_start_gatt_discovery(const RawAddress& bd_addr) {
     } else {
 
       log::warn("btm_dm_start_gatt_discovery:ACL disconnected, Not creating acl"
-      " for client_if = %d", bta_dm_discovery_cb.client_if);
+      " for client_if = %d, run disc from queue", bta_dm_discovery_cb.client_if);
+      bta_dm_discovery_set_state(BTA_DM_DISCOVER_IDLE);
+      bta_dm_execute_queued_discovery_request();
 
     }
   }
