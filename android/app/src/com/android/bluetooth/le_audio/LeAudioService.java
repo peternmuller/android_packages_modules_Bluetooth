@@ -204,6 +204,7 @@ public class LeAudioService extends ProfileService {
             new LinkedList<>();
     boolean mIsSourceStreamMonitorModeEnabled = false;
     boolean mLeAudioSuspended = false;
+    boolean mUnicastVolumeRetainedForBroadcastTransition = false;
 
     @VisibleForTesting TbsService mTbsService;
 
@@ -536,6 +537,7 @@ public class LeAudioService extends ProfileService {
         mAwaitingBroadcastCreateResponse = false;
         mIsSourceStreamMonitorModeEnabled = false;
         mLeAudioSuspended = false;
+        mUnicastVolumeRetainedForBroadcastTransition = false;
 
         clearBroadcastTimeoutCallback();
 
@@ -705,6 +707,14 @@ public class LeAudioService extends ProfileService {
             return IBluetoothVolumeControl.VOLUME_CONTROL_UNKNOWN_VOLUME;
         }
         return volumeControlService.getAudioDeviceGroupVolume(groupId);
+    }
+
+    Boolean getGroupMute(int groupId) {
+        VolumeControlService volumeControlService = getVolumeControlService();
+        if (volumeControlService == null) {
+            return false;
+        }
+        return volumeControlService.getGroupMute(groupId);
     }
 
     LeAudioDeviceDescriptor createDeviceDescriptor(
@@ -1128,6 +1138,10 @@ public class LeAudioService extends ProfileService {
             mCreateBroadcastQueue.add(broadcastSettings);
             if (Flags.leaudioBroadcastAudioHandoverPolicies()) {
                 mNativeInterface.setUnicastMonitorMode(LeAudioStackEvent.DIRECTION_SINK, true);
+            }
+            if (Flags.leaudioBroadcastVolumeControlWithSetVolume()) {
+                Log.i(TAG, "Need retain unicast volume after transition to broadcast");
+                mUnicastVolumeRetainedForBroadcastTransition = true;
             }
             removeActiveDevice(true);
 
@@ -1950,6 +1964,24 @@ public class LeAudioService extends ProfileService {
         setActiveDevice(null);
     }
 
+    void handleBroadcastAudioDeviceAdded() {
+        if (!mUnicastVolumeRetainedForBroadcastTransition) {
+            Log.i(TAG, "Unicast volume is not retained for broadcast, return");
+            return;
+        }
+
+        // If broadcast audio is muted previously, after unicast switch to broadcast again.
+        // need unmute broadcast audio if the unicast group is unmuted now
+        Boolean groupMute =
+                getGroupMute(mUnicastGroupIdDeactivatedForBroadcastTransition);
+        if (mAudioManager.isStreamMute(AudioManager.STREAM_MUSIC) && !groupMute) {
+            mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_UNMUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
+            Log.i(TAG, "Unmute broadcast audio stream");
+        }
+        mUnicastVolumeRetainedForBroadcastTransition = false;
+    }
+
     /* Notifications of audio device connection/disconn events. */
     private class AudioManagerAudioDeviceCallback extends AudioDeviceCallback {
         @Override
@@ -1960,6 +1992,12 @@ public class LeAudioService extends ProfileService {
             }
 
             for (AudioDeviceInfo deviceInfo : addedDevices) {
+                if (deviceInfo.getType() == AudioDeviceInfo.TYPE_BLE_BROADCAST) {
+                    Log.i(TAG, "Broadcast Audio device is added");
+                    handleBroadcastAudioDeviceAdded();
+                    continue;
+                }
+
                 if ((deviceInfo.getType() != AudioDeviceInfo.TYPE_BLE_HEADSET)
                         && (deviceInfo.getType() != AudioDeviceInfo.TYPE_BLE_SPEAKER)) {
                     continue;
@@ -2045,8 +2083,16 @@ public class LeAudioService extends ProfileService {
                         + newDevice
                         + ", previousDevice: "
                         + previousDevice);
+
+        int volume = IBluetoothVolumeControl.VOLUME_CONTROL_UNKNOWN_VOLUME;
+        if (newDevice != null && mUnicastVolumeRetainedForBroadcastTransition) {
+            int groupId = (getActiveGroupId() != LE_AUDIO_GROUP_ID_INVALID) ?
+                    getActiveGroupId() : mUnicastGroupIdDeactivatedForBroadcastTransition;
+            volume = getAudioDeviceGroupVolume(groupId);
+        }
+
         mAudioManager.handleBluetoothActiveDeviceChanged(
-                newDevice, previousDevice, getBroadcastProfile(suppressNoisyIntent));
+                newDevice, previousDevice, getBroadcastProfile(suppressNoisyIntent, volume));
     }
 
     /*
@@ -2467,11 +2513,11 @@ public class LeAudioService extends ProfileService {
         }
     }
 
-    BluetoothProfileConnectionInfo getBroadcastProfile(boolean suppressNoisyIntent) {
+    BluetoothProfileConnectionInfo getBroadcastProfile(boolean suppressNoisyIntent, int volume) {
         Parcel parcel = Parcel.obtain();
         parcel.writeInt(BluetoothProfile.LE_AUDIO_BROADCAST);
         parcel.writeBoolean(suppressNoisyIntent);
-        parcel.writeInt(-1 /* mVolume */);
+        parcel.writeInt(volume);
         parcel.writeBoolean(true /* mIsLeOutput */);
         parcel.setDataPosition(0);
 
