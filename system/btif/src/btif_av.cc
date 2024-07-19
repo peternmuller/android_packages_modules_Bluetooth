@@ -607,6 +607,12 @@ class BtifAvSource {
       std::promise<void> peer_ready_promise) {
     // Restart the session if the codec for the active peer is updated
     A2dpCodecConfig* current_codec = bta_av_get_a2dp_current_codec();
+
+    if (current_codec == nullptr) {
+      log::warn("Current Codec null, returning.");
+      return;
+    }
+
     bool aptX_config_change = true;
     uint16_t cs4 = 0;
     for (auto cp : codec_preferences) {
