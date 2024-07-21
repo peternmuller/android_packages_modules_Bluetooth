@@ -1214,11 +1214,7 @@ public class LeAudioService extends ProfileService {
         }
 
         Log.d(TAG, "startBroadcast");
-        if (mLeAudioSuspended) {
-            Log.d(TAG, "startBroadcast: Release LeAudio stream");
-            mAudioManager.setLeAudioSuspended(false);
-            mLeAudioSuspended = false;
-        }
+        releaseLeAudioStream();
 
         /* Start timeout to recover from stucked/error start Broadcast operation */
         mDialingOutTimeoutEvent = new DialingOutTimeoutEvent(broadcastId);
@@ -1994,6 +1990,12 @@ public class LeAudioService extends ProfileService {
             }
 
             for (AudioDeviceInfo deviceInfo : removedDevices) {
+                if (deviceInfo.getType() == AudioDeviceInfo.TYPE_BLE_BROADCAST) {
+                    Log.i(TAG, "Broadcast Audio device is removed");
+                    releaseLeAudioStream();
+                    continue;
+                }
+
                 if ((deviceInfo.getType() != AudioDeviceInfo.TYPE_BLE_HEADSET)
                         && (deviceInfo.getType() != AudioDeviceInfo.TYPE_BLE_SPEAKER)) {
                     continue;
@@ -2016,12 +2018,7 @@ public class LeAudioService extends ProfileService {
                         startBroadcast(mBroadcastIdPendingStart.get());
                         mBroadcastIdPendingStart = Optional.empty();
                     }
-
-                    if (mLeAudioSuspended) {
-                        Log.d(TAG, "Release LeAudio stream after unicast device removed");
-                        mAudioManager.setLeAudioSuspended(false);
-                        mLeAudioSuspended = false;
-                    }
+                    releaseLeAudioStream();
                 }
 
                 handleAudioDeviceRemoved(
@@ -2659,11 +2656,7 @@ public class LeAudioService extends ProfileService {
                 if (!mCreateBroadcastQueue.isEmpty()) {
                     mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
                             AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
-                    if (!mLeAudioSuspended) {
-                        Log.d(TAG, "Suspend LeAudio stream before update unicast device inactive");
-                        mAudioManager.setLeAudioSuspended(true);
-                        mLeAudioSuspended = true;
-                    }
+                    suspendLeAudioStream();
                 }
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
@@ -2809,6 +2802,22 @@ public class LeAudioService extends ProfileService {
         groupDescriptor.updateAllowedContexts(sinkContextTypes, sourceContextTypes);
 
         mNativeInterface.setGroupAllowedContextMask(groupId, sinkContextTypes, sourceContextTypes);
+    }
+
+    private void suspendLeAudioStream() {
+        if (!mLeAudioSuspended) {
+            Log.d(TAG, "Suspend LeAudio stream");
+            mAudioManager.setLeAudioSuspended(true);
+            mLeAudioSuspended = true;
+        }
+    }
+
+    private void releaseLeAudioStream() {
+        if (mLeAudioSuspended) {
+            Log.d(TAG, "Release LeAudio stream");
+            mAudioManager.setLeAudioSuspended(false);
+            mLeAudioSuspended = false;
+        }
     }
 
     @VisibleForTesting
@@ -2989,10 +2998,19 @@ public class LeAudioService extends ProfileService {
     void transitionFromBroadcastToUnicast() {
         if (mUnicastGroupIdDeactivatedForBroadcastTransition == LE_AUDIO_GROUP_ID_INVALID) {
             Log.d(TAG, "No deactivated group due for broadcast transmission");
+
+            A2dpService mA2dp = A2dpService.getA2dpService();
+            boolean suppressNoisyIntent = false;
+            // SuppressNoisyIntent if fallback to A2dp device after stop broadcast
+            if (mA2dp != null && mA2dp.getActiveDevice() != null) {
+                Log.d(TAG, "fallback to a2dp device after broadcast stopped");
+                suppressNoisyIntent = true;
+            }
+
             // Notify audio manager
             if (mBroadcastDescriptors.values().stream()
                     .noneMatch(d -> d.mState.equals(LeAudioStackEvent.BROADCAST_STATE_STREAMING))) {
-                updateBroadcastActiveDevice(null, mActiveBroadcastAudioDevice, false);
+                updateBroadcastActiveDevice(null, mActiveBroadcastAudioDevice, suppressNoisyIntent);
             }
             return;
         }
@@ -4186,6 +4204,7 @@ public class LeAudioService extends ProfileService {
             Log.d(TAG, "setInactiveForBroadcast: stop broadcast now");
             updateFallbackUnicastGroupIdForBroadcast(LE_AUDIO_GROUP_ID_INVALID);
             stopBroadcast(broadcastId.get());
+            suspendLeAudioStream();
             Log.d(TAG, "Wait for broadcast to stop");
             int waitCount = SystemProperties.getInt(
                     "persist.bluetooth.stop_broadcast_waiting_count", 5);
