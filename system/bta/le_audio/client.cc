@@ -647,6 +647,11 @@ class LeAudioClientImpl : public LeAudioClient {
   }
 
   void CancelStreamingRequest() {
+  log::info(
+        " audio_sender_state {}, audio_receiver_state {}",
+        bluetooth::common::ToString(audio_sender_state_),
+        bluetooth::common::ToString(audio_receiver_state_));
+
     if (audio_sender_state_ >= AudioState::READY_TO_START) {
       CancelLocalAudioSourceStreamingRequest();
     }
@@ -4316,6 +4321,12 @@ class LeAudioClientImpl : public LeAudioClient {
         remote_contexts =
           DirectionalRealignMetadataAudioContexts(group, local_direction);
       }
+    } else if (configuration_context_type_ == LeAudioContextType::GAME &&
+               (remote_direction ==
+                bluetooth::le_audio::types::kLeAudioDirectionSource)) {
+       log::debug("Ensuring to saty in VBC path.");
+       remote_contexts =
+          DirectionalRealignMetadataAudioContexts(group, local_direction);
     }
     ApplyRemoteMetadataAudioContextPolicy(group, remote_contexts,
                                           remote_direction);
@@ -4781,12 +4792,23 @@ class LeAudioClientImpl : public LeAudioClient {
       return;
     }
 
+    log::debug("configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
     /* We need new configuration_context_type_ to be selected before we go any
      * further.
      */
     if (audio_receiver_state_ == AudioState::IDLE) {
-      ReconfigureOrUpdateRemote(
-          group, bluetooth::le_audio::types::kLeAudioDirectionSource);
+      //Below condition is not to allow reconfig to LIVE when
+      //configuration_context_type_ is GAME as there is no UpdateMetadata
+      //update on decoding session. This ensures to be stay in VBC path.
+      if ((audio_sender_state_ == AudioState::IDLE) &&
+          (configuration_context_type_ == LeAudioContextType::GAME)) {
+        ReconfigureOrUpdateRemote(
+          group, bluetooth::le_audio::types::kLeAudioDirectionSink);
+      } else {
+         ReconfigureOrUpdateRemote(
+            group, bluetooth::le_audio::types::kLeAudioDirectionSource);
+      }
     }
 
     /* Check if the device resume is allowed */
@@ -4815,6 +4837,9 @@ class LeAudioClientImpl : public LeAudioClient {
         active_group_id_, audio_receiver_state_, audio_sender_state_,
         ToHexString(configuration_context_type_),
         group ? " exist " : " does not exist ");
+
+    log::debug("After reconfig, updated configuration_context_type_= {}.",
+                              ToString(configuration_context_type_));
 
     switch (audio_receiver_state_) {
       case AudioState::STARTED:
@@ -6205,6 +6230,9 @@ class LeAudioClientImpl : public LeAudioClient {
                     ? bluetooth::le_audio::types::kLeAudioDirectionSource
                     : bluetooth::le_audio::types::kLeAudioDirectionSink;
 
+            log::debug( "remote_direction= {}", (remote_direction ==
+              bluetooth::le_audio::types::kLeAudioDirectionSource ? "Source" : "Sink"));
+
             /* Reconfiguration to non requiring source scenario */
             if (sink_monitor_mode_ &&
                 (remote_direction ==
@@ -6215,10 +6243,25 @@ class LeAudioClientImpl : public LeAudioClient {
 
             auto remote_contexts =
                 DirectionalRealignMetadataAudioContexts(group, remote_direction);
+            //Below check is needed only when BCast->Unicast switch as part of VBC.
+            //Already here LIVE(of VBC) path started, and when Unicast becomes active
+            //UpdateMetadata comes for Game, and it would reconfigure to Game from
+            //LIVE(of VBC). Due to avove remote_contexts, it is trying to switch
+            //remote_contexts to LIVE, and mismatch happens between remote_contexts
+            //and configuration_context_type_.
+            if (configuration_context_type_ == LeAudioContextType::GAME &&
+                remote_direction == bluetooth::le_audio::types::kLeAudioDirectionSource &&
+                audio_receiver_state_ == AudioState::RELEASING) {
+              remote_contexts = DirectionalRealignMetadataAudioContexts(group,
+                                  bluetooth::le_audio::types::kLeAudioDirectionSink);
+            }
+
             ApplyRemoteMetadataAudioContextPolicy(group, remote_contexts,
                                                   remote_direction);
             if (GroupStream(group->group_id_, configuration_context_type_,
                             remote_contexts)) {
+              log::info("configuration succeed, wait for new status for group {}",
+                         group->group_id_);
               /* If configuration succeed wait for new status. */
               return;
             }
