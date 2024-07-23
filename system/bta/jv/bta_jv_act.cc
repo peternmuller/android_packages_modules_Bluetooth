@@ -51,6 +51,7 @@
 #include "stack/include/l2cdefs.h"
 #include "stack/include/port_api.h"
 #include "stack/include/sdp_api.h"
+#include "stack/include/acl_api.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
 
@@ -63,6 +64,7 @@ std::unordered_set<uint16_t> used_l2cap_classic_dynamic_psm;
 static tBTA_JV_PCB* bta_jv_add_rfc_port(tBTA_JV_RFC_CB* p_cb,
                                         tBTA_JV_PCB* p_pcb_open);
 static tBTA_JV_STATUS bta_jv_free_set_pm_profile_cb(uint32_t jv_handle);
+static void bta_jv_pm_conn_congested(tBTA_JV_PM_CB* p_cb);
 static void bta_jv_pm_conn_busy(tBTA_JV_PM_CB* p_cb);
 static void bta_jv_pm_conn_idle(tBTA_JV_PM_CB* p_cb);
 static void bta_jv_pm_state_change(tBTA_JV_PM_CB* p_cb,
@@ -424,10 +426,14 @@ tBTA_JV_STATUS bta_jv_free_l2c_cb(tBTA_JV_L2C_CB* p_cb) {
  *
  ******************************************************************************/
 static void bta_jv_clear_pm_cb(tBTA_JV_PM_CB* p_pm_cb, bool close_conn) {
+  /* Ensure that timer is stopped */
+  alarm_cancel(p_pm_cb->idle_timer);
   /* needs to be called if registered with bta pm, otherwise we may run out of
    * dm pm slots! */
   if (close_conn)
     bta_sys_conn_close(BTA_ID_JV, p_pm_cb->app_id, p_pm_cb->peer_bd_addr);
+  else
+    bta_jv_pm_state_change(p_pm_cb, BTA_JV_CONN_IDLE);
   p_pm_cb->state = BTA_JV_PM_FREE_ST;
   p_pm_cb->app_id = BTA_JV_PM_ALL;
   p_pm_cb->handle = BTA_JV_PM_HANDLE_CLEAR;
@@ -568,6 +574,8 @@ static tBTA_JV_PM_CB* bta_jv_alloc_set_pm_profile_cb(uint32_t jv_handle,
     bta_jv_cb.pm_cb[i].app_id = app_id;
     bta_jv_cb.pm_cb[i].peer_bd_addr = peer_bd_addr;
     bta_jv_cb.pm_cb[i].state = BTA_JV_PM_IDLE_ST;
+    bta_jv_cb.pm_cb[i].idle_timer = alarm_new("bta.jv_idle_timer");
+    log::verbose("bta_jv_alloc_set_pm_profile_cb: {}", i);
     return &bta_jv_cb.pm_cb[i];
   }
   log::warn("handle=0x{:x}, app_id={}, return NULL", jv_handle, app_id);
@@ -1007,6 +1015,11 @@ static void bta_jv_l2cap_client_cback(uint16_t gap_handle, uint16_t event,
     case GAP_EVT_CONN_CONGESTED:
     case GAP_EVT_CONN_UNCONGESTED:
       p_cb->cong = (event == GAP_EVT_CONN_CONGESTED) ? true : false;
+      if (NULL != p_cb->p_pm_cb) {
+        p_cb->p_pm_cb->cong = p_cb->cong;
+      }
+      if (p_cb->cong == true)
+        bta_jv_pm_conn_congested(p_cb->p_pm_cb);
       evt_data.l2c_cong.cong = p_cb->cong;
       p_cb->p_cback(BTA_JV_L2CAP_CONG_EVT, &evt_data, p_cb->l2cap_socket_id);
       break;
@@ -1171,6 +1184,11 @@ static void bta_jv_l2cap_server_cback(uint16_t gap_handle, uint16_t event,
     case GAP_EVT_CONN_CONGESTED:
     case GAP_EVT_CONN_UNCONGESTED:
       p_cb->cong = (event == GAP_EVT_CONN_CONGESTED) ? true : false;
+      if (NULL != p_cb->p_pm_cb) {
+        p_cb->p_pm_cb->cong = p_cb->cong;
+      }
+      if (p_cb->cong == true)
+        bta_jv_pm_conn_congested(p_cb->p_pm_cb);
       evt_data.l2c_cong.cong = p_cb->cong;
       p_cb->p_cback(BTA_JV_L2CAP_CONG_EVT, &evt_data, p_cb->l2cap_socket_id);
       break;
@@ -1339,6 +1357,7 @@ static int bta_jv_port_data_co_cback(uint16_t port_handle, uint8_t* buf,
                                      uint16_t len, int type) {
   tBTA_JV_RFC_CB* p_cb = bta_jv_rfc_port_to_cb(port_handle);
   tBTA_JV_PCB* p_pcb = bta_jv_rfc_port_to_pcb(port_handle);
+  int ret = 0;
   log::verbose("p_cb={}, p_pcb={}, len={}, type={}", fmt::ptr(p_cb),
                fmt::ptr(p_pcb), len, type);
   if (p_pcb != NULL) {
@@ -1349,7 +1368,11 @@ static int bta_jv_port_data_co_cback(uint16_t port_handle, uint8_t* buf,
                                   false)) {
           bta_jv_reset_sniff_timer(p_pcb->p_pm_cb);
         }
-        return bta_co_rfc_data_incoming(p_pcb->rfcomm_slot_id, (BT_HDR*)buf);
+        bta_jv_pm_conn_busy(p_pcb->p_pm_cb);
+        ret = bta_co_rfc_data_incoming(p_pcb->rfcomm_slot_id, (BT_HDR*)buf);
+        bta_jv_pm_conn_idle(p_pcb->p_pm_cb);
+
+        return ret;
       case DATA_CO_CALLBACK_TYPE_OUTGOING_SIZE:
         return bta_co_rfc_data_outgoing_size(p_pcb->rfcomm_slot_id, (int*)buf);
       case DATA_CO_CALLBACK_TYPE_OUTGOING:
@@ -1452,6 +1475,12 @@ static void bta_jv_port_event_cl_cback(uint32_t code, uint16_t port_handle) {
 
   if (code & PORT_EV_FC) {
     p_pcb->cong = (code & PORT_EV_FCS) ? false : true;
+    if (NULL != p_pcb->p_pm_cb) {
+       p_pcb->p_pm_cb->cong = p_pcb->cong;
+    }
+    if (p_pcb->cong == true) {
+      bta_jv_pm_conn_congested(p_pcb->p_pm_cb);
+    }
     evt_data.rfc_cong.cong = p_pcb->cong;
     evt_data.rfc_cong.handle = p_cb->handle;
     evt_data.rfc_cong.status = tBTA_JV_STATUS::SUCCESS;
@@ -1694,6 +1723,12 @@ static void bta_jv_port_event_sr_cback(uint32_t code, uint16_t port_handle) {
 
   if (code & PORT_EV_FC) {
     p_pcb->cong = (code & PORT_EV_FCS) ? false : true;
+    if (NULL != p_pcb->p_pm_cb) {
+       p_pcb->p_pm_cb->cong = p_pcb->cong;
+    }
+    if (p_pcb->cong == true) {
+      bta_jv_pm_conn_congested(p_pcb->p_pm_cb);
+    }
     evt_data.rfc_cong.cong = p_pcb->cong;
     evt_data.rfc_cong.handle = p_cb->handle;
     evt_data.rfc_cong.status = tBTA_JV_STATUS::SUCCESS;
@@ -1965,6 +2000,24 @@ void bta_jv_set_pm_profile(uint32_t handle, tBTA_JV_PM_ID app_id,
 
 /*******************************************************************************
  *
+ * Function    bta_jv_pm_conn_congested
+ *
+ * Description set pm connection congested state (input param safe)
+ *
+ * Params      p_cb: pm control block of jv connection
+ *
+ * Returns     void
+ *
+ ******************************************************************************/
+static void bta_jv_pm_conn_congested(tBTA_JV_PM_CB* p_cb) {
+  if (NULL != p_cb) {
+    bta_jv_pm_state_change(p_cb, BTA_JV_CONN_BUSY);
+    log::verbose("bta_jv_pm_conn_congested");
+  }
+}
+
+/*******************************************************************************
+ *
  * Function    bta_jv_pm_conn_busy
  *
  * Description set pm connection busy state (input param safe)
@@ -1975,8 +2028,19 @@ void bta_jv_set_pm_profile(uint32_t handle, tBTA_JV_PM_ID app_id,
  *
  ******************************************************************************/
 static void bta_jv_pm_conn_busy(tBTA_JV_PM_CB* p_cb) {
-  if ((NULL != p_cb) && (BTA_JV_PM_IDLE_ST == p_cb->state))
-    bta_jv_pm_state_change(p_cb, BTA_JV_CONN_BUSY);
+  if ((NULL != p_cb) && (BTA_JV_PM_IDLE_ST == p_cb->state)) {
+    tBTM_PM_MODE    mode = BTM_PM_MD_ACTIVE;
+    if (BTM_ReadPowerMode(p_cb->peer_bd_addr, &mode)) {
+      if (mode == BTM_PM_MD_SNIFF) {
+        bta_jv_pm_state_change(p_cb, BTA_JV_CONN_BUSY);
+      } else {
+        p_cb->state = BTA_JV_PM_BUSY_ST;
+        log::verbose("bta_jv_pm_conn_busy:power mode: {}", mode);
+      }
+    } else {
+      bta_jv_pm_state_change(p_cb, BTA_JV_CONN_BUSY);
+    }
+  }
 }
 
 /*******************************************************************************
@@ -1991,8 +2055,15 @@ static void bta_jv_pm_conn_busy(tBTA_JV_PM_CB* p_cb) {
  *
  ******************************************************************************/
 static void bta_jv_pm_conn_idle(tBTA_JV_PM_CB* p_cb) {
-  if ((NULL != p_cb) && (BTA_JV_PM_IDLE_ST != p_cb->state))
-    bta_jv_pm_state_change(p_cb, BTA_JV_CONN_IDLE);
+  if ((NULL != p_cb) && (BTA_JV_PM_IDLE_ST != p_cb->state)) {
+    log::verbose("bta_jv_pm_conn_idle, p_cb: {}", fmt::ptr(p_cb));
+    p_cb->state = BTA_JV_PM_IDLE_ST;
+
+    // start intermediate idle timer for 1s
+    if (!alarm_is_scheduled(p_cb->idle_timer)) {
+      alarm_set_on_mloop(p_cb->idle_timer, BTA_JV_IDLE_TIMEOUT_MS, bta_jv_idle_timeout_handler, p_cb);
+    }
+  }
 }
 
 /*******************************************************************************
@@ -2082,3 +2153,39 @@ void bta_jv_start_discovery_cback(uint32_t rfcomm_slot_id,
 }
 
 }  // namespace bluetooth::legacy::testing
+
+/*******************************************************************************
+**
+** Function         bta_jv_idle_timeout_handler
+**
+** Description      Bta JV specific idle timeout handler
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+void bta_jv_idle_timeout_handler (void *tle) {
+  tBTA_JV_PM_CB *p_cb = (tBTA_JV_PM_CB *)tle;
+  log::verbose("p_cb: {}", fmt::ptr(p_cb));
+
+  if (NULL != p_cb) {
+
+    if (p_cb->cong == TRUE) {
+      p_cb->state = BTA_JV_PM_BUSY_ST;
+      bta_jv_pm_conn_idle(p_cb);
+      log::warn(": {}", p_cb->cong);
+      return;
+    }
+
+    tBTM_PM_MODE mode = BTM_PM_MD_ACTIVE;
+    if (BTM_ReadPowerMode(p_cb->peer_bd_addr, &mode)) {
+      if (mode == BTM_PM_MD_SNIFF) {
+        log::warn("mode: {}", mode);
+        return;
+      }
+    } else {
+      log::warn("Read power mode failed: {}", mode);
+    }
+    bta_jv_pm_state_change(p_cb, BTA_JV_CONN_IDLE);
+  }
+}

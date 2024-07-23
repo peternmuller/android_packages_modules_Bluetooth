@@ -486,6 +486,7 @@ cc_test {
         ":TestMockStackL2cap",
         ":TestMockStackRfcomm",
         ":TestMockStackSdp",
+        ":TestMockStackAcl",
         "jv/bta_jv_act.cc",
         "rfcomm/bta_rfcomm_scn.cc",
         "test/bta_rfcomm_scn_test.cc",
