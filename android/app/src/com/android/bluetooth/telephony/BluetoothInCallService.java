@@ -162,7 +162,7 @@ public class BluetoothInCallService extends InCallService {
     public static int DSDS = 1;
     public static int PSEUDO_DSDA = 2;
     public static int DSDA = 3;
-    public int currentMode = DSDS;
+    public int currentMode = DSDA;
     public boolean dsdsTransition = false;
 
     @VisibleForTesting
@@ -271,7 +271,7 @@ public class BluetoothInCallService extends InCallService {
                String action = intent.getAction();
                 if (action.equals(ACTION_MSIM_VOICE_CAPABILITY_CHANGED)) {
                     Log.d(TAG, "ACTION_MSIM_VOICE_CAPABILITY_CHANGED intent received");
-                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDS);
+                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDA);
                     if (mTelephonyManager != null) {
                         if (currentMode == DSDS) {
                             Log.w(TAG, "In DSDS mode");
