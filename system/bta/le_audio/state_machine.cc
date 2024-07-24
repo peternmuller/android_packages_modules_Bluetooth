@@ -925,7 +925,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       }
       state_machine_callbacks_->StatusReportCb(group->group_id_,
                                                GroupStreamStatus::STREAMING);
-    };
+    }
   }
 
   void ProcessHciNotifRemoveIsoDataPath(LeAudioDeviceGroup* group,
