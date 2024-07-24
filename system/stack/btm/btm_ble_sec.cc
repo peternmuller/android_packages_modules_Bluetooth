@@ -83,6 +83,11 @@ constexpr char kBtmLogTag[] = "SEC";
 static constexpr char kPropertyCtkdDisableCsrkDistribution[] =
     "bluetooth.core.smp.le.ctkd.quirk_disable_csrk_distribution";
 
+void btm_ble_conn_proc_timer_timeout(void* /* data */) {
+  log::warn("btm_ble_conn_proc_timer_timeout");
+}
+
+
 /******************************************************************************/
 /* External Function to be called by other modules                            */
 /******************************************************************************/
@@ -1548,8 +1553,15 @@ void btm_ble_connected(const RawAddress& bda, uint16_t handle,
                        tBLE_ADDR_TYPE addr_type, bool addr_matched,
                        bool can_read_discoverable_characteristics) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
-  log::info("Update timestamp for ble connection:{}", bda);
+  log::warn("Update timestamp for ble connection:{}", bda);
+
+  alarm_set_on_mloop(btm_cb.devcb.conn_proc_timer, BTM_SEC_CONN_PROC_TIMEOUT_MS,
+                       btm_ble_conn_proc_timer_timeout, NULL);
+
   // TODO() Why is timestamp a counter ?
   p_dev_rec->timestamp = btm_sec_cb.dev_rec_count++;
 

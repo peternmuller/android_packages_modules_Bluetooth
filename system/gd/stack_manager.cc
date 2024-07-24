@@ -22,6 +22,7 @@
 #include <future>
 #include <queue>
 
+#include <signal.h>
 #include "common/bind.h"
 #include "module.h"
 #include "os/handler.h"
@@ -54,10 +55,10 @@ void StackManager::StartUp(ModuleList* modules, Thread* stack_thread) {
 
   log::info("init_status == {}", int(init_status));
 
-  log::assert_that(
-      init_status == std::future_status::ready,
-      "Can't start stack, last instance: {}",
-      registry_.last_instance_);
+  if (init_status != std::future_status::ready) {
+    log::warn("Can't start stack, last instance: {}", registry_.last_instance_);
+    kill(getpid(), SIGKILL);
+  }
 
   log::info("init complete");
 }

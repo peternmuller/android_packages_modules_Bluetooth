@@ -36,7 +36,6 @@
 #include "stack/include/l2cdefs.h"
 #include "stack/rfcomm/port_int.h"
 #include "stack/rfcomm/rfc_int.h"
-#include "stack/include/main_thread.h"
 #include "types/raw_address.h"
 
 using namespace bluetooth;
@@ -51,7 +50,6 @@ static void RFCOMM_ConfigInd(uint16_t lcid, tL2CAP_CFG_INFO* p_cfg);
 static void RFCOMM_ConfigCnf(uint16_t lcid, uint16_t result,
                              tL2CAP_CFG_INFO* p_cfg);
 static void RFCOMM_DisconnectInd(uint16_t lcid, bool is_clear);
-static void RFCOMM_BufDataInd(uint16_t lcid, BT_HDR* p_buf);
 static void RFCOMM_CongestionStatusInd(uint16_t lcid, bool is_congested);
 
 /*******************************************************************************
@@ -169,6 +167,10 @@ void RFCOMM_ConnectCnf(uint16_t lcid, uint16_t result) {
       }
 
       p_mcb->pending_lcid = 0;
+      if (p_mcb->pending_buf != nullptr) {
+        osi_free(p_mcb->pending_buf);
+        p_mcb->pending_buf = nullptr;
+      }
     }
   }
 
@@ -263,9 +265,22 @@ void RFCOMM_DisconnectInd(uint16_t lcid, bool is_conf_needed) {
  *
  ******************************************************************************/
 void RFCOMM_BufDataInd(uint16_t lcid, BT_HDR* p_buf) {
+  if (p_buf == nullptr) {
+    log::warn("Bluetooth Header is empty.");
+    return;
+  }
   tRFC_MCB* p_mcb = rfc_find_lcid_mcb(lcid);
 
   if (!p_mcb) {
+
+
+    for (auto& [cid, mcb] : rfc_lcid_mcb) {
+      if (mcb != nullptr && mcb->pending_lcid == lcid) {
+        log::warn("pending mcb found store data buffer for lcid 0x{:x}", lcid);
+        mcb->pending_buf =  p_buf;
+        return;
+      }
+    }
     log::warn("Cannot find RFCOMM multiplexer for lcid 0x{:x}", lcid);
     osi_free(p_buf);
     return;
@@ -367,9 +382,7 @@ void RFCOMM_CongestionStatusInd(uint16_t lcid, bool is_congested) {
   } else {
     log::verbose("RFCOMM_CongestionStatusInd LCID:0x{:x}", lcid);
   }
-  do_in_main_thread(
-      FROM_HERE, base::BindOnce(rfc_process_l2cap_congestion,
-                                p_mcb, is_congested));
+  rfc_process_l2cap_congestion(p_mcb, is_congested);
 }
 
 /*******************************************************************************

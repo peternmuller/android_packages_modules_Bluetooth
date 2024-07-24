@@ -96,6 +96,8 @@ typedef struct tBTM_DEVCB {
   alarm_t* read_tx_power_timer;     /* Read tx power timer */
   tBTM_CMPL_CB* p_tx_power_cmpl_cb; /* Callback function to be called       */
 
+  alarm_t* conn_proc_timer; /* Connection processing timer */
+
   DEV_CLASS dev_class; /* Local device class                   */
 
   tBTM_CMPL_CB*
@@ -112,6 +114,7 @@ typedef struct tBTM_DEVCB {
     read_automatic_flush_timeout_timer =
         alarm_new("btm.read_automatic_flush_timeout_timer");
     read_tx_power_timer = alarm_new("btm.read_tx_power_timer");
+    conn_proc_timer = alarm_new("btm.conn_proc_timer");
   }
 
   void Free() {
@@ -120,6 +123,7 @@ typedef struct tBTM_DEVCB {
     alarm_free(read_failed_contact_counter_timer);
     alarm_free(read_automatic_flush_timeout_timer);
     alarm_free(read_tx_power_timer);
+    alarm_free(conn_proc_timer);
   }
 } tBTM_DEVCB;
 

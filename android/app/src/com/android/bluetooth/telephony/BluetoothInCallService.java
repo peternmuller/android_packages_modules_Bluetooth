@@ -1790,10 +1790,6 @@ public class BluetoothInCallService extends InCallService {
         // TODO: Should we be hardcoding this value to 2 or should we check if all top level calls
         //       are held?
         boolean callsPendingSwitch = (numHeldCalls == 2);
-        if (mEnableDsdaMode && callsPendingSwitch) {
-            callsPendingSwitch = false;
-            numHeldCalls = 1;
-        }
 
         // For conference calls which support swapping the active BluetoothCall within the
         // conference (namely CDMA calls) we need to expose that as a held BluetoothCall
@@ -2442,7 +2438,7 @@ public class BluetoothInCallService extends InCallService {
         public BluetoothCall getCallByState(int state) {
             List<BluetoothCall> calls = getBluetoothCalls();
             for (BluetoothCall call : calls) {
-                if (state == call.getState()) {
+                if (state == call.getState() && call.getParentId() == null) {
                     return call;
                 }
             }

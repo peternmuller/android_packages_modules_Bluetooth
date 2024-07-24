@@ -207,7 +207,6 @@ public class ScanManager {
         mRegularScanClients.clear();
         mBatchClients.clear();
         mSuspendedScanClients.clear();
-        mScanNative.cleanup();
 
         if (mActivityManager != null) {
             try {
@@ -230,6 +229,8 @@ public class ScanManager {
             }
             mHandler = null;
         }
+
+        mScanNative.cleanup();
 
         try {
             mContext.unregisterReceiver(mLocationReceiver);
@@ -776,10 +777,10 @@ public class ScanManager {
             switch (client.scanModeApp) {
                 case ScanSettings.SCAN_MODE_LOW_POWER:
                     return client.updateScanMode(ScanSettings.SCAN_MODE_BALANCED);
-                case ScanSettings.SCAN_MODE_BALANCED:
                 case ScanSettings.SCAN_MODE_AMBIENT_DISCOVERY:
                     return client.updateScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
                 case ScanSettings.SCAN_MODE_OPPORTUNISTIC:
+                case ScanSettings.SCAN_MODE_BALANCED:
                 case ScanSettings.SCAN_MODE_LOW_LATENCY:
                 default:
                     return false;

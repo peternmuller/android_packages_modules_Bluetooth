@@ -2067,7 +2067,7 @@ void btif_on_gatt_results(RawAddress bd_addr, BD_NAME bd_name,
       (void*)property_value.data()});
 
   /* Also write this to the NVRAM */
-  bt_status_t ret = btif_storage_set_remote_device_property(&bd_addr, &prop[0]);
+  bt_status_t ret = btif_storage_set_remote_device_property(&bd_addr, &prop.back());
   ASSERTC(ret == BT_STATUS_SUCCESS, "storing remote services failed", ret);
 
   /* Remote name update */
@@ -2078,7 +2078,7 @@ void btif_on_gatt_results(RawAddress bd_addr, BD_NAME bd_name,
         BT_PROPERTY_BDNAME,
         static_cast<int>(strnlen((char*)bd_name, BD_NAME_LEN)), bd_name});
 
-    ret = btif_storage_set_remote_device_property(&bd_addr, &prop[1]);
+    ret = btif_storage_set_remote_device_property(&bd_addr, &prop.back());
     ASSERTC(ret == BT_STATUS_SUCCESS, "failed to save remote device property",
             ret);
   }
