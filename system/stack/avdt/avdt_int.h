@@ -61,6 +61,9 @@ enum {
 #define AVDT_CLOSE_INT 1
 #define AVDT_OPEN_ACP 2
 #define AVDT_OPEN_INT 3
+#define AVDT_CONF_ACP 4
+#define AVDT_CONF_INT 5
+#define AVDT_DELAY_RPT_OPEN_INT 6
 
 /* states for avdt_scb_verify */
 #define AVDT_VERIFY_OPEN 0
@@ -86,6 +89,9 @@ enum {
 
 /* scb transport channel disconnect timeout value (in milliseconds) */
 #define AVDT_SCB_TC_DISC_TIMEOUT_MS (10 * 1000)
+
+/*Delay report timer for remote response*/
+#define AVDT_DELAY_REPORT_TIMEOUT_MS (2 * 1000)
 
 /* maximum number of command retransmissions */
 #ifndef AVDT_RET_MAX
@@ -413,6 +419,7 @@ class AvdtpScb {
  public:
   AvdtpScb()
       : transport_channel_timer(nullptr),
+        delay_report_timer(nullptr),
         p_pkt(nullptr),
         p_ccb(nullptr),
         media_seq(0),
@@ -486,6 +493,7 @@ class AvdtpScb {
   AvdtpSepConfig curr_cfg;           // Current configuration
   AvdtpSepConfig req_cfg;            // Requested configuration
   alarm_t* transport_channel_timer;  // Transport channel connect timer
+  alarm_t* delay_report_timer;       // Delay report timer before Open
   BT_HDR* p_pkt;                     // Packet waiting to be sent
   AvdtpCcb* p_ccb;                   // CCB associated with this SCB
   uint16_t media_seq;                // Media packet sequence number
@@ -939,6 +947,7 @@ void avdt_ccb_idle_ccb_timer_timeout(void* data);
 void avdt_ccb_ret_ccb_timer_timeout(void* data);
 void avdt_ccb_rsp_ccb_timer_timeout(void* data);
 void avdt_scb_transport_channel_timer_timeout(void* data);
+void avdt_delay_report_timer_timeout(void* data);
 
 /*****************************************************************************
  * macros
