@@ -1326,7 +1326,10 @@ public class LeAudioService extends ProfileService {
             return;
         }
 
-        if (mUnicastGroupIdDeactivatedForBroadcastTransition != LE_AUDIO_GROUP_ID_INVALID) {
+        if (getLeadDeviceForTheGroup(mUnicastGroupIdDeactivatedForBroadcastTransition) == null) {
+            Log.w(TAG, "stopBroadcast: No valid unicast device for group ID "
+                    + mUnicastGroupIdDeactivatedForBroadcastTransition);
+        } else {
             mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE,
                     AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
         }
@@ -2709,7 +2712,10 @@ public class LeAudioService extends ProfileService {
          */
         if (status == LeAudioStackEvent.STATUS_LOCAL_STREAM_REQUESTED) {
             Optional<Integer> broadcastId = getFirstNotStoppedBroadcastId();
-            if (broadcastId.isEmpty() || (mBroadcastDescriptors.get(broadcastId.get()) == null)) {
+            BluetoothDevice unicastDevice =
+                    getLeadDeviceForTheGroup(mUnicastGroupIdDeactivatedForBroadcastTransition);
+            if (broadcastId.isEmpty() || (mBroadcastDescriptors.get(broadcastId.get()) == null)
+                    || (unicastDevice == null)) {
                 Log.e(
                         TAG,
                         "handleUnicastStreamStatusChange: Broadcast to Unicast handover not"

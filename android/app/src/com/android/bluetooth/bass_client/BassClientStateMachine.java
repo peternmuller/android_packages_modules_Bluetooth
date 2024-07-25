@@ -341,6 +341,11 @@ public class BassClientStateMachine extends StateMachine {
             return null;
         }
 
+        if (recvState.getNumSubgroups() == 0) {
+            Log.w(TAG, "getBroadcastMetadataFromReceiveState: number of subgroups is 0");
+            return null;
+        }
+
         List<BluetoothLeAudioContentMetadata> subgroupMetadata =
                 recvState.getSubgroupMetadata();
         for (int i = 0; i < recvState.getNumSubgroups(); i++) {
