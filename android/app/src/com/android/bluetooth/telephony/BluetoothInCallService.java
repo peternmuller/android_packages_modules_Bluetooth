@@ -108,7 +108,8 @@ public class BluetoothInCallService extends InCallService {
     private static final int OUTGOING_INCOMING_DISCONNECTION = 3;
     private static final int MULTI_RINGING_DISCONNECTION = 4;
     private static final int OUTGOING_DISCONNECTION = 5;
-    private static final int DSDS_EVENT = 6;
+    private static final int MULTI_HELD_ACTIVE = 6;
+    private static final int DSDS_EVENT = 7;
 
     public int mLastBtHeadsetState = CALL_STATE_IDLE;
 
@@ -822,6 +823,38 @@ public class BluetoothInCallService extends InCallService {
                       mDsDaRingingName);
                    mLastBtHeadsetState = CALL_STATE_INCOMING;
                  }
+             break;
+             case MULTI_HELD_ACTIVE:
+                Log.d(TAG, "MULTI_HELD_ACTIVE event");
+                if (mNumHeldCalls < mDsDaHeldCalls) {
+                    Log.d(TAG, "one of the held moved to active");
+                   if (numActiveCalls > mDsdaActiveCalls) {
+                     int temp_callState = CALL_STATE_IDLE;
+                     if (numRingingCalls > 0) {
+                       temp_callState = CALL_STATE_INCOMING;
+                       BluetoothCall ringingCall = mCallInfo.getRingingOrSimulatedRingingCall();
+                       getDSDARingingAddress(ringingCall);
+                     }
+                     mBluetoothHeadset.phoneStateChanged(
+                        numActiveCalls,
+                        0,
+                        temp_callState,
+                        mDsDaRingingAddress,
+                        mDsDaRingingAddressType,
+                        mDsDaRingingName);
+                     handlerThreadSleep(DELAY_DSDA_CALL_INDICATORS);
+                     mBluetoothHeadset.phoneStateChanged(
+                        numActiveCalls,
+                        1,
+                        temp_callState,
+                        mDsDaRingingAddress,
+                        mDsDaRingingAddressType,
+                        mDsDaRingingName);
+                     mDsDaHeldCalls = numHeldCalls;
+                     mDsdaActiveCalls = numActiveCalls;
+                     mLastBtHeadsetState = temp_callState;
+                   }
+                }
              break;
              case DSDS_EVENT:
                 Log.d(TAG, "DSDS_EVENT event");
@@ -2306,7 +2339,7 @@ public class BluetoothInCallService extends InCallService {
                            //we will send as if held is made as active and
                            //then update the held call info
                            Log.d(TAG, "multiple held, one moved to active");
-                           updateHeadsetWithDSDACallState(true, MULTI_HELD);
+                           updateHeadsetWithDSDACallState(true, MULTI_HELD_ACTIVE);
                        }
                    }
                    else {
