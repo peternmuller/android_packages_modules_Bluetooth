@@ -211,6 +211,9 @@ public class BluetoothInCallService extends InCallService {
     private static final String ACTION_MSIM_VOICE_CAPABILITY_CHANGED =
         "org.codeaurora.intent.action.MSIM_VOICE_CAPABILITY_CHANGED";
 
+    private static final String PROPERTY_MULTISIM_VOICE_CAPABILITY =
+        "ril.multisim.voice_capability";
+
     /**
      * Listens to connections and disconnections of bluetooth headsets. We need to save the current
      * bluetooth headset so that we know where to send BluetoothCall updates.
@@ -271,7 +274,7 @@ public class BluetoothInCallService extends InCallService {
                String action = intent.getAction();
                 if (action.equals(ACTION_MSIM_VOICE_CAPABILITY_CHANGED)) {
                     Log.d(TAG, "ACTION_MSIM_VOICE_CAPABILITY_CHANGED intent received");
-                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDA);
+                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, currentMode);
                     if (mTelephonyManager != null) {
                         if (currentMode == DSDS) {
                             Log.w(TAG, "In DSDS mode");
@@ -1262,6 +1265,12 @@ public class BluetoothInCallService extends InCallService {
         }
         mTelephonyManager = getSystemService(TelephonyManager.class);
         mTelecomManager = getSystemService(TelecomManager.class);
+        currentMode = SystemProperties.getInt(PROPERTY_MULTISIM_VOICE_CAPABILITY, UNKNOWN);
+        Log.e(TAG, "current mode is: " + currentMode);
+        if (currentMode == UNKNOWN || currentMode == DSDS) {
+            Log.e(TAG, "setting the default mode to DSDS");
+            currentMode = DSDS;
+        }
     }
 
     @Override
