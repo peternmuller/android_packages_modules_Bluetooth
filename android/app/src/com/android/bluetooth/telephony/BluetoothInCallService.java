@@ -2178,6 +2178,25 @@ public class BluetoothInCallService extends InCallService {
        int btCallState           = getBtCallState(call, false);
        Log.d(TAG, "ProcessOnStateChanged events");
 
+      if ((mdsDaSelectPhoneAccountFlag == 1) &&
+          (mSelectPhoneAccountId == call.getId())) {
+         if ((call.getState() == Call.STATE_CONNECTING) ||
+            (call.getState() == Call.STATE_DIALING)) {
+           Log.d(TAG, "Dialing state update After SelectPhoneAccount");
+           mdsDaSelectPhoneAccountFlag = 0;
+           mSelectPhoneAccountId = 0;
+           mDsDaOutgoingCalls++;
+           updateHeadsetWithCallState(false /*force*/);
+         }
+         else {
+           //If not call moved to Dialing or connecting, Call would
+           //Have been disconnected before selecting the sim.
+           //Will remove after the call removed callback.
+           Log.d(TAG, "Call Disconnect for SelectPhoneAccount");
+         }
+         return;
+      }
+
        switch (bluetoothLastState) {
           case CALL_STATE_ALERTING:
           case CALL_STATE_INCOMING:
