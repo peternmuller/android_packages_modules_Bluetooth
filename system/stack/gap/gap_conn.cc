@@ -783,7 +783,7 @@ static void gap_config_ind(uint16_t l2cap_cid, tL2CAP_CFG_INFO* p_cfg) {
   } else {
     if (p_ccb->cfg.fcr.mode == L2CAP_FCR_ERTM_MODE) {
       local_mtu_size =
-          BT_DEFAULT_BUFFER_SIZE - sizeof(BT_HDR) - L2CAP_MIN_OFFSET;
+          OBX_LRG_DATA_BUF_SIZE - sizeof(BT_HDR) - L2CAP_MIN_OFFSET;
     } else {
       local_mtu_size = L2CAP_MTU_SIZE;
     }
