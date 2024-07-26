@@ -1936,7 +1936,7 @@ public class BluetoothInCallService extends InCallService {
             mHeadsetUpdatedRecently = true;
             mLastBtHeadsetState = bluetoothCallState;
             mDsdaActiveCalls = mNumActiveCalls;
-            mDsDaHeldCalls = mNumHeldCalls;
+            //mDsDaHeldCalls = mNumHeldCalls;
             Log.d(TAG, "LastBt Headset State is : "+ mLastBtHeadsetState);
         }
     }
@@ -2192,7 +2192,7 @@ public class BluetoothInCallService extends InCallService {
                  //outgoing call is made active
                  if (mDsdaIncomingCalls == 0) {
                     Log.d(TAG, "outgoing call became active. DSDS");
-                    mDsDaOutgoingCalls--;
+                    mDsDaOutgoingCalls = 0;
                     mDsdaActiveCalls = 1;
                     updateHeadsetWithDSDACallState(true, DSDS_EVENT);
                  } else {
@@ -2246,6 +2246,10 @@ public class BluetoothInCallService extends InCallService {
                       Log.d(TAG, "1st held call from active");
                   }
                 }
+              } else {
+                Log.d(TAG, "Received Held call event before any active call");
+                mDsDaHeldCalls++;
+                updateHeadsetWithDSDACallState(true, DSDS_EVENT);
               }
            }
          break;
