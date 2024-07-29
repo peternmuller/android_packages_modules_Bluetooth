@@ -2183,6 +2183,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       struct bluetooth::le_audio::client_parser::ascs::ase_rsp_hdr& arh,
       struct ase* ase, LeAudioDeviceGroup* group,
       LeAudioDevice* leAudioDevice) {
+    log::info("group_id: {}", group->group_id_);
+    log::debug("ase state: {}", static_cast<int>(ase->state));
     switch (ase->state) {
       case AseState::BTA_LE_AUDIO_ASE_STATE_IDLE:
       case AseState::BTA_LE_AUDIO_ASE_STATE_CODEC_CONFIGURED:
@@ -2226,6 +2228,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         cancel_watchdog_if_needed(group->group_id_);
         ReleaseCisIds(group);
+        RemoveCigForGroup(group);
+        group->SetTargetState(AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);
         state_machine_callbacks_->StatusReportCb(group->group_id_,
                                                  GroupStreamStatus::IDLE);
 
