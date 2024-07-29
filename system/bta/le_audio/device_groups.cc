@@ -1896,6 +1896,22 @@ void LeAudioDeviceGroup::ClearSuspendedForReconfiguration(void) {
   suspended_for_reconfig_ = false;
 }
 
+
+
+bool LeAudioDeviceGroup::IsReconfigStartPendingDir(uint8_t direction) const {
+  log::info(" reconfig_start_pending_directions_: {}",
+                                      reconfig_start_pending_directions_);
+  return (reconfig_start_pending_directions_ & direction);
+}
+
+void LeAudioDeviceGroup::SetReconfigStartPendingDirs(uint8_t directions) {
+  reconfig_start_pending_directions_ = directions;
+}
+
+void LeAudioDeviceGroup::ClearReconfigStartPendingDirs(uint8_t directions) {
+  reconfig_start_pending_directions_ &= ~directions;
+}
+
 void LeAudioDeviceGroup::Disable(int gatt_if) {
   is_enabled_ = false;
 

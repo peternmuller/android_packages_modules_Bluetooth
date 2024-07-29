@@ -1457,6 +1457,9 @@ class LeAudioClientImpl : public LeAudioClient {
       }
 
       log::info("current state {}", ToString(group->GetState()));
+      group->ClearReconfigStartPendingDirs(
+           bluetooth::le_audio::types::kLeAudioDirectionSink |
+           bluetooth::le_audio::types::kLeAudioDirectionSource);
 
       //Below to ensure CIS termination before updating to app about inactive.
       if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
@@ -1579,6 +1582,9 @@ class LeAudioClientImpl : public LeAudioClient {
         //to other device(Mostly in case of making call active from in-active device)
         log::info("Clear pending configuration flag of previous active group");
         prev_group->ClearPendingConfiguration();
+        prev_group->ClearReconfigStartPendingDirs(
+             bluetooth::le_audio::types::kLeAudioDirectionSink |
+             bluetooth::le_audio::types::kLeAudioDirectionSource);
         GroupStop(previous_active_group);
       } else {
         log::info(" Previous group not streaming");
@@ -4483,6 +4489,9 @@ class LeAudioClientImpl : public LeAudioClient {
       return;
     }
 
+    group->ClearReconfigStartPendingDirs(
+         bluetooth::le_audio::types::kLeAudioDirectionSink);
+
     log::debug("configuration_context_type_= {}.",
                               ToString(configuration_context_type_));
     /* Check if the device resume is allowed */
@@ -4791,6 +4800,9 @@ class LeAudioClientImpl : public LeAudioClient {
       log::error("Invalid group: {}", static_cast<int>(active_group_id_));
       return;
     }
+
+    group->ClearReconfigStartPendingDirs(
+         bluetooth::le_audio::types::kLeAudioDirectionSource);
 
     log::debug("configuration_context_type_= {}.",
                               ToString(configuration_context_type_));
@@ -5127,8 +5139,19 @@ class LeAudioClientImpl : public LeAudioClient {
 
     group->dsa_.mode = dsa_mode;
 
-    ReconfigureOrUpdateRemote(
-        group, bluetooth::le_audio::types::kLeAudioDirectionSink);
+    /* allow reconfigure only if the new source context is bi-directional
+       (or) not in suspended for reconfiguration (or) receiver state is idle
+       to avoid the additional reconfigurations.
+    */
+    if((local_metadata_context_types_.source.test(LeAudioContextType::MEDIA) &&
+        configuration_context_type_ == LeAudioContextType::LIVE) &&
+       (group->IsPendingConfiguration() || group->IsSuspendedForReconfiguration() ||
+        group->IsReconfigStartPendingDir(bluetooth::le_audio::types::kLeAudioDirectionSink))) {
+      log::warn(" Skip ReconfigureOrUpdateRemote as reconfig start pending for Source.");
+    } else {
+      ReconfigureOrUpdateRemote(
+           group, bluetooth::le_audio::types::kLeAudioDirectionSink);
+    }
   }
 
   /* Applies some predefined policy on the audio context metadata, including
@@ -6080,6 +6103,32 @@ class LeAudioClientImpl : public LeAudioClient {
     SetAsymmetricBlePhy(group, false);
   }
 
+  void reconfigurationComplete(void) {
+    // Check which directions were suspended
+    uint8_t previously_active_directions = 0;
+    auto group = aseGroups_.FindById(active_group_id_);
+
+    if (audio_sender_state_ >= AudioState::READY_TO_START) {
+      previously_active_directions |=
+          bluetooth::le_audio::types::kLeAudioDirectionSink;
+    }
+    if (audio_receiver_state_ >= AudioState::READY_TO_START) {
+      previously_active_directions |=
+          bluetooth::le_audio::types::kLeAudioDirectionSource;
+    }
+
+    /* We are done with reconfiguration.
+     * Clean state and if Audio HAL is waiting, cancel the request
+     * so Audio HAL can Resume again.
+     */
+    if(group) {
+      group->ClearSuspendedForReconfiguration();
+      group->SetReconfigStartPendingDirs(previously_active_directions);
+    }
+    CancelStreamingRequest();
+    ReconfigurationComplete(previously_active_directions);
+  }
+
   void OnStateMachineStatusReportCb(int group_id, GroupStreamStatus status) {
     log::info(
         "status: {} ,  group_id: {}, audio_sender_state {}, "
@@ -6180,26 +6229,7 @@ class LeAudioClientImpl : public LeAudioClient {
         SuspendAudio();
         break;
       case GroupStreamStatus::CONFIGURED_BY_USER: {
-        // Check which directions were suspended
-        uint8_t previously_active_directions = 0;
-        if (audio_sender_state_ >= AudioState::READY_TO_START) {
-          previously_active_directions |=
-              bluetooth::le_audio::types::kLeAudioDirectionSink;
-        }
-        if (audio_receiver_state_ >= AudioState::READY_TO_START) {
-          previously_active_directions |=
-              bluetooth::le_audio::types::kLeAudioDirectionSource;
-        }
-
-        /* We are done with reconfiguration.
-         * Clean state and if Audio HAL is waiting, cancel the request
-         * so Audio HAL can Resume again.
-         */
-        if (group->IsSuspendedForReconfiguration()) {
-          group->ClearSuspendedForReconfiguration();
-        }
-        CancelStreamingRequest();
-        ReconfigurationComplete(previously_active_directions);
+        reconfigurationComplete();
       } break;
       case GroupStreamStatus::CONFIGURED_AUTONOMOUS:
         /* This state is notified only when
@@ -6319,19 +6349,7 @@ class LeAudioClientImpl : public LeAudioClient {
             stream_setup_end_timestamp_ = 0;
             stream_setup_start_timestamp_ = 0;
             if (group->IsSuspendedForReconfiguration()) {
-               group->ClearSuspendedForReconfiguration();
-               // Check which directions were suspended
-               uint8_t prev_active_directions = 0;
-               if (audio_sender_state_ >= AudioState::READY_TO_START) {
-                 prev_active_directions |=
-                     bluetooth::le_audio::types::kLeAudioDirectionSink;
-               }
-               if (audio_receiver_state_ >= AudioState::READY_TO_START) {
-                 prev_active_directions |=
-                     bluetooth::le_audio::types::kLeAudioDirectionSource;
-               }
-               CancelStreamingRequest();
-               ReconfigurationComplete(prev_active_directions);
+              reconfigurationComplete();
             } else {
                CancelStreamingRequest();
             }
