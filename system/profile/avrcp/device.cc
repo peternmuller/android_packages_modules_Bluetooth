@@ -683,8 +683,37 @@ void Device::SetVolume(int8_t volume) {
     }
   }
 
-  volume_ = volume;
   send_message_cb_.Run(label, false, std::move(request));
+
+  if (stack_config_get_interface()->get_pts_avrcp_test()) {
+    label = MAX_TRANSACTION_LABEL;
+    for (uint8_t i = 0; i < MAX_TRANSACTION_LABEL; i++) {
+      if (active_labels_.find(i) == active_labels_.end()) {
+        active_labels_.insert(i);
+        label = i;
+        break;
+      }
+    }
+
+    auto vol_cmd_push = PassThroughPacketBuilder::MakeBuilder(
+         false, true, (volume_ < volume) ? 0x41 : 0x42);
+    send_message(label, false, std::move(vol_cmd_push));
+
+    label = MAX_TRANSACTION_LABEL;
+    for (uint8_t i = 0; i < MAX_TRANSACTION_LABEL; i++) {
+      if (active_labels_.find(i) == active_labels_.end()) {
+        active_labels_.insert(i);
+        label = i;
+        break;
+      }
+    }
+
+    auto vol_cmd_release = PassThroughPacketBuilder::MakeBuilder(
+         false, false, (volume_ < volume) ? 0x41 : 0x42);
+    send_message(label, false, std::move(vol_cmd_release));
+  }
+
+  volume_ = volume;
 }
 
 void Device::TrackChangedNotificationResponse(uint8_t label, bool interim,
