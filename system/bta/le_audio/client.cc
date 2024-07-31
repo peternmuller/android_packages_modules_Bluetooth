@@ -2147,7 +2147,9 @@ class LeAudioClientImpl : public LeAudioClient {
       }
 
       leAudioDevice->SetAvailableContexts(contexts);
-
+      btif_storage_set_leaudio_supported_context_types(
+          leAudioDevice->address_, contexts.sink.value(),
+          contexts.source.value());
       if (!group) {
         return;
       }
@@ -2192,10 +2194,6 @@ class LeAudioClientImpl : public LeAudioClient {
               supp_audio_contexts, len, value)) {
         /* Just store if for now */
         leAudioDevice->SetSupportedContexts(supp_audio_contexts);
-
-        btif_storage_set_leaudio_supported_context_types(
-            leAudioDevice->address_, supp_audio_contexts.sink.value(),
-            supp_audio_contexts.source.value());
       }
     } else if (hdl == leAudioDevice->ctp_hdls_.val_hdl) {
       groupStateMachine_->ProcessGattCtpNotification(group, value, len);
