@@ -544,7 +544,8 @@ static void BTM_CancelLeScan() {
  *
  ******************************************************************************/
 void BTM_CancelInquiry(void) {
-  log::verbose("");
+  log::info("inq_active={:#x}, inqparms.mode={:#x}",
+      btm_cb.btm_inq_vars.inq_active, btm_cb.btm_inq_vars.inqparms.mode);
 
   log::assert_that(BTM_IsDeviceUp(), "assert failed: BTM_IsDeviceUp()");
 
@@ -779,6 +780,11 @@ tBTM_STATUS BTM_StartInquiry(tBTM_INQ_RESULTS_CB* p_results_cb,
                              "assert failed: status_view.IsValid()");
             auto status = status_view.GetStatus();
             if (status == bluetooth::hci::ErrorCode::SUCCESS) {
+              if ((btm_cb.btm_inq_vars.inq_active & BTM_GENERAL_INQUIRY) != 0 &&
+                  (btm_cb.btm_inq_vars.inqparms.mode & BTM_GENERAL_INQUIRY) == 0) {
+                log::warn("inq_active is inconsistent with inq mode");
+                btm_cb.btm_inq_vars.inqparms.mode |= BTM_GENERAL_INQUIRY;
+              }
               BTIF_dm_report_inquiry_status_change(
                   tBTM_INQUIRY_STATE::BTM_INQUIRY_STARTED);
             } else {
@@ -1747,6 +1753,9 @@ void btm_sort_inq_result(void) {
  *
  ******************************************************************************/
 void btm_process_inq_complete(tHCI_STATUS status, uint8_t mode) {
+  log::info("mode={:#x}, inq_active={:#x}, inqparms.mode={:#x}",
+      mode, btm_cb.btm_inq_vars.inq_active, btm_cb.btm_inq_vars.inqparms.mode);
+
   btm_cb.btm_inq_vars.inqparms.mode &= ~(mode);
   const auto inq_active = btm_cb.btm_inq_vars.inq_active;
 
