@@ -189,6 +189,11 @@ void NotifyBondingCanceled(tBTM_STATUS /* btm_status */) {
   }
 }
 
+
+void btm_conn_proc_timer_timeout(void* /* data */) {
+  log::warn("btm_conn_proc_timer expired");
+}
+
 /*******************************************************************************
  *
  * Function         btm_dev_authenticated
@@ -1578,6 +1583,9 @@ tBTM_STATUS btm_sec_l2cap_access_req_by_requirement(
 
   /* Find or get oldest record */
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(bd_addr);
+  if (p_dev_rec == NULL) {
+    return (BTM_NO_RESOURCES);
+  }
 
   p_dev_rec->hci_handle = BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_BR_EDR);
 
@@ -1854,7 +1862,9 @@ tBTM_STATUS btm_sec_mx_access_request(const RawAddress& bd_addr,
 
   /* Find or get oldest record */
   p_dev_rec = btm_find_or_alloc_dev(bd_addr);
-
+  if (p_dev_rec == NULL) {
+    return (BTM_NO_RESOURCES);
+  }
   /* there are some devices (moto phone) which connects to several services at
    * the same time */
   /* we will process one after another */
@@ -2036,6 +2046,9 @@ void btm_sec_conn_req(const RawAddress& bda, const DEV_CLASS dc) {
   btm_sec_cb.connecting_dc = dc;
 
   p_dev_rec = btm_find_or_alloc_dev(bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
   p_dev_rec->sm4 |= BTM_SM4_CONN_PEND;
 }
 
@@ -2526,6 +2539,9 @@ void btm_sec_rmt_host_support_feat_evt(const RawAddress bd_addr,
   tBTM_SEC_DEV_REC* p_dev_rec;
 
   p_dev_rec = btm_find_or_alloc_dev(bd_addr);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
   log::info("Got btm_sec_rmt_host_support_feat_evt from {}", bd_addr);
 
@@ -2575,6 +2591,9 @@ void btm_io_capabilities_req(RawAddress p) {
   }
 
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(p);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
   if ((btm_sec_cb.security_mode == BTM_SEC_MODE_SC) &&
       (!p_dev_rec->remote_feature_received)) {
@@ -2749,6 +2768,9 @@ void btm_io_capabilities_rsp(const tBTM_SP_IO_RSP evt_data) {
 
   /* Allocate a new device record or reuse the oldest one */
   p_dev_rec = btm_find_or_alloc_dev(evt_data.bd_addr);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
   /* If no security is in progress, this indicates incoming security */
   if (btm_sec_cb.pairing_state == BTM_PAIR_STATE_IDLE) {
@@ -3651,6 +3673,9 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle,
 
     if (status == HCI_SUCCESS) {
       p_dev_rec = btm_sec_alloc_dev(bda);
+      if (p_dev_rec == NULL) {
+        return;
+      }
       log::debug("Allocated new device record for new connection peer:{}", bda);
     } else {
       /* If the device matches with stored paring address
@@ -3720,6 +3745,11 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle,
       p_dev_rec->sm4 &= ~BTM_SM4_CONN_PEND;
     }
   }
+
+  alarm_set_on_mloop(btm_cb.devcb.conn_proc_timer, BTM_SEC_CONN_PROC_TIMEOUT_MS,
+                       btm_conn_proc_timer_timeout, NULL);
+
+  log::warn("btm_conn_proc_timer_timeout started");
 
   p_dev_rec->device_type |= BT_DEVICE_TYPE_BREDR;
 
@@ -3937,12 +3967,17 @@ void btm_sec_disconnected(uint16_t handle, tHCI_REASON reason,
               hci_error_code_text(reason), handle, comment);
   }
 
+
+
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(handle);
   if (p_dev_rec == nullptr) {
     log::warn("Got disconnect for unknown device record handle:0x{:04x}",
               handle);
     return;
   }
+
+  alarm_set_on_mloop(btm_cb.devcb.conn_proc_timer, BTM_SEC_CONN_PROC_TIMEOUT_MS,
+                       btm_conn_proc_timer_timeout, NULL);
 
   const tBT_TRANSPORT transport =
       (handle == p_dev_rec->hci_handle) ? BT_TRANSPORT_BR_EDR : BT_TRANSPORT_LE;
@@ -4156,6 +4191,9 @@ void btm_sec_encryption_key_refresh_complete(uint16_t handle,
 void btm_sec_link_key_notification(const RawAddress& p_bda,
                                    const Octet16& link_key, uint8_t key_type) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(p_bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
   bool we_are_bonding = false;
   bool ltk_derived_lk = false;
 
@@ -4281,6 +4319,9 @@ void btm_sec_link_key_notification(const RawAddress& p_bda,
  ******************************************************************************/
 void btm_sec_link_key_request(const RawAddress bda) {
   tBTM_SEC_DEV_REC* p_dev_rec = btm_find_or_alloc_dev(bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
 
   log::verbose("bda: {}", bda);
   if (!concurrentPeerAuthIsEnabled()) {
@@ -4460,6 +4501,9 @@ void btm_sec_pin_code_request(const RawAddress p_bda) {
   }
 
   p_dev_rec = btm_find_or_alloc_dev(p_bda);
+  if (p_dev_rec == NULL) {
+    return;
+  }
   /* received PIN code request. must be non-sm4 */
   p_dev_rec->sm4 = BTM_SM4_KNOWN;
 

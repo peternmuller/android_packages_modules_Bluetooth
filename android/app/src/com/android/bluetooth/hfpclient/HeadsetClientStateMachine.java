@@ -75,6 +75,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.UUID;
 
 public class HeadsetClientStateMachine extends StateMachine {
     private static final String TAG = HeadsetClientStateMachine.class.getSimpleName();
@@ -489,7 +490,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                 warn("Outgoing call did not see a response, clear the calls and send CHUP");
                 // We send a terminate because we are in a bad state and trying to
                 // recover.
-                terminateCall();
+                terminateCall(null);
 
                 // Clean out the state for outgoing call.
                 for (Integer idx : mCalls.keySet()) {
@@ -724,6 +725,17 @@ public class HeadsetClientStateMachine extends StateMachine {
                 return;
             }
 
+            // If we have ACTIVE + WAITING call then we cannot HOLD the ACTIVE call alone so drop
+            // the explicit HOLD request and handle when user answered the call.
+            // When user accepted the call HFP will send AT + CHLD = 2 in this case, expectation
+            // from other end device is to hold the active call to answer the call. If active and
+            // hold calls are present then expectation is to disconnect the hold call and hold the
+            // active call to answer the incoming call.
+            if (getCall(HfpClientCall.CALL_STATE_WAITING) != null) {
+                debug("holdCall: ignore holding active call.");
+                return;
+            }
+
             action = HeadsetClientHalConstants.CALL_ACTION_CHLD_2;
         }
 
@@ -734,19 +746,45 @@ public class HeadsetClientStateMachine extends StateMachine {
         }
     }
 
-    private void terminateCall() {
+    /* Return Call object match with uuid */
+    private HfpClientCall getCallFromUuid(UUID uuid) {
+        if (uuid == null) {
+            return null;
+        }
+
+        for (HfpClientCall c : mCalls.values()) {
+            if (c.getUUID() == uuid) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private void terminateCall(UUID uuid) {
         debug("terminateCall");
+        HfpClientCall c = getCallFromUuid(uuid);
 
         int action = HeadsetClientHalConstants.CALL_ACTION_CHUP;
 
-        HfpClientCall c =
-                getCall(
+        if (c == null) {
+            c = getCall(
                         HfpClientCall.CALL_STATE_DIALING,
                         HfpClientCall.CALL_STATE_ALERTING,
                         HfpClientCall.CALL_STATE_ACTIVE);
+        }
+
         if (c == null) {
             // If the call being terminated is currently held, switch the action to CHLD_0
             c = getCall(HfpClientCall.CALL_STATE_HELD);
+            action = HeadsetClientHalConstants.CALL_ACTION_CHLD_0;
+        } else if (c.getState() == HfpClientCall.CALL_STATE_HELD) {
+            // If the call id passed is HELD call then check if any Waiting call is present, if
+            // present we cannot handle the terminate HELD call so ignore.
+            if (getCall(HfpClientCall.CALL_STATE_INCOMING) != null ||
+                    getCall(HfpClientCall.CALL_STATE_WAITING) != null) {
+                debug("terminateCall: ignore terminating hold call.");
+                return;
+            }
             action = HeadsetClientHalConstants.CALL_ACTION_CHLD_0;
         }
         if (c != null) {
@@ -1569,7 +1607,8 @@ public class HeadsetClientStateMachine extends StateMachine {
                     holdCall();
                     break;
                 case TERMINATE_CALL:
-                    terminateCall();
+                    UUID uuid = (UUID) message.obj;
+                    terminateCall(uuid);
                     break;
                 case ENTER_PRIVATE_MODE:
                     enterPrivateMode(message.arg1);

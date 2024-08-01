@@ -257,6 +257,10 @@ class LeAudioDeviceGroup {
   void SetSuspendedForReconfiguration(void);
   void ClearSuspendedForReconfiguration(void);
 
+  bool IsReconfigStartPendingDir(uint8_t direction) const;
+  void SetReconfigStartPendingDirs(uint8_t directions);
+  void ClearReconfigStartPendingDirs(uint8_t directions);
+
   inline types::AseState GetState(void) const {
     log::info("current_state_: {}", bluetooth::common::ToString(current_state_));
     return current_state_;
@@ -320,10 +324,13 @@ class LeAudioDeviceGroup {
 
   inline void SetConfigurationContextType(
       types::LeAudioContextType context_type) {
+    log::debug("context_type = {}.", bluetooth::common::ToString(context_type));
     configuration_context_type_ = context_type;
   }
 
   inline types::LeAudioContextType GetConfigurationContextType(void) const {
+    log::debug("configuration_context_type_= {}.",
+                     bluetooth::common::ToString(configuration_context_type_));
     return configuration_context_type_;
   }
 
@@ -515,6 +522,7 @@ class LeAudioDeviceGroup {
   bool in_transition_;
   std::vector<std::weak_ptr<LeAudioDevice>> leAudioDevices_;
   bool suspended_for_reconfig_;
+  uint8_t reconfig_start_pending_directions_;
 };
 
 /* LeAudioDeviceGroup class represents a wraper helper over all device groups in

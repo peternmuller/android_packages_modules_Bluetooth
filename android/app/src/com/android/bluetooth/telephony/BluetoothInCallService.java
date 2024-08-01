@@ -162,7 +162,7 @@ public class BluetoothInCallService extends InCallService {
     public static int DSDS = 1;
     public static int PSEUDO_DSDA = 2;
     public static int DSDA = 3;
-    public int currentMode = DSDS;
+    public int currentMode = DSDA;
     public boolean dsdsTransition = false;
 
     @VisibleForTesting
@@ -271,7 +271,7 @@ public class BluetoothInCallService extends InCallService {
                String action = intent.getAction();
                 if (action.equals(ACTION_MSIM_VOICE_CAPABILITY_CHANGED)) {
                     Log.d(TAG, "ACTION_MSIM_VOICE_CAPABILITY_CHANGED intent received");
-                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDS);
+                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDA);
                     if (mTelephonyManager != null) {
                         if (currentMode == DSDS) {
                             Log.w(TAG, "In DSDS mode");
@@ -1790,10 +1790,6 @@ public class BluetoothInCallService extends InCallService {
         // TODO: Should we be hardcoding this value to 2 or should we check if all top level calls
         //       are held?
         boolean callsPendingSwitch = (numHeldCalls == 2);
-        if (mEnableDsdaMode && callsPendingSwitch) {
-            callsPendingSwitch = false;
-            numHeldCalls = 1;
-        }
 
         // For conference calls which support swapping the active BluetoothCall within the
         // conference (namely CDMA calls) we need to expose that as a held BluetoothCall
@@ -2442,7 +2438,7 @@ public class BluetoothInCallService extends InCallService {
         public BluetoothCall getCallByState(int state) {
             List<BluetoothCall> calls = getBluetoothCalls();
             for (BluetoothCall call : calls) {
-                if (state == call.getState()) {
+                if (state == call.getState() && call.getParentId() == null) {
                     return call;
                 }
             }

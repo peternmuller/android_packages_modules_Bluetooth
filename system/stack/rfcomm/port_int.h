@@ -99,6 +99,8 @@ typedef struct {
   bool is_disc_initiator; /* true if initiated disc of port */
   uint16_t
       pending_lcid; /* store LCID for incoming connection while connecting */
+  BT_HDR*
+      pending_buf;  /* store pending rfcomm data for incoming connection while connecting */
   bool pending_configure_complete;       /* true if confiquration of the pending
                                             connection was completed*/
   tL2CAP_CFG_INFO pending_cfg_info = {}; /* store configure info for incoming

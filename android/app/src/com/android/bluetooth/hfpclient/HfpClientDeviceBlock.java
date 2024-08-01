@@ -19,6 +19,7 @@ import android.bluetooth.BluetoothDevice;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelUuid;
+import android.telecom.Conferenceable;
 import android.telecom.Connection;
 import android.telecom.DisconnectCause;
 import android.telecom.PhoneAccount;
@@ -27,10 +28,12 @@ import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 // Helper class that manages the call handling for one device. HfpClientConnectionService holds a
 // list of such blocks and routes traffic from the UI.
@@ -302,7 +305,27 @@ public class HfpClientDeviceBlock {
                     debug("Adding connection " + otherConn + " to conference.");
                     addConf = true;
                 }
+            } else {
+                // for any connections not a part of a conference call, set the conference call as
+                // conferenceable to allow merging into the conference call
+                List<Conferenceable> connectionsList = new ArrayList<>();
+                if (mConference != null) {
+                    connectionsList.add(mConference);
+                } else {
+                    connectionsList = mConnections.values().stream().filter(
+                        connection -> otherConn != connection).collect(
+                        Collectors.toCollection(ArrayList::new));
+                }
+                otherConn.setConferenceables(connectionsList);
             }
+        }
+
+        if (mConference != null) {
+            List<Connection> connectionsList = mConnections.values().stream().filter(
+                    connection ->
+                    !((HfpClientConnection)connection).inConference()).collect(
+                    Collectors.toCollection(ArrayList::new));
+            mConference.setConferenceableConnections(connectionsList);
         }
 
         // If we have no connections in the conference we should simply end it.

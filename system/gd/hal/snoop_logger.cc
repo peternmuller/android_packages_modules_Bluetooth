@@ -558,14 +558,14 @@ void SnoopLogger::OpenNextSnoopLogFile() {
   file_creation_time = fake_timerfd_get_clock();
 #endif
   if (!btsnoop_ostream_.good()) {
-    log::fatal(
+    log::warn(
         "Unable to open snoop log at \"{}\", error: \"{}\"", snoop_log_path_, strerror(errno));
   }
   umask(prevmask);
   if (!btsnoop_ostream_.write(
           reinterpret_cast<const char*>(&SnoopLoggerCommon::kBtSnoopFileHeader),
           sizeof(SnoopLoggerCommon::FileHeaderType))) {
-    log::fatal(
+    log::warn(
         "Unable to write file header to \"{}\", error: \"{}\"", snoop_log_path_, strerror(errno));
   }
   if (!btsnoop_ostream_.flush()) {
@@ -1305,14 +1305,14 @@ void SnoopLogger::DumpSnoozLogToFile(const std::vector<std::string>& data) const
   // do not use std::ios::app as we want override the existing file
   std::ofstream btsnooz_ostream(snooz_log_path_, std::ios::binary | std::ios::out);
   if (!btsnooz_ostream.good()) {
-    log::fatal(
+    log::warn(
         "Unable to open snoop log at \"{}\", error: \"{}\"", snooz_log_path_, strerror(errno));
   }
   umask(prevmask);
   if (!btsnooz_ostream.write(
           reinterpret_cast<const char*>(&SnoopLoggerCommon::kBtSnoopFileHeader),
           sizeof(SnoopLoggerCommon::FileHeaderType))) {
-    log::fatal(
+    log::warn(
         "Unable to write file header to \"{}\", error: \"{}\"", snooz_log_path_, strerror(errno));
   }
   for (const auto& packet : data) {
