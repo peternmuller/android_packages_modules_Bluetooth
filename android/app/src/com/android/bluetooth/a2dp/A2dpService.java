@@ -282,6 +282,27 @@ public class A2dpService extends ProfileService {
         sA2dpService = instance;
     }
 
+    public boolean isCsipSupported(BluetoothDevice device) {
+        Log.d(TAG, "isCsipSupported: " + device);
+        boolean supportsCsip = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
+                                                      BluetoothUuid.COORDINATED_SET);
+        CsipSetCoordinatorService csipClient = mFactory.getCsipSetCoordinatorService();
+        int csipGroupSize = 1;
+        int grpId = -1;
+        if (supportsCsip && csipClient != null) {
+            grpId = csipClient.getGroupId(device, BluetoothUuid.CAP);
+            csipGroupSize = csipClient.getDesiredGroupSize(grpId);
+        }
+
+        Log.w(TAG, "Group size of device " + device + " with group id: " + grpId +
+                " has group size = " + csipGroupSize);
+        if (supportsCsip && csipGroupSize > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public boolean connect(BluetoothDevice device) {
         Log.d(TAG, "connect(): " + device);
 
@@ -294,21 +315,8 @@ public class A2dpService extends ProfileService {
             return false;
         }
 
-        boolean isCsipSupported = Utils.arrayContains(mAdapterService.getRemoteUuids(device),
-                                                      BluetoothUuid.COORDINATED_SET);
-        CsipSetCoordinatorService csipClient = mFactory.getCsipSetCoordinatorService();
-        int CsipGroupSize = 1;
-        int groupId = -1;
-        if (isCsipSupported && csipClient != null) {
-            groupId = csipClient.getGroupId(device, BluetoothUuid.CAP);
-            CsipGroupSize = csipClient.getDesiredGroupSize(groupId);
-        }
-
-        Log.w(TAG, "Group size of device " + device + " with group id: " + groupId +
-                " has group size = " + CsipGroupSize);
-
         if (Utils.isDualModeAudioEnabled()) {
-            if (isCsipSupported && CsipGroupSize > 0) {
+            if (isCsipSupported(device)) {
                 LeAudioService mLeAudio = LeAudioService.getLeAudioService();
                 if (mLeAudio != null) {
                     int connPolicy = mLeAudio.getConnectionPolicy(device);
