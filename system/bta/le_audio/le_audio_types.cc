@@ -115,7 +115,8 @@ void get_cis_count(LeAudioContextType context_type,
             } else {
               out_cis_count_bidir = 2*expected_device_cnt;
             }
-          } else if (context_type == LeAudioContextType::LIVE) {
+          } else if (context_type == LeAudioContextType::LIVE ||
+                     context_type == LeAudioContextType::VOICEASSISTANTS) {
             out_cis_count_bidir = 2*expected_device_cnt;
           } else {
             out_cis_count_bidir = expected_device_cnt;
