@@ -480,6 +480,8 @@ bt_soc_type_t convertSocNameToBTSocType(const char* soc_name) {
     soc_type = BT_SOC_TYPE_HAMILTON;
   } else if (!strncasecmp(soc_name, "ganges", sizeof("ganges"))) {
     soc_type = BT_SOC_TYPE_GANGES;
+  } else if (!strncasecmp(soc_name, "orne", sizeof("orne"))) {
+    soc_type = BT_SOC_TYPE_ORNE;
   } else if (!strncasecmp(soc_name, "pronto", sizeof("pronto"))) {
     soc_type = BT_SOC_TYPE_DEFAULT;
   } else {
