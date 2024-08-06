@@ -65,7 +65,7 @@
         {
             "name": "Media",
             "configurations": [
-                "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96-Two-OneChan-SrcAse-Aptx_LeX_V1_32_High_Reliability_L_R",
+                "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96_High_Reliability_L_R",
                 "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_96_High_Reliability",
                 "VND_Two-OneChan-SnkAse-Aptx_LeX_V1_48_High_Reliability",
                 "VND_Two-OneChan-SnkAse-Aptx_Le_V2_48_High_Reliability",
