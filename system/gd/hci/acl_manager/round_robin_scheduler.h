@@ -64,7 +64,7 @@ class RoundRobinScheduler {
   os::Handler* handler_ = nullptr;
   Controller* controller_ = nullptr;
   std::map<uint16_t, acl_queue_handler> acl_queue_handlers_;
-  common::MultiPriorityQueue<std::pair<ConnectionType, std::unique_ptr<AclBuilder>>, 2> fragments_to_send_;
+  common::MultiPriorityQueue<std::tuple<ConnectionType, uint16_t, std::unique_ptr<AclBuilder>>, 2> fragments_to_send_;
   uint16_t max_acl_packet_credits_ = 0;
   uint16_t acl_packet_credits_ = 0;
   uint16_t le_max_acl_packet_credits_ = 0;
