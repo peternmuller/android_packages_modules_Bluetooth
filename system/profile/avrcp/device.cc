@@ -301,6 +301,7 @@ void Device::VendorPacketHandler(uint8_t label,
     } break;
 
     case CommandPdu::GET_CURRENT_PLAYER_APPLICATION_SETTING_VALUE: {
+      log::info("{}: Command PDU: {}", address_, pkt->GetCommandPdu());
       if (player_settings_interface_ == nullptr) {
         log::error("Player Settings Interface not initialized.");
         auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
@@ -323,6 +324,7 @@ void Device::VendorPacketHandler(uint8_t label,
       std::vector<PlayerAttribute> attributes =
           get_current_player_setting_value_request->GetRequestedAttributes();
       for (auto attribute : attributes) {
+        log::info("{}: PDU: {} attribute: {}", address_, pkt->GetCommandPdu(), (int)attribute);
         if (attribute < PlayerAttribute::EQUALIZER ||
             attribute > PlayerAttribute::SCAN) {
           log::warn("{}: Player Setting Attribute is not valid", address_);
@@ -333,6 +335,7 @@ void Device::VendorPacketHandler(uint8_t label,
         }
       }
 
+      log::info("{}: Get current player setting value ", address_);
       player_settings_interface_->GetCurrentPlayerSettingValue(
           attributes,
           base::Bind(&Device::GetPlayerApplicationSettingValueResponse,
@@ -340,6 +343,7 @@ void Device::VendorPacketHandler(uint8_t label,
     } break;
 
     case CommandPdu::SET_PLAYER_APPLICATION_SETTING_VALUE: {
+      log::info("{}: Command PDU: {}", address_, pkt->GetCommandPdu());
       if (player_settings_interface_ == nullptr) {
         log::error("Player Settings Interface not initialized.");
         auto response = RejectBuilder::MakeBuilder(pkt->GetCommandPdu(),
@@ -365,6 +369,7 @@ void Device::VendorPacketHandler(uint8_t label,
 
       bool invalid_request = false;
       for (size_t i = 0; i < attributes.size(); i++) {
+        log::info("{}: PDU: {} attributes[i] = {}", address_, pkt->GetCommandPdu(), (int)attributes[i]);
         if (attributes[i] < PlayerAttribute::EQUALIZER ||
             attributes[i] > PlayerAttribute::SCAN) {
           log::warn("{}: Player Setting Attribute is not valid", address_);
@@ -374,6 +379,7 @@ void Device::VendorPacketHandler(uint8_t label,
 
         if (attributes[i] == PlayerAttribute::REPEAT) {
           PlayerRepeatValue value = static_cast<PlayerRepeatValue>(values[i]);
+          log::info("{}: PDU: {} REPEAT value = {}", address_, pkt->GetCommandPdu(), (int)value);
           if (value < PlayerRepeatValue::OFF ||
               value > PlayerRepeatValue::GROUP) {
             log::warn("{}: Player Repeat Value is not valid", address_);
@@ -382,6 +388,7 @@ void Device::VendorPacketHandler(uint8_t label,
           }
         } else if (attributes[i] == PlayerAttribute::SHUFFLE) {
           PlayerShuffleValue value = static_cast<PlayerShuffleValue>(values[i]);
+          log::info("{}: PDU: {} SHUFFLE value = {}", address_, pkt->GetCommandPdu(), (int)value);
           if (value < PlayerShuffleValue::OFF ||
               value > PlayerShuffleValue::GROUP) {
             log::warn("{}: Player Shuffle Value is not valid", address_);
@@ -398,6 +405,7 @@ void Device::VendorPacketHandler(uint8_t label,
         return;
       }
 
+      log::info("{}: Set player settings ", address_);
       player_settings_interface_->SetPlayerSettings(
           attributes, values,
           base::Bind(&Device::SetPlayerApplicationSettingValueResponse,

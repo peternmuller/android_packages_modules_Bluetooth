@@ -375,6 +375,7 @@ class PlayerSettingsInterfaceWrapper : public PlayerSettingsInterface {
   void SetPlayerSettings(std::vector<PlayerAttribute> attributes,
                          std::vector<uint8_t> values,
                          SetPlayerSettingValueCallback cb) override {
+    log::info("");
     auto cb_lambda = [](const SetPlayerSettingValueCallback& cb, bool success) {
       do_in_main_thread(FROM_HERE, base::BindOnce(cb, success));
     };
