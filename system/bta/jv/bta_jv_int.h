@@ -34,6 +34,7 @@
 #include "stack/include/rfcdefs.h"
 #include "types/bluetooth/uuid.h"
 #include "types/raw_address.h"
+#include "osi/include/alarm.h"
 
 /*****************************************************************************
  *  Constants
@@ -56,6 +57,8 @@ typedef struct {
   uint8_t state;        /* state: see above enum */
   tBTA_JV_PM_ID app_id; /* JV app specific id indicating power table to use */
   RawAddress peer_bd_addr; /* Peer BD address */
+  bool cong;            /* TRUE, if congested */
+  alarm_t *idle_timer; /* intermediate idle timer for paricular scb */
 } tBTA_JV_PM_CB;
 
 enum {
@@ -186,5 +189,6 @@ void bta_jv_set_pm_profile(uint32_t handle, tBTA_JV_PM_ID app_id,
                            tBTA_JV_CONN_STATE init_st);
 
 void bta_jv_l2cap_stop_server_le(uint16_t local_chan);
+extern void bta_jv_idle_timeout_handler(void *tle);
 
 #endif /* BTA_JV_INT_H */
