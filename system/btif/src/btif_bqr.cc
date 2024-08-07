@@ -21,6 +21,7 @@
 #endif
 #include <sys/stat.h>
 
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 
@@ -60,6 +61,7 @@ std::unique_ptr<BluetoothQualityReportInterface> bluetoothQualityReportInstance;
 
 namespace {
 common::PostableContext* to_bind_ = nullptr;
+std::atomic<bool> vse_callback_registered_{false};
 }
 
 void BqrVseSubEvt::ParseBqrLinkQualityEvt(uint8_t length,
@@ -372,6 +374,7 @@ void EnableBtQualityReport(common::PostableContext* to_bind) {
   BqrConfiguration bqr_config = {};
 
   if (to_bind) {
+    vse_callback_registered_ = true;
     bqr_config.report_action = REPORT_ACTION_ADD;
     bqr_config.quality_event_mask =
         static_cast<uint32_t>(atoi(bqr_prop_evtmask));
@@ -386,6 +389,10 @@ void EnableBtQualityReport(common::PostableContext* to_bind) {
     register_vse();
     kpBqrEventQueue.Clear();
   } else {
+    if (!vse_callback_registered_.exchange(false)) {
+      log::warn("Bluetooth Quality Report is already disabled");
+      return;
+    }
     bqr_config.report_action = REPORT_ACTION_CLEAR;
     bqr_config.quality_event_mask = kQualityEventMaskAllOff;
     bqr_config.minimum_report_interval_ms = kMinReportIntervalNoLimit;

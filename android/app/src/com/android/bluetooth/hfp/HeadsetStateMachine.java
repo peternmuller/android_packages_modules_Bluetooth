@@ -147,6 +147,12 @@ class HeadsetStateMachine extends StateMachine {
     private boolean mIsCallIndDelay = false;
     private boolean mIsBlacklistedDevice = false;
     private boolean mIsBlacklistedForSCOAfterSLC = false;
+
+    private int mRetryConnectCount = 0;
+    private static final int MAX_RETRY_CONNECT_COUNT = 2;
+    /* Retry outgoing connection after this time if the first attempt fails */
+    private static final int RETRY_CONNECT_TIME_MSEC = 2500;
+
     private boolean mIsRetrySco = false;
     private boolean mIsBlacklistedDeviceforRetrySCO = false;
     // The timestamp when the device entered connecting/connected state
@@ -630,6 +636,14 @@ class HeadsetStateMachine extends StateMachine {
                                 "CONNECT failed, device=" + device + ", currentDevice=" + mDevice);
                         break;
                     }
+
+                    stateLogD("mRetryConnectCount = " + mRetryConnectCount);
+                    if (mRetryConnectCount >= MAX_RETRY_CONNECT_COUNT) {
+                        // max attempts reached, reset it to 0
+                        mRetryConnectCount = 0;
+                        break;
+                    }
+
                     if (!mNativeInterface.connectHfp(device)) {
                         stateLogE("CONNECT failed for connectHfp(" + device + ")");
                         // No state transition is involved, fire broadcast immediately
@@ -647,6 +661,7 @@ class HeadsetStateMachine extends StateMachine {
                                 MetricsLogger.getInstance().getRemoteDeviceInfoProto(mDevice));
                         break;
                     }
+                    mRetryConnectCount++;
                     transitionTo(mConnecting);
                     break;
                 case DISCONNECT:
@@ -925,6 +940,16 @@ class HeadsetStateMachine extends StateMachine {
             switch (state) {
                 case HeadsetHalConstants.CONNECTION_STATE_DISCONNECTED:
                     stateLogW("Disconnected");
+                    stateLogD("mRetryConnectCount = " + mRetryConnectCount);
+                    if (mRetryConnectCount == 1 && !hasDeferredMessages(DISCONNECT)) {
+                        stateLogD("No deferred Disconnect, retry once more ");
+                        sendMessageDelayed(CONNECT, mDevice, RETRY_CONNECT_TIME_MSEC);
+                    } else if (mRetryConnectCount >= MAX_RETRY_CONNECT_COUNT ||
+                            hasDeferredMessages(DISCONNECT)) {
+                        // we already tried twice.
+                        stateLogD("Already tried twice or has deferred Disconnect");
+                        mRetryConnectCount = 0;
+                    }
                     transitionTo(mDisconnected);
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_CONNECTED:
@@ -932,6 +957,7 @@ class HeadsetStateMachine extends StateMachine {
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_SLC_CONNECTED:
                     stateLogD("SLC connected");
+                    mRetryConnectCount = 0;
                     transitionTo(mConnected);
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_CONNECTING:
@@ -1288,6 +1314,7 @@ class HeadsetStateMachine extends StateMachine {
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_SLC_CONNECTED:
                     stateLogE("processConnectionEvent: SLC connected again, shouldn't happen");
+                    mRetryConnectCount = 0;
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_DISCONNECTING:
                     stateLogI("processConnectionEvent: Disconnecting");

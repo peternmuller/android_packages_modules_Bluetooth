@@ -108,7 +108,8 @@ public class BluetoothInCallService extends InCallService {
     private static final int OUTGOING_INCOMING_DISCONNECTION = 3;
     private static final int MULTI_RINGING_DISCONNECTION = 4;
     private static final int OUTGOING_DISCONNECTION = 5;
-    private static final int DSDS_EVENT = 6;
+    private static final int MULTI_HELD_ACTIVE = 6;
+    private static final int DSDS_EVENT = 7;
 
     public int mLastBtHeadsetState = CALL_STATE_IDLE;
 
@@ -211,6 +212,9 @@ public class BluetoothInCallService extends InCallService {
     private static final String ACTION_MSIM_VOICE_CAPABILITY_CHANGED =
         "org.codeaurora.intent.action.MSIM_VOICE_CAPABILITY_CHANGED";
 
+    private static final String PROPERTY_MULTISIM_VOICE_CAPABILITY =
+        "ril.multisim.voice_capability";
+
     /**
      * Listens to connections and disconnections of bluetooth headsets. We need to save the current
      * bluetooth headset so that we know where to send BluetoothCall updates.
@@ -271,7 +275,7 @@ public class BluetoothInCallService extends InCallService {
                String action = intent.getAction();
                 if (action.equals(ACTION_MSIM_VOICE_CAPABILITY_CHANGED)) {
                     Log.d(TAG, "ACTION_MSIM_VOICE_CAPABILITY_CHANGED intent received");
-                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, DSDA);
+                    currentMode = intent.getIntExtra(EXTRAS_MSIM_VOICE_CAPABILITY, currentMode);
                     if (mTelephonyManager != null) {
                         if (currentMode == DSDS) {
                             Log.w(TAG, "In DSDS mode");
@@ -820,6 +824,38 @@ public class BluetoothInCallService extends InCallService {
                    mLastBtHeadsetState = CALL_STATE_INCOMING;
                  }
              break;
+             case MULTI_HELD_ACTIVE:
+                Log.d(TAG, "MULTI_HELD_ACTIVE event");
+                if (mNumHeldCalls < mDsDaHeldCalls) {
+                    Log.d(TAG, "one of the held moved to active");
+                   if (numActiveCalls > mDsdaActiveCalls) {
+                     int temp_callState = CALL_STATE_IDLE;
+                     if (numRingingCalls > 0) {
+                       temp_callState = CALL_STATE_INCOMING;
+                       BluetoothCall ringingCall = mCallInfo.getRingingOrSimulatedRingingCall();
+                       getDSDARingingAddress(ringingCall);
+                     }
+                     mBluetoothHeadset.phoneStateChanged(
+                        numActiveCalls,
+                        0,
+                        temp_callState,
+                        mDsDaRingingAddress,
+                        mDsDaRingingAddressType,
+                        mDsDaRingingName);
+                     handlerThreadSleep(DELAY_DSDA_CALL_INDICATORS);
+                     mBluetoothHeadset.phoneStateChanged(
+                        numActiveCalls,
+                        1,
+                        temp_callState,
+                        mDsDaRingingAddress,
+                        mDsDaRingingAddressType,
+                        mDsDaRingingName);
+                     mDsDaHeldCalls = numHeldCalls;
+                     mDsdaActiveCalls = numActiveCalls;
+                     mLastBtHeadsetState = temp_callState;
+                   }
+                }
+             break;
              case DSDS_EVENT:
                 Log.d(TAG, "DSDS_EVENT event");
                 updateHeadsetWithCallState(false);
@@ -1262,6 +1298,12 @@ public class BluetoothInCallService extends InCallService {
         }
         mTelephonyManager = getSystemService(TelephonyManager.class);
         mTelecomManager = getSystemService(TelecomManager.class);
+        currentMode = SystemProperties.getInt(PROPERTY_MULTISIM_VOICE_CAPABILITY, UNKNOWN);
+        Log.e(TAG, "current mode is: " + currentMode);
+        if (currentMode == UNKNOWN || currentMode == DSDS) {
+            Log.e(TAG, "setting the default mode to DSDS");
+            currentMode = DSDS;
+        }
     }
 
     @Override
@@ -1551,6 +1593,15 @@ public class BluetoothInCallService extends InCallService {
         String address = addressUri == null ? null : addressUri.getSchemeSpecificPart();
         if (address != null) {
             address = PhoneNumberUtils.stripSeparators(address);
+        }
+
+        // Don't send host call information when IMS calls are conferenced
+        String subsNum = getSubscriberNumber();
+        if (subsNum != null && address != null) {
+           if (subsNum.equals(address)) {
+              Log.w(TAG, "return without sending host call in CLCC");
+              return;
+           }
         }
 
         int addressType = address == null ? -1 : PhoneNumberUtils.toaFromString(address);
@@ -1972,7 +2023,6 @@ public class BluetoothInCallService extends InCallService {
       Log.d(TAG, "processOnCallAdded Events");
       if ((call.getState()  == Call.STATE_CONNECTING) ||
           (call.getState()  == Call.STATE_DIALING)) {
-
          if (activeCall != null && mDsdaActiveCalls == 1) {
            mDelayOutgoingUpdate = 1;
            mDsDaOutgoingCalls++;
@@ -2251,7 +2301,8 @@ public class BluetoothInCallService extends InCallService {
                    (call.getState() == Call.STATE_SIMULATED_RINGING)) {
                  Log.d(TAG, "ignoring these call state events");
                }
-               else if (call.getState() == Call.STATE_DISCONNECTED) {
+               else if ((call.getState() == Call.STATE_DISCONNECTED) ||
+                        (call.getState() == Call.STATE_DISCONNECTING)) {
                  Log.d(TAG, "this event can come for either held or active call");
                  if ((numActiveCalls == 0) && (mDsdaActiveCalls == 1)) {
                    Log.d(TAG, "active call ended event is received. lets remove from oncallremoved");
@@ -2297,7 +2348,7 @@ public class BluetoothInCallService extends InCallService {
                            //we will send as if held is made as active and
                            //then update the held call info
                            Log.d(TAG, "multiple held, one moved to active");
-                           updateHeadsetWithDSDACallState(true, MULTI_HELD);
+                           updateHeadsetWithDSDACallState(true, MULTI_HELD_ACTIVE);
                        }
                    }
                    else {
