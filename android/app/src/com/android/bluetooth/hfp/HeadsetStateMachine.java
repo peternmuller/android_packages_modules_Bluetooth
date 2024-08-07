@@ -1715,6 +1715,13 @@ class HeadsetStateMachine extends StateMachine {
                                             + mDevice);
                             break;
                         }
+
+                        if (mIsRetrySco) {
+                            Log.d(TAG, "reset mIsRetrySco as DISCONNECT_AUDIO");
+                            mIsRetrySco = false;
+                            removeMessages(SCO_RETRIAL_NOT_REQ);
+                        }
+
                         if (mNativeInterface.disconnectAudio(mDevice)) {
                             stateLogD("DISCONNECT_AUDIO, device=" + mDevice);
                             transitionTo(mAudioDisconnecting);
@@ -2229,6 +2236,13 @@ class HeadsetStateMachine extends StateMachine {
                   RETRY_SCO_CONNECTION_DELAY =
                       SystemProperties.getInt("persist.vendor.btstack.mo.retry_sco.interval", 2000);
               }
+           }
+
+           if (mIsRetrySco && callState.mNumActive == 0 && callState.mNumHeld == 0 &&
+                      callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE) {
+               Log.d(TAG, "reset mIsRetrySco as no call is ongoing");
+               mIsRetrySco = false;
+               removeMessages(SCO_RETRIAL_NOT_REQ);
            }
         }
         mStateMachineCallState.mNumActive = callState.mNumActive;
