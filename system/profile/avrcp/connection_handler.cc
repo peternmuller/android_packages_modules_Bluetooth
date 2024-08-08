@@ -408,7 +408,7 @@ void ConnectionHandler::AcceptorControlCb(uint8_t handle, uint8_t event,
       // as this one which will be closed when the device is disconnected.
       AvrcpConnect(false, RawAddress::kAny);
 
-      if (com::android::bluetooth::flags::avrcp_connect_a2dp_delayed()) {
+      if (true/*com::android::bluetooth::flags::avrcp_connect_a2dp_delayed()*/) {
         // Check peer audio role: src or sink and connect A2DP after 3 seconds
         SdpLookupAudioRole(handle);
       }
