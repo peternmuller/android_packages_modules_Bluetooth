@@ -3578,12 +3578,17 @@ class LeAudioClientImpl : public LeAudioClient {
     bool remote_support = false;
     if (group) {
       auto group_pacs = group->GetFirstDevice()->snk_pacs_;
-      for (auto& [handles, pacs_record] : group_pacs) {
-        for (auto& pac : pacs_record) {
-          if (pac.codec_id.vendor_codec_id ==
-              bluetooth::le_audio::types::kLeAudioCodingFormatAptxLeX) {
-            remote_support = true;
-            break;
+      if (!group_pacs.empty()) {
+        for (auto& [handles, pacs_record] : group_pacs) {
+          if (!pacs_record.empty()) {
+            for (auto& pac : pacs_record) {
+              if (pac.codec_id.vendor_codec_id ==
+                  bluetooth::le_audio::types::kLeAudioCodingFormatAptxLeX) {
+                remote_support = true;
+                break;
+              }
+            }
+            if (remote_support) break;
           }
         }
       }
