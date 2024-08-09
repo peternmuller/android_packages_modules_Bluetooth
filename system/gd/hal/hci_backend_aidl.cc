@@ -23,6 +23,8 @@
 #include "common/stop_watch.h"
 #include "hal/hci_backend.h"
 
+#define SIGKILL 9
+
 namespace bluetooth::hal {
 
 class AidlHciCallbacks : public ::aidl::android::hardware::bluetooth::BnBluetoothHciCallbacks {
@@ -31,7 +33,10 @@ class AidlHciCallbacks : public ::aidl::android::hardware::bluetooth::BnBluetoot
 
   using AidlStatus = ::aidl::android::hardware::bluetooth::Status;
   ::ndk::ScopedAStatus initializationComplete(AidlStatus status) override {
-    log::assert_that(status == AidlStatus::SUCCESS, "status == AidlStatus::SUCCESS");
+    if (status != AidlStatus::SUCCESS) {
+      log::warn( "status != AidlStatus::SUCCESS");
+      kill(getpid(), SIGKILL);
+    }
     callbacks_->initializationComplete();
     return ::ndk::ScopedAStatus::ok();
   }
@@ -65,7 +70,10 @@ class AidlHci : public HciBackend {
   AidlHci(const char* service_name) {
     ::ndk::SpAIBinder binder(AServiceManager_waitForService(service_name));
     hci_ = aidl::android::hardware::bluetooth::IBluetoothHci::fromBinder(binder);
-    log::assert_that(hci_ != nullptr, "Failed to retrieve AIDL interface.");
+    if (hci_ == nullptr) {
+      log::warn( "Failed to retrieve AIDL interface.");
+      kill(getpid(), SIGKILL);
+    }
 
     death_recipient_ =
         ::ndk::ScopedAIBinder_DeathRecipient(AIBinder_DeathRecipient_new([](void* /* cookie*/) {
@@ -73,12 +81,14 @@ class AidlHci : public HciBackend {
           common::StopWatch::DumpStopWatchLog();
           // At shutdown, sometimes the HAL service gets killed before Bluetooth.
           std::this_thread::sleep_for(std::chrono::seconds(1));
-          log::error("The Bluetooth HAL died.");
+          log::fatal("The Bluetooth HAL died.");
         }));
 
     auto death_link = AIBinder_linkToDeath(hci_->asBinder().get(), death_recipient_.get(), this);
-    log::assert_that(
-        death_link == STATUS_OK, "Unable to set the death recipient for the Bluetooth HAL");
+    if (death_link != STATUS_OK) {
+      log::warn( "Unable to set the death recipient for the Bluetooth HAL");
+      kill(getpid(), SIGKILL);
+    }
   }
 
   ~AidlHci() {
