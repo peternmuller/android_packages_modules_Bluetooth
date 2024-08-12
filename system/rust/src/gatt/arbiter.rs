@@ -81,6 +81,13 @@ fn try_parse_att_server_packet(
 }
 
 fn on_le_connect(tcb_idx: u8, advertiser: u8) {
+   // Events may be received after a FactoryReset
+   // is initiated for Bluetooth and the rust arbiter is taken
+   // down.
+   if !has_arbiter() {
+     warn!("arbiter is not yet initialized");
+     return;
+    }
     let tcb_idx = TransportIndex(tcb_idx);
     let advertiser = AdvertiserId(advertiser);
     let is_isolated = with_arbiter(|arbiter| arbiter.is_advertiser_isolated(advertiser));
