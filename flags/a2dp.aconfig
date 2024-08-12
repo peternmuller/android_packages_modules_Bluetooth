@@ -75,3 +75,13 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "av_stream_reconfigure_fix"
+    namespace: "bluetooth"
+    description: "Handle AVDT stream reconfiguration in an event"
+    bug: "348351688"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
