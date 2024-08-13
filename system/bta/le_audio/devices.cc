@@ -915,6 +915,28 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
   return 0;
 }
 
+bool LeAudioDevice::isLeXDevice(void) const{
+  if (snk_pacs_.empty()) {
+    return false;
+  }
+  for (const auto& pac_tuple : snk_pacs_) {
+    const auto& pac_recs = std::get<1>(pac_tuple);
+    log::info("Num of PACS records : {}", pac_recs.size());
+    if (pac_recs.empty()) {
+      continue;
+    }
+    for (const auto& pac : pac_recs) {
+      log::info("Coding format : {}, Vendor Codec ID : {}",
+          pac.codec_id.coding_format, pac.codec_id.vendor_codec_id);
+      if (pac.codec_id.vendor_codec_id ==
+          types::kLeAudioCodingFormatAptxLeX) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Returns supported PHY's bitfield
  */

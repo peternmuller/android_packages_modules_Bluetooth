@@ -557,6 +557,31 @@ uint8_t BTM_GetQcmPhyState(const RawAddress& bda) {
   return (uint8_t)qcm_phy_state;
 }
 
+
+void btm_update_codec_settings(uint8_t* p) {
+  uint16_t handle, delay = 0xFFFF;
+  uint8_t types, mode = 0xFF;
+
+  STREAM_TO_UINT16(handle, p);
+  STREAM_TO_UINT8(types, p);
+
+  log::info(":: handle = 0x{:02x}, types = 0x{:02x}", handle, types);
+
+  while(types--) {
+    uint8_t len = 0x00, type = 0xFF;
+    STREAM_TO_UINT8(len, p);
+    STREAM_TO_UINT8(type, p);
+    if (len > 2 && type == 0x01) {
+      STREAM_TO_UINT24(delay, p);
+    } else if (len > 0 && type == 0x00) {
+      STREAM_TO_UINT8(mode, p);
+    }
+  }
+
+  bluetooth::hci::IsoManager::GetInstance()->HandleVSCodecSettingsEvent(mode,
+    delay);
+}
+
 /*******************************************************************************
  *
  * Function        btm_acl_update_qcm_phy_state
@@ -712,6 +737,9 @@ void btm_vendor_vse_cback(uint8_t vse_subcode, uint8_t evt_len, uint8_t* p) {
         case MSG_QBCE_QCM_PHY_CHANGE:
           btm_acl_update_qcm_phy_state(pp);
           break;
+        case MSG_QBCE_VS_CODEC_SETTINGS:
+          btm_update_codec_settings(pp);
+          break;
         case MSG_QBCE_QLE_CIG_LATENCY_CHANGED:
           break;
         default:
@@ -719,9 +747,6 @@ void btm_vendor_vse_cback(uint8_t vse_subcode, uint8_t evt_len, uint8_t* p) {
           break;
       }
       return;
-    } else if (MSG_QBCE_VS_PARAM_REPORT_EVENT == vse_subcode) {
-      bluetooth::hci::IsoManager::GetInstance()->HandleVscHciEvent(
-          vse_subcode, pp, evt_len - 1);
     } else if (HCI_VS_LINK_POWER_CTRL_EVENT == vse_subcode) {
       btm_vendor_link_power_control_event(pp);
     }
