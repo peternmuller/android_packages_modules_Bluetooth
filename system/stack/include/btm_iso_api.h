@@ -233,9 +233,7 @@ class IsoManager {
   virtual void HandleHciEvent(uint8_t sub_code, uint8_t* params,
                               uint16_t length);
 
-  virtual void HandleVscHciEvent(uint8_t sub_code, uint8_t* params,
-                              uint16_t length);
-
+  virtual void HandleVSCodecSettingsEvent(uint8_t mode, uint16_t delay);
   /**
    * Starts the IsoManager module
    */

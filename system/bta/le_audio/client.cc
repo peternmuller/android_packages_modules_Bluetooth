@@ -62,9 +62,6 @@
 #include "state_machine.h"
 #include "storage_helper.h"
 
-#define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
-#define VS_QHCI_USECASE_UPDATE 0x15
-
 using namespace bluetooth;
 
 using base::Closure;
@@ -937,13 +934,6 @@ class LeAudioClientImpl : public LeAudioClient {
       callbacks_->OnUnicastMonitorModeStatus(
           bluetooth::le_audio::types::kLeAudioDirectionSource,
           UnicastMonitorModeStatus::STREAMING_REQUESTED);
-    }
-
-    auto device = group->GetFirstDevice();
-    if (device) {
-      send_vs_cmd(device->GetBdAddress(),
-        static_cast<uint16_t>(configuration_context_type),
-        group->GetFirstDevice()->snk_pacs_);
     }
 
     bool result = groupStateMachine_->StartStream(
@@ -5457,28 +5447,6 @@ class LeAudioClientImpl : public LeAudioClient {
     return remote_metadata;
   }
 
-  void send_vs_cmd(const RawAddress& bd_addr, uint16_t content_type,
-    const bluetooth::le_audio::types::PublishedAudioCapabilities& group_pacs) {
-    bool remote_support = false;
-    for (auto& [handles, pacs_record] : group_pacs) {
-      for (auto& pac : pacs_record) {
-        if (pac.codec_id.vendor_codec_id == bluetooth::le_audio::types::kLeAudioCodingFormatAptxLeX) {
-          remote_support = true;
-          break;
-        }
-      }
-    }
-    if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
-      uint8_t param[4] = {0};
-      param[0] = VS_QHCI_USECASE_UPDATE;
-      param[1] = (BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0x00FF;
-      param[2] = ((BTM_GetHCIConnHandle(bd_addr, BT_TRANSPORT_LE)) & 0xFF00) >> 8;
-      param[3] = (uint8_t)content_type;
-      //BTM_VendorSpecificCommand(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
-      btsnd_hcic_vendor_spec_cmd(HCI_VSQC_CONTROLLER_A2DP_OPCODE, 4, param, NULL);
-    }
-  }
-
   LeAudioContextType AdjustForVoiceAssistant(
       LeAudioDeviceGroup* group, LeAudioContextType new_configuration_context) {
     if (!com::android::bluetooth::flags::
@@ -5665,13 +5633,6 @@ class LeAudioClientImpl : public LeAudioClient {
           "Checking whether to change configuration context from {} to {}",
           ToString(configuration_context_type_),
           ToString(new_configuration_context));
-
-      auto device = group->GetFirstDevice();
-      if (device) {
-        send_vs_cmd(device->GetBdAddress(),
-          static_cast<uint16_t>(new_configuration_context),
-          group->GetFirstDevice()->snk_pacs_);
-      }
 
       LeAudioLogHistory::Get()->AddLogHistory(
           kLogAfCallBt, active_group_id_, RawAddress::kEmpty,
