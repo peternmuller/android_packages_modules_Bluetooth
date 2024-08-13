@@ -1753,6 +1753,31 @@ bool L2CA_isMediaChannel(uint16_t handle, uint16_t channel_id,
 }
 
 /*******************************************************************************
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
+  log::verbose("CID: 0x{:04x}", lcid);
+
+  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
+  if (p_ccb == nullptr) {
+    log::error("No CCB for CID:0x{:04x}", lcid);
+    return false;
+  }
+
+  log::assert_that(rcid != nullptr, "assert failed: rcid != nullptr");
+  *rcid = p_ccb->remote_cid;
+  return true;
+}
+
+/*******************************************************************************
  *
  * Function         L2CA_Ping
  *
@@ -1794,34 +1819,46 @@ bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback) {
     alarm_set_on_mloop(p_lcb->l2c_lcb_timer, 30000, l2c_lcb_timer_timeout,
                        p_lcb);
   }
-
   return (true);
 }
 
 /*******************************************************************************
- *  Function        L2CA_GetPeerChannelId
+ * Function         L2CA_FlowControl
  *
- *  Description     Get remote channel ID for Connection Oriented Channel.
+ * Description      Higher layers call this function to flow control a channel.
  *
- *  Parameters:     lcid: Local CID
- *                  rcid: Pointer to remote CID
+ *                  data_enabled - true data flows, false data is stopped
  *
- *  Return value:   true if peer is connected
+ * Returns          true if valid channel, else false
  *
  ******************************************************************************/
-bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
-  log::verbose("CID: 0x{:04x}", lcid);
+bool L2CA_FlowControl(uint16_t cid, bool data_enabled) {
+  tL2C_CCB* p_ccb;
+  bool on_off = !data_enabled;
 
-  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
-  if (p_ccb == nullptr) {
-    log::error("No CCB for CID:0x{:04x}", lcid);
-    return false;
+  log::error("L2CA_FlowControl CID:0x{:04x}", cid);
+
+  /* Find the channel control block. We don't know the link it is on. */
+  p_ccb = l2cu_find_ccb_by_cid(NULL, cid);
+  if (p_ccb == NULL) {
+    log::error("L2CAP - no CCB for, L2CA_FlowControl CID:0x{:04x}", cid);
+    return (false);
   }
 
-  log::assert_that(rcid != nullptr, "assert failed: rcid != nullptr");
-  *rcid = p_ccb->remote_cid;
-  return true;
+  if (p_ccb->peer_cfg.fcr.mode != L2CAP_FCR_ERTM_MODE) {
+    log::error("L2CA_FlowControl mode:{}", p_ccb->peer_cfg.fcr.mode);
+    return (false);
+  }
+
+  if ((p_ccb->chnl_state == CST_OPEN) && (!p_ccb->fcrb.wait_ack)) {
+    if (on_off)
+      l2c_fcr_send_S_frame(p_ccb, L2CAP_FCR_SUP_RNR, 0);
+    else
+      l2c_fcr_send_S_frame(p_ccb, L2CAP_FCR_SUP_RR, L2CAP_FCR_P_BIT);
+  }
+  return (true);
 }
+
 using namespace bluetooth;
 
 #define DUMPSYS_TAG "shim::legacy::l2cap"
