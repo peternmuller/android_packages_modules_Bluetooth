@@ -796,9 +796,18 @@ void bta_gattc_cfg_mtu(tBTA_GATTC_CLCB* p_clcb, const tBTA_GATTC_DATA* p_data) {
       /* Check if MTU is not already set, if so, just report it back to the user
        * and continue with other requests.
        */
+      log::info(" MTU_EXCHANGE_ALREADY_DONE  {}", p_clcb->bda);
       GATTC_UpdateUserAttMtuIfNeeded(p_clcb->bda, p_clcb->transport,
                                      p_data->api_mtu.mtu);
       bta_gattc_send_mtu_response(p_clcb, p_data, current_mtu);
+      if (!p_clcb->p_q_cmd_queue.empty()) {
+        const tBTA_GATTC_DATA* p_q_cmd = p_clcb->p_q_cmd_queue.front();
+        if (p_q_cmd->hdr.event == BTA_GATTC_API_CFG_MTU_EVT) {
+          log::info("Removing the MTU packet from the command queue ");
+          p_clcb->p_q_cmd_queue.pop_front();
+        }
+        bta_gattc_continue(p_clcb);
+      }
       return;
     case MTU_EXCHANGE_IN_PROGRESS:
       log::info("Enqueue MTU Request  - waiting for response on p_clcb {}",
@@ -811,6 +820,7 @@ void bta_gattc_cfg_mtu(tBTA_GATTC_CLCB* p_clcb, const tBTA_GATTC_DATA* p_data) {
       return;
 
     case MTU_EXCHANGE_NOT_DONE_YET:
+      log::info(" MTU_EXCHANGE_NOT_DONE_YET  {}", p_clcb->bda);
       /* OK to proceed */
       break;
   }
