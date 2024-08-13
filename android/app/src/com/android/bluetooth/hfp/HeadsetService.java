@@ -2614,13 +2614,16 @@ public class HeadsetService extends ProfileService {
                     }
                 }
 
-                // Unsuspend A2DP when SCO connection is gone and call state is idle
-                if (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled()) {
-                    mSystemInterface.getAudioManager().setA2dpSuspended(false);
-                    if (isAtLeastU()) {
-                        mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                mStateMachinesThreadHandler.post(() -> {
+                    // Unsuspend A2DP when SCO connection is gone and call state is idle
+                    if (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled()) {
+                        Log.i(TAG, "Resume A2DP when SCO is gone and call state is idle");
+                        mSystemInterface.getAudioManager().setA2dpSuspended(false);
+                        if (isAtLeastU()) {
+                            mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                        }
                     }
-                }
+                });
             }
         }
     }
