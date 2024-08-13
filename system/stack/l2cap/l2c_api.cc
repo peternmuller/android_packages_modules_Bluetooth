@@ -1798,6 +1798,30 @@ bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback) {
   return (true);
 }
 
+/*******************************************************************************
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
+  log::verbose("CID: 0x{:04x}", lcid);
+
+  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
+  if (p_ccb == nullptr) {
+    log::error("No CCB for CID:0x{:04x}", lcid);
+    return false;
+  }
+
+  log::assert_that(rcid != nullptr, "assert failed: rcid != nullptr");
+  *rcid = p_ccb->remote_cid;
+  return true;
+}
 using namespace bluetooth;
 
 #define DUMPSYS_TAG "shim::legacy::l2cap"

@@ -984,6 +984,19 @@ void L2CA_SetMediaStreamChannel(uint16_t local_media_cid, bool status);
  ******************************************************************************/
 bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback);
 
+ /*******************************************************************************
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+[[nodiscard]] bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid);
+
 namespace fmt {
 template <>
 struct formatter<tL2CAP_LATENCY> : enum_formatter<tL2CAP_LATENCY> {};
