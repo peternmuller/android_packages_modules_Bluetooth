@@ -1388,6 +1388,21 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
         return leAudioService != null && !leAudioService.getAllBroadcastMetadata().isEmpty();
     }
 
+    private boolean stopBroadcastingAudio() {
+        Log.d(TAG, "stopBroadcastingAudio");
+        if (!isBroadcastingAudio()) {
+            Log.w(TAG, "Broadcast audio is not active");
+            return false;
+        }
+
+        final LeAudioService leAudioService = mFactory.getLeAudioService();
+        if (leAudioService == null) {
+            return false;
+        }
+        leAudioService.setInactiveForBroadcast();
+        return true;
+    }
+
     /**
      * Called when a wired audio device is connected. It might be called multiple times each time a
      * wired audio device is connected.
@@ -1400,5 +1415,6 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
         setHfpActiveDevice(null);
         setHearingAidActiveDevice(null, true);
         setLeAudioActiveDevice(null, true);
+        stopBroadcastingAudio();
     }
 }
