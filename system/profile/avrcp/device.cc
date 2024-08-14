@@ -1756,7 +1756,7 @@ void Device::HandlePlayStatusUpdate() {
 
   media_interface_->GetPlayStatus(base::Bind(
       [](base::WeakPtr<Device> d, PlayStatus s) {
-        if (s.state == PlayState::PLAYING) {
+        if (d && s.state == PlayState::PLAYING && s.state != d->last_play_status_.state) {
           bool is_le_audio_in_idle = LeAudioClient::IsLeAudioClientRunning() ?
               LeAudioClient::IsLeAudioClientInIdle() : false;
           log::info("is_leaudio_in_idle: {}", is_le_audio_in_idle);
