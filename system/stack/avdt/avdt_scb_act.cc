@@ -743,16 +743,23 @@ void avdt_scb_hdl_setconfig_rsp(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
   if (p_scb->p_ccb != NULL) {
     /* save configuration */
     p_scb->curr_cfg = p_scb->req_cfg;
-
+    p_scb->role = AVDT_CONF_INT;
     // In sink mode, report delay value when this device initiates the connection.
     // Delay reporting is sent before open request (i.e., in configured state).
     avdt_scb_snd_snk_delay_rpt_req(p_scb, p_data);
 
     /* initiate open */
-    single.seid = p_scb->peer_seid;
-    tAVDT_SCB_EVT avdt_scb_evt;
-    avdt_scb_evt.msg.single = single;
-    avdt_scb_event(p_scb, AVDT_SCB_API_OPEN_REQ_EVT, &avdt_scb_evt);
+    if (!(p_scb->curr_cfg.psc_mask & AVDT_PSC_DELAY_RPT)) {
+      /* initiate open */
+      single.seid = p_scb->peer_seid;
+      tAVDT_SCB_EVT avdt_scb_evt;
+      avdt_scb_evt.msg.single = single;
+      avdt_scb_event(p_scb, AVDT_SCB_API_OPEN_REQ_EVT, &avdt_scb_evt);
+    } else {
+      alarm_set_on_mloop(p_scb->delay_report_timer,
+                         AVDT_DELAY_REPORT_TIMEOUT_MS,
+                         avdt_delay_report_timer_timeout, p_scb);
+    }
   }
 }
 
@@ -908,16 +915,32 @@ void avdt_scb_snd_delay_rpt_req(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
  *
  ******************************************************************************/
 void avdt_scb_hdl_delay_rpt_cmd(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
+  tAVDT_EVT_HDR single;
+  alarm_cancel(p_scb->delay_report_timer);
   (*p_scb->stream_config.p_avdt_ctrl_cback)(
       avdt_scb_to_hdl(p_scb),
       p_scb->p_ccb ? p_scb->p_ccb->peer_addr : RawAddress::kEmpty,
       AVDT_DELAY_REPORT_EVT, (tAVDT_CTRL*)&p_data->msg.hdr,
       p_scb->stream_config.scb_index);
 
-  if (p_scb->p_ccb)
-    avdt_msg_send_rsp(p_scb->p_ccb, AVDT_SIG_DELAY_RPT, &p_data->msg);
-  else
+  if (p_scb->p_ccb) {
+    if ((p_scb->curr_cfg.psc_mask & AVDT_PSC_DELAY_RPT)) {
+      avdt_msg_send_rsp(p_scb->p_ccb, AVDT_SIG_DELAY_RPT, &p_data->msg);
+      if (p_scb->role == AVDT_CONF_INT) {
+        /* initiate open after get initial delay report value*/
+        single.seid = p_scb->peer_seid;
+        p_scb->role = AVDT_DELAY_RPT_OPEN_INT;
+        log::debug("avdt_scb_hdl_delay_rpt_cmd: Initiate open request");
+        avdt_scb_event(p_scb, AVDT_SCB_API_OPEN_REQ_EVT, (tAVDT_SCB_EVT*)&single);
+      }
+    } else {
+      p_data->msg.hdr.err_code = AVDT_ERR_NSC;
+      avdt_msg_send_rej(p_scb->p_ccb, AVDT_SIG_DELAY_RPT, &p_data->msg);
+    }
+  }
+  else {
     avdt_scb_rej_not_in_use(p_scb, p_data);
+  }
 }
 
 /*******************************************************************************
@@ -1406,7 +1429,7 @@ void avdt_scb_snd_setconfig_req(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
 void avdt_scb_snd_setconfig_rsp(AvdtpScb* p_scb, tAVDT_SCB_EVT* p_data) {
   if (p_scb->p_ccb != NULL) {
     p_scb->curr_cfg = p_scb->req_cfg;
-
+    p_scb->role = AVDT_CONF_ACP;
     avdt_msg_send_rsp(p_scb->p_ccb, AVDT_SIG_SETCONFIG, &p_data->msg);
   }
 }
