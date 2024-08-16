@@ -603,9 +603,12 @@ void bta_hh_co_close(btif_hh_device_t* p_dev) {
   /* Stop the polling thread */
   p_dev->uhid.hh_keep_polling = 0;
   if (p_dev->hh_poll_thread_id > 0) {
+    pthread_t hh_poll_thread_id = p_dev->hh_poll_thread_id;
     p_dev->uhid.hh_keep_polling = 0;
-    pthread_join(p_dev->hh_poll_thread_id, NULL);
+    /* set p_dev->hh_poll_thread_id to invalid handle before joining thread. */
     p_dev->hh_poll_thread_id = -1;
+    pthread_join(hh_poll_thread_id, NULL);
+    log::info("Closing device hh_poll_thread_id=0x{:x} ", hh_poll_thread_id);
   }
   /* UHID file descriptor is closed by the polling thread */
 }

@@ -2654,11 +2654,11 @@ public class LeAudioService extends ProfileService {
             Integer newDirections = AUDIO_DIRECTION_NONE;
             if (Flags.leaudioBroadcastAudioHandoverPolicies()
                     && isBroadcastReadyToBeReActivated()) {
-                if (!mCreateBroadcastQueue.isEmpty()) {
+                if (!mCreateBroadcastQueue.isEmpty() || leaudioUseAudioModeListener()) {
                     mAudioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
                             AudioManager.ADJUST_MUTE, AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
-                    suspendLeAudioStream();
                 }
+                suspendLeAudioStream();
                 leaveConnectedInputDevice = true;
                 newDirections |= AUDIO_DIRECTION_INPUT_BIT;
 
