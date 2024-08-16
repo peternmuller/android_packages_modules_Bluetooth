@@ -1360,6 +1360,14 @@ class HeadsetStateMachine extends StateMachine {
                 mIsBlacklistedForSCOAfterSLC = isSCONeededImmediatelyAfterSLC();
                 // Checking for the Blacklisted device Addresses
                 mIsBlacklistedDeviceforRetrySCO = isConnectedDeviceBlacklistedforRetrySco();
+
+                if (mSystemInterface.isInCall() || mSystemInterface.isRinging()) {
+                    Log.w(TAG, "call is in ringing/present, suspending a2dp/le audio");
+                    mSystemInterface.getAudioManager().setA2dpSuspended(true);
+                    if (isAtLeastU()) {
+                        mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                    }
+                }
                 // Remove pending connection attempts that were deferred during the pending
                 // state. This is to prevent auto connect attempts from disconnecting
                 // devices that previously successfully connected.
@@ -1715,6 +1723,13 @@ class HeadsetStateMachine extends StateMachine {
                                             + mDevice);
                             break;
                         }
+
+                        if (mIsRetrySco) {
+                            Log.d(TAG, "reset mIsRetrySco as DISCONNECT_AUDIO");
+                            mIsRetrySco = false;
+                            removeMessages(SCO_RETRIAL_NOT_REQ);
+                        }
+
                         if (mNativeInterface.disconnectAudio(mDevice)) {
                             stateLogD("DISCONNECT_AUDIO, device=" + mDevice);
                             transitionTo(mAudioDisconnecting);
@@ -2230,6 +2245,13 @@ class HeadsetStateMachine extends StateMachine {
                       SystemProperties.getInt("persist.vendor.btstack.mo.retry_sco.interval", 2000);
               }
            }
+
+           if (mIsRetrySco && callState.mNumActive == 0 && callState.mNumHeld == 0 &&
+                      callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE) {
+               Log.d(TAG, "reset mIsRetrySco as no call is ongoing");
+               mIsRetrySco = false;
+               removeMessages(SCO_RETRIAL_NOT_REQ);
+           }
         }
         mStateMachineCallState.mNumActive = callState.mNumActive;
         mStateMachineCallState.mNumHeld = callState.mNumHeld;
@@ -2421,7 +2443,11 @@ class HeadsetStateMachine extends StateMachine {
             if (phoneNumber == null) {
                 phoneNumber = "";
             }
+            if (phoneNumber == ""){
+               phoneNumber = "10000000";
+            }
             int type = PhoneNumberUtils.toaFromString(phoneNumber);
+            Log.e(TAG, "processAtClcc: voip phoneNumber " + phoneNumber +" voip type " + type);
             mNativeInterface.clccResponse(device, 1, 0, 0, 0, false, phoneNumber, type);
             mNativeInterface.clccResponse(device, 0, 0, 0, 0, false, "", 0);
         } else {

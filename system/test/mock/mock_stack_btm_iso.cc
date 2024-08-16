@@ -44,8 +44,8 @@ void IsoManager::RegisterCigCallbacks(
   if (!pimpl_) return;
   pimpl_->RegisterCigCallbacks(callbacks);
 }
-void IsoManager::HandleVscHciEvent(uint8_t /* sub_code */, uint8_t* /* params */,
-                                uint16_t /* length */) {}
+void IsoManager::HandleVSCodecSettingsEvent(uint8_t /* mode */,
+            uint16_t /* delay*/) {}
 
 void IsoManager::RegisterBigCallbacks(
     iso_manager::BigCallbacks* callbacks) const {

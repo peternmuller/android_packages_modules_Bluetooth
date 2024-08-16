@@ -89,6 +89,10 @@ public class BluetoothOppTransferHistory extends Activity
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         Utils.setEdgeToEdge(this);
+
+        // TODO(b/309578419): Make this activity handle insets properly and then remove this.
+        getTheme().applyStyle(R.style.OptOutEdgeToEdgeEnforcement, /* force */ false);
+
         setContentView(R.layout.bluetooth_transfers_page);
         mListView = (ListView) findViewById(R.id.list);
         mListView.setEmptyView(findViewById(R.id.empty));

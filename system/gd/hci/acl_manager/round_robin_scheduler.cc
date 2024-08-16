@@ -58,6 +58,16 @@ void RoundRobinScheduler::Unregister(uint16_t handle) {
       acl_queue_handlers_.count(handle) == 1,
       "assert failed: acl_queue_handlers_.count(handle) == 1");
   auto acl_queue_handler = acl_queue_handlers_.find(handle)->second;
+
+  //Clear fragments which did not send
+  while (!fragments_to_send_.empty()) {
+    auto acl_handle = std::get<1>(fragments_to_send_.front());
+    if (acl_handle == handle) {
+      fragments_to_send_.pop();
+    } else {
+      break;
+    }
+  }
   // Reclaim outstanding packets
   if (acl_queue_handler.connection_type_ == ConnectionType::CLASSIC) {
     acl_packet_credits_ += acl_queue_handler.number_of_sent_packets_;
@@ -96,7 +106,7 @@ void RoundRobinScheduler::start_round_robin() {
     return;
   }
   if (!fragments_to_send_.empty()) {
-    auto connection_type = fragments_to_send_.front().first;
+    auto connection_type = std::get<0>(fragments_to_send_.front());
     bool classic_buffer_full = acl_packet_credits_ == 0 && connection_type == ConnectionType::CLASSIC;
     bool le_buffer_full = le_acl_packet_credits_ == 0 && connection_type == ConnectionType::LE;
     if (classic_buffer_full || le_buffer_full) {
@@ -159,15 +169,15 @@ void RoundRobinScheduler::buffer_packet(uint16_t acl_handle) {
   int acl_priority = acl_queue_handler->second.high_priority_ ? 1 : 0;
   if (packet->size() <= mtu) {
     fragments_to_send_.push(
-        std::make_pair(
-            connection_type, AclBuilder::Create(handle, packet_boundary_flag, broadcast_flag, std::move(packet))),
+        std::make_tuple(
+            connection_type, handle, AclBuilder::Create(handle, packet_boundary_flag, broadcast_flag, std::move(packet))),
         acl_priority);
   } else {
     auto fragments = AclFragmenter(mtu, std::move(packet)).GetFragments();
     for (size_t i = 0; i < fragments.size(); i++) {
       fragments_to_send_.push(
-          std::make_pair(
-              connection_type,
+          std::make_tuple(
+              connection_type, handle,
               AclBuilder::Create(handle, packet_boundary_flag, broadcast_flag, std::move(fragments[i]))),
           acl_priority);
       packet_boundary_flag = PacketBoundaryFlag::CONTINUING_FRAGMENT;
@@ -199,7 +209,7 @@ void RoundRobinScheduler::send_next_fragment() {
 
 // Invoked from some external Queue Reactable context 1
 std::unique_ptr<AclBuilder> RoundRobinScheduler::handle_enqueue_next_fragment() {
-  ConnectionType connection_type = fragments_to_send_.front().first;
+  ConnectionType connection_type = std::get<0>(fragments_to_send_.front());
   if (connection_type == ConnectionType::CLASSIC) {
     log::assert_that(acl_packet_credits_ > 0, "assert failed: acl_packet_credits_ > 0");
     acl_packet_credits_ -= 1;
@@ -208,7 +218,7 @@ std::unique_ptr<AclBuilder> RoundRobinScheduler::handle_enqueue_next_fragment() 
     le_acl_packet_credits_ -= 1;
   }
 
-  auto raw_pointer = fragments_to_send_.front().second.release();
+  auto raw_pointer = std::get<2>(fragments_to_send_.front()).release();
   fragments_to_send_.pop();
   if (fragments_to_send_.empty()) {
     if (enqueue_registered_.exchange(false)) {
@@ -216,7 +226,7 @@ std::unique_ptr<AclBuilder> RoundRobinScheduler::handle_enqueue_next_fragment() 
     }
     handler_->Post(common::BindOnce(&RoundRobinScheduler::start_round_robin, common::Unretained(this)));
   } else {
-    ConnectionType next_connection_type = fragments_to_send_.front().first;
+    ConnectionType next_connection_type = std::get<0>(fragments_to_send_.front());
     bool classic_buffer_full = next_connection_type == ConnectionType::CLASSIC && acl_packet_credits_ == 0;
     bool le_buffer_full = next_connection_type == ConnectionType::LE && le_acl_packet_credits_ == 0;
     if ((classic_buffer_full || le_buffer_full) && enqueue_registered_.exchange(false)) {

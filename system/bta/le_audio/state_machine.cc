@@ -110,6 +110,7 @@ constexpr uint8_t  LTV_LEN_LATENCY_MODE                 = 0X01;
 constexpr uint8_t  LTV_LEN_MAX_FT                       = 0X01;
 
 constexpr uint8_t  ENCODER_LIMITS_SUB_OP                = 0x24;
+constexpr uint8_t  HCI_VS_SET_CIG_CONTEXT_TYPE          = 0x3C;
 
 typedef struct {
   uint8_t cig_id;
@@ -261,6 +262,24 @@ void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
       (p) += (ltv_len - 1);
     }
     meta_data_len -= (ltv_len + 1);
+  }
+}
+
+void send_vs_cmd(const uint16_t content_type, const uint8_t cig_id, const uint8_t cis_cnt,
+  const std::vector<uint16_t> cis_conn_handles, bool remote_support) {
+  if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
+    std::vector<uint8_t> param;
+    param.push_back(HCI_VS_SET_CIG_CONTEXT_TYPE);
+    param.push_back(cig_id);
+    param.push_back(content_type & 0x00FF);
+    param.push_back((content_type & 0xFF00) >> 8);
+    param.push_back(cis_cnt);
+    for (auto& cis_handle: cis_conn_handles) {
+      param.push_back(cis_handle & 0x00FF);
+      param.push_back((cis_handle & 0xFF00) >> 8);
+    }
+    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF,
+        param.size(), param.data(), NULL);
   }
 }
 
@@ -768,6 +787,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         config_controller_to_host_sent = false;
       }
     }
+    send_vs_cmd(static_cast<uint16_t>(group->GetConfigurationContextType()),
+        cig_id, group->cig.cises.size(), conn_handles, group->IsLeXDevice());
+
     PrepareAndSendQoSToTheGroup(group);
   }
 

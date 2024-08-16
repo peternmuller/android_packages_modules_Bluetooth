@@ -405,6 +405,8 @@ static void event_clean_up_stack(std::promise<void> promise,
 
   btif_cleanup_bluetooth();
 
+  main_thread_shut_down();
+
   module_clean_up(get_local_module(STACK_CONFIG_MODULE));
   module_clean_up(get_local_module(INTEROP_MODULE));
 
@@ -414,8 +416,6 @@ static void event_clean_up_stack(std::promise<void> promise,
   module_clean_up(get_local_module(OSI_MODULE));
   log::info("Gd shim module disabled");
   module_shut_down(get_local_module(GD_SHIM_MODULE));
-
-  main_thread_shut_down();
 
   module_management_stop();
   log::info("finished");

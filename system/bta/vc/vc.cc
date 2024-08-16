@@ -704,10 +704,15 @@ class VolumeControlImpl : public VolumeControl {
     }
 
     // Remove operations with no devices
-    ongoing_operations_.erase(
-        std::remove_if(ongoing_operations_.begin(), ongoing_operations_.end(),
-                       [](auto& op) { return op.devices_.empty(); }),
-        ongoing_operations_.end());
+    for (auto op = ongoing_operations_.begin();
+        op != ongoing_operations_.end();) {
+      if (op->devices_.empty()) {
+        log::debug("Removing operation {}", op->operation_id_);
+        op = ongoing_operations_.erase(op);
+      } else {
+        ++op;
+      }
+    }
   }
 
   void RemoveDeviceFromOperationList(const RawAddress& addr, int operation_id) {
@@ -759,8 +764,8 @@ class VolumeControlImpl : public VolumeControl {
         }
       }
       if (op->devices_.empty()) {
-        op = ongoing_operations_.erase(op);
         log::debug("Removing operation {}", op->operation_id_);
+        op = ongoing_operations_.erase(op);
       } else {
         op++;
       }
