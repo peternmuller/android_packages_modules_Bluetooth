@@ -17,6 +17,16 @@
  ******************************************************************************/
 
 /******************************************************************************
+ * Changes from Qualcomm Innovation Center are provided under the following
+ * license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ ******************************************************************************/
+
+/******************************************************************************
  *
  *  This file contains L2CAP internal definitions
  *
@@ -695,6 +705,11 @@ extern tL2C_CB l2cb;
 /* Functions provided by l2c_main.cc
  ***********************************
 */
+
+void l2cu_adj_id(tL2C_LCB* p_lcb);
+
+void l2cu_send_peer_echo_req(tL2C_LCB* p_lcb, uint8_t* p_data,
+                             uint16_t data_len);
 
 void l2c_receive_hold_timer_timeout(void* data);
 void l2c_ccb_timer_timeout(void* data);
