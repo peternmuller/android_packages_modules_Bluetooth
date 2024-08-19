@@ -22,12 +22,12 @@ import android.media.session.PlaybackState;
 // TODO(apanicke): Send the current active song ID along with this object so that all information
 // is carried by our custom types.
 public class PlayStatus {
-    static final byte STOPPED = 0;
-    static final byte PLAYING = 1;
-    static final byte PAUSED = 2;
-    static final byte FWD_SEEK = 3;
-    static final byte REV_SEEK = 4;
-    static final byte ERROR = -1;
+    public static final byte STOPPED = 0;
+    public static final byte PLAYING = 1;
+    public static final byte PAUSED = 2;
+    public static final byte FWD_SEEK = 3;
+    public static final byte REV_SEEK = 4;
+    public static final byte ERROR = -1;
 
     public long position = 0;
     public long duration = 0x00L;
