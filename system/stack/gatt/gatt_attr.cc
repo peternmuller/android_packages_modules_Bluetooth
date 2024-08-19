@@ -60,7 +60,6 @@ const bool encrypted_advertising_data_supported_ = true;
 #define BLE_GATT_CL_SUP_FEAT_CACHING_BITMASK 0x01
 #define BLE_GATT_CL_SUP_FEAT_EATT_BITMASK 0x02
 #define BLE_GATT_CL_SUP_FEAT_MULTI_NOTIF_BITMASK 0x04
-#define BLE_GATT_CL_SUP_FEAT_NON_RFU_BITMASK 0x07
 
 #define BLE_GATT_CL_ANDROID_SUP_FEAT \
   (BLE_GATT_CL_SUP_FEAT_EATT_BITMASK | BLE_GATT_CL_SUP_FEAT_MULTI_NOTIF_BITMASK)
@@ -1228,7 +1227,7 @@ static tGATT_STATUS gatt_sr_write_cl_supp_feat(uint16_t conn_id,
   // get current robust caching status before setting new one
   bool curr_caching_state = gatt_sr_is_cl_robust_caching_supported(tcb);
 
-  tcb.cl_supp_feat = (tmp.front() & BLE_GATT_CL_SUP_FEAT_NON_RFU_BITMASK);
+  tcb.cl_supp_feat = tmp.front();
   if (!gatt_sr_is_robust_caching_enabled()) {
     // remove robust caching bit
     tcb.cl_supp_feat &= ~BLE_GATT_CL_SUP_FEAT_CACHING_BITMASK;
