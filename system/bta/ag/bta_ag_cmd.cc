@@ -1185,6 +1185,10 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
           !osi_property_get_bool("vendor.bt.pts.certification", false)) {
         p_scb->masked_features &= HFP_1_6_FEAT_MASK;
       }
+      if (osi_property_get_bool("vendor.bt.pts.disable_3way_calling", false)) {
+        log::verbose("disabling 3-way calling");
+        p_scb->masked_features &= ~(BTA_AG_FEAT_3WAY);
+      }
       if(interop_match_addr_or_name(INTEROP_INBAND_RINGTONE_SET_TO_FALSE,
           &p_scb->peer_addr, &btif_storage_get_remote_device_property)) {
            log::verbose("do not send inband ringtone supported for blacklisted device");
