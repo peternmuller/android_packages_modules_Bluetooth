@@ -17,6 +17,16 @@
  ******************************************************************************/
 
 /******************************************************************************
+ * Changes from Qualcomm Innovation Center are provided under the following
+ * license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ ******************************************************************************/
+
+/******************************************************************************
  *
  *  This file contains L2CAP internal definitions
  *
@@ -61,7 +71,7 @@ constexpr uint16_t L2CAP_CREDIT_BASED_MIN_MPS = 64;
 #define L2CAP_CHNL_CONNECT_EXT_TIMEOUT_MS (120 * 1000) /* 120 seconds */
 #define L2CAP_CHNL_CFG_TIMEOUT_MS (30 * 1000)          /* 30 seconds */
 #define L2CAP_CHNL_DISCONNECT_TIMEOUT_MS (10 * 1000)   /* 10 seconds */
-#define L2CAP_DELAY_CHECK_SM4_TIMEOUT_MS (2 * 1000)    /* 2 seconds */
+#define L2CAP_DELAY_CHECK_SM4_TIMEOUT_MS (10 * 1000)    /* 2 seconds */
 #define L2CAP_WAIT_INFO_RSP_TIMEOUT_MS (3 * 1000)      /* 3 seconds */
 #define L2CAP_BLE_LINK_CONNECT_TIMEOUT_MS (30 * 1000)  /* 30 seconds */
 #define L2CAP_FCR_ACK_TIMEOUT_MS 200                   /* 200 milliseconds */
@@ -695,6 +705,11 @@ extern tL2C_CB l2cb;
 /* Functions provided by l2c_main.cc
  ***********************************
 */
+
+void l2cu_adj_id(tL2C_LCB* p_lcb);
+
+void l2cu_send_peer_echo_req(tL2C_LCB* p_lcb, uint8_t* p_data,
+                             uint16_t data_len);
 
 void l2c_receive_hold_timer_timeout(void* data);
 void l2c_ccb_timer_timeout(void* data);
