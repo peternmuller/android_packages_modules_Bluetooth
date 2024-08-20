@@ -51,6 +51,7 @@
 #include "include/hardware/bluetooth_headset_interface.h"
 #include "include/hardware/bt_hf.h"
 #include "internal_include/bt_target.h"
+#include "osi/include/properties.h"
 #include "stack/btm/btm_sco_hfp_hal.h"
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_api.h"
@@ -1342,6 +1343,7 @@ bt_status_t HeadsetInterface::PhoneStateChange(
     log::verbose("Call setup states changed. old: {} new: {}",
                  dump_hf_call_state(control_block.call_setup_state),
                  dump_hf_call_state(call_setup_state));
+    bool value = osi_property_get_bool("persist.bluetooth.disableconnectaudio", false);
     switch (call_setup_state) {
       case BTHF_CALL_STATE_IDLE: {
         switch (control_block.call_setup_state) {
@@ -1349,7 +1351,11 @@ bt_status_t HeadsetInterface::PhoneStateChange(
             if (num_active > control_block.num_active) {
               res = BTA_AG_IN_CALL_CONN_RES;
               if (is_active_device(*bd_addr)) {
-                ag_res.audio_handle = control_block.handle;
+                if(value) {
+                  log::warn("not initiating sco when call moved from ringing to active state");
+                } else {
+                  ag_res.audio_handle = control_block.handle;
+                }
               }
             } else if (num_held > control_block.num_held)
               res = BTA_AG_IN_CALL_HELD_RES;
@@ -1377,7 +1383,11 @@ bt_status_t HeadsetInterface::PhoneStateChange(
         } else {
           res = BTA_AG_IN_CALL_RES;
           if (is_active_device(*bd_addr)) {
-            ag_res.audio_handle = control_block.handle;
+            if(value) {
+              log::warn("not initiating sco when call is in ringing state");
+            } else {
+              ag_res.audio_handle = control_block.handle;
+            }
           }
         }
         if (number) {
@@ -1438,7 +1448,11 @@ bt_status_t HeadsetInterface::PhoneStateChange(
         break;
       case BTHF_CALL_STATE_DIALING:
         if (!(num_active + num_held) && is_active_device(*bd_addr)) {
-          ag_res.audio_handle = control_block.handle;
+          if(value) {
+            log::warn("not initiating sco when call is in dialing state");
+          } else {
+            ag_res.audio_handle = control_block.handle;
+          }
         }
         res = BTA_AG_OUT_CALL_ORIG_RES;
         break;
@@ -1447,7 +1461,11 @@ bt_status_t HeadsetInterface::PhoneStateChange(
          * triggers it */
         if ((control_block.call_setup_state == BTHF_CALL_STATE_IDLE) &&
             !(num_active + num_held) && is_active_device(*bd_addr)) {
-          ag_res.audio_handle = control_block.handle;
+          if(value) {
+            log::warn("not initiating sco when call is in alerting state");
+          } else {
+            ag_res.audio_handle = control_block.handle;
+          }
         }
         res = BTA_AG_OUT_CALL_ALERT_RES;
         break;

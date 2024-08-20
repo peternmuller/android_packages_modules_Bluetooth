@@ -130,6 +130,8 @@ public class HeadsetService extends ProfileService {
             "persist.bluetooth.disableinbandringing";
     private static final String REJECT_SCO_IF_HFPC_CONNECTED_PROPERTY =
             "bluetooth.hfp.reject_sco_if_hfpc_connected";
+    private static final String DISABLE_CONNECT_AUDIO =
+            "persist.bluetooth.disableconnectaudio";
     private static final ParcelUuid[] HEADSET_UUIDS = {BluetoothUuid.HSP, BluetoothUuid.HFP};
     private static final int[] CONNECTING_CONNECTED_STATES = {
         BluetoothProfile.STATE_CONNECTING, BluetoothProfile.STATE_CONNECTED
@@ -747,9 +749,15 @@ public class HeadsetService extends ProfileService {
             if (service == null) {
                 return BluetoothStatusCodes.ERROR_PROFILE_SERVICE_NOT_BOUND;
             }
-
-            enforceBluetoothPrivilegedPermission(service);
-            return service.connectAudio();
+            if(!SystemProperties.getBoolean(DISABLE_CONNECT_AUDIO, false)) {
+                Log.w(TAG, "Initiating connect Audio");
+                enforceBluetoothPrivilegedPermission(service);
+                return service.connectAudio();
+            }
+            else {
+                Log.w(TAG, "Not initiating connect Audio");
+                return BluetoothStatusCodes.NOT_ALLOWED;
+            }
         }
 
         @Override
