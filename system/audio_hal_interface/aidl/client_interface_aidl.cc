@@ -303,6 +303,15 @@ bool BluetoothAudioClientInterface::UpdateAudioConfig(
       (transport_->GetSessionType() ==
        SessionType::LE_AUDIO_BROADCAST_HARDWARE_OFFLOAD_ENCODING_DATAPATH);
   auto audio_config_tag = audio_config.getTag();
+
+  log::error(
+            "AIDL: is_software_session: {}, is_a2dp_offload_session: {}, "
+            "is_leaudio_unicast_offload_session: {}, "
+            "is_leaudio_broadcast_offload_session: {}",
+            is_software_session, is_a2dp_offload_session,
+            is_leaudio_unicast_offload_session,
+            is_leaudio_broadcast_offload_session);
+
   bool is_software_audio_config =
       (is_software_session &&
        audio_config_tag == AudioConfiguration::pcmConfig);
@@ -316,6 +325,16 @@ bool BluetoothAudioClientInterface::UpdateAudioConfig(
   bool is_leaudio_broadcast_offload_audio_config =
       (is_leaudio_broadcast_offload_session &&
        audio_config_tag == AudioConfiguration::leAudioBroadcastConfig);
+
+  log::error(
+            "AIDL: is_software_audio_config: {}, "
+            "is_a2dp_offload_audio_config: {}, "
+            "is_leaudio_unicast_offload_audio_config: {}, "
+            "is_leaudio_broadcast_offload_audio_config: {}",
+            is_software_audio_config, is_a2dp_offload_audio_config,
+            is_leaudio_unicast_offload_audio_config,
+            is_leaudio_broadcast_offload_audio_config);
+
   bool is_hfp_offload_audio_config =
       (bta_ag_is_sco_managed_by_audio() &&
        transport_->GetSessionType() ==
@@ -334,12 +353,13 @@ bool BluetoothAudioClientInterface::UpdateAudioConfig(
     return true;
   }
 
+  auto aidl_retval = provider_->updateAudioConfiguration(audio_config);
+
   if (!session_started_) {
     log::info("BluetoothAudioHal session has not started");
     return true;
   }
 
-  auto aidl_retval = provider_->updateAudioConfiguration(audio_config);
   if (!aidl_retval.isOk()) {
     if (audio_config.getTag() != transport_->GetAudioConfiguration().getTag()) {
       log::warn(

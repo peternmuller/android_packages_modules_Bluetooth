@@ -102,6 +102,33 @@ uint8_t A2dp_SendSetConfigRspErrorCodeForPTS() {
   inc_func_call_count(__func__);
   return 0;
 }
+bool A2DP_IsCodecEnabledInOffload(btav_a2dp_codec_index_t codec_index) {
+  inc_func_call_count(__func__);
+  return false;
+}
+bool check_mm_supports_offload_codec (std::vector<btav_a2dp_codec_config_t>
+        offload_enabled_codecs_config, btav_a2dp_codec_index_t codecIndex) {
+  inc_func_call_count(__func__);
+  return false;
+}
+bool A2DP_Get_Aptx_AdaptiveR2_1_Supported() {
+  inc_func_call_count(__func__);
+  return false;
+}
+bool A2DP_Get_Aptx_AdaptiveR2_2_Supported() {
+  inc_func_call_count(__func__);
+  return false;
+}
+bool A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported() {
+  inc_func_call_count(__func__);
+  return false;
+}
+void A2DP_SetAptxADSupport(
+  const std::vector<btav_a2dp_codec_config_t> offload_enabled_codecs_config,
+  uint8_t soc_add_on_features_len, bool isSplitTxSupported,
+  bool isSplitA2dpSinkSupported) {
+  inc_func_call_count(__func__);
+}
 bool A2DP_IsPeerSinkCodecValid(const uint8_t* /* p_codec_info */) {
   inc_func_call_count(__func__);
   return false;
