@@ -380,17 +380,27 @@ class HeadsetStateMachine extends StateMachine {
         // Should not be called from enter() method
         void broadcastConnectionState(BluetoothDevice device, int fromState, int toState) {
             stateLogD("broadcastConnectionState " + device + ": " + fromState + "->" + toState);
-            mHeadsetService.onConnectionStateChangedFromStateMachine(device, fromState, toState);
-            Intent intent = new Intent(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
-            intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, fromState);
-            intent.putExtra(BluetoothProfile.EXTRA_STATE, toState);
-            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-            intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
-            mHeadsetService.sendBroadcastAsUser(
-                    intent,
-                    UserHandle.ALL,
-                    BLUETOOTH_CONNECT,
-                    Utils.getTempBroadcastOptions().toBundle());
+
+            if(mHeadsetService == null) {
+                Log.e(TAG, "HeadsetService is null");
+                return;
+            }
+
+            if (mHeadsetService.isVoipLeaWarEnabled()) {
+                mHeadsetService.updateConnState(device, toState);
+            } else {
+                mHeadsetService.onConnectionStateChangedFromStateMachine(device, fromState, toState);
+                Intent intent = new Intent(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
+                intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, fromState);
+                intent.putExtra(BluetoothProfile.EXTRA_STATE, toState);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+                intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+                mHeadsetService.sendBroadcastAsUser(
+                        intent,
+                        UserHandle.ALL,
+                        BLUETOOTH_CONNECT,
+                        Utils.getTempBroadcastOptions().toBundle());
+            }
         }
 
         // Should not be called from enter() method

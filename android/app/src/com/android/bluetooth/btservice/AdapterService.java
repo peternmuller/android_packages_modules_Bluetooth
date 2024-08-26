@@ -139,6 +139,7 @@ import com.android.bluetooth.hid.HidDeviceService;
 import com.android.bluetooth.hid.HidHostService;
 import com.android.bluetooth.le_audio.LeAudioService;
 import com.android.bluetooth.le_scan.ScanController;
+import com.android.bluetooth.le_audio.CallAudio;
 import com.android.bluetooth.le_scan.ScanManager;
 import com.android.bluetooth.map.BluetoothMapService;
 import com.android.bluetooth.mapclient.MapClientService;
@@ -322,6 +323,7 @@ public class AdapterService extends Service {
     private BluetoothQualityReportNativeInterface mBluetoothQualityReportNativeInterface;
     private GattService mGattService;
     private ScanController mScanController;
+    private CallAudio mCallAudio;
 
     private volatile boolean mTestModeEnabled = false;
 
@@ -2021,6 +2023,7 @@ public class AdapterService extends Service {
         if (Flags.scanManagerRefactor()) {
             mGattService = GattService.getGattService();
         }
+        mCallAudio = CallAudio.get();
     }
 
     @BluetoothAdapter.RfcommListenerResult
@@ -5173,6 +5176,15 @@ public class AdapterService extends Service {
                  */
                 mLeAudioService.removeActiveDevice(true /* hasFallbackDevice */);
             } else {
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null && mCallAudio.isVoipLeaWarEnabled()) {
+                    BluetoothDevice curActiveDevice = mCallAudio.getActiveDevice();
+                    int curActiveProfile = mCallAudio.getActiveProfile();
+                    if (curActiveDevice != null && curActiveProfile == mCallAudio.HFP) {
+                        Log.i(TAG, "setActiveDevice: HFP active, set to null " + curActiveDevice);
+                        mHeadsetService.setActiveDevice(null);
+                    }
+                }
                 mLeAudioService.setActiveDevice(device);
             }
         }
@@ -5199,6 +5211,15 @@ public class AdapterService extends Service {
         }
 
         if (setHeadset && hfpSupported) {
+            CallAudio mCallAudio = CallAudio.get();
+            if (mCallAudio != null && mCallAudio.isVoipLeaWarEnabled()) {
+                BluetoothDevice curActiveDevice = mCallAudio.getActiveDevice();
+                int curActiveProfile = mCallAudio.getActiveProfile();
+                if (curActiveDevice != null && curActiveProfile == mCallAudio.LE_AUDIO_VOICE) {
+                    Log.i(TAG, "setActiveDevice: LE Audio active, set to null " + curActiveDevice);
+                    mLeAudioService.removeActiveDevice(true /* hasFallbackDevice */);
+                }
+            }
             Log.i(TAG, "setActiveDevice: Setting active Headset " + device);
             mHeadsetService.setActiveDevice(device);
         }
@@ -5252,11 +5273,17 @@ public class AdapterService extends Service {
                 if (mHeadsetService == null) {
                     Log.e(TAG, "getActiveDevices: HeadsetService is null");
                 } else {
-                    BluetoothDevice device = mHeadsetService.getActiveDevice();
+                    BluetoothDevice device = null;
+                    if (mCallAudio != null && mCallAudio.isVoipLeaWarEnabled()) {
+                        device = mCallAudio.getActiveDevice();
+                        Log.i(TAG, "getActiveDevices: CallAudio device: " + device);
+                    } else {
+                        device = mHeadsetService.getActiveDevice();
+                        Log.i(TAG, "getActiveDevices: Headset device: " + device);
+                    }
                     if (device != null) {
                         activeDevices.add(device);
                     }
-                    Log.i(TAG, "getActiveDevices: Headset device: " + device);
                 }
                 break;
             case BluetoothProfile.A2DP:

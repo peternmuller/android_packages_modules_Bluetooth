@@ -154,6 +154,7 @@ public class LeAudioService extends ProfileService {
     private static final int DIALING_OUT_TIMEOUT_MS = 5000;
 
     private AdapterService mAdapterService;
+    private CallAudio mCallAudio;
     private DatabaseManager mDatabaseManager;
     private HandlerThread mStateMachinesThread;
     private volatile BluetoothDevice mActiveAudioOutDevice;
@@ -434,6 +435,7 @@ public class LeAudioService extends ProfileService {
                 Objects.requireNonNull(
                         mAdapterService.getDatabase(),
                         "DatabaseManager cannot be null when LeAudioService starts");
+        mCallAudio = CallAudio.init(this);
 
         mAudioManager = getSystemService(AudioManager.class);
         Objects.requireNonNull(
@@ -655,6 +657,7 @@ public class LeAudioService extends ProfileService {
         mVolumeControlService = null;
         mCsipSetCoordinatorService = null;
         mBassClientService = null;
+        mCallAudio.cleanup();
     }
 
     @Override
@@ -1496,6 +1499,14 @@ public class LeAudioService extends ProfileService {
         return descriptor.mGroupId == mUnicastGroupIdDeactivatedForBroadcastTransition;
     }
 
+    private boolean isVoipLeaWarEnabled() {
+        Log.d(TAG, "isVoipLeaWarEnabled");
+        CallAudio mCallAudio = CallAudio.get();
+        if (mCallAudio != null)
+            return mCallAudio.isVoipLeaWarEnabled();
+        return false;
+    }
+
     private boolean areBroadcastsAllStopped() {
         if (mBroadcastDescriptors == null) {
             Log.e(TAG, "areBroadcastsAllStopped: Invalid Broadcast Descriptors");
@@ -1744,6 +1755,19 @@ public class LeAudioService extends ProfileService {
         Log.d(TAG, "updateActiveOutDevice: Nothing to do.");
         return false;
     }
+
+    void notifyConnectionStateChanged(BluetoothDevice device,
+                                      int newState, int prevState, boolean isVoIPWarEnabled) {
+        Log.d(TAG, "notifyConnectionStateChanged, isVoIPWarEnabled:" + isVoIPWarEnabled);
+        if (isVoIPWarEnabled) {
+            CallAudio mCallAudio = CallAudio.get();
+            if (mCallAudio != null) {
+                mCallAudio.onConnStateChange(device, newState, mCallAudio.LE_AUDIO_VOICE);
+            }
+        }
+        notifyConnectionStateChanged(device, newState, prevState);
+    }
+
 
     /**
      * Send broadcast intent about LeAudio connection state changed. This is called by
@@ -2250,6 +2274,15 @@ public class LeAudioService extends ProfileService {
      */
     private boolean setActiveGroupWithDevice(BluetoothDevice device, boolean hasFallbackDevice) {
         int groupId = LE_AUDIO_GROUP_ID_INVALID;
+
+        if (device == null) {
+            CallAudio mCallAudio = CallAudio.get();
+            if (mCallAudio != null && mCallAudio.isVirtualCallStarted()) {
+                if (!mCallAudio.stopScoUsingVirtualVoiceCall()) {
+                    Log.w(TAG, "setActiveGroupWithDevice: fail to stopScoUsingVirtualVoiceCall");
+                }
+            }
+        }
 
         if (device != null) {
             LeAudioDeviceDescriptor descriptor = getDeviceDescriptor(device);
@@ -3853,7 +3886,7 @@ public class LeAudioService extends ProfileService {
     }
 
     @VisibleForTesting
-    List<BluetoothDevice> getConnectedPeerDevices(int groupId) {
+    public List<BluetoothDevice> getConnectedPeerDevices(int groupId) {
         List<BluetoothDevice> result = new ArrayList<>();
         for (BluetoothDevice peerDevice : getConnectedDevices()) {
             if (getGroupId(peerDevice) == groupId) {
