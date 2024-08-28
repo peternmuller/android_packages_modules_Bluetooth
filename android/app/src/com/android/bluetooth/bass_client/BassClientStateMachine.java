@@ -154,6 +154,7 @@ public class BassClientStateMachine extends StateMachine {
     @VisibleForTesting boolean mAutoTriggered = false;
     private boolean mDefNoPAS = false;
     private boolean mForceSB = false;
+    private boolean mRemoveSourceRequested = false;
     @VisibleForTesting BluetoothLeBroadcastMetadata mPendingSourceToAdd = null;
     private int mBroadcastSourceIdLength = 3;
     @VisibleForTesting byte mNextSourceId = 0;
@@ -247,6 +248,7 @@ public class BassClientStateMachine extends StateMachine {
         mPendingOperation = -1;
         mPendingSourceId = -1;
         mPendingMetadata = null;
+        mRemoveSourceRequested = false;
         mPendingSourceToAdd = null;
         mPendingSourceToSwitch = null;
         mCurrentMetadata.clear();
@@ -885,7 +887,8 @@ public class BassClientStateMachine extends StateMachine {
         if (receiverState.length == 0
                 || isEmpty(Arrays.copyOfRange(receiverState, 1, receiverState.length - 1))) {
             byte[] emptyBluetoothDeviceAddress = Utils.getBytesFromAddress("00:00:00:00:00:00");
-            if (mPendingOperation == REMOVE_BCAST_SOURCE) {
+            log("processBroadcastReceiverState: mRemoveSourceRequested " + mRemoveSourceRequested);
+            if (mRemoveSourceRequested) {
                 recvState =
                         new BluetoothLeBroadcastReceiveState(
                                 mPendingSourceId,
@@ -903,6 +906,7 @@ public class BassClientStateMachine extends StateMachine {
                                 Arrays.asList(
                                         new BluetoothLeAudioContentMetadata[0]) // subgroupMetadata
                                 );
+                mRemoveSourceRequested = false;
             } else if (receiverState.length == 0) {
                 if (mBluetoothLeBroadcastReceiveStates != null) {
                     mNextSourceId = (byte) mBluetoothLeBroadcastReceiveStates.size();
@@ -1493,6 +1497,7 @@ public class BassClientStateMachine extends StateMachine {
         mPendingMetadata = null;
         mCurrentMetadata.clear();
         mPendingRemove.clear();
+        mRemoveSourceRequested = false;
     }
 
     @VisibleForTesting
@@ -2172,6 +2177,7 @@ public class BassClientStateMachine extends StateMachine {
                         }
 
                         writeBassControlPoint(removeSourceInfo);
+                        mRemoveSourceRequested = true;
                         mPendingOperation = message.what;
                         mPendingSourceId = sid;
                         transitionTo(mConnectedProcessing);
@@ -2383,6 +2389,8 @@ public class BassClientStateMachine extends StateMachine {
                     if ((message.arg1 == UPDATE_BCAST_SOURCE)
                             || (message.arg1 == ADD_BCAST_SOURCE)) {
                         mPendingMetadata = null;
+                    } else if (message.arg1 == REMOVE_BCAST_SOURCE) {
+                        mRemoveSourceRequested = false;
                     }
                     transitionTo(mConnected);
                     break;
