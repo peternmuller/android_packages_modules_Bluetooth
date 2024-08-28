@@ -3504,7 +3504,14 @@ public class LeAudioService extends ProfileService {
                                 if (!leaudioUseAudioModeListener()) {
                                     mQueuedInCallValue = Optional.empty();
                                 }
-                                startBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
+                                if (mAudioManagerAddedOutDevice == null) {
+                                    startBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
+                                } else {
+                                    Log.d(TAG, "Audio out device is still not removed, "
+                                            + "pending start broadcast");
+                                    mBroadcastIdPendingStart =
+                                            mBroadcastIdDeactivatedForUnicastTransition;
+                                }
                                 mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
                             }
 
