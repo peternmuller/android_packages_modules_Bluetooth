@@ -975,6 +975,7 @@ tBTM_STATUS BTM_SecBondCancel(const RawAddress& bd_addr) {
         btm_sec_cb.pairing_flags |= BTM_PAIR_FLAGS_WE_CANCEL_DD;
         return BTM_CMD_STARTED;
       }
+      btm_sec_cb.change_pairing_state(BTM_PAIR_STATE_IDLE);
       return BTM_NOT_AUTHORIZED;
     }
   }

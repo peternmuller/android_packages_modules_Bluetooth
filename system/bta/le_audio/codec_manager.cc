@@ -1274,7 +1274,7 @@ struct codec_manager_impl {
                 software_audio_set_conf->confs.source[0].codec.id ==
                 le_audio::set_configurations::LeAudioCodecIdAptxLeX) {
               if (ctx_type == types::LeAudioContextType::CONVERSATIONAL &&
-                  !osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", false)){
+                  !osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", true)){
                 continue;
               }
             }

@@ -2428,6 +2428,12 @@ public class HeadsetService extends ProfileService {
     /** Called from {@link HeadsetClientStateMachine} to update inband ringing status. */
     public void updateInbandRinging(BluetoothDevice device, boolean connected) {
         synchronized (mStateMachines) {
+            if (SystemProperties.getBoolean(DISABLE_INBAND_RINGING_PROPERTY, false)) {
+                Log.i(TAG, "updateInbandRinging(): in-band ringtone disabled " +
+                            "through property");
+                return;
+            }
+
             List<BluetoothDevice> audioConnectableDevices = getConnectedDevices();
             final int enabled;
             final boolean inbandRingingRuntimeDisable = mInbandRingingRuntimeDisable;
@@ -2614,13 +2620,16 @@ public class HeadsetService extends ProfileService {
                     }
                 }
 
-                // Unsuspend A2DP when SCO connection is gone and call state is idle
-                if (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled()) {
-                    mSystemInterface.getAudioManager().setA2dpSuspended(false);
-                    if (isAtLeastU()) {
-                        mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                mStateMachinesThreadHandler.post(() -> {
+                    // Unsuspend A2DP when SCO connection is gone and call state is idle
+                    if (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled()) {
+                        Log.i(TAG, "Resume A2DP when SCO is gone and call state is idle");
+                        mSystemInterface.getAudioManager().setA2dpSuspended(false);
+                        if (isAtLeastU()) {
+                            mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                        }
                     }
-                }
+                });
             }
         }
     }

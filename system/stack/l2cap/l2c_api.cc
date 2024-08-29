@@ -17,6 +17,16 @@
  ******************************************************************************/
 
 /******************************************************************************
+ * Changes from Qualcomm Innovation Center are provided under the following
+ * license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ ******************************************************************************/
+
+/******************************************************************************
  *
  *  This file contains the L2CAP API code
  *
@@ -1742,6 +1752,76 @@ bool L2CA_isMediaChannel(uint16_t handle, uint16_t channel_id,
   return ret;
 }
 
+/*******************************************************************************
+ *
+ * Function         L2CA_Ping
+ *
+ * Description      Higher layers call this function to send an echo request.
+ *
+ * Returns          true if echo request sent, else false.
+ *
+ ******************************************************************************/
+bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback) {
+  tL2C_LCB* p_lcb;
+
+  /* Fail if we have not established communications with the controller */
+  if (!BTM_IsDeviceUp()) return (false);
+
+  /* First, see if we already have a link to the remote */
+  p_lcb = l2cu_find_lcb_by_bd_addr(p_bd_addr, BT_TRANSPORT_BR_EDR);
+  if (p_lcb == NULL) {
+    /* No link. Get an LCB and start link establishment */
+    p_lcb = l2cu_allocate_lcb(p_bd_addr, false, BT_TRANSPORT_BR_EDR);
+    if (p_lcb == NULL) {
+      log::error("L2CAP - no LCB for L2CA_ping");
+      return (false);
+    }
+    l2cu_create_conn_br_edr(p_lcb);
+
+    return (true);
+  }
+
+  /* Have a link control block. If link is disconnecting, tell user to retry
+   * later */
+  if (p_lcb->link_state == LST_DISCONNECTING) {
+    log::error("L2CAP - L2CA_ping rejected - link disconnecting");
+    return (false);
+  }
+
+  if (p_lcb->link_state == LST_CONNECTED) {
+    l2cu_adj_id(p_lcb);
+    l2cu_send_peer_echo_req(p_lcb, NULL, 0);
+    alarm_set_on_mloop(p_lcb->l2c_lcb_timer, 30000, l2c_lcb_timer_timeout,
+                       p_lcb);
+  }
+
+  return (true);
+}
+
+/*******************************************************************************
+ *  Function        L2CA_GetPeerChannelId
+ *
+ *  Description     Get remote channel ID for Connection Oriented Channel.
+ *
+ *  Parameters:     lcid: Local CID
+ *                  rcid: Pointer to remote CID
+ *
+ *  Return value:   true if peer is connected
+ *
+ ******************************************************************************/
+bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid) {
+  log::verbose("CID: 0x{:04x}", lcid);
+
+  tL2C_CCB* p_ccb = l2cu_find_ccb_by_cid(nullptr, lcid);
+  if (p_ccb == nullptr) {
+    log::error("No CCB for CID:0x{:04x}", lcid);
+    return false;
+  }
+
+  log::assert_that(rcid != nullptr, "assert failed: rcid != nullptr");
+  *rcid = p_ccb->remote_cid;
+  return true;
+}
 using namespace bluetooth;
 
 #define DUMPSYS_TAG "shim::legacy::l2cap"

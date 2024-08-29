@@ -747,9 +747,16 @@ bool btif_hh_copy_hid_info(tBTA_HH_DEV_DSCP_INFO* dest,
  *
  ******************************************************************************/
 
-bt_status_t btif_hh_virtual_unplug(const tAclLinkSpec& link_spec) {
-  BTHH_LOG_LINK(link_spec);
+bt_status_t btif_hh_virtual_unplug(const tAclLinkSpec& link_spec_input) {
+  BTHH_LOG_LINK(link_spec_input);
+  tAclLinkSpec link_spec = link_spec_input;
   btif_hh_device_t* p_dev;
+  if (com::android::bluetooth::flags::allow_switching_hid_and_hogp() &&
+        link_spec.transport == BT_TRANSPORT_AUTO) {
+      log::warn("Resolving link spec {} transport to BREDR/LE",
+            link_spec.ToRedactedStringForLogging());
+      btif_hh_transport_select(link_spec);
+  }
   p_dev = btif_hh_find_dev_by_link_spec(link_spec);
   if ((p_dev != NULL) && (p_dev->dev_status == BTHH_CONN_STATE_CONNECTED) &&
       (p_dev->attr_mask & HID_VIRTUAL_CABLE)) {

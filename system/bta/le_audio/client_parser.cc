@@ -557,7 +557,7 @@ void TestLeXPacRecords(uint8_t *pp,  uint16_t codec) {
     uint8_t sf, cv, fd, fb, pc;
     const char *without_vs_feature = "0 41 0 1 5";
     const char *with_vs_feature = "";
-    if (osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", false)) {
+    if (osi_property_get_bool("persist.bluetooth.leaudio_lex_voice.enabled", true)) {
       osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, with_vs_feature);
     } else {
       osi_property_get("persist.vendor.btstack.send_new_ltv_values", new_values, without_vs_feature);
