@@ -386,6 +386,7 @@ static bt_status_t btif_gatts_close(int server_if, const RawAddress& bd_addr,
 
 static void on_service_added_cb(tGATT_STATUS status, int server_if,
                                 vector<btgatt_db_element_t> service) {
+  if ((bt_gatt_callbacks != NULL) && (bt_gatt_callbacks->server != NULL))
   HAL_CBACK(bt_gatt_callbacks, server->service_added_cb, status, server_if,
             service.data(), service.size());
 }
