@@ -19,6 +19,7 @@
 #include <bluetooth/log.h>
 #include <fcntl.h>
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -46,6 +47,7 @@ void Thread::run(Priority priority) {
       log::error("unable to set SCHED_FIFO priority: {}", strerror(errno));
     }
   }
+  prctl(PR_SET_NAME, name_.c_str());
   reactor_.Run();
 }
 
