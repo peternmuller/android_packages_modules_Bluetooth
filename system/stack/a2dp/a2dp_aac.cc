@@ -41,17 +41,6 @@
 
 using namespace bluetooth;
 
-// data type for the AAC Codec Information Element */
-// NOTE: bits_per_sample is needed only for AAC encoder initialization.
-typedef struct {
-  uint8_t objectType;             /* Object Type */
-  uint16_t sampleRate;            /* Sampling Frequency */
-  uint8_t channelMode;            /* STEREO/MONO */
-  uint8_t variableBitRateSupport; /* Variable Bit Rate Support*/
-  uint32_t bitRate;               /* Bit rate */
-  btav_a2dp_codec_bits_per_sample_t bits_per_sample;
-} tA2DP_AAC_CIE;
-
 static bool aac_source_caps_configured = false;
 static tA2DP_AAC_CIE a2dp_aac_source_caps = {};
 
@@ -270,6 +259,12 @@ bool A2DP_IsPeerSinkCodecValidAac(const uint8_t* p_codec_info) {
   /* Use a liberal check when parsing the codec info */
   return (A2DP_ParseInfoAac(&cfg_cie, p_codec_info, false) == A2DP_SUCCESS) ||
          (A2DP_ParseInfoAac(&cfg_cie, p_codec_info, true) == A2DP_SUCCESS);
+}
+
+bool A2DP_GetAacCIE(const uint8_t* p_codec_info,
+                        tA2DP_AAC_CIE *cfg_cie) {
+  return (A2DP_ParseInfoAac(cfg_cie, p_codec_info, false) ==
+          A2DP_SUCCESS);
 }
 
 bool A2DP_IsSinkCodecSupportedAac(const uint8_t* p_codec_info) {

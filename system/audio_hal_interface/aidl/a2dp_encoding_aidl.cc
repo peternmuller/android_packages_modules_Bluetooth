@@ -29,9 +29,14 @@
 #include "codec_status_aidl.h"
 #include "transport_instance.h"
 #include "hardware/audio.h"
+#include "a2dp_aac.h"
 #include "a2dp_sbc.h"
 #include "a2dp_vendor_ldac_constants.h"
 #include <a2dp_vendor.h>
+#include "stack/include/btm_client_interface.h"
+#include "stack/include/btm_vendor_types.h"
+#define AAC_SAMPLE_SIZE  1024
+#define AAC_LATM_HEADER  12
 
 /*****************************************************************************
  *  Local type definitions
@@ -580,7 +585,7 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
   if (A2DP_MEDIA_CT_SBC == codec_type) {
     bitrate = A2DP_GetBitrateSbc();
     log::info("AIDL SBC bitrate: {}", bitrate);
-    codec_config->encodedAudioBitrate = bitrate * 1000;
+    codec_config->encodedAudioBitrate = bitrate;
   }  else if (A2DP_MEDIA_CT_NON_A2DP == codec_type) {
     int samplerate = A2DP_GetTrackSampleRate(p_codec_info);
     if ((A2DP_VendorCodecGetVendorId(p_codec_info)) == A2DP_LDAC_VENDOR_ID) {
@@ -592,8 +597,34 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
       codec_config->encodedAudioBitrate = (samplerate * bits_per_sample * 2)/4;
       log::info("AIDL Aptx bitrate: {}", codec_config->encodedAudioBitrate);
     }
+  } else if (A2DP_MEDIA_CT_AAC == codec_type) {
+    bool is_AAC_frame_ctrl_stack_enable =
+                    get_btm_client_interface().vendor.BTM_IsAACFrameCtrlEnabled();
+    uint32_t codec_based_bit_rate = 0;
+    uint32_t mtu_based_bit_rate = 0;
+    log::info("AIDL Stack AAC frame control enabled: {}",
+                                                is_AAC_frame_ctrl_stack_enable);
+    tA2DP_AAC_CIE aac_cie;
+    if(!A2DP_GetAacCIE(p_codec_info, &aac_cie)) {
+      log::error("AIDL : Unable to get AAC CIE");
+      return false;
+    }
+    codec_based_bit_rate = aac_cie.bitRate;
+    if (is_AAC_frame_ctrl_stack_enable) {
+      int sample_rate = A2DP_GetTrackSampleRate(p_codec_info);
+      mtu_based_bit_rate = (peer_param.peer_mtu - AAC_LATM_HEADER)
+                                          * (8 * sample_rate / AAC_SAMPLE_SIZE);
+      log::info("aidl: sample_rate: {}", sample_rate);
+      log::info("aidl:  peer_mtu: {}", peer_param.peer_mtu);
+      log::info("aidl: codec_bit_rate: {}, MTU bitrate: {}",
+                                          codec_based_bit_rate, mtu_based_bit_rate);
+      codec_config->encodedAudioBitrate = (codec_based_bit_rate < mtu_based_bit_rate) ?
+                                           codec_based_bit_rate:mtu_based_bit_rate;
+    } else {
+      log::info("aidl: codec_bit_rate: {}", codec_based_bit_rate);
+      codec_config->encodedAudioBitrate = codec_based_bit_rate;
+    }
   }
-  //codec_config_global = codec_config;
   log::info("CodecConfiguration={}", codec_config->toString());
   return true;
 }
