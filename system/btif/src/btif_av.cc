@@ -4203,6 +4203,24 @@ bool btif_av_stream_ready(const A2dpType local_a2dp_type) {
   return (state == BtifAvStateMachine::kStateOpened);
 }
 
+bool btif_av_check_flag(const A2dpType local_a2dp_type, uint8_t flag) {
+  // Make sure the main adapter is enabled
+  if (btif_is_enabled() == 0) {
+    log::verbose("Main adapter is not enabled");
+    return false;
+  }
+
+  BtifAvPeer* peer = btif_av_find_active_peer(local_a2dp_type);
+  if (peer == nullptr) {
+    log::warn("No active peer found");
+    return false;
+  }
+
+  log::info("active_peer={} peer flags={}, requested flag",
+      peer->PeerAddress(), peer->FlagsToString(), flag);
+  return peer->CheckFlags(flag);
+}
+
 bool btif_av_stream_started_ready(const A2dpType local_a2dp_type) {
   BtifAvPeer* peer = btif_av_find_active_peer(local_a2dp_type);
   if (peer == nullptr) {
