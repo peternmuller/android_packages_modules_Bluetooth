@@ -1258,7 +1258,7 @@ struct codec_manager_impl {
                 continue;
             }
           }
-          if (!osi_property_get_bool("persist.bluetooth.leaudio_lex_l_r.enabled", false)){
+          if (!osi_property_get_bool("persist.bluetooth.leaudio_lex_l_r.enabled", true)){
             if (software_audio_set_conf->confs.sink.size() > 0) {
               if (software_audio_set_conf->confs.sink[0].codec.id ==
                   le_audio::set_configurations::LeAudioCodecIdAptxLeX) {
