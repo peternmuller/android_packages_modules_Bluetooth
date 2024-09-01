@@ -48,7 +48,7 @@ class HidlHciCallbacks : public IBluetoothHciCallbacks_1_1 {
 
   using HidlStatus = ::android::hardware::bluetooth::V1_0::Status;
   Return<void> initializationComplete(HidlStatus status) override {
-    if (status == HidlStatus::SUCCESS) {
+    if (status != HidlStatus::SUCCESS) {
       log::warn( "status == HidlStatus::SUCCESS");
       kill(getpid(), SIGKILL);
     }
