@@ -524,6 +524,14 @@ void bta_ag_create_sco(tBTA_AG_SCB* p_scb, bool is_orig) {
   } else if (esco_codec == UUID_CODEC_MSBC) {
     if (p_scb->codec_msbc_settings == BTA_AG_SCO_MSBC_SETTINGS_T2) {
       params = esco_parameters_for_codec(ESCO_CODEC_MSBC_T2, offload);
+      bool value = false;
+      value = osi_property_get_bool("vendor.bt.pts.certification", false);
+      log::info("PTS certification prop set to %s", value ? "true" : "false");
+
+      if (value == true) {
+        params.packet_types = ESCO_PKT_TYPES_MASK_NO_3_EV3 |
+                  ESCO_PKT_TYPES_MASK_NO_2_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV5;
+      }
     } else {
       params = esco_parameters_for_codec(ESCO_CODEC_MSBC_T1, offload);
     }
