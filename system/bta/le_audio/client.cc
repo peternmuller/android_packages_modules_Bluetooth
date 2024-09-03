@@ -4257,7 +4257,6 @@ class LeAudioClientImpl : public LeAudioClient {
 
   AudioReconfigurationResult UpdateConfigAndCheckIfReconfigurationIsNeeded(
       LeAudioDeviceGroup* group, LeAudioContextType context_type) {
-    bool is_frame_duration_changed = false;
 
     log::debug("Checking whether to reconfigure from {} to {}",
                ToString(configuration_context_type_), ToString(context_type));
@@ -4292,10 +4291,6 @@ class LeAudioClientImpl : public LeAudioClient {
         LeAudioContextToIntContent(configuration_context_type_);
     log::info("OnMetadataUpdate for context type: {}", ToHexString(context_type));
     callbacks_->OnMetadataUpdate(context_update_);
-
-    if (is_frame_duration_changed) {
-      return AudioReconfigurationResult::RECONFIGURATION_BY_HAL;
-    }
 
     // Note: The local sink config is based on remote device's source config
     //       and vice versa.
