@@ -719,7 +719,7 @@ void Device::SetVolume(int8_t volume) {
 void Device::TrackChangedNotificationResponse(uint8_t label, bool interim,
                                               std::string curr_song_id,
                                               std::vector<SongInfo> song_list) {
-  log::verbose("");
+  log::verbose(" Current song ID: {}", curr_song_id);
 
   if (interim) {
     track_changed_ = Notification(true, label);
@@ -742,10 +742,11 @@ void Device::TrackChangedNotificationResponse(uint8_t label, bool interim,
   // PTS BV-04-C and BV-5-C assume browsing not supported
   if (stack_config_get_interface()->get_pts_avrcp_test()) {
     log::warn("{}: pts test mode", address_);
-    uint64_t uid = curr_song_id.empty() ? 0xffffffffffffffff : 0;
+    uint64_t uid = (curr_song_id.empty() || curr_song_id == "currsong" ||
+                       curr_song_id == "Not Provided") ? 0xffffffffffffffff : 0;
+    log::verbose(" uid: {}", uid);
     auto response =
-        RegisterNotificationResponseBuilder::MakeTrackChangedBuilder(interim,
-                                                                     uid);
+        RegisterNotificationResponseBuilder::MakeTrackChangedBuilder(interim, uid);
     send_message_cb_.Run(label, false, std::move(response));
     return;
   }
