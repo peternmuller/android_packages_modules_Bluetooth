@@ -662,7 +662,9 @@ public class LeAudioService extends ProfileService {
         mVolumeControlService = null;
         mCsipSetCoordinatorService = null;
         mBassClientService = null;
-        mCallAudio.cleanup();
+        if (mCallAudio != null) {
+          mCallAudio.cleanup();
+        }
     }
 
     @Override
