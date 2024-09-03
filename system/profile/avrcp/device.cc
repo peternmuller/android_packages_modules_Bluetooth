@@ -1345,8 +1345,7 @@ void Device::HandleChangePath(uint8_t label,
       current_path_.pop();
     } else {
       log::error("{}: Trying to change directory up past root.", address_);
-      auto builder =
-          ChangePathResponseBuilder::MakeBuilder(Status::DOES_NOT_EXIST, 0);
+      auto builder = ChangePathResponseBuilder::MakeBuilder(Status::INVALID_DIRECTION, 0);
       send_message(label, true, std::move(builder));
       return;
     }
