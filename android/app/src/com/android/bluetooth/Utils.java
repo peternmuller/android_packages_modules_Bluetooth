@@ -97,6 +97,7 @@ public final class Utils {
     private static final int MICROS_PER_UNIT = 625;
     private static final String PTS_TEST_MODE_PROPERTY = "persist.bluetooth.pts";
     private static final String TMAP_PTS_MODE_PROPERTY = "persist.bluetooth.tmap.pts";
+    private static final String BAP_NO_PACS_PTS_MODE_PROPERTY = "persist.bluetooth.bap.no.pacs.pts";
 
     private static final String ENABLE_DUAL_MODE_AUDIO =
             "persist.bluetooth.enable_dual_mode_audio";
@@ -1121,6 +1122,23 @@ public final class Utils {
      */
     public static boolean isTmapPtsTestMode() {
         return SystemProperties.getBoolean(TMAP_PTS_MODE_PROPERTY, false);
+    }
+
+    /**
+     * Check if we are running in PTS BAP test mode. To enable/disable BAP PTS test mode, invoke
+     * {@code adb shell setprop persist.bluetooth.bap.no.audio.loc.pts true/false}
+     *
+     * @return true if in PTS Test mode, false otherwise.
+     * For below BAP cases:
+     *
+     * BAP/UCL/STR/BV-554-C
+     * BAP/UCL/STR/BV-555-C
+     * BAP/UCL/STR/BV-558-C
+     * BAP/UCL/STR/BV-559-C
+     *
+     */
+    public static boolean isBapNoPacsPtsTestMode() {
+        return SystemProperties.getBoolean(BAP_NO_PACS_PTS_MODE_PROPERTY, false);
     }
 
     /**
