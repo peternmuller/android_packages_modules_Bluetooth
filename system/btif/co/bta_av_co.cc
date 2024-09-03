@@ -1535,6 +1535,16 @@ void bta_av_co_init(
   bta_av_co_cb.Init(codec_priorities, supported_codecs);
 }
 
+void bta_av_co_aptx_ad_support(std::vector<btav_a2dp_codec_config_t> offloading_preference) {
+  log::verbose("");
+  uint8_t soc_add_on_features_len = 0;
+  const bt_device_soc_add_on_features_t* soc_add_on_features =
+        get_btm_client_interface().vendor.BTM_GetSocAddOnFeatures(&soc_add_on_features_len);
+  A2DP_SetAptxADSupport(offloading_preference, soc_add_on_features_len,
+    BTM_SPLIT_A2DP_SOURCE_Tx_Split_APTX_ADAPTIVE_SUPPORTED(soc_add_on_features->as_array),
+    BTM_SPLIT_A2DP_SINK_APTX__ADAPTIVE_SUPPORTED(soc_add_on_features->as_array));
+}
+
 bool bta_av_co_is_supported_codec(btav_a2dp_codec_index_t codec_index) {
   return bta_av_co_cb.IsSupportedCodec(codec_index);
 }

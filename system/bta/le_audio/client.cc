@@ -200,6 +200,7 @@ VscCallback* stateMachineVscHciCallback;
 LeAudioGroupStateMachine::Callbacks* stateMachineCallbacks;
 DeviceGroupsCallbacks* device_group_callbacks;
 LeAudioIsoDataCallback* iso_data_callback;
+constexpr uint16_t HCI_VS_QBCE_OCF = 0xFC51;
 
 /*
  * Coordinatet Set Identification Profile (CSIP) based on CSIP 1.0
@@ -4029,6 +4030,28 @@ class LeAudioClientImpl : public LeAudioClient {
                     weak_factory_.GetWeakPtr(), std::placeholders::_1,
                     std::placeholders::_2));
     }
+
+    if ((configuration_context_type_ == LeAudioContextType::MEDIA) ||
+        (configuration_context_type_ == LeAudioContextType::GAME)) {
+      // Send vendor specific command for codec mode
+      uint16_t update_value =
+          (configuration_context_type_ == LeAudioContextType::MEDIA) ? 0x1 : 0x2;
+      uint8_t param_arr[7];
+      uint8_t *p = param_arr;
+
+      UINT8_TO_STREAM(p, 0x24); //sub-opcode
+      UINT8_TO_STREAM(p, group_id);
+      UINT8_TO_STREAM(p, group->cig.cises[0].id);
+      UINT8_TO_STREAM(p, 1); //numlimits
+
+      UINT8_TO_STREAM(p, 0x3);
+      UINT8_TO_STREAM(p, 0x1);
+      UINT8_TO_STREAM(p, update_value);
+
+      bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(
+          HCI_VS_QBCE_OCF, 7, param_arr, NULL);
+    }
+
   }
 
   const struct bluetooth::le_audio::stream_configuration*
@@ -6321,6 +6344,9 @@ class LeAudioClientImpl : public LeAudioClient {
            */
           log::error("Internal state machine error");
           group->PrintDebugState();
+          if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_IDLE) {
+            defer_notify_inactive_until_stop_ = true;
+          }
           groupSetAndNotifyInactive();
         }
 

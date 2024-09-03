@@ -4658,7 +4658,8 @@ tBTM_STATUS btm_sec_execute_procedure(tBTM_SEC_DEV_REC* p_dev_rec) {
       p_dev_rec->sec_rec.sec_state);
 
   if (p_dev_rec->sec_rec.sec_state != BTM_SEC_STATE_IDLE &&
-      p_dev_rec->sec_rec.sec_state != BTM_SEC_STATE_LE_ENCRYPTING) {
+      p_dev_rec->sec_rec.sec_state != BTM_SEC_STATE_LE_ENCRYPTING &&
+      p_dev_rec->sec_rec.sec_state != BTM_SEC_STATE_DISCONNECTING_BLE) {
     log::info("No immediate action taken in busy state: {}",
               security_state_text(p_dev_rec->sec_rec.sec_state));
     return (BTM_CMD_STARTED);

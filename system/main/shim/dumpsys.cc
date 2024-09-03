@@ -37,16 +37,22 @@ static std::unordered_map<const void*, bluetooth::shim::DumpsysFunction>
 
 void bluetooth::shim::RegisterDumpsysFunction(const void* token,
                                               DumpsysFunction func) {
-  log::assert_that(dumpsys_functions_.find(token) == dumpsys_functions_.end(),
-                   "assert failed: dumpsys_functions_.find(token) == "
-                   "dumpsys_functions_.end()");
+  if (dumpsys_functions_.find(token) != dumpsys_functions_.end()) {
+        log::warn(
+        ":dumpsys_functions_.find(token) != "
+        "dumpsys_functions_.end()");
+        return;
+    }
   dumpsys_functions_.insert({token, func});
 }
 
 void bluetooth::shim::UnregisterDumpsysFunction(const void* token) {
-  log::assert_that(dumpsys_functions_.find(token) != dumpsys_functions_.end(),
-                   "assert failed: dumpsys_functions_.find(token) != "
-                   "dumpsys_functions_.end()");
+  if (dumpsys_functions_.find(token) == dumpsys_functions_.end()) {
+    log::warn(
+        ": dumpsys_functions_.find(token) == "
+        "dumpsys_functions_.end()");
+    return;
+  }
   dumpsys_functions_.erase(token);
 }
 
@@ -67,9 +73,8 @@ void bluetooth::shim::Dump(int fd, const char** args) {
             [&promise, fd, args](shim::Dumpsys* mod) {
               mod->Dump(fd, args, std::move(promise));
             })) {
-      log::assert_that(
-          future.wait_for(std::chrono::seconds(1)) == std::future_status::ready,
-          "Timed out waiting for dumpsys to complete");
+      if (future.wait_for(std::chrono::seconds(2)) != std::future_status::ready)
+        log::warn("Timed out waiting for dumpsys to complete after 2 sec");
     } else {
       dprintf(fd, "%s NOTE: gd dumpsys module not loaded or started\n",
               kModuleName);

@@ -974,17 +974,6 @@ void L2CA_SetMediaStreamChannel(uint16_t local_media_cid, bool status);
                                        bool is_local_cid);
 
 /*******************************************************************************
- *
- * Function         L2CA_Ping
- *
- * Description      Higher layers call this function to send an echo request.
- *
- * Returns          true if echo request sent, else false.
- *
- ******************************************************************************/
-bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback);
-
- /*******************************************************************************
  *  Function        L2CA_GetPeerChannelId
  *
  *  Description     Get remote channel ID for Connection Oriented Channel.
@@ -996,6 +985,30 @@ bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback);
  *
  ******************************************************************************/
 [[nodiscard]] bool L2CA_GetPeerChannelId(uint16_t lcid, uint16_t* rcid);
+
+/*******************************************************************************
+ *
+ * Function         L2CA_Ping
+ *
+ * Description      Higher layers call this function to send an echo request.
+ *
+ * Returns          true if echo request sent, else false.
+ *
+ ******************************************************************************/
+bool L2CA_Ping(const RawAddress& p_bd_addr, tL2CA_ECHO_RSP_CB* p_callback);
+
+/*******************************************************************************
+ *
+ * Function         L2CA_FlowControl
+ *
+ * Description      Higher layers call this function to flow control a channel.
+ *
+ *                  data_enabled - true data flows, false data is stopped
+ *
+ * Returns          true if valid channel, else false
+ *
+ ******************************************************************************/
+bool L2CA_FlowControl(uint16_t cid, bool data_enabled);
 
 namespace fmt {
 template <>

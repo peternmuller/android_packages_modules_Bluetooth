@@ -29,6 +29,9 @@
 #include "codec_status_aidl.h"
 #include "transport_instance.h"
 #include "hardware/audio.h"
+#include "a2dp_sbc.h"
+#include "a2dp_vendor_ldac_constants.h"
+#include <a2dp_vendor.h>
 
 /*****************************************************************************
  *  Local type definitions
@@ -486,6 +489,7 @@ static uint16_t a2dp_get_peer_mtu(btav_a2dp_codec_index_t codec_index,
 
 bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
   A2dpCodecConfig* a2dp_config = bta_av_get_a2dp_current_codec();
+  uint8_t p_codec_info[AVDT_CODEC_SIZE];
   if (a2dp_config == nullptr) {
     log::warn("failure to get A2DP codec config");
     return false;
@@ -539,6 +543,7 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
       log::error("Unknown codec_type={}", current_codec.codec_type);
       return false;
   }
+#if 0
   codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
   // Obtain the MTU
   RawAddress peer_addr = btif_av_source_active_peer();
@@ -557,6 +562,38 @@ bool a2dp_get_selected_hal_codec_config(CodecConfiguration* codec_config) {
   } else if (codec_config->peerMtu > MAX_3MBPS_AVDTP_MTU) {
     codec_config->peerMtu = MAX_3MBPS_AVDTP_MTU;
   }
+#endif
+  RawAddress peer_addr = btif_av_source_active_peer();
+  tA2DP_ENCODER_INIT_PEER_PARAMS peer_param;
+  bta_av_co_get_peer_params(peer_addr, &peer_param);
+  // Obtain the MTU
+  memset(p_codec_info, 0, AVDT_CODEC_SIZE);
+  if (!a2dp_config->copyOutOtaCodecConfig(p_codec_info))
+  {
+    log::error("AIDL No valid codec config");
+    return false;
+  }
+  uint8_t codec_type;
+  uint32_t bitrate = 0;
+  codec_type = A2DP_GetCodecType((const uint8_t*)p_codec_info);
+  codec_config->peerMtu = peer_param.peer_mtu - A2DP_HEADER_SIZE;
+  if (A2DP_MEDIA_CT_SBC == codec_type) {
+    bitrate = A2DP_GetBitrateSbc();
+    log::info("AIDL SBC bitrate: {}", bitrate);
+    codec_config->encodedAudioBitrate = bitrate * 1000;
+  }  else if (A2DP_MEDIA_CT_NON_A2DP == codec_type) {
+    int samplerate = A2DP_GetTrackSampleRate(p_codec_info);
+    if ((A2DP_VendorCodecGetVendorId(p_codec_info)) == A2DP_LDAC_VENDOR_ID) {
+      codec_config->encodedAudioBitrate = a2dp_config->getTrackBitRate();
+      log::info("AIDL LDAC bitrate: {}", codec_config->encodedAudioBitrate);
+    } else {
+      /* BR = (Sampl_Rate * PCM_DEPTH * CHNL)/Compression_Ratio */
+      int bits_per_sample = 16; // TODO
+      codec_config->encodedAudioBitrate = (samplerate * bits_per_sample * 2)/4;
+      log::info("AIDL Aptx bitrate: {}", codec_config->encodedAudioBitrate);
+    }
+  }
+  //codec_config_global = codec_config;
   log::info("CodecConfiguration={}", codec_config->toString());
   return true;
 }
