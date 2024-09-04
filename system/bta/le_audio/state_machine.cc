@@ -119,6 +119,8 @@ typedef struct {
   uint8_t encoder_mode;
 } tBTM_BLE_SET_ENCODER_LIMITS_PARAM;
 
+bool flag_sendenableLater = false;
+
 bool isRecordReadable(uint8_t total_len, uint8_t processed_len,
                       uint8_t req_len) {
   LOG(WARNING) << __func__ << ": total_len: " << loghex(total_len)
@@ -467,6 +469,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
          * stream configuration is satisfied. We can do that already for
          * all the devices in a group, without any state transitions.
          */
+        static int count = 0;
         if (!group->IsMetadataChanged(metadata_context_types, ccid_lists))
           return true;
 
@@ -475,7 +478,13 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           log::error("group has no active devices");
           return false;
         }
-
+        if (count == 0) {
+           if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS", false)) {
+              log::error("One moved to streaming, processing the other one");
+              PrepareAndSendEnable(leAudioDevice);
+              count = 1;
+           }
+        }
         while (leAudioDevice) {
           PrepareAndSendUpdateMetadata(leAudioDevice, metadata_context_types,
                                        ccid_lists);
@@ -1304,7 +1313,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return;
     }
 
-    if (!leAudioDevice->IsReadyToCreateStream()) {
+    if (!leAudioDevice->IsReadyToCreateStream() && !flag_sendenableLater) {
       /* Device still remains in ready to create stream state. It means that
        * more enabling status notifications has to come. This may only happen
        * for reconnection scenario for bi-directional CIS.
@@ -1316,6 +1325,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
      * to streaming state.
      */
     struct ase* ase = leAudioDevice->GetFirstActiveAse();
+    if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS_src", false)) {
+       ase= leAudioDevice->GetNextActiveAse(ase);
+    }
     log::assert_that(ase != nullptr,
                      "shouldn't be called without an active ASE, device {}, "
                      "group id: {}, cis handle 0x{:04x}",
@@ -1962,6 +1974,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
   static bool CisCreate(LeAudioDeviceGroup* group) {
     LeAudioDevice* leAudioDevice = group->GetFirstActiveDevice();
     struct ase* ase;
+    static int count = 0;
     std::vector<EXT_CIS_CREATE_CFG> conn_pairs;
 
     log::assert_that(leAudioDevice,
@@ -1976,6 +1989,18 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     do {
       ase = leAudioDevice->GetFirstActiveAse();
+      if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS_src", false)) {
+         ase = leAudioDevice->GetNextActiveAse(ase);
+      }
+      if (flag_sendenableLater && count == 1) {
+           log::debug("next ase is being called");
+           if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS_src", false)) {
+              ase = leAudioDevice->GetFirstActiveAse();
+           } else {
+              ase = leAudioDevice->GetNextActiveAse(ase);
+           }
+      }
+      count = 1;
       log::assert_that(ase, "shouldn't be called without an active ASE");
       do {
         /* First is ase pair is Sink, second Source */
@@ -1994,7 +2019,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                               .acl_conn_handle = acl_handle});
         log::debug("cis handle: {} acl handle : 0x{:x}", ase->cis_conn_hdl,
                    acl_handle);
-
+        if (flag_sendenableLater) {
+           break;
+        }
       } while ((ase = leAudioDevice->GetNextActiveAse(ase)));
     } while ((leAudioDevice = group->GetNextActiveDevice(leAudioDevice)));
 
@@ -2909,6 +2936,16 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     msg_stream << kLogAseEnableOp;
 
     ase = leAudioDevice->GetFirstActiveAse();
+    if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS", false)) {
+       ase = leAudioDevice->GetNextActiveAse(ase);
+    }
+
+    if (flag_sendenableLater) {
+      log::debug("sending enable for 2nd ase");
+      //ase = leAudioDevice->GetNextActiveAse(ase);
+      ase = leAudioDevice->GetFirstActiveAse();
+    }
+
     log::assert_that(ase, "shouldn't be called without an active ASE");
     do {
       log::debug("device: {}, ase_id: {}, cis_id: {}, ase state: {}",
@@ -2924,7 +2961,10 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                    << base::HexEncode(conf.metadata.data(),
                                       conf.metadata.size())
                    << ";;";
-
+      if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS", false)) {
+         flag_sendenableLater = true;
+         break;
+      }
     } while ((ase = leAudioDevice->GetNextActiveAse(ase)));
 
     bluetooth::le_audio::client_parser::ascs::PrepareAseCtpEnable(confs, value);
@@ -3252,6 +3292,13 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                     AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING);
 
         if (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+          if (flag_sendenableLater) {
+            if (osi_property_get_bool("persist.bluetooth.leaudio.bap_enableQoS_src", false)) {
+              log::debug("Sending Start ready for 2nd ASE");
+              PrepareAndSendReceiverStartReady(leAudioDevice, ase);
+              return;
+            }
+          }
           if (ase->cis_state < CisState::CONNECTING) {
             /* We are here because of the reconnection of the single device. */
             if (!CisCreateForDevice(group, leAudioDevice)) {
@@ -3285,7 +3332,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
-        if (leAudioDevice->IsReadyToCreateStream())
+        if (leAudioDevice->IsReadyToCreateStream() || flag_sendenableLater)
+          log::error("processing Enable to group");
           ProcessGroupEnable(group);
 
         break;
@@ -3340,7 +3388,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
                     AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING);
 
         if (!group->HaveAllActiveDevicesAsesTheSameState(
-                AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING)) {
+                AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) && !flag_sendenableLater) {
           /* More ASEs notification form this device has to come for this group
            */
           return;
@@ -3357,14 +3405,14 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         }
 
         /* Not all CISes establish events will came */
-        if (!group->IsGroupStreamReady()) {
+        if (!group->IsGroupStreamReady() && !flag_sendenableLater) {
           log::info("CISes are not yet ready, wait for it.");
           group->SetNotifyStreamingWhenCisesAreReadyFlag(true);
           return;
         }
 
         if (group->GetTargetState() ==
-            AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+            AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING || flag_sendenableLater) {
           /* No more transition for group */
           cancel_watchdog_if_needed(group->group_id_);
 
@@ -3612,8 +3660,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
   void ProcessGroupEnable(LeAudioDeviceGroup* group) {
     if (group->GetState() != AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING) {
+       log::debug("is state not in enabling");
       /* Check if the group is ready to create stream. If not, keep waiting. */
-      if (!group->IsGroupReadyToCreateStream()) {
+      if (!group->IsGroupReadyToCreateStream() && !flag_sendenableLater) {
         log::debug(
             "Waiting for more ASEs to be in enabling or directly in streaming "
             "state");
@@ -3635,6 +3684,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     /* Try to create CISes for the group */
     if (!CisCreate(group)) {
+      log::debug("cis creation got the group");
       StopStream(group);
     }
   }
