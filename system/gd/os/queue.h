@@ -252,7 +252,10 @@ std::unique_ptr<T> Queue<T>::TryDequeue() {
 template <typename T>
 void Queue<T>::EnqueueCallbackInternal(EnqueueCallback callback) {
   std::unique_ptr<T> data = callback.Run();
-  log::assert_that(data != nullptr, "assert failed: data != nullptr");
+  if(data == nullptr) {
+      log::warn("data == nullptr");
+      return;
+  }
   std::lock_guard<std::mutex> lock(mutex_);
   enqueue_.reactive_semaphore_.Decrease();
   queue_.push(std::move(data));

@@ -524,6 +524,14 @@ void bta_ag_create_sco(tBTA_AG_SCB* p_scb, bool is_orig) {
   } else if (esco_codec == UUID_CODEC_MSBC) {
     if (p_scb->codec_msbc_settings == BTA_AG_SCO_MSBC_SETTINGS_T2) {
       params = esco_parameters_for_codec(ESCO_CODEC_MSBC_T2, offload);
+      bool value = false;
+      value = osi_property_get_bool("vendor.bt.pts.certification", false);
+      log::info("PTS certification prop set to %s", value ? "true" : "false");
+
+      if (value == true) {
+        params.packet_types = ESCO_PKT_TYPES_MASK_NO_3_EV3 |
+                  ESCO_PKT_TYPES_MASK_NO_2_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV5;
+      }
     } else {
       params = esco_parameters_for_codec(ESCO_CODEC_MSBC_T1, offload);
     }
@@ -531,6 +539,9 @@ void bta_ag_create_sco(tBTA_AG_SCB* p_scb, bool is_orig) {
     if (com::android::bluetooth::flags::fix_hfp_qual_1_9() &&
         p_scb->codec_cvsd_settings == BTA_AG_SCO_CVSD_SETTINGS_S1) {
       params = esco_parameters_for_codec(ESCO_CODEC_CVSD_S1, offload);
+      params.packet_types = ESCO_PKT_TYPES_MASK_EV3|ESCO_PKT_TYPES_MASK_NO_2_EV3|
+                            ESCO_PKT_TYPES_MASK_NO_3_EV3 | ESCO_PKT_TYPES_MASK_NO_2_EV5|
+                            ESCO_PKT_TYPES_MASK_NO_3_EV5;
     } else {
       if ((p_scb->features & BTA_AG_FEAT_ESCO_S4) &&
           (p_scb->peer_features & BTA_AG_PEER_FEAT_ESCO_S4)) {
@@ -539,6 +550,17 @@ void bta_ag_create_sco(tBTA_AG_SCB* p_scb, bool is_orig) {
       } else {
         // HFP <=1.6 eSCO
         params = esco_parameters_for_codec(ESCO_CODEC_CVSD_S3, offload);
+      }
+
+      bool value = false;
+      // Set CVSD S2 parameters
+      value = osi_property_get_bool("vendor.bt.pts.S2_parameter", false);
+      log::info("CVSD S2 parameters property set to %s", value ? "true" : "false");
+      if (value == true && p_scb->codec_cvsd_settings != BTA_AG_SCO_CVSD_SETTINGS_S1) {
+        params.max_latency_ms = 7;
+        params.retransmission_effort = ESCO_RETRANSMISSION_POWER;
+        params.packet_types = ESCO_PKT_TYPES_MASK_NO_3_EV3 |
+                  ESCO_PKT_TYPES_MASK_NO_2_EV5 | ESCO_PKT_TYPES_MASK_NO_3_EV5;
       }
     }
   }
