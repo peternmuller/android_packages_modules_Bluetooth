@@ -774,7 +774,6 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
             CallAudio mCallAudio = CallAudio.get();
             if (mCallAudio != null && isVoipLeaWarEnabled()) {
                 mCallAudio.updateActiveDevice(device, mCallAudio.HFP);
-                mCallAudio.broadcastActiveDevice(device);
             }
 
             if (!Objects.equals(mHfpActiveDevice, device)) {
@@ -883,8 +882,6 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
             CallAudio mCallAudio = CallAudio.get();
             if (mCallAudio != null && isVoipLeaWarEnabled()) {
                 mCallAudio.updateActiveDevice(device, mCallAudio.LE_AUDIO_VOICE);
-                //Fake HFP active device for VoIP WAR
-                mCallAudio.broadcastActiveDevice(device);
             }
 
             if (device != null && !mLeAudioConnectedDevices.contains(device)) {
