@@ -96,6 +96,7 @@ public final class Utils {
     private static final String TAG = "BluetoothUtils";
     private static final int MICROS_PER_UNIT = 625;
     private static final String PTS_TEST_MODE_PROPERTY = "persist.bluetooth.pts";
+    private static final String TMAP_PTS_MODE_PROPERTY = "persist.bluetooth.tmap.pts";
 
     private static final String ENABLE_DUAL_MODE_AUDIO =
             "persist.bluetooth.enable_dual_mode_audio";
@@ -1110,6 +1111,16 @@ public final class Utils {
      */
     public static boolean isPtsTestMode() {
         return SystemProperties.getBoolean(PTS_TEST_MODE_PROPERTY, false);
+    }
+
+    /**
+     * Check if we are running in PTS TMAP test mode. To enable/disable TMAP PTS test mode, invoke
+     * {@code adb shell setprop persist.bluetooth.tmap.pts true/false}
+     *
+     * @return true if in PTS Test mode, false otherwise
+     */
+    public static boolean isTmapPtsTestMode() {
+        return SystemProperties.getBoolean(TMAP_PTS_MODE_PROPERTY, false);
     }
 
     /**

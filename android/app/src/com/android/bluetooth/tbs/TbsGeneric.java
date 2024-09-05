@@ -32,6 +32,7 @@ import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
 
+import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.ServiceFactory;
 import com.android.bluetooth.le_audio.ContentControlIdKeeper;
 import com.android.bluetooth.le_audio.LeAudioService;
@@ -647,6 +648,14 @@ public class TbsGeneric {
 
         TbsCall tbsCall = mCurrentCallsList.get(callIndex);
         if (tbsCall.getState() == state) {
+            if (Utils.isTmapPtsTestMode()) {
+                if (state == 0) {
+                    Log.e(TAG, "need to send incoming call again");
+                    mTbsGatt.setIncomingCall(1, tbsCall.getUri());
+                    notifyCclc();
+                    return;
+                }
+            }
             return;
         }
 
