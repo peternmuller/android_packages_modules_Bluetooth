@@ -571,7 +571,7 @@ public class HeadsetService extends ProfileService {
         private boolean isAospLeaVoipWarEnabled() {
             boolean ret = false;
             CallAudio mCallAudio = CallAudio.get();
-            if (mCallAudio.isVoipLeaWarEnabled()
+            if (mCallAudio != null && mCallAudio.isVoipLeaWarEnabled()
                 && mCallAudio.getActiveProfile()== mCallAudio.LE_AUDIO_VOICE) {
                 ret = true;
             }
