@@ -103,6 +103,12 @@ void btif_av_stream_start_offload(void);
 bool btif_av_stream_ready(const A2dpType local_a2dp_type);
 
 /**
+ * Check whether A2DP flag is set OR not.
+ * @param local_a2dp_type type of local a2dp profile and flag to check.
+ */
+bool btif_av_check_flag(const A2dpType local_a2dp_type, uint8_t flag);
+
+/**
  * Check whether the A2DP stream is in started state and ready
  * for media start.
  * @param local_a2dp_type type of local a2dp profile.

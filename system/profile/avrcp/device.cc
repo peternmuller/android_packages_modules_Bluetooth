@@ -1788,12 +1788,15 @@ void Device::HandlePlayStatusUpdate() {
         if (d && s.state == PlayState::PLAYING && s.state != d->last_play_status_.state) {
           bool is_le_audio_in_idle = LeAudioClient::IsLeAudioClientRunning() ?
               LeAudioClient::IsLeAudioClientInIdle() : false;
+          int remote_suspend = 0x2;
           log::info("is_leaudio_in_idle: {}", is_le_audio_in_idle);
           log::info("Clear Remote Supend if already set");
-          btif_av_clear_remote_suspend_flag(A2dpType::kSource);
-          if (bluetooth::headset::IsCallIdle() && is_le_audio_in_idle &&
-              (btif_av_stream_ready(A2dpType::kSource))) {
-            btif_av_stream_start(A2dpType::kSource);
+          if (btif_av_check_flag(A2dpType::kSource, remote_suspend)) {
+            btif_av_clear_remote_suspend_flag(A2dpType::kSource);
+            if (bluetooth::headset::IsCallIdle() && is_le_audio_in_idle &&
+                (btif_av_stream_ready(A2dpType::kSource))) {
+              btif_av_stream_start(A2dpType::kSource);
+            }
           }
         }
       },
