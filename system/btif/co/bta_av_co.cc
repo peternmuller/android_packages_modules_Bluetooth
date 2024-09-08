@@ -1049,13 +1049,14 @@ bool BtaAvCo::ReportSourceCodecState(BtaAvCoPeer* p_peer) {
   bool is_qhs_phy_supported = get_btm_client_interface().vendor.BTM_IsQHSPhySupported(
       p_peer->addr, BT_TRANSPORT_BR_EDR);
 
-  if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE
-      && is_qhs_phy_supported) {
-    codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
-    codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_AVAILABLE;
-  } else {
-    codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
-    codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_NOT_AVAILABLE;
+  if (codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+    if (is_qhs_phy_supported) {
+      codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
+      codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_AVAILABLE;
+    } else {
+      codec_config.codec_specific_3 &= ~((int64_t)QHS_SUPPORT_MASK);
+      codec_config.codec_specific_3 |=  (int64_t)QHS_SUPPORT_NOT_AVAILABLE;
+    }
   }
 
   log::info("peer {} codec_config={{}}", p_peer->addr, codec_config.ToString());
