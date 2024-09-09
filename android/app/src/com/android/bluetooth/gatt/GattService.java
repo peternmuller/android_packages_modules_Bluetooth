@@ -2598,7 +2598,16 @@ public class GattService extends ProfileService {
             return;
         }
 
-        mNativeInterface.gattClientRegisterForNotifications(clientIf, address, handle, enable);
+        int state = BluetoothAdapter.STATE_OFF;
+        if (mAdapterService != null) {
+            state = mAdapterService.getState();
+        }
+
+        if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_BLE_ON) {
+            mNativeInterface.gattClientRegisterForNotifications(clientIf, address, handle, enable);
+        } else {
+            Log.w(TAG, "registerForNotification() -  Disallowed in BT state: " + state);
+        }
     }
 
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
