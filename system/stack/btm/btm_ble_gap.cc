@@ -1533,18 +1533,29 @@ void btm_send_hci_set_scan_params(uint8_t scan_type, uint16_t scan_int,
                                   tBLE_ADDR_TYPE addr_type_own,
                                   uint8_t scan_filter_policy) {
   if (bluetooth::shim::GetController()->SupportsBleExtendedAdvertising()) {
-    scanning_phy_cfg phy_cfg;
-    phy_cfg.scan_type = scan_type;
-    phy_cfg.scan_int = scan_int;
-    phy_cfg.scan_win = scan_win;
+    int phy_cnt =
+        std::bitset<std::numeric_limits<uint8_t>::digits>(scan_phy).count();
+    if (phy_cnt > 2) {
+      log::error("scan_phy count {} is not valid for scan_phy: {}", phy_cnt,
+                 scan_phy);
+      return;
+    }
+
+    scanning_phy_cfg* phy_cfg = new scanning_phy_cfg[phy_cnt];
+    for (int i = 0; i < phy_cnt; i++) {
+      phy_cfg[i].scan_type = scan_type;
+      phy_cfg[i].scan_int = scan_int;
+      phy_cfg[i].scan_win = scan_win;
+    }
 
     if (com::android::bluetooth::flags::phy_to_native()) {
       btsnd_hcic_ble_set_extended_scan_params(addr_type_own, scan_filter_policy,
-                                              scan_phy, &phy_cfg);
+                                              scan_phy, phy_cfg);
     } else {
       btsnd_hcic_ble_set_extended_scan_params(addr_type_own, scan_filter_policy,
-                                              1, &phy_cfg);
+                                              1, phy_cfg);
     }
+    delete[] phy_cfg;
   } else {
     btsnd_hcic_ble_set_scan_params(scan_type, scan_int, scan_win, addr_type_own,
                                    scan_filter_policy);
