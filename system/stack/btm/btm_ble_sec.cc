@@ -1295,9 +1295,9 @@ static void btm_ble_notify_enc_cmpl(const RawAddress& bd_addr,
         remote_lmp_version == 0) {
       log::warn("BLE Unable to determine remote version");
     }
-
+    log::info("Remote version information::{} ", remote_lmp_version);
     if (remote_lmp_version == 0 ||
-        remote_lmp_version >= HCI_PROTO_VERSION_5_0) {
+        remote_lmp_version >= HCI_PROTO_VERSION_5_2) {
       /* Link is encrypted, start EATT if remote LMP version is unknown, or 5.2
        * or greater */
       bluetooth::eatt::EattExtension::GetInstance()->Connect(bd_addr);
