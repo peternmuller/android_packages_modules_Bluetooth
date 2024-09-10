@@ -2478,6 +2478,13 @@ public class BassClientService extends ProfileService {
                         mPendingSourcesToAdd.add(
                                 new AddSourceData(sink, sourceMetadata, isGroupOp));
                     }
+                } else if (broadcastId != BassConstants.INVALID_BROADCAST_ID
+                        && isSearchInProgress()) {
+                    log("AddSource: pending for search broadcast: " + broadcastId);
+                    synchronized (mPendingSourcesToAdd) {
+                        mPendingSourcesToAdd.add(
+                                new AddSourceData(sink, sourceMetadata, isGroupOp));
+                    }
                 } else {
                     log("AddSource: broadcast not cached or invalid, broadcastId: " + broadcastId);
                     mCallbacks.notifySourceAddFailed(
