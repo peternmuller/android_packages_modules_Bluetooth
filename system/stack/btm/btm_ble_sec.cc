@@ -198,7 +198,7 @@ void BTM_SecAddBleKey(const RawAddress& bd_addr, tBTM_LE_KEY_VALUE* p_le_key,
 
   btm_sec_save_le_key(bd_addr, key_type, p_le_key, false);
   // Only set peer irk. Local irk is always the same.
-  if (key_type == BTM_LE_KEY_PID) {
+  if (key_type == BTM_LE_KEY_PID || key_type == BTM_LE_KEY_LID) {
     btm_ble_resolving_list_load_dev(*p_dev_rec);
   }
 }
