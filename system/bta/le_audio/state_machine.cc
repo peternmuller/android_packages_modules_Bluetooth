@@ -203,8 +203,50 @@ void UpdateEncoderParams(uint8_t cig_id, uint8_t cis_id,
     bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF, length, param, NULL);
 }
 
+void send_vs_cmd(const uint16_t content_type, const uint8_t cig_id, const uint8_t cis_cnt,
+  const std::vector<uint16_t> cis_conn_handles, bool remote_support) {
+  if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
+    std::vector<uint8_t> param;
+    param.push_back(HCI_VS_SET_CIG_CONTEXT_TYPE);
+    param.push_back(cig_id);
+    param.push_back(content_type & 0x00FF);
+    param.push_back((content_type & 0xFF00) >> 8);
+    param.push_back(cis_cnt);
+    for (auto& cis_handle: cis_conn_handles) {
+      param.push_back(cis_handle & 0x00FF);
+      param.push_back((cis_handle & 0xFF00) >> 8);
+    }
+    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF,
+        param.size(), param.data(), NULL);
+  }
+}
+
+using bluetooth::common::ToString;
+using bluetooth::hci::IsoManager;
+using bluetooth::legacy::hci::GetInterface;
+using bluetooth::le_audio::CodecManager;
+using bluetooth::le_audio::GroupStreamStatus;
+using bluetooth::le_audio::LeAudioDevice;
+using bluetooth::le_audio::LeAudioDeviceGroup;
+using bluetooth::le_audio::LeAudioGroupStateMachine;
+
+using bluetooth::hci::ErrorCode;
+using bluetooth::hci::ErrorCodeText;
+using bluetooth::le_audio::DsaMode;
+using bluetooth::le_audio::DsaModes;
+using bluetooth::le_audio::types::ase;
+using bluetooth::le_audio::types::AseState;
+using bluetooth::le_audio::types::AudioContexts;
+using bluetooth::le_audio::types::BidirectionalPair;
+using bluetooth::le_audio::types::CigState;
+using bluetooth::le_audio::types::CisState;
+using bluetooth::le_audio::types::CodecLocation;
+using bluetooth::le_audio::types::DataPathState;
+using bluetooth::le_audio::types::LeAudioContextType;
+using bluetooth::le_audio::types::LeAudioCoreCodecConfig;
+
 void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
-                     uint8_t cig_id, uint8_t cis_id) {
+                     uint8_t cig_id, uint8_t cis_id, struct ase* ase) {
   LOG(INFO) << __func__ ;
   uint8_t* p = metadata.data();
   uint8_t ltv_len, ltv_type;
@@ -249,8 +291,14 @@ void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
           STREAM_TO_ARRAY(vs_meta_data.data(), p, vs_meta_data_len - 1); // "ltv_len - 1" because 1B for type
           LOG(INFO) << __func__ << ": STREAM_TO_ARRAY done ";
           processed_len += static_cast<int> (sizeof(vs_meta_data));
-          LOG(INFO) << __func__ << ": straight away call UpdateEncoderParams ";
-          UpdateEncoderParams(cig_id, cis_id, vs_meta_data, 0xFF);
+          if (ase->state == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+            LOG(INFO) << __func__ << ": straight away call UpdateEncoderParams ";
+            UpdateEncoderParams(cig_id, cis_id, vs_meta_data, 0xFF);
+          } else {
+            LOG(INFO) << __func__ << ": Cache it untill encoder is up ";
+            ase->metadata = vs_meta_data;
+            ase->is_vsmetadata_available = true;
+          }
           vs_meta_data.clear();
         } else {
           (p) += (vs_meta_data_len - 1); //just ignore and increase pointer
@@ -264,48 +312,6 @@ void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
     meta_data_len -= (ltv_len + 1);
   }
 }
-
-void send_vs_cmd(const uint16_t content_type, const uint8_t cig_id, const uint8_t cis_cnt,
-  const std::vector<uint16_t> cis_conn_handles, bool remote_support) {
-  if (osi_property_get_bool("persist.vendor.service.bt.adv_transport", false) && remote_support) {
-    std::vector<uint8_t> param;
-    param.push_back(HCI_VS_SET_CIG_CONTEXT_TYPE);
-    param.push_back(cig_id);
-    param.push_back(content_type & 0x00FF);
-    param.push_back((content_type & 0xFF00) >> 8);
-    param.push_back(cis_cnt);
-    for (auto& cis_handle: cis_conn_handles) {
-      param.push_back(cis_handle & 0x00FF);
-      param.push_back((cis_handle & 0xFF00) >> 8);
-    }
-    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF,
-        param.size(), param.data(), NULL);
-  }
-}
-
-using bluetooth::common::ToString;
-using bluetooth::hci::IsoManager;
-using bluetooth::legacy::hci::GetInterface;
-using bluetooth::le_audio::CodecManager;
-using bluetooth::le_audio::GroupStreamStatus;
-using bluetooth::le_audio::LeAudioDevice;
-using bluetooth::le_audio::LeAudioDeviceGroup;
-using bluetooth::le_audio::LeAudioGroupStateMachine;
-
-using bluetooth::hci::ErrorCode;
-using bluetooth::hci::ErrorCodeText;
-using bluetooth::le_audio::DsaMode;
-using bluetooth::le_audio::DsaModes;
-using bluetooth::le_audio::types::ase;
-using bluetooth::le_audio::types::AseState;
-using bluetooth::le_audio::types::AudioContexts;
-using bluetooth::le_audio::types::BidirectionalPair;
-using bluetooth::le_audio::types::CigState;
-using bluetooth::le_audio::types::CisState;
-using bluetooth::le_audio::types::CodecLocation;
-using bluetooth::le_audio::types::DataPathState;
-using bluetooth::le_audio::types::LeAudioContextType;
-using bluetooth::le_audio::types::LeAudioCoreCodecConfig;
 
 std::map<uint32_t, uint8_t> freq_to_ltv_map = {
      {8000,     bluetooth::le_audio::codec_spec_conf::kLeAudioSamplingFreq8000Hz},
@@ -3251,6 +3257,15 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         SetAseState(leAudioDevice, ase,
                     AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING);
 
+        {
+          struct le_audio::client_parser::ascs::ase_transient_state_params rsp;
+
+          if (ParseAseStatusTransientStateParams(rsp, len, data)) {
+            parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id,
+                rsp.cis_id, ase);
+          }
+        }
+
         if (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
           if (ase->cis_state < CisState::CONNECTING) {
             /* We are here because of the reconnection of the single device. */
@@ -3290,16 +3305,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
         break;
 
-      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING: {
-        struct le_audio::client_parser::ascs::ase_transient_state_params rsp;
-
-        if (ParseAseStatusTransientStateParams(rsp, len, data)) {
-          parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
-        }
-
-        /* Enable/Switch Content */
-        break;
-      }
+      case AseState::BTA_LE_AUDIO_ASE_STATE_ENABLING:
         /* Enable/Switch Content */
         break;
       default:
@@ -3392,7 +3398,8 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
-        parseVSMetadata(rsp.metadata.size(), rsp.metadata, rsp.cig_id, rsp.cis_id);
+        parseVSMetadata(rsp.metadata.size(), rsp.metadata,
+            rsp.cig_id, rsp.cis_id, ase);
         /* Cache current set up metadata values for for further possible
          * reconfiguration
          */

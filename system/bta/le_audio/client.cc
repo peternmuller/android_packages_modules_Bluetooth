@@ -200,7 +200,99 @@ VscCallback* stateMachineVscHciCallback;
 LeAudioGroupStateMachine::Callbacks* stateMachineCallbacks;
 DeviceGroupsCallbacks* device_group_callbacks;
 LeAudioIsoDataCallback* iso_data_callback;
-constexpr uint16_t HCI_VS_QBCE_OCF = 0xFC51;
+constexpr uint16_t HCI_VS_QBCE_OCF                      = 0xFC51;
+constexpr uint8_t  LTV_TYPE_VS_METADATA                 = 0xFF;
+constexpr uint8_t  LTV_TYPE_VS_METADATA_FE              = 0xFE;
+
+constexpr uint8_t  LTV_TYPE_MIN_FT                      = 0X00;
+constexpr uint8_t  LTV_TYPE_MIN_BIT_RATE                = 0X01;
+constexpr uint8_t  LTV_TYPE_MIN_MAX_ERROR_RESILIENCE    = 0X02;
+constexpr uint8_t  LTV_TYPE_LATENCY_MODE                = 0X03;
+constexpr uint8_t  LTV_TYPE_MAX_FT                      = 0X04;
+
+constexpr uint8_t  LTV_LEN_MIN_FT                       = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_BIT_RATE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MIN_MAX_ERROR_RESILIENCE     = 0X01;
+constexpr uint8_t  LTV_LEN_LATENCY_MODE                 = 0X01;
+constexpr uint8_t  LTV_LEN_MAX_FT                       = 0X01;
+
+constexpr uint8_t  ENCODER_LIMITS_SUB_OP                = 0x24;
+
+typedef struct {
+  uint8_t cig_id;
+  uint8_t cis_id;
+  std::vector<uint8_t> encoder_params;
+  uint8_t encoder_mode;
+} tBTM_BLE_SET_ENCODER_LIMITS_PARAM;
+
+uint8_t* PrepareSetEncoderLimitsPayload(tBTM_BLE_SET_ENCODER_LIMITS_PARAM *params,
+                                        uint8_t *length, uint8_t *p) {
+  uint8_t param_len = 0;
+  uint8_t size = params->encoder_params.size();
+  uint8_t num_limits = (size == 0) ? 1 : size;
+  LOG(INFO) <<__func__  << "num_limits = "<<loghex(num_limits);
+  LOG(INFO) <<__func__  << "params->cig_id = "<<loghex(params->cig_id);
+  LOG(INFO) <<__func__  << "params->cis_id = "<<loghex(params->cis_id);
+  UINT8_TO_STREAM(p, ENCODER_LIMITS_SUB_OP); //sub-opcode
+  param_len++;
+  UINT8_TO_STREAM(p, params->cig_id);
+  param_len++;
+  UINT8_TO_STREAM(p, params->cis_id);
+  param_len++;
+  UINT8_TO_STREAM(p, num_limits); //numlimits
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[0]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_BIT_RATE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[2]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MIN_MAX_ERROR_RESILIENCE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[3]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_LATENCY_MODE);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[4]);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_TYPE_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, LTV_LEN_MAX_FT);
+  param_len++;
+  UINT8_TO_STREAM(p, params->encoder_params[1]);
+  param_len++;
+  *length = param_len;
+  LOG(INFO) <<__func__  << "param_len = "<<loghex(param_len);
+  return p;
+}
+
+void UpdateEncoderParams(uint8_t cig_id, uint8_t cis_id,
+                                 std::vector<uint8_t> encoder_limit_params) {
+  tBTM_BLE_SET_ENCODER_LIMITS_PARAM encoder_params = {
+                                       .cig_id = cig_id,
+                                       .cis_id = cis_id,
+                                       .encoder_params = encoder_limit_params};
+    uint8_t length = 0;
+    uint8_t size = 1;
+    if (encoder_params.encoder_params.size())
+      size = encoder_params.encoder_params.size();
+    uint16_t len = 4 + size * 3;
+    LOG(INFO) <<__func__  << "len = "<<loghex(len);
+    uint8_t param_arr[len];
+    uint8_t *param = param_arr;
+    PrepareSetEncoderLimitsPayload(&encoder_params, &length, param);
+    bluetooth::legacy::hci::GetInterface().SendVendorSpecificCmd(HCI_VS_QBCE_OCF, length, param, NULL);
+}
 
 /*
  * Coordinatet Set Identification Profile (CSIP) based on CSIP 1.0
@@ -4043,8 +4135,11 @@ class LeAudioClientImpl : public LeAudioClient {
     if ((configuration_context_type_ == LeAudioContextType::MEDIA) ||
         (configuration_context_type_ == LeAudioContextType::GAME)) {
       // Send vendor specific command for codec mode
-      uint16_t update_value =
-          (configuration_context_type_ == LeAudioContextType::MEDIA) ? 0x1 : 0x2;
+      uint8_t update_value =
+          (configuration_context_type_ == LeAudioContextType::MEDIA) ? 0x01 : 0x02;
+
+      log::warn("Send VSC Cmd for Encoder Limits for group {}, mode value {}",
+              group_id, update_value);
       uint8_t param_arr[7];
       uint8_t *p = param_arr;
 
@@ -4061,6 +4156,13 @@ class LeAudioClientImpl : public LeAudioClient {
           HCI_VS_QBCE_OCF, 7, param_arr, NULL);
     }
 
+    if (device->GetFirstActiveAse()->is_vsmetadata_available) {
+      for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
+        UpdateEncoderParams(group_id, cis.id,
+            device->GetFirstActiveAse()->metadata);
+        device->GetFirstActiveAse()->is_vsmetadata_available = false;
+      }
+    }
   }
 
   const struct bluetooth::le_audio::stream_configuration*
