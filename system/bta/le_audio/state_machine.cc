@@ -2317,6 +2317,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
     std::vector<struct bluetooth::le_audio::client_parser::ascs::ctp_codec_conf>
         confs;
     struct ase* ase;
+    bool mFlagGattWriteUpdated = false;
     std::stringstream msg_stream;
     std::stringstream extra_stream;
 
@@ -2358,13 +2359,22 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       }
       extra_stream << +conf.codec_id.coding_format << ","
                    << +conf.target_latency << ";;";
+
+      if (osi_property_get_bool("persist.bluetooth.leaudio.tmap_vrc_05_08", false)) {
+         std::vector<uint8_t> value;
+         bluetooth::le_audio::client_parser::ascs::PrepareAseCtpCodecConfig(confs,
+                                                                            value);
+         WriteToControlPoint(leAudioDevice, value);
+         confs.pop_back();
+         mFlagGattWriteUpdated = true;
+      }
     }
-
-    std::vector<uint8_t> value;
-    bluetooth::le_audio::client_parser::ascs::PrepareAseCtpCodecConfig(confs,
-                                                                       value);
-    WriteToControlPoint(leAudioDevice, value);
-
+    if (!mFlagGattWriteUpdated) {
+       std::vector<uint8_t> value;
+       bluetooth::le_audio::client_parser::ascs::PrepareAseCtpCodecConfig(confs,
+                                                                            value);
+       WriteToControlPoint(leAudioDevice, value);
+    }
     log_history_->AddLogHistory(kLogControlPointCmd, group->group_id_,
                                 leAudioDevice->address_, msg_stream.str(),
                                 extra_stream.str());
@@ -3034,6 +3044,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     bool validate_transport_latency = false;
     bool validate_max_sdu_size = false;
+    bool mFlagGattWriteUpdated = false;
 
     std::stringstream msg_stream;
     msg_stream << kLogAseQoSConfigOp;
@@ -3097,21 +3108,30 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       extra_stream << +conf.cis << "," << +conf.max_sdu << ","
                    << +conf.max_transport_latency << "," << +conf.retrans_nb
                    << "," << +conf.phy << "," << +conf.framing << ";;";
+
+      if (confs.size() == 0 || !validate_transport_latency ||
+          !validate_max_sdu_size) {
+        log::error("Invalid configuration or latency or sdu size");
+        group->PrintDebugState();
+        StopStream(group);
+        return;
+      }
+      if (osi_property_get_bool("persist.bluetooth.leaudio.tmap_vrc_05_08", false)) {
+        std::vector<uint8_t> value;
+        bluetooth::le_audio::client_parser::ascs::PrepareAseCtpConfigQos(confs,
+                                                                       value);
+        WriteToControlPoint(leAudioDevice, value);
+        confs.pop_back();
+        mFlagGattWriteUpdated =  true;
+      }
     }
 
-    if (confs.size() == 0 || !validate_transport_latency ||
-        !validate_max_sdu_size) {
-      log::error("Invalid configuration or latency or sdu size");
-      group->PrintDebugState();
-      StopStream(group);
-      return;
+    if (!mFlagGattWriteUpdated) {
+       std::vector<uint8_t> value;
+       bluetooth::le_audio::client_parser::ascs::PrepareAseCtpConfigQos(confs,
+                                                                      value);
+       WriteToControlPoint(leAudioDevice, value);
     }
-
-    std::vector<uint8_t> value;
-    bluetooth::le_audio::client_parser::ascs::PrepareAseCtpConfigQos(confs,
-                                                                     value);
-    WriteToControlPoint(leAudioDevice, value);
-
     log::info("group_id: {}, {}", leAudioDevice->group_id_,
               leAudioDevice->address_);
     log_history_->AddLogHistory(kLogControlPointCmd, group->group_id_,
