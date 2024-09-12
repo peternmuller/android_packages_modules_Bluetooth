@@ -2117,6 +2117,8 @@ void bta_ag_send_ring(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
               p_scb->conn_service, p_scb->callsetup_ind);
     return;
   }
+  log::info("exiting sniff for sending RING");
+  bta_sys_busy(BTA_ID_AG, p_scb->app_id, p_scb->peer_addr);
   /* send RING */
   bta_ag_send_result(p_scb, BTA_AG_LOCAL_RES_RING, nullptr, 0);
 
@@ -2128,6 +2130,8 @@ void bta_ag_send_ring(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& /* data */) {
 
   bta_sys_start_timer(p_scb->ring_timer, BTA_AG_RING_TIMEOUT_MS,
                       BTA_AG_RING_TIMEOUT_EVT, bta_ag_scb_to_idx(p_scb));
+  log::info("resetting idle timer after sending RING");
+  bta_sys_idle(BTA_ID_AG, p_scb->app_id, p_scb->peer_addr);
 }
 
 /*******************************************************************************
