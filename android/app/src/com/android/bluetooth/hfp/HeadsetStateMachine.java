@@ -106,7 +106,7 @@ class HeadsetStateMachine extends StateMachine {
     private static final int CLCC_RSP_TIMEOUT_MS = 5000;
     // NOTE: the value is not "final" - it is modified in the unit tests
     @VisibleForTesting static int sConnectTimeoutMs = 30000;
-
+    private static final String VOIP_CALL_NUMBER = "10000000";
     // Number of times we should retry disconnecting audio before
     // disconnecting the device.
     private static final int MAX_RETRY_DISCONNECT_AUDIO = 3;
@@ -2449,13 +2449,7 @@ class HeadsetStateMachine extends StateMachine {
     void processAtClcc(BluetoothDevice device) {
         if (mHeadsetService.isVirtualCallStarted()) {
             // In virtual call, send our phone number instead of remote phone number
-            String phoneNumber = mSystemInterface.getSubscriberNumber();
-            if (phoneNumber == null) {
-                phoneNumber = "";
-            }
-            if (phoneNumber == ""){
-               phoneNumber = "10000000";
-            }
+            String phoneNumber = VOIP_CALL_NUMBER;
             int type = PhoneNumberUtils.toaFromString(phoneNumber);
             Log.e(TAG, "processAtClcc: voip phoneNumber " + phoneNumber +" voip type " + type);
             mNativeInterface.clccResponse(device, 1, 0, 0, 0, false, phoneNumber, type);
