@@ -4065,8 +4065,8 @@ class LeAudioClientImpl : public LeAudioClient {
     if (written != to_write) log::error("not all data sinked");
   }
 
-  void ConfirmLocalAudioSourceStreamingRequest() {
-    le_audio_source_hal_client_->ConfirmStreamingRequest();
+  void ConfirmLocalAudioSourceStreamingRequest(bool force) {
+    le_audio_source_hal_client_->ConfirmStreamingRequest(force);
 
     LeAudioLogHistory::Get()->AddLogHistory(
         kLogBtCallAf, active_group_id_, RawAddress::kEmpty,
@@ -4076,8 +4076,8 @@ class LeAudioClientImpl : public LeAudioClient {
     audio_sender_state_ = AudioState::STARTED;
   }
 
-  void ConfirmLocalAudioSinkStreamingRequest() {
-    le_audio_sink_hal_client_->ConfirmStreamingRequest();
+  void ConfirmLocalAudioSinkStreamingRequest(bool force) {
+    le_audio_sink_hal_client_->ConfirmStreamingRequest(force);
 
     LeAudioLogHistory::Get()->AddLogHistory(
         kLogBtCallAf, active_group_id_, RawAddress::kEmpty,
@@ -4150,7 +4150,7 @@ class LeAudioClientImpl : public LeAudioClient {
     }
 
     le_audio_source_hal_client_->UpdateRemoteDelay(remote_delay_ms);
-    ConfirmLocalAudioSourceStreamingRequest();
+    ConfirmLocalAudioSourceStreamingRequest(false);
 
     if (!LeAudioHalVerifier::SupportsStreamActiveApi()) {
       /* We update the target audio allocation before streamStarted so that the
@@ -4261,7 +4261,7 @@ class LeAudioClientImpl : public LeAudioClient {
       }
     }
     le_audio_sink_hal_client_->UpdateRemoteDelay(remote_delay_ms);
-    ConfirmLocalAudioSinkStreamingRequest();
+    ConfirmLocalAudioSinkStreamingRequest(false);
 
     if (!LeAudioHalVerifier::SupportsStreamActiveApi()) {
       /* We update the target audio allocation before streamStarted so that the
@@ -4677,7 +4677,7 @@ class LeAudioClientImpl : public LeAudioClient {
     switch (audio_sender_state_) {
       case AudioState::STARTED:
         /* Looks like previous Confirm did not get to the Audio Framework*/
-        ConfirmLocalAudioSourceStreamingRequest();
+        ConfirmLocalAudioSourceStreamingRequest(false);
         break;
       case AudioState::IDLE:
         switch (audio_receiver_state_) {
@@ -4806,7 +4806,7 @@ class LeAudioClientImpl : public LeAudioClient {
             /* Stream is up just restore it */
             if (alarm_is_scheduled(suspend_timeout_))
               alarm_cancel(suspend_timeout_);
-            ConfirmLocalAudioSourceStreamingRequest();
+            ConfirmLocalAudioSourceStreamingRequest(false);
             bluetooth::le_audio::MetricsCollector::Get()->OnStreamStarted(
                 active_group_id_, configuration_context_type_);
             break;
@@ -4997,7 +4997,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     switch (audio_receiver_state_) {
       case AudioState::STARTED:
-        ConfirmLocalAudioSinkStreamingRequest();
+        ConfirmLocalAudioSinkStreamingRequest(false);
         break;
       case AudioState::IDLE:
         switch (audio_sender_state_) {
@@ -5126,7 +5126,7 @@ class LeAudioClientImpl : public LeAudioClient {
             /* Stream is up just restore it */
             if (alarm_is_scheduled(suspend_timeout_))
               alarm_cancel(suspend_timeout_);
-            ConfirmLocalAudioSinkStreamingRequest();
+            ConfirmLocalAudioSinkStreamingRequest(false);
             break;
           case AudioState::RELEASING:
             /* Wait until releasing is completed */
@@ -6075,11 +6075,23 @@ class LeAudioClientImpl : public LeAudioClient {
       log::error("Invalid group: {}", active_group_id_);
       return;
     }
-    log::warn("QhciVscEvt: {} delay {} mode.", delay, mode);
-    if (delay != 0xFFFF)
-      group->stream_conf.stream_params.sink.delay = delay;
-    if (mode != 0xFF)
+    log::warn("{} delay {} mode.", delay, mode);
+    if (mode != 0xFF) {
       group->stream_conf.stream_params.sink.mode = mode;
+    }
+    if (delay != 0xFFFF) {
+      log::warn("updating delay to bt audio hal");
+      group->UpdateCisConfiguration(bluetooth::le_audio::types::kLeAudioDirectionSink);
+      BidirectionalPair<uint16_t> delays_pair = {
+        .sink = delay,
+        .source = 0};
+      CodecManager::GetInstance()->UpdateActiveAudioConfig(
+        group->stream_conf.stream_params, delays_pair, group->stream_conf.codec_id,
+        std::bind(&LeAudioClientImpl::UpdateAudioConfigToHal,
+                  weak_factory_.GetWeakPtr(), std::placeholders::_1,
+                  std::placeholders::_2));
+      ConfirmLocalAudioSourceStreamingRequest(true);
+    }
   }
 
   void IsoLinkQualityReadCb(
