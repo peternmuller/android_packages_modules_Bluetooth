@@ -957,10 +957,22 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
     case BTA_AG_AT_A_EVT:
     case BTA_AG_SPK_EVT:
     case BTA_AG_MIC_EVT:
-    case BTA_AG_AT_CHUP_EVT:
     case BTA_AG_AT_CBC_EVT:
       /* send OK */
       bta_ag_send_ok(p_scb);
+      break;
+    case BTA_AG_AT_CHUP_EVT:
+     if (!bta_ag_sco_is_active_device(p_scb->peer_addr) &&
+           interop_match_addr_or_name(INTEROP_DISALLOW_REJECT_CALL,
+             &p_scb->peer_addr, &btif_storage_get_remote_device_property)) {
+        log::verbose("%s: AT+CHUP rejected as %s is not the active "\
+                            "device", __func__, p_scb->peer_addr.ToString().c_str());
+        log::verbose("Avoid sending AT+CHUP update to application.");
+        bta_ag_send_ok(p_scb);
+        event = BTA_AG_ENABLE_EVT;
+      } else {
+        bta_ag_send_ok(p_scb);
+      }
       break;
     case BTA_AG_AT_BLDN_EVT:
       /* Do not send OK, App will send error or OK depending on
