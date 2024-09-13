@@ -167,6 +167,7 @@ class HeadsetStateMachine extends StateMachine {
     private boolean mHasWbsEnabled = false;
     private boolean mHasSwbLc3Enabled = false;
     private boolean mHasSwbAptXEnabled = false;
+    private boolean mIsSwbSupportedByRemote = false;
     // AT Phone book keeps a group of states used by AT+CPBR commands
     @VisibleForTesting final AtPhonebook mPhonebook;
     // HSP specific
@@ -571,14 +572,21 @@ class HeadsetStateMachine extends StateMachine {
                 return;
             }
             if (mHeadsetService.isVirtualCallStarted()) {
-                stateLogD("CALL_STATE_CHANGED: enable AptX SWB for all voip calls ");
-                mHeadsetService.enableSwbCodec(
-                        HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, true, mDevice);
+                if (mIsSwbSupportedByRemote) {
+                    stateLogD("CALL_STATE_CHANGED: enable AptX SWB for all voip calls");
+                    mHeadsetService.enableSwbCodec(
+                            HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, true, mDevice);
+                } else {
+                    stateLogD("CALL_STATE_CHANGED: disable AptX SWB for all voip calls");
+                    mHeadsetService.enableSwbCodec(
+                            HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, false, mDevice);
+                }
             } else if ((callState.mCallState == HeadsetHalConstants.CALL_STATE_DIALING)
                     || (callState.mCallState == HeadsetHalConstants.CALL_STATE_INCOMING)
                     || ((callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE)
                             && (callState.mNumActive > 0))) {
-                if (!mSystemInterface.isHighDefCallInProgress()) {
+                if (!mSystemInterface.isHighDefCallInProgress() ||
+                         !mIsSwbSupportedByRemote) {
                     stateLogD("CALL_STATE_CHANGED: disable AptX SWB for non-HD call ");
                     mHeadsetService.enableSwbCodec(
                             HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX, false, mDevice);
@@ -617,6 +625,7 @@ class HeadsetStateMachine extends StateMachine {
             mHasSwbLc3Enabled = false;
             mHasNrecEnabled = false;
             mHasSwbAptXEnabled = false;
+            mIsSwbSupportedByRemote = false;
             // reset call information
             mStateMachineCallState.mNumActive = 0;
             mStateMachineCallState.mNumHeld = 0;
@@ -869,6 +878,11 @@ class HeadsetStateMachine extends StateMachine {
                             processWBSEvent(event.valueInt);
                             break;
                         case HeadsetStackEvent.EVENT_TYPE_SWB:
+                            if (event.valueInt == HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX &&
+                                    event.valueInt2 == HeadsetHalConstants.BTHF_SWB_YES) {
+                                mIsSwbSupportedByRemote = true;
+                                stateLogW("Remote supports SWB. setting mIsSwbSupportedByRemote to true");
+                            }
                             processSWBEvent(event.valueInt, event.valueInt2);
                             break;
                         case HeadsetStackEvent.EVENT_TYPE_BIND:
@@ -1275,6 +1289,11 @@ class HeadsetStateMachine extends StateMachine {
                             processWBSEvent(event.valueInt);
                             break;
                         case HeadsetStackEvent.EVENT_TYPE_SWB:
+                            if (event.valueInt == HeadsetHalConstants.BTHF_SWB_CODEC_VENDOR_APTX &&
+                                    event.valueInt2 == HeadsetHalConstants.BTHF_SWB_YES) {
+                                mIsSwbSupportedByRemote = true;
+                                stateLogW("Remote supports SWB. setting mIsSwbSupportedByRemote to true");
+                            }
                             processSWBEvent(event.valueInt, event.valueInt2);
                             break;
                         case HeadsetStackEvent.EVENT_TYPE_AT_CHLD:
@@ -1447,10 +1466,11 @@ class HeadsetStateMachine extends StateMachine {
                     if (isAtLeastU()) {
                         mSystemInterface.getAudioManager().setLeAudioSuspended(true);
                     }
-
+                    stateLogD("mIsSwbSupportedByRemote is " + mIsSwbSupportedByRemote);
                     if (Flags.hfpCodecAptxVoice()
                             && mHeadsetService.isAptXSwbEnabled()
-                            && mHeadsetService.isAptXSwbPmEnabled()) {
+                            && mHeadsetService.isAptXSwbPmEnabled() &&
+                            mIsSwbSupportedByRemote) {
                         if (!mHeadsetService.isVirtualCallStarted()
                                 && mSystemInterface.isHighDefCallInProgress()) {
                             stateLogD("CONNECT_AUDIO: enable AptX SWB for HD call ");
