@@ -334,9 +334,6 @@ static void event_start_up_stack(bluetooth::core::CoreInterface* interface,
     return;
   }
 
-  if (!com::android::bluetooth::flags::scan_manager_refactor()) {
-    module_start_up(get_local_module(RUST_MODULE));
-  }
   if (com::android::bluetooth::flags::channel_sounding_in_stack()) {
     bluetooth::ras::GetRasServer()->Initialize();
     bluetooth::ras::GetRasClient()->Initialize();
@@ -358,10 +355,6 @@ static void event_shut_down_stack(ProfileStopCallback stopProfiles) {
   future_t* local_hack_future = future_new();
   hack_future = local_hack_future;
   stack_is_running = false;
-
-  if (!com::android::bluetooth::flags::scan_manager_refactor()) {
-    module_shut_down(get_local_module(RUST_MODULE));
-  }
 
   do_in_main_thread(FROM_HERE, base::BindOnce(&btm_ble_scanner_cleanup));
 
