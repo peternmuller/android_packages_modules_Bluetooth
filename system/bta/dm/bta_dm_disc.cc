@@ -275,9 +275,12 @@ void bta_dm_sdp_finished(RawAddress bda, tBTA_STATUS result,
 /* Callback from sdp with discovery status */
 void bta_dm_sdp_callback(const RawAddress& /* bd_addr */,
                          tSDP_STATUS sdp_status) {
-  log::info("{}", bta_dm_state_text(bta_dm_discovery_get_state()));
+  log::info("discovery state: {}, sdp_status: {}",
+      bta_dm_state_text(bta_dm_discovery_get_state()), sdp_status);
 
   if (bta_dm_discovery_get_state() == BTA_DM_DISCOVER_IDLE) {
+    log::info("cleanup bta_dm_discovery_cb.transports");
+    bta_dm_discovery_cb.transports = 0;
     return;
   }
 

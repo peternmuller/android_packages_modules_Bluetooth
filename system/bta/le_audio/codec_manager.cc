@@ -123,7 +123,6 @@ struct codec_manager_impl {
     uint8_t qll_supported_feat_len = 0;
     uint8_t soc_add_on_features_len = 0;
     bool is_apx_lossless_le_supported = false;
-    bool is_apx_lossless_le_supported_local = false;
     bool is_qhs_enabled_locally = false;
 
     bt_device_qll_local_supported_features_t *qll_feature_list =
@@ -141,12 +140,6 @@ struct codec_manager_impl {
       is_apx_lossless_le_supported = true;
     }
 
-    // To-Do remove below property once FW change merges
-    if (osi_property_get_bool("bluetooth.aptx_adaptive_le.enabled", false)) {
-      log::debug("Aptx LE codec enabled at local level");
-      is_apx_lossless_le_supported_local = true;
-    }
-
     char qhs_value[PROPERTY_VALUE_MAX] = "0";
     osi_property_get("persist.vendor.btstack.qhs_support", qhs_value, "255");
     uint8_t qhs_support_mask = (uint8_t)atoi(qhs_value);
@@ -158,8 +151,7 @@ struct codec_manager_impl {
 
     is_aptx_adaptive_le_supported_ = is_dynamic_bn_over_qhs &&
                                      is_dynamic_ft_change_supported &&
-                                     is_apx_lossless_le_supported &&
-                                     is_apx_lossless_le_supported_local;
+                                     is_apx_lossless_le_supported;
     is_aptx_adaptive_lex_supported_ = /*(IsAptxLeXSuppoerted(check sysprop, QLL feat)*/ true;
 
     is_enhanced_le_gaming_supported_ = BTM_QBCE_QLE_HCI_SUPPORTED(soc_add_on_features->as_array) &&
@@ -178,6 +170,7 @@ struct codec_manager_impl {
                                      kIsoDataPathPlatformDefault, {});
     SetCodecLocation(CodecLocation::ADSP);
   }
+
   void start(
       const std::vector<btle_audio_codec_config_t>& offloading_preference) {
     dual_bidirection_swb_supported_ = osi_property_get_bool(
@@ -1258,7 +1251,7 @@ struct codec_manager_impl {
                 continue;
             }
           }
-          if (!osi_property_get_bool("persist.bluetooth.leaudio_lex_l_r.enabled", false)){
+          if (!osi_property_get_bool("persist.bluetooth.leaudio_lex_l_r.enabled", true)){
             if (software_audio_set_conf->confs.sink.size() > 0) {
               if (software_audio_set_conf->confs.sink[0].codec.id ==
                   le_audio::set_configurations::LeAudioCodecIdAptxLeX) {

@@ -1181,9 +1181,30 @@ void bta_ag_at_hfp_cback(tBTA_AG_SCB* p_scb, uint16_t cmd, uint8_t arg_type,
       /* store peer features */
       p_scb->peer_features = (uint16_t)int_arg;
 
+      bool is_allowlisted_1_7 =
+          interop_match_addr_or_name(INTEROP_HFP_1_7_ALLOWLIST, &p_scb->peer_addr,
+                                     &btif_storage_get_remote_device_property);
+      bool is_allowlisted_1_9 =
+          interop_match_addr_or_name(INTEROP_HFP_1_9_ALLOWLIST, &p_scb->peer_addr,
+                                     &btif_storage_get_remote_device_property);
+      if (p_scb->peer_version == HFP_HSP_VERSION_UNKNOWN ||
+          p_scb->peer_version == HFP_VERSION_1_1) {
+          if (is_allowlisted_1_7) {
+              log::verbose("HFP version set to 1.7");
+              p_scb->peer_version = HFP_VERSION_1_7;
+          }
+          if (is_allowlisted_1_9) {
+              log::verbose("HFP version set to 1.9");
+              p_scb->peer_version = HFP_VERSION_1_9;
+          }
+      }
       if (p_scb->peer_version < HFP_VERSION_1_7 &&
           !osi_property_get_bool("vendor.bt.pts.certification", false)) {
         p_scb->masked_features &= HFP_1_6_FEAT_MASK;
+      }
+      if (osi_property_get_bool("vendor.bt.pts.disable_3way_calling", false)) {
+        log::verbose("disabling 3-way calling");
+        p_scb->masked_features &= ~(BTA_AG_FEAT_3WAY);
       }
       if(interop_match_addr_or_name(INTEROP_INBAND_RINGTONE_SET_TO_FALSE,
           &p_scb->peer_addr, &btif_storage_get_remote_device_property)) {

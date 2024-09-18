@@ -1209,7 +1209,7 @@ public class LeAudioService extends ProfileService {
 
             BluetoothLeAudioCodecStatus codecStatus = getCodecStatus(groupId);
             if (codecStatus != null
-                    && !codecStatus.isInputCodecConfigSelectable(BROADCAST_HIGH_QUALITY_CONFIG)) {
+                    && !codecStatus.isOutputCodecConfigSelectable(BROADCAST_HIGH_QUALITY_CONFIG)) {
                 // If any sink device does not support high quality audio config,
                 // set all subgroup audio quality to standard quality for now before multi codec
                 // config support is ready
@@ -2385,17 +2385,6 @@ public class LeAudioService extends ProfileService {
         }
 
         mNativeInterface.groupSetActive(groupId);
-        if (groupId == LE_AUDIO_GROUP_ID_INVALID) {
-            /* Native will clear its states and send us group Inactive.
-             * However we would like to notify audio framework that LeAudio is not
-             * active anymore and does not want to get more audio data.
-             * Notify audio framework LeAudio InActive until it is inactive
-             * in stack if broadcast create request in queue.
-             */
-            if (mCreateBroadcastQueue.isEmpty()) {
-                handleGroupTransitToInactive(currentlyActiveGroupId);
-            }
-        }
         return true;
     }
 

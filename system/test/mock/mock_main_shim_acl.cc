@@ -98,22 +98,21 @@ void bluetooth::shim::legacy::Acl::OnClassicLinkDisconnected(
   inc_func_call_count(__func__);
 }
 
-bluetooth::hci::AddressWithType shim::legacy::Acl::GetConnectionLocalAddress(
-    uint16_t /* handle */, bool /* ota_address */) {
+void shim::legacy::Acl::GetConnectionLocalAddress(
+    uint16_t /* handle */, bool /* ota_address */,
+    std::promise<bluetooth::hci::AddressWithType> /* promise */) {
   inc_func_call_count(__func__);
-  return hci::AddressWithType();
 }
-bluetooth::hci::AddressWithType shim::legacy::Acl::GetConnectionPeerAddress(
-    uint16_t /* handle */, bool /* ota_address */) {
+void shim::legacy::Acl::GetConnectionPeerAddress(
+    uint16_t /* handle */, bool /* ota_address */,
+    std::promise<bluetooth::hci::AddressWithType> /* promise */) {
   inc_func_call_count(__func__);
-  return hci::AddressWithType();
 }
 
-std::optional<uint8_t> shim::legacy::Acl::GetAdvertisingSetConnectedTo(
-    const RawAddress& /* remote_bda */) {
+void shim::legacy::Acl::GetAdvertisingSetConnectedTo(
+    const RawAddress& /* remote_bda */,
+    std::promise<std::optional<uint8_t>> /* promise */) {
   inc_func_call_count(__func__);
-  return std::nullopt;
-  ;
 }
 
 void shim::legacy::Acl::OnLeLinkDisconnected(HciHandle /* handle */,

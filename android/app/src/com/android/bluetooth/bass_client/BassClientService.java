@@ -2478,6 +2478,13 @@ public class BassClientService extends ProfileService {
                         mPendingSourcesToAdd.add(
                                 new AddSourceData(sink, sourceMetadata, isGroupOp));
                     }
+                } else if (broadcastId != BassConstants.INVALID_BROADCAST_ID
+                        && isSearchInProgress()) {
+                    log("AddSource: pending for search broadcast: " + broadcastId);
+                    synchronized (mPendingSourcesToAdd) {
+                        mPendingSourcesToAdd.add(
+                                new AddSourceData(sink, sourceMetadata, isGroupOp));
+                    }
                 } else {
                     log("AddSource: broadcast not cached or invalid, broadcastId: " + broadcastId);
                     mCallbacks.notifySourceAddFailed(
@@ -2685,8 +2692,9 @@ public class BassClientService extends ProfileService {
      *
      * @param sink representing the Broadcast Sink from which a Broadcast Source should be removed
      * @param sourceId source ID as delivered in onSourceAdded
+     * @param internal removing source from UI or internal logic (stop source receivers)
      */
-    public void removeSource(BluetoothDevice sink, int sourceId) {
+    public void removeSource(BluetoothDevice sink, int sourceId, boolean internal) {
         log("removeSource: device: " + sink + ", sourceId: " + sourceId);
 
         Map<BluetoothDevice, Integer> devices = getGroupManagedDeviceSources(sink, sourceId).second;
@@ -2695,6 +2703,12 @@ public class BassClientService extends ProfileService {
             Integer deviceSourceId = deviceSourceIdPair.getValue();
             BassClientStateMachine stateMachine = getOrCreateStateMachine(device);
 
+            if (!internal) {
+                if(mPausedBroadcastSinks.contains(device)) {
+                    log("removeSource: remove sink from mPausedBroadcastSinks");
+                    mPausedBroadcastSinks.remove(device);
+                }
+            }
             /* Removes metadata for sink device if not paused */
             if (!mPausedBroadcastSinks.contains(device)) {
                 mBroadcastMetadataMap.remove(device);
@@ -2887,7 +2901,7 @@ public class BassClientService extends ProfileService {
                 getReceiveStateDevicePairs(broadcastId);
 
         for (Pair<BluetoothLeBroadcastReceiveState, BluetoothDevice> pair : sourcesToRemove) {
-            removeSource(pair.second, pair.first.getSourceId());
+            removeSource(pair.second, pair.first.getSourceId(), true);
         }
 
         /* There may be some pending add/modify source operations */
@@ -2929,7 +2943,7 @@ public class BassClientService extends ProfileService {
         }
 
         for (Map.Entry<BluetoothDevice, Integer> entry : sourcesToRemove.entrySet()) {
-            removeSource(entry.getKey(), entry.getValue());
+            removeSource(entry.getKey(), entry.getValue(), true);
         }
     }
 
@@ -3875,7 +3889,7 @@ public class BassClientService extends ProfileService {
                     return;
                 }
                 enforceBluetoothPrivilegedPermission(service);
-                service.removeSource(sink, sourceId);
+                service.removeSource(sink, sourceId, false);
             } catch (RuntimeException e) {
                 Log.e(TAG, "Exception happened", e);
             }

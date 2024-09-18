@@ -489,7 +489,7 @@ typedef enum {
   BT_SSP_VARIANT_PASSKEY_NOTIFICATION
 } bt_ssp_variant_t;
 
-#define BT_MAX_NUM_UUIDS 32
+#define BT_MAX_NUM_UUIDS 40
 
 /** Bluetooth Interface callbacks */
 

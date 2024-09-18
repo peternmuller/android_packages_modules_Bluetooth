@@ -840,7 +840,7 @@ public class BassClientStateMachine extends StateMachine {
         // If there is pending one process it Now
         if (recvState.getBigEncryptionState()
                         == BluetoothLeBroadcastReceiveState.BIG_ENCRYPTION_STATE_CODE_REQUIRED
-                && mSetBroadcastCodePending) {
+                && mSetBroadcastPINMetadata != null) {
             log("Update the Broadcast now");
             if (mSetBroadcastPINMetadata != null) {
                 setCurrentBroadcastMetadata(recvState.getSourceId(), mSetBroadcastPINMetadata);
@@ -850,11 +850,15 @@ public class BassClientStateMachine extends StateMachine {
             m.arg1 = ARGTYPE_RCVSTATE;
             sendMessage(m);
             mSetBroadcastCodePending = false;
-            mSetBroadcastPINMetadata = null;
         } else if (recvState.getBigEncryptionState()
                 == BluetoothLeBroadcastReceiveState.BIG_ENCRYPTION_STATE_BAD_CODE ||
                 recvState.getPaSyncState()
                         == BluetoothLeBroadcastReceiveState.PA_SYNC_STATE_FAILED_TO_SYNCHRONIZE) {
+            if (mSetBroadcastPINMetadata != null && (recvState.getBroadcastId()
+                    == mSetBroadcastPINMetadata.getBroadcastId())) {
+                log("Bad code, clear saved pin code");
+                mSetBroadcastPINMetadata = null;
+            }
             log("Bad code, remove this source...");
             int sourceId = recvState.getSourceId();
             if (recvState.getPaSyncState()
@@ -1039,6 +1043,7 @@ public class BassClientStateMachine extends StateMachine {
                 return;
             }
             mBluetoothLeBroadcastReceiveStates.put(characteristic.getInstanceId(), recvState);
+            mSetBroadcastPINMetadata = null;
             checkAndUpdateBroadcastCode(recvState);
             processPASyncState(recvState);
         } else {
@@ -1063,6 +1068,11 @@ public class BassClientStateMachine extends StateMachine {
                         || recvState.getSourceDevice().getAddress().equals(emptyBluetoothDevice)) {
                     BluetoothDevice removedDevice = oldRecvState.getSourceDevice();
                     log("sourceInfo removal " + removedDevice);
+                    if (mSetBroadcastPINMetadata != null && (oldRecvState.getBroadcastId()
+                            == mSetBroadcastPINMetadata.getBroadcastId())) {
+                        log("source is removed, clear saved pin code");
+                        mSetBroadcastPINMetadata = null;
+                    }
                     if (!Flags.leaudioBroadcastExtractPeriodicScannerFromStateMachine()) {
                         cancelActiveSync(
                                 mService.getSyncHandleForBroadcastId(recvState.getBroadcastId()));

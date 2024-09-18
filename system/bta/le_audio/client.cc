@@ -263,6 +263,7 @@ class LeAudioClientImpl : public LeAudioClient {
         defer_notify_active_until_stop_(false),
         defer_sink_suspend_ack_until_stop_(false),
         defer_source_suspend_ack_until_stop_(false),
+        is_local_sink_metadata_available_(false),
         le_audio_source_hal_client_(nullptr),
         le_audio_sink_hal_client_(nullptr),
         close_vbc_timeout_(alarm_new("LeAudioCloseVbcTimeout")),
@@ -638,6 +639,7 @@ class LeAudioClientImpl : public LeAudioClient {
         kLogAfCancel + "LocalSink",
         "s_state: " + ToString(audio_receiver_state_));
 
+     is_local_sink_metadata_available_ = false;
     audio_receiver_state_ = AudioState::IDLE;
   }
 
@@ -1806,6 +1808,10 @@ class LeAudioClientImpl : public LeAudioClient {
       log::warn("Could not load ases");
     }
 
+    //For BT reboot cases, remotes need PACS discover.
+    leAudioDevice->known_service_handles_ = false;
+    btif_storage_leaudio_clear_service_data(address);
+
     leAudioDevice->autoconnect_flag_ = autoconnect;
     /* When adding from storage, make sure that autoconnect is used
      * by all the devices in the group.
@@ -2151,7 +2157,9 @@ class LeAudioClientImpl : public LeAudioClient {
       }
 
       leAudioDevice->SetAvailableContexts(contexts);
-
+      btif_storage_set_leaudio_supported_context_types(
+          leAudioDevice->address_, contexts.sink.value(),
+          contexts.source.value());
       if (!group) {
         return;
       }
@@ -2196,10 +2204,6 @@ class LeAudioClientImpl : public LeAudioClient {
               supp_audio_contexts, len, value)) {
         /* Just store if for now */
         leAudioDevice->SetSupportedContexts(supp_audio_contexts);
-
-        btif_storage_set_leaudio_supported_context_types(
-            leAudioDevice->address_, supp_audio_contexts.sink.value(),
-            supp_audio_contexts.source.value());
       }
     } else if (hdl == leAudioDevice->ctp_hdls_.val_hdl) {
       groupStateMachine_->ProcessGattCtpNotification(group, value, len);
@@ -2644,6 +2648,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
   void OnGattDisconnected(uint16_t conn_id, tGATT_IF client_if,
                           RawAddress address, tGATT_DISCONN_REASON reason) {
+    log::info("OnGattDisconnected");
     LeAudioDevice* leAudioDevice = leAudioDevices_.FindByConnId(conn_id);
 
     if (!leAudioDevice) {
@@ -2663,6 +2668,10 @@ class LeAudioClientImpl : public LeAudioClient {
     leAudioDevice->closing_stream_for_disconnection_ = false;
     leAudioDevice->encrypted_ = false;
     leAudioDevice->acl_phy_update_done_ = false;
+
+    log::info("Remove service data, addr: {}", address);
+    leAudioDevice->known_service_handles_ = false;
+    btif_storage_leaudio_clear_service_data(address);
 
     groupStateMachine_->ProcessHciNotifAclDisconnected(group, leAudioDevice);
 
@@ -4246,7 +4255,6 @@ class LeAudioClientImpl : public LeAudioClient {
 
   AudioReconfigurationResult UpdateConfigAndCheckIfReconfigurationIsNeeded(
       LeAudioDeviceGroup* group, LeAudioContextType context_type) {
-    bool is_frame_duration_changed = false;
 
     log::debug("Checking whether to reconfigure from {} to {}",
                ToString(configuration_context_type_), ToString(context_type));
@@ -4282,10 +4290,6 @@ class LeAudioClientImpl : public LeAudioClient {
     log::info("OnMetadataUpdate for context type: {}", ToHexString(context_type));
     callbacks_->OnMetadataUpdate(context_update_);
 
-    if (is_frame_duration_changed) {
-      return AudioReconfigurationResult::RECONFIGURATION_BY_HAL;
-    }
-
     // Note: The local sink config is based on remote device's source config
     //       and vice versa.
     current_decoder_config_ = group->GetAudioSessionCodecConfigForDirection(
@@ -4304,6 +4308,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
     log::debug("configuration_context_type_= {}.",
                               ToString(configuration_context_type_));
+    log::debug(" is_local_sink_metadata_available_= {}.",
+                               is_local_sink_metadata_available_);
     log::debug( "remote_direction= {}",
          (remote_direction == bluetooth::le_audio::types::kLeAudioDirectionSource
              ? "Source" : "Sink"));
@@ -4321,7 +4327,8 @@ class LeAudioClientImpl : public LeAudioClient {
         remote_contexts =
           DirectionalRealignMetadataAudioContexts(group, local_direction);
       }
-    } else if (configuration_context_type_ == LeAudioContextType::GAME &&
+    } else if (( is_local_sink_metadata_available_ == false) &&
+               (configuration_context_type_ == LeAudioContextType::GAME) &&
                (remote_direction ==
                 bluetooth::le_audio::types::kLeAudioDirectionSource)) {
        log::debug("Ensuring to saty in VBC path.");
@@ -4791,6 +4798,7 @@ class LeAudioClientImpl : public LeAudioClient {
      */
     auto group = aseGroups_.FindById(active_group_id_);
     if (!group) {
+       is_local_sink_metadata_available_ = false;
       log::error("Invalid group: {}", static_cast<int>(active_group_id_));
       return;
     }
@@ -4800,6 +4808,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
     log::debug("configuration_context_type_= {}.",
                               ToString(configuration_context_type_));
+    log::debug(" is_local_sink_metadata_available_= {}.",
+                               is_local_sink_metadata_available_);
     /* We need new configuration_context_type_ to be selected before we go any
      * further.
      */
@@ -4807,7 +4817,8 @@ class LeAudioClientImpl : public LeAudioClient {
       //Below condition is not to allow reconfig to LIVE when
       //configuration_context_type_ is GAME as there is no UpdateMetadata
       //update on decoding session. This ensures to be stay in VBC path.
-      if ((audio_sender_state_ == AudioState::IDLE) &&
+      if (( is_local_sink_metadata_available_ == false) &&
+          (audio_sender_state_ == AudioState::IDLE) &&
           (configuration_context_type_ == LeAudioContextType::GAME)) {
         ReconfigureOrUpdateRemote(
           group, bluetooth::le_audio::types::kLeAudioDirectionSink);
@@ -4990,6 +5001,7 @@ class LeAudioClientImpl : public LeAudioClient {
         /* Wait until releasing is completed */
         break;
     }
+     is_local_sink_metadata_available_ = false;
   }
 
   /* Chooses a single context type to use as a key for selecting a single
@@ -5293,6 +5305,8 @@ class LeAudioClientImpl : public LeAudioClient {
       log::error("Invalid group: {}", static_cast<int>(active_group_id_));
       return;
     }
+
+     is_local_sink_metadata_available_ = true;
 
     log::info(
         "group_id {} state={}, target_state={}, audio_receiver_state_: {}, "
@@ -6407,6 +6421,8 @@ class LeAudioClientImpl : public LeAudioClient {
   /*To track MM issued suspend progress */
   bool defer_sink_suspend_ack_until_stop_;
   bool defer_source_suspend_ack_until_stop_;
+  /* To know whether MM sent sink track update Metadata */
+  bool  is_local_sink_metadata_available_;
 
   /* Reconnection mode */
   tBTM_BLE_CONN_TYPE reconnection_mode_;
@@ -6648,7 +6664,9 @@ void le_audio_gattc_callback(tBTA_GATTC_EVT event, tBTA_GATTC* p_data) {
       break;
 
     case BTA_GATTC_SRVC_DISC_DONE_EVT:
-      instance->OnGattServiceDiscoveryDone(p_data->service_changed.remote_bda);
+      /*PACS read would be done when encryption complete*/
+      log::warn("Needn't do PACS when BTA_GATTC_SRVC_DISC_DONE_EVT.");
+      //instance->OnGattServiceDiscoveryDone(p_data->service_changed.remote_bda);
       break;
 
     case BTA_GATTC_SRVC_CHG_EVT:

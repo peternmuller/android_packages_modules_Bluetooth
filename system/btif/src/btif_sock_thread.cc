@@ -439,6 +439,9 @@ static void prepare_poll_fds(int h, struct pollfd* pfds) {
 }
 static void* sock_poll_thread(void* arg) {
   std::array<struct pollfd, MAX_POLL> pfds;
+  if (pthread_setname_np(pthread_self(), "btif_sock_poll") != 0) {
+    log::error("set thread name=btif_sock_poll failed");
+  }
 
   int h = (intptr_t)arg;
   for (;;) {
