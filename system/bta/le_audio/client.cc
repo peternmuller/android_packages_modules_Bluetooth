@@ -116,6 +116,7 @@ using bluetooth::le_audio::utils::GetAudioContextsFromSourceMetadata;
 
 using namespace bluetooth;
 
+
 /* Enums */
 enum class AudioReconfigurationResult {
   RECONFIGURATION_NEEDED = 0x00,
@@ -2690,7 +2691,18 @@ class LeAudioClientImpl : public LeAudioClient {
       log::error(", skipping unknown leAudioDevice, address: {}", address);
       return;
     }
-
+    if (!lexAvailableTransportDevices_.empty()) {
+      auto it = std::find(lexAvailableTransportDevices_.begin(),
+          lexAvailableTransportDevices_.end(), address);
+      if (it !=
+          lexAvailableTransportDevices_.end()) {
+          log::info("found device in lexAvailableTransportDevices to remove.");
+          lexAvailableTransportDevices_.erase(
+            std::remove(lexAvailableTransportDevices_.begin(),
+            lexAvailableTransportDevices_.end(), (*it)),
+            lexAvailableTransportDevices_.end());
+      }
+    }
     leAudioDevice->acl_asymmetric_ = false;
     BtaGattQueue::Clean(leAudioDevice->conn_id_);
     LeAudioDeviceGroup* group = aseGroups_.FindById(leAudioDevice->group_id_);
@@ -4334,6 +4346,22 @@ class LeAudioClientImpl : public LeAudioClient {
     return AudioReconfigurationResult::RECONFIGURATION_NEEDED;
   }
 
+  bool isLeXtransportAvailable(LeAudioDeviceGroup* group) {
+     LeAudioDevice* leAudioDevice = group->GetFirstDevice();
+     if (!leAudioDevice) return false;
+     do {
+       auto address = leAudioDevice->address_;
+       auto it = std::find(lexAvailableTransportDevices_.begin(),
+           lexAvailableTransportDevices_.end(), address);
+       if (it != lexAvailableTransportDevices_.end()) {
+           log::info("LeX transport available to stream.");
+           return true;
+       }
+     } while ((leAudioDevice = group->GetNextDevice(leAudioDevice)));
+     log::info("No transport is available.");
+     return false;
+  }
+
   /* Returns true if stream is started */
   bool OnAudioResume(LeAudioDeviceGroup* group, int local_direction) {
     auto remote_direction =
@@ -4389,6 +4417,10 @@ class LeAudioClientImpl : public LeAudioClient {
         leAudioHealthStatus_->AddStatisticForGroup(
             group, LeAudioHealthGroupStatType::STREAM_CONTEXT_NOT_AVAILABLE);
       }
+      return false;
+    }
+
+    if (group->GetFirstDevice()->isLeXDevice() && !isLeXtransportAvailable(group)) {
       return false;
     }
 
@@ -5967,7 +5999,23 @@ class LeAudioClientImpl : public LeAudioClient {
         group, leAudioDevice, status, conn_handle);
   }
 
-  void QhciVscEvt(uint16_t delay, uint8_t mode) {
+  void updateLexAvailableTransportDevices(uint64_t bdAddr) {
+    if (bdAddr != 0xFFFFFFFFFFFFFFFF) {
+      RawAddress rawAddress;
+      uint8_t addr[] = {static_cast<uint8_t>((bdAddr >> 40) & 0xFF),
+                        static_cast<uint8_t>((bdAddr >> 32) & 0xFF),
+                        static_cast<uint8_t>((bdAddr >> 24) & 0xFF),
+                        static_cast<uint8_t>((bdAddr >> 16) & 0xFF),
+                        static_cast<uint8_t>((bdAddr >> 8) & 0xFF),
+                        static_cast<uint8_t>((bdAddr) & 0xFF)};
+      rawAddress.FromOctets((uint8_t*)addr);
+      log::info("Updating Transport device {}", rawAddress.ToString());
+      lexAvailableTransportDevices_.push_back(rawAddress);
+    }
+  }
+
+  void QhciVscEvt(uint16_t delay, uint8_t mode, uint64_t bdAddr) {
+    updateLexAvailableTransportDevices(bdAddr);
     auto group = aseGroups_.FindById(active_group_id_);
     if (!group) {
       log::error("Invalid group: {}", active_group_id_);
@@ -6521,6 +6569,8 @@ class LeAudioClientImpl : public LeAudioClient {
 
   std::map<int, GroupStreamStatus> lastNotifiedGroupStreamStatusMap_;
 
+  std::vector<RawAddress> lexAvailableTransportDevices_;
+
   void ClientAudioInterfaceRelease() {
     auto group = aseGroups_.FindById(active_group_id_);
     if (!group) {
@@ -6758,8 +6808,8 @@ LeAudioStateMachineHciCallbacksImpl stateMachineHciCallbacksImpl;
 
 class LeAudioStateMachineVscHciCallbackImpl : public VscCallback {
   public:
-    void OnVscEvent(uint16_t delay, uint8_t mode) override {
-      if (instance) instance->QhciVscEvt(delay, mode);
+    void OnVscEvent(uint16_t delay, uint8_t mode, uint64_t bdAddr) override {
+      if (instance) instance->QhciVscEvt(delay, mode, bdAddr);
     }
 };
 
