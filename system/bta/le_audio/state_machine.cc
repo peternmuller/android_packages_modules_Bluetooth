@@ -376,6 +376,16 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       return false;
     }
 
+    /*Return false if device is not CONNECTED, it will
+     *retry AttachToStream after kDeviceAttachDelayMs.
+     */
+    if (leAudioDevice->GetConnectionState() !=
+                       bluetooth::le_audio::DeviceConnectState::CONNECTED) {
+      log::error("device: {}, in the state: {}", leAudioDevice->address_,
+          bluetooth::common::ToString(leAudioDevice->GetConnectionState()));
+      return false;
+    }
+
     /* This is cautious - mostly needed for unit test only */
     auto group_metadata_contexts =
         get_bidirectional(group->GetMetadataContexts());
