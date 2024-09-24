@@ -226,14 +226,30 @@ public:
       log::warn("Create new tracker");
     }
     trackers_[address].conn_id_ = p_data->conn.conn_id;
+
+    RawAddress identity_address = p_data->conn.remote_bda;
+    tBLE_ADDR_TYPE address_type = BLE_ADDR_PUBLIC_ID;
+    btm_random_pseudo_to_identity_addr(&identity_address, &address_type);
+    // TODO: optimize, remove this event, initialize the tracker within the GD on demand.
+    callbacks_->OnRasServerConnected(identity_address);
   }
 
   void OnGattDisconnect(tBTA_GATTS* p_data) {
-    auto address = p_data->conn.remote_bda;
-    log::info("Address: {}, conn_id:{}", address, p_data->conn.conn_id);
-    if (trackers_.find(address) != trackers_.end()) {
-      trackers_.erase(address);
+    auto remote_bda = p_data->conn.remote_bda;
+    log::info("Address: {}, conn_id:{}", remote_bda, p_data->conn.conn_id);
+    if (trackers_.find(remote_bda) != trackers_.end()) {
+      NotifyRasServerDisconnected(remote_bda);
+      trackers_.erase(remote_bda);
     }
+  }
+
+  void NotifyRasServerDisconnected(const RawAddress& remote_bda) {
+    tBLE_BD_ADDR ble_identity_bd_addr;
+    ble_identity_bd_addr.bda = remote_bda;
+    ble_identity_bd_addr.type = BLE_ADDR_RANDOM;
+    btm_random_pseudo_to_identity_addr(&ble_identity_bd_addr.bda, &ble_identity_bd_addr.type);
+
+    callbacks_->OnRasServerDisconnected(ble_identity_bd_addr.bda);
   }
 
   void OnGattServerRegister(tBTA_GATTS* p_data) {
