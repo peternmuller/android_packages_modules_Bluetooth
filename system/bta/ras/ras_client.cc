@@ -36,6 +36,7 @@ RasClientImpl* instance;
 
 enum CallbackDataType { VENDOR_SPECIFIC_REPLY };
 static constexpr uint16_t kCachedDataSize = 10;
+static constexpr uint16_t kInvalidGattHandle = 0x0000;
 
 class RasClientImpl : public bluetooth::ras::RasClient {
 public:
@@ -126,9 +127,12 @@ public:
       trackers_.emplace_back(std::make_shared<RasTracker>(ble_bd_addr.bda, address));
     } else if (tracker->is_connected_) {
       log::info("Already connected");
-      uint16_t att_handle = tracker->FindCharacteristicByUuid(kRasRealTimeRangingDataCharacteristic)
-                                    ->value_handle;
-      callbacks_->OnConnected(address, att_handle, tracker->vendor_specific_characteristics_);
+      auto characteristic =
+              tracker->FindCharacteristicByUuid(kRasRealTimeRangingDataCharacteristic);
+      uint16_t real_time_att_handle =
+              characteristic == nullptr ? kInvalidGattHandle : characteristic->value_handle;
+      callbacks_->OnConnected(address, real_time_att_handle,
+                              tracker->vendor_specific_characteristics_);
       return;
     }
     BTA_GATTC_Open(gatt_if_, ble_bd_addr.bda, BTM_BLE_DIRECT_CONNECTION, true);
@@ -640,9 +644,10 @@ public:
       SubscribeCharacteristic(tracker, kRasRangingDataReadyCharacteristic);
       SubscribeCharacteristic(tracker, kRasRangingDataOverWrittenCharacteristic);
     }
-    uint16_t att_handle =
-            tracker->FindCharacteristicByUuid(kRasRealTimeRangingDataCharacteristic)->value_handle;
-    callbacks_->OnConnected(tracker->address_for_cs_, att_handle,
+    auto characteristic = tracker->FindCharacteristicByUuid(kRasRealTimeRangingDataCharacteristic);
+    uint16_t real_time_att_handle =
+            characteristic == nullptr ? kInvalidGattHandle : characteristic->value_handle;
+    callbacks_->OnConnected(tracker->address_for_cs_, real_time_att_handle,
                             tracker->vendor_specific_characteristics_);
   }
 
