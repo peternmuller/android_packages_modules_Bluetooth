@@ -524,8 +524,7 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
             kChannelMapRepetition,
             CsChannelSelectionType::TYPE_3B,
             CsCh3cShape::HAT_SHAPE,
-            kCh3cJump,
-            Enable::DISABLED),
+            kCh3cJump),
         handler_->BindOnce(check_status<LeCsCreateConfigStatusView>));
   }
 

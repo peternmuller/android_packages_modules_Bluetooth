@@ -4762,7 +4762,9 @@ packet LeRemoveIsoDataPathComplete : CommandComplete (command_op_code = LE_REMOV
 enum LeHostFeatureBits : 8 {
   CONNECTED_ISO_STREAM_HOST_SUPPORT = 32,
   CONNECTION_SUBRATING_HOST_SUPPORT = 38,
+  CHANNEL_SOUNDING_SUPPORT = 46,
   CHANNEL_SOUNDING_HOST_SUPPORT = 47,
+  CHANNEL_SOUNDING_TONE_QUALITY_INDICATION = 48,
 }
 
 packet LeSetHostFeature : Command (op_code = LE_SET_HOST_FEATURE) {
@@ -4994,6 +4996,15 @@ struct CsOptionalTPmTimesSupported {
   _reserved_ : 14,
 }
 
+enum CsSnrControl : 8 {
+  ADJUST_18_DB = 0x00,
+  ADJUST_21_DB = 0x01,
+  ADJUST_24_DB = 0x02,
+  ADJUST_27_DB = 0x03,
+  ADJUST_30_DB = 0x04,
+  NOT_APPLIED = 0xFF,
+}
+
 packet LeCsReadLocalSupportedCapabilitiesComplete : CommandComplete (command_op_code = LE_CS_READ_LOCAL_SUPPORTED_CAPABILITIES) {
   status : ErrorCode,
   num_config_supported: 8,
@@ -5015,6 +5026,7 @@ packet LeCsReadLocalSupportedCapabilitiesComplete : CommandComplete (command_op_
   optional_t_fcs_times_supported : CsOptionalTFcsTimesSupported,
   optional_t_pm_times_supported : CsOptionalTPmTimesSupported,
   t_sw_time_supported : 8,
+  tx_snr_capability : CsSnrControl,
 }
 
 packet LeCsReadRemoteSupportedCapabilities : DistanceMeasurementCommand (op_code = LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES) {
@@ -5047,6 +5059,7 @@ packet LeCsWriteCachedRemoteSupportedCapabilities : DistanceMeasurementCommand (
   optional_t_fcs_times_supported : CsOptionalTFcsTimesSupported,
   optional_t_pm_times_supported : CsOptionalTPmTimesSupported,
   t_sw_time_supported : 8,
+  tx_snr_capability: CsSnrControl,
 }
 
 packet LeCsWriteCachedRemoteSupportedCapabilitiesComplete : CommandComplete (command_op_code = LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES) {
@@ -5176,7 +5189,7 @@ packet LeCsCreateConfig : DistanceMeasurementCommand (op_code = LE_CS_CREATE_CON
   channel_selection_type : CsChannelSelectionType,
   ch3c_shape : CsCh3cShape,
   ch3c_jump : 8,
-  companion_signal_enable : Enable,
+  _reserved_ : 8,
 }
 
 packet LeCsCreateConfigStatus : CommandStatus (command_op_code = LE_CS_CREATE_CONFIG) {
@@ -5212,15 +5225,6 @@ struct CsPreferredPeerAntenna {
   use_third_ordered_antenna_element : 1,
   use_fourth_ordered_antenna_element : 1,
   _reserved_ : 4,
-}
-
-enum CsSnrControl : 8 {
-  ADJUST_18_DB = 0x00,
-  ADJUST_21_DB = 0x01,
-  ADJUST_24_DB = 0x02,
-  ADJUST_27_DB = 0x03,
-  ADJUST_30_DB = 0x04,
-  NOT_APPLIED = 0xFF,
 }
 
 packet LeCsSetProcedureParameters  : DistanceMeasurementCommand (op_code = LE_CS_SET_PROCEDURE_PARAMETERS) {
@@ -6796,6 +6800,7 @@ packet LeCsReadRemoteSupportedCapabilitiesComplete : LeMetaEvent (subevent_code 
   optional_t_fcs_times_supported : CsOptionalTFcsTimesSupported,
   optional_t_pm_times_supported : CsOptionalTPmTimesSupported,
   t_sw_time_supported : 8,
+  tx_snr_capability : CsSnrControl,
 }
 
 packet LeCsReadRemoteFaeTableComplete : LeMetaEvent (subevent_code = LE_CS_READ_REMOTE_FAE_TABLE_COMPLETE) {
@@ -6849,11 +6854,16 @@ packet LeCsConfigComplete : LeMetaEvent (subevent_code = LE_CS_CONFIG_COMPLETE) 
   channel_selection_type : CsChannelSelectionType,
   ch3c_shape : CsCh3cShape,
   ch3c_jump : 8,
-  companion_signal_enable : Enable,
+  _reserved_ : 8,
   t_ip1_time : 8,
   t_ip2_time : 8,
   t_fcs_time : 8,
   t_pm_time : 8,
+}
+
+enum CsProcedureState : 8 {
+  DISABLED = 0x00,
+  ENABLED = 0x01,
 }
 
 packet LeCsProcedureEnableComplete : LeMetaEvent (subevent_code = LE_CS_PROCEDURE_ENABLE_COMPLETE) {
@@ -6871,6 +6881,7 @@ packet LeCsProcedureEnableComplete : LeMetaEvent (subevent_code = LE_CS_PROCEDUR
   event_interval : 16,
   procedure_interval : 16,
   procedure_count : 16,
+  max_procedure_len : 16,
 }
 
 struct LeCsMode0InitatorData {
