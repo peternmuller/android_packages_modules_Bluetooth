@@ -94,7 +94,7 @@ void get_cis_count(LeAudioContextType context_type,
           }
         }
       } else {
-        if(context_type == LeAudioContextType::LIVE) {
+        if (context_type == LeAudioContextType::LIVE) {
           out_cis_count_unidir_source = expected_device_cnt;
         } else {
           out_cis_count_unidir_sink = expected_device_cnt;
@@ -139,7 +139,7 @@ void get_cis_count(LeAudioContextType context_type,
           }
         }
       } else {
-        if(context_type == LeAudioContextType::LIVE) {
+        if (context_type == LeAudioContextType::LIVE) {
           out_cis_count_unidir_source = 2*expected_device_cnt;
         } else {
           out_cis_count_unidir_sink = 2*expected_device_cnt;

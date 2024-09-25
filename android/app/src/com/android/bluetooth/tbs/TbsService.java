@@ -403,7 +403,17 @@ public class TbsService extends ProfileService {
     @VisibleForTesting
     void callStateChanged(int ccid, UUID callId, int state) {
         Log.d(TAG, "callStateChanged: ccid=" + ccid + " callId=" + callId + " state=" + state);
-
+        if (Utils.isTmapPtsTestMode()) {
+          if (state == BluetoothLeCall.STATE_ACTIVE) {
+           Log.d(TAG, "CP: sending Dummy incoming call state");
+           mTbsGeneric.callStateChanged(ccid, callId, BluetoothLeCall.STATE_INCOMING);
+          } else if (state == BluetoothLeCall.STATE_ALERTING) {
+             Log.d(TAG, "not sending alerting state");
+             Log.d(TAG, "sending active state as it is reading for active");
+             mTbsGeneric.callStateChanged(ccid, callId, BluetoothLeCall.STATE_ACTIVE);
+             return;
+          }
+        }
         mTbsGeneric.callStateChanged(ccid, callId, state);
     }
 
