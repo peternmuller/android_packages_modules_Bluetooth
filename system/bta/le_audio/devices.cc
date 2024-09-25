@@ -408,6 +408,7 @@ bool LeAudioDevice::ConfigureAses(
       ase->qos_config.max_sdu_size = ase_cfg.qos.maxSdu;
       ase->qos_config.retrans_nb = ase_cfg.qos.retransmission_number;
       ase->qos_config.max_transport_latency = ase_cfg.qos.max_transport_latency;
+      ase->is_vsmetadata_available = false;
 
       SetMetadataToAse(ase, metadata_context_types, ccid_lists);
     }
