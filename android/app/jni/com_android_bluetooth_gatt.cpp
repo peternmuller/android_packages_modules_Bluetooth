@@ -1323,9 +1323,7 @@ static void initializeNative(JNIEnv* env, jobject object) {
     return;
   }
 
-  if (com::android::bluetooth::flags::scan_manager_refactor()) {
-    btIf->start_rust_module();
-  }
+  btIf->start_rust_module();
 
   sGattIf->advertiser->RegisterCallbacks(
       JniAdvertisingCallbacks::GetInstance());
@@ -1340,9 +1338,7 @@ static void cleanupNative(JNIEnv* env, jobject /* object */) {
 
   if (!btIf) return;
 
-  if (com::android::bluetooth::flags::scan_manager_refactor()) {
-    btIf->stop_rust_module();
-  }
+  btIf->stop_rust_module();
 
   if (sGattIf != NULL) {
     sGattIf->cleanup();
