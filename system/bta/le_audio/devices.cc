@@ -924,7 +924,12 @@ uint8_t LeAudioDevice::GetSupportedAudioChannelCounts(uint8_t direction) const {
 }
 
 bool LeAudioDevice::isLeXDevice(void) const{
+  if (!osi_property_get_bool("persist.vendor.service.bt.adv_transport", false)){
+    log::warn("Platform does not support LeX");
+    return false;
+  }
   if (snk_pacs_.empty()) {
+    log::warn("No sink pacs");
     return false;
   }
   for (const auto& pac_tuple : snk_pacs_) {
