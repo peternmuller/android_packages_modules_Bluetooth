@@ -1260,7 +1260,7 @@ class LeAudioBroadcasterImpl : public LeAudioBroadcaster, public BigCallbacks {
         return;
       }
 
-      instance->le_audio_source_hal_client_->ConfirmStreamingRequest();
+      instance->le_audio_source_hal_client_->ConfirmStreamingRequest(false);
     }
 
     virtual void OnAudioMetadataUpdate(
