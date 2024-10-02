@@ -1201,12 +1201,14 @@ class LeAudioClientImpl : public LeAudioClient {
         bluetooth::le_audio::btle_audio_codec_index_t::LE_AUDIO_CODEC_INDEX_SOURCE_APTX_LEX) {
       group->DisableLeXCodec(false);
       log::debug("Enabling LeX Codec");
-      group->UpdateAudioSetConfigurationCache(group->GetConfigurationContextType());
+      group->UpdateAudioSetConfigurationCache(LeAudioContextType::MEDIA);
+      group->UpdateAudioSetConfigurationCache(LeAudioContextType::CONVERSATIONAL);
     } else if (output_codec_config.codec_type ==
         bluetooth::le_audio::btle_audio_codec_index_t::LE_AUDIO_CODEC_INDEX_SOURCE_DEFAULT) {
       group->DisableLeXCodec(true);
       log::debug("Disabling LeX Codec");
-      group->UpdateAudioSetConfigurationCache(group->GetConfigurationContextType());
+      group->UpdateAudioSetConfigurationCache(LeAudioContextType::MEDIA);
+      group->UpdateAudioSetConfigurationCache(LeAudioContextType::CONVERSATIONAL);
     } else {
       log::debug("Disallow param changes for LC3 triggered by ALS");
       return;
