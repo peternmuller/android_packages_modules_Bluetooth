@@ -539,7 +539,7 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
                     CsConfigRttType::RTT_WITH_128_BIT_RANDOM_SEQUENCE, CsSyncPhy::LE_1M_PHY,
                     channel_map, kChannelMapRepetition, CsChannelSelectionType::TYPE_3B,
                     CsCh3cShape::HAT_SHAPE, kCh3cJump),
-            handler_->BindOnce(check_status<LeCsCreateConfigStatusView>));
+            handler_->BindOnceOn(this, &impl::on_cs_setup_command_status_cb, connection_handle));
   }
 
   void send_le_cs_set_procedure_parameters(uint16_t connection_handle) {
