@@ -246,7 +246,7 @@ struct codec_manager_impl {
       if (stream_params.get(direction).delay != 0xFFFF)
         delay = stream_params.get(direction).delay;
       else
-	delay = delays_ms.get(direction);
+        delay = delays_ms.get(direction);
 
       bluetooth::le_audio::offload_config unicast_cfg = {
           .stream_map = (stream_map.is_initial ||
