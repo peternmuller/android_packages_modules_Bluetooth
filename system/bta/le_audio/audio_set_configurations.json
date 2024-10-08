@@ -1472,7 +1472,7 @@
         },
         {
             "name": "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs_R5_L20-Two-OneChan_SrcAse-Lc3_16_2_40octs_R5_L10_1",
-            "codec_config_name": "Two_Two-OneChan-SnkAse-Lc3_48_2_155octs-Two-OneChan_SrcAse-Lc3_16_2_40octs",
+            "codec_config_name": "VND_Two-OneChan-SnkAse-Lc3_48_2_155octs-Two-OneChan_SrcAse-Lc3_16_2_40octs",
             "qos_config_name": [
                 "VND_QoS_Config_R5_L20",
                 "VND_QoS_Config_R5_L10"
