@@ -171,6 +171,8 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
     @GuardedBy("mLock")
     private BluetoothDevice mPendingActiveDevice = null;
 
+    private BluetoothDevice mPendingFallbackDevice = null;
+
     private BluetoothDevice mClassicDeviceToBeActivated = null;
     private BluetoothDevice mClassicDeviceNotToBeActivated = null;
 
@@ -276,6 +278,11 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
                 mHandler.post(() -> handleHearingAidActiveDeviceChanged(device));
                 break;
         }
+    }
+
+    public BluetoothDevice getA2dpFallbackDevice(){
+        Log.d(TAG, "mPendingFallbackDevice:" + mPendingFallbackDevice);
+        return mPendingFallbackDevice;
     }
 
     private void handleAdapterStateChanged(int currentState) {
@@ -834,7 +841,6 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
                         && mDbManager.getProfileConnectionPolicy(device, BluetoothProfile.A2DP)
                                 == BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
                     mClassicDeviceToBeActivated = device;
-                    setA2dpActiveDevice(device);
                     mHandler.postDelayed(
                             () -> mClassicDeviceToBeActivated = null,
                             mClassicDeviceToBeActivated,
@@ -1316,9 +1322,18 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
         BluetoothDevice device = mDbManager.getMostRecentlyConnectedDevicesInList(connectedDevices);
         if (device != null) {
             if (mAudioManager.getMode() == AudioManager.MODE_NORMAL) {
+                Log.d(TAG, "device: " + device + ",a2dpFallbackDevice: " + a2dpFallbackDevice);
                 if (Objects.equals(a2dpFallbackDevice, device)) {
                     Log.d(TAG, "Found an A2DP fallback device: " + device);
-                    setA2dpActiveDevice(device);
+                    if (Objects.equals(a2dpFallbackDevice, headsetFallbackDevice)) {
+                        mPendingFallbackDevice = a2dpFallbackDevice;
+                        Log.d(TAG, "Setting the Active device as null, mPendingFallbackDevice: " +
+                                                                        mPendingFallbackDevice);
+                        setA2dpActiveDevice(null, true);
+                    } else {
+                        Log.d(TAG, "Setting Active device: " + device);
+                        setA2dpActiveDevice(device);
+                    }
                     if (Objects.equals(headsetFallbackDevice, device)) {
                         setHfpActiveDevice(device);
                     } else {
@@ -1343,6 +1358,7 @@ public class ActiveDeviceManager implements AdapterService.BluetoothStateCallbac
                     setHearingAidActiveDevice(null, true);
                 }
             } else {
+                Log.d(TAG, "device: " + device + ", headsetFallbackDevice: " + headsetFallbackDevice);
                 if (Objects.equals(headsetFallbackDevice, device)) {
                     Log.d(TAG, "Found a HFP fallback device: " + device);
                     setHfpActiveDevice(device);
