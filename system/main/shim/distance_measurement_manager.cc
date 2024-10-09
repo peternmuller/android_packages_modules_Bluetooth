@@ -23,7 +23,7 @@
 #include "main/shim/entry.h"
 #include "main/shim/helpers.h"
 #include "stack/include/acl_api.h"
-
+#include "stack/include/main_thread.h"
 using bluetooth::hci::DistanceMeasurementErrorCode;
 using bluetooth::hci::DistanceMeasurementMethod;
 
@@ -39,8 +39,10 @@ public:
   void Init() {
     // Register callback
     bluetooth::shim::GetDistanceMeasurementManager()->RegisterDistanceMeasurementCallbacks(this);
-    bluetooth::ras::GetRasServer()->RegisterCallbacks(this);
-    bluetooth::ras::GetRasClient()->RegisterCallbacks(this);
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasServer::RegisterCallbacks,
+                                     base::Unretained(bluetooth::ras::GetRasServer()),this));
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasClient::RegisterCallbacks,
+                                     base::Unretained(bluetooth::ras::GetRasClient()), this));
   }
 
   /**
@@ -48,7 +50,8 @@ public:
    * @param bd_addr could be random, rpa or identity address.
    * @return BLE ACL handle
    */
-  uint16_t GetConnectionHandleAndRole(const RawAddress& bd_addr, bluetooth::hci::Role* hci_role = nullptr) {
+  static uint16_t GetConnectionHandleAndRole(const RawAddress& bd_addr,
+                                             bluetooth::hci::Role* hci_role = nullptr) {
     tBTM_SEC_DEV_REC* p_sec_dev_rec = btm_find_dev(bd_addr);
     if (p_sec_dev_rec != nullptr) {
       if (hci_role != nullptr) {
@@ -122,13 +125,15 @@ public:
   }
 
   void OnRasFragmentReady(bluetooth::hci::Address address, uint16_t procedure_counter, bool is_last,
-                          std::vector<uint8_t> raw_data) {
-    bluetooth::ras::GetRasServer()->PushProcedureData(bluetooth::ToRawAddress(address),
-                                                      procedure_counter, is_last, raw_data);
+                          std::vector<uint8_t> raw_data) override {
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasServer::PushProcedureData,
+                                     base::Unretained(bluetooth::ras::GetRasServer()),
+                                     bluetooth::ToRawAddress(address), procedure_counter, is_last,
+                                     std::move(raw_data)));
   }
 
   void OnVendorSpecificCharacteristics(std::vector<bluetooth::hal::VendorSpecificCharacteristic>
-                                               vendor_specific_characteristics) {
+                                               vendor_specific_characteristics) override {
     std::vector<bluetooth::ras::VendorSpecificCharacteristic> ras_vendor_specific_characteristics;
     for (auto& characteristic : vendor_specific_characteristics) {
       bluetooth::ras::VendorSpecificCharacteristic vendor_specific_characteristic;
@@ -137,13 +142,14 @@ public:
       vendor_specific_characteristic.value_ = characteristic.value_;
       ras_vendor_specific_characteristics.emplace_back(vendor_specific_characteristic);
     }
-    bluetooth::ras::GetRasServer()->SetVendorSpecificCharacteristic(
-            ras_vendor_specific_characteristics);
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasServer::SetVendorSpecificCharacteristic,
+                                     base::Unretained(bluetooth::ras::GetRasServer()),
+                                     std::move(ras_vendor_specific_characteristics)));
   }
 
   void OnVendorSpecificReply(bluetooth::hci::Address address,
                              std::vector<bluetooth::hal::VendorSpecificCharacteristic>
-                                     vendor_specific_characteristics) {
+                                     vendor_specific_characteristics) override {
     std::vector<bluetooth::ras::VendorSpecificCharacteristic> ras_vendor_specific_characteristics;
     for (auto& characteristic : vendor_specific_characteristics) {
       bluetooth::ras::VendorSpecificCharacteristic vendor_specific_characteristic;
@@ -152,13 +158,16 @@ public:
       vendor_specific_characteristic.value_ = characteristic.value_;
       ras_vendor_specific_characteristics.emplace_back(vendor_specific_characteristic);
     }
-    bluetooth::ras::GetRasClient()->SendVendorSpecificReply(bluetooth::ToRawAddress(address),
-                                                            ras_vendor_specific_characteristics);
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasClient::SendVendorSpecificReply,
+                                     base::Unretained(bluetooth::ras::GetRasClient()),
+                                     bluetooth::ToRawAddress(address),
+                                     std::move(ras_vendor_specific_characteristics)));
   }
 
-  void OnHandleVendorSpecificReplyComplete(bluetooth::hci::Address address, bool success) {
-    bluetooth::ras::GetRasServer()->HandleVendorSpecificReplyComplete(
-            bluetooth::ToRawAddress(address), success);
+  void OnHandleVendorSpecificReplyComplete(bluetooth::hci::Address address, bool success) override {
+    do_in_main_thread(FROM_HERE, base::BindOnce(&bluetooth::ras::RasServer::HandleVendorSpecificReplyComplete,
+                                     base::Unretained(bluetooth::ras::GetRasServer()),
+                                     bluetooth::ToRawAddress(address), success));
   }
 
   // Callbacks of bluetooth::ras::RasServerCallbacks
