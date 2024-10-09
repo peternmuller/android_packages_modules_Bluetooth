@@ -1791,6 +1791,17 @@ public class LeAudioService extends ProfileService {
                 mCallAudio.onConnStateChange(device, newState, mCallAudio.LE_AUDIO_VOICE);
             }
         }
+        int bondState = BluetoothDevice.BOND_NONE;
+        if (mAdapterService != null) {
+            bondState = mAdapterService.getBondState(device);
+        }
+        if (newState == BluetoothProfile.STATE_DISCONNECTED &&
+                                          bondState == BluetoothDevice.BOND_NONE) {
+            Log.d(TAG, device + " is unbond. Remove state machine");
+            removeStateMachine(device);
+            removeAuthorizationInfoForRelatedProfiles(device);
+        }
+
         notifyConnectionStateChanged(device, newState, prevState);
     }
 
@@ -3976,7 +3987,8 @@ public class LeAudioService extends ProfileService {
         }
 
         int bondState = mAdapterService.getBondState(device);
-        if (bondState == BluetoothDevice.BOND_NONE) {
+        if (bondState == BluetoothDevice.BOND_NONE &&
+            getConnectionState(device) == BluetoothProfile.STATE_DISCONNECTED) {
             Log.d(TAG, device + " is unbond. Remove state machine");
 
             removeStateMachine(device);
