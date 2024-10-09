@@ -940,12 +940,20 @@ static void bta_ag_sco_event(tBTA_AG_SCB* p_scb, uint8_t event) {
           break;
 
         case BTA_AG_SCO_SHUTDOWN_E:
-          /* If not opening scb, just close it */
-          if (p_scb != p_sco->p_curr_scb) {
-            /* remove listening connection */
-            bta_ag_remove_sco(p_scb, false);
-          } else
-            p_sco->state = BTA_AG_SCO_SHUTTING_ST;
+          /* remove listening connection */
+          bta_ag_remove_sco(p_scb, false);
+
+          /* If last SCO instance then finish shutting down */
+          if (!bta_ag_other_scb_open(p_scb)) {
+            p_sco->state = BTA_AG_SCO_SHUTDOWN_ST;
+          } else if (p_scb == p_sco->p_curr_scb) {
+            /* If current instance shutdown, move to listening */
+            p_sco->state = BTA_AG_SCO_LISTEN_ST;
+          }
+
+          if (p_scb == p_sco->p_curr_scb) {
+            p_sco->p_curr_scb = NULL;
+          }
 
           break;
 
