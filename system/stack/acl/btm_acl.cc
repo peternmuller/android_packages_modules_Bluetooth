@@ -2115,6 +2115,11 @@ bool BTM_BLE_IS_RESOLVE_BDA(const RawAddress& x) {
   return ((x.address)[0] & BLE_RESOLVE_ADDR_MASK) == BLE_RESOLVE_ADDR_MSB;
 }
 
+bool BTM_BLE_IS_RANDOM_STATIC_BDA(const RawAddress& x) {
+  return ((x.address)[0] & BLE_RANDOM_STATIC_ADDR_MSB_MASK) ==
+         BLE_RANDOM_STATIC_ADDR_MSB;
+}
+
 bool acl_refresh_remote_address(const RawAddress& identity_address,
                                 tBLE_ADDR_TYPE identity_address_type,
                                 const RawAddress& bda,
