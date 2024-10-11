@@ -2819,7 +2819,9 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
           return;
         }
 
-        if (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING) {
+        if (group->GetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING ||
+            (group->GetTargetState() == AseState::BTA_LE_AUDIO_ASE_STATE_STREAMING &&
+                                       group->cig.GetState() == CigState::CREATED)) {
           /* We are here because of the reconnection of the single device. */
           PrepareAndSendEnable(leAudioDevice);
           return;
