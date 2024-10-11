@@ -635,10 +635,33 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
       return;
     }
 
+    if (!cs_trackers_[connection_handle].measurement_ongoing) {
+      log::error("safe guard, error state, no local measurement request.");
+      if (cs_trackers_[connection_handle].repeating_alarm) {
+        cs_trackers_[connection_handle].repeating_alarm->Cancel();
+      }
+      return;
+    }
+
     hci_layer_->EnqueueCommand(
             LeCsProcedureEnableBuilder::Create(connection_handle,
                                                cs_trackers_[connection_handle].config_id, enable),
-            handler_->BindOnceOn(this, &impl::on_cs_setup_command_status_cb, connection_handle));
+            handler_->BindOnceOn(this, &impl::on_cs_procedure_enable_command_status_cb,
+                                 connection_handle, enable));
+  }
+
+  void on_cs_procedure_enable_command_status_cb(uint16_t connection_handle, Enable enable,
+                                                CommandStatusView status_view) {
+    ErrorCode status = status_view.GetStatus();
+    // controller may send error if the procedure instance has finished all scheduled procedures.
+    if (enable == Enable::DISABLED && status == ErrorCode::COMMAND_DISALLOWED) {
+      log::info("ignored the procedure disable command disallow error.");
+      if (cs_trackers_.find(connection_handle) != cs_trackers_.end()) {
+        reset_tracker_on_stopped(&cs_trackers_[connection_handle]);
+      }
+    } else {
+      on_cs_setup_command_status_cb(connection_handle, status_view);
+    }
   }
 
   void on_cs_setup_command_status_cb(uint16_t connection_handle, CommandStatusView status_view) {
