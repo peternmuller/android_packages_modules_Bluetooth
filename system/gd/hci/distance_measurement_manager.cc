@@ -219,7 +219,8 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
             duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
     distance_measurement_callbacks_->OnDistanceMeasurementResult(
             cs_trackers_[connection_handle].address, ranging_result.result_meters_ * 100, 0.0, -1,
-            -1, -1, -1, elapsedRealtimeNanos, DistanceMeasurementMethod::METHOD_CS);
+            -1, -1, -1, elapsedRealtimeNanos, ranging_result.confidence_level_,
+            DistanceMeasurementMethod::METHOD_CS);
   }
 
   ~impl() {}
@@ -1568,7 +1569,7 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
     long elapsedRealtimeNanos =
             duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
     distance_measurement_callbacks_->OnDistanceMeasurementResult(
-            address, distance * 100, distance * 100, -1, -1, -1, -1, elapsedRealtimeNanos,
+            address, distance * 100, distance * 100, -1, -1, -1, -1, elapsedRealtimeNanos, -1,
             DistanceMeasurementMethod::METHOD_RSSI);
   }
 
