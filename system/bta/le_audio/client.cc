@@ -1158,6 +1158,7 @@ class LeAudioClientImpl : public LeAudioClient {
         log::warn("group {} was about to stream, but got canceled: {}",
                   group_id, ToString(group->GetTargetState()));
         group->SetTargetState(AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);
+        CancelStreamingRequest();
       } else {
         log::warn(", group {} already stopped: {}", group_id,
                   ToString(group->GetState()));
