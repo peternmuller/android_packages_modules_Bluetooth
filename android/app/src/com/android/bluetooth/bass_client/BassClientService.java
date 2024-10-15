@@ -2551,6 +2551,20 @@ public class BassClientService extends ProfileService {
                     message.obj = sourceMetadata;
                     message.arg1 = sourceId;
                     stateMachine.sendMessage(message);
+
+                    if (code != null && code.length != 0) {
+                        sEventLogger.logd(
+                                TAG,
+                                "Set Broadcast Code (Switch Source context): "
+                                        + ("device: " + device)
+                                        + (", broadcastId: " + sourceMetadata.getBroadcastId())
+                                        + (", broadcastName: " + sourceMetadata.getBroadcastName()));
+
+                        message = stateMachine.obtainMessage(BassClientStateMachine.SET_BCAST_CODE);
+                        message.obj = sourceMetadata;
+                        message.arg1 = BassClientStateMachine.ARGTYPE_METADATA;
+                        stateMachine.sendMessage(message);
+                    }
                 } else {
                     mCallbacks.notifySourceAddFailed(
                             device,
