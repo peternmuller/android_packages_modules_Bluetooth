@@ -1684,13 +1684,18 @@ public class HeadsetService extends ProfileService {
                                         + mActiveDevice
                                         + " with status code "
                                         + connectStatus);
-                        if (previousActiveDevice == null) {
-                            removeActiveDevice();
+                        if (!shouldPersistAudio()) {
+                            Log.w(TAG, "setActiveDevice: connectAudio shouldn't be called.");
+                            return true;
                         } else {
-                            mActiveDevice = previousActiveDevice;
-                            mNativeInterface.setActiveDevice(previousActiveDevice);
+                            if (previousActiveDevice == null) {
+                                removeActiveDevice();
+                            } else {
+                                mActiveDevice = previousActiveDevice;
+                                mNativeInterface.setActiveDevice(previousActiveDevice);
+                            }
+                            return false;
                         }
-                        return false;
                     }
                 }
             } else {
@@ -1940,10 +1945,10 @@ public class HeadsetService extends ProfileService {
                 Log.w(TAG, "stopScoUsingVirtualVoiceCall: virtual call not started");
                 return false;
             }
-            mVirtualCallStarted = false;
             mSendIndicatorsAfterSuspend = false;
             // 2. Send virtual phone state changed to close SCO
             phoneStateChanged(0, 0, HeadsetHalConstants.CALL_STATE_IDLE, "", 0, "", true);
+            mVirtualCallStarted = false;
         }
         return true;
     }
