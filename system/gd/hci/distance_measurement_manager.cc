@@ -1004,14 +1004,6 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
         distance_measurement_callbacks_->OnDistanceMeasurementStarted(live_tracker->address,
                                                                       METHOD_CS);
       }
-      // cs role switch from requester to responder, may reset the config if conflict.
-      if (!live_tracker->local_start &&
-          cs_requester_trackers_.find(connection_handle) != cs_requester_trackers_.end() &&
-          cs_requester_trackers_[connection_handle].config_id == live_tracker->config_id) {
-        log::debug("config id {} from remote is the same as the cached local, reset config_set.",
-                   cs_requester_trackers_[connection_handle].config_id);
-        cs_requester_trackers_[connection_handle].config_set = false;
-      }
     } else if (event_view.GetState() == Enable::DISABLED) {
       uint8_t valid_requester_states = static_cast<uint8_t>(CsTrackerState::STARTED);
       uint8_t valid_responder_states = static_cast<uint8_t>(CsTrackerState::STARTED);
