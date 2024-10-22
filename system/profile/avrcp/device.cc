@@ -112,9 +112,34 @@ bool Device::IsActive() const {
   return address_ == a2dp_interface_->active_peer();
 }
 
+bool Device::IsPendingPlay() {
+  log::info("IsPendingPlay_: {}", IsPendingPlay_);
+  return IsPendingPlay_;
+}
+
 bool Device::IsInSilenceMode() const {
   return a2dp_interface_->is_peer_in_silence_mode(address_);
 }
+
+void Device::HandlePendingPlay() {
+  media_interface_->GetPlayStatus(base::Bind(
+      [](base::WeakPtr<Device> d, PlayStatus s) {
+    if (!d || !bluetooth::headset::IsCallIdle() ||
+        s.state == PlayState::PLAYING || !d->IsActive()) {
+        d->IsPendingPlay_ = false;
+      return;
+    }
+
+    if (d->IsPendingPlay()) {
+      log::info("Send PLAY to {}", d->address_);
+      d->media_interface_->SendKeyEvent(uint8_t(OperationID::PLAY), KeyState::PUSHED);
+      d->IsPendingPlay_ = false;
+    }
+  },
+  weak_ptr_factory_.GetWeakPtr()));
+  return;
+}
+
 
 void Device::VendorPacketHandler(uint8_t label,
                                  std::shared_ptr<VendorPacket> pkt) {
@@ -1033,10 +1058,13 @@ void Device::MessageReceived(uint8_t label, std::shared_ptr<Packet> pkt) {
                   log::info(
                       "Skipping sendKeyEvent since music is already playing");
                   return;
+                } else {
+                  log::info("cache PLAY pending cmd", d->address_);
+                  d->IsPendingPlay_ = true;
                 }
+              } else {
+                d->media_interface_->SendKeyEvent(uint8_t(OperationID::PLAY), KeyState::PUSHED);
               }
-
-              d->media_interface_->SendKeyEvent(uint8_t(OperationID::PLAY), KeyState::PUSHED);
             },
             weak_ptr_factory_.GetWeakPtr()));
         return;
