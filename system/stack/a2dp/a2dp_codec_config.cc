@@ -1687,7 +1687,7 @@ bool A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported() {
 void A2DP_SetAptxADSupport(
   const std::vector<btav_a2dp_codec_config_t> offload_enabled_codecs_config,
   uint8_t soc_add_on_features_len, bool isSplitTxSupported,
-  bool isSplitA2dpSinkSupported) {
+  bool isSplitA2dpSourceSupported) {
   log::info("");
   char adaptive_value[PROPERTY_VALUE_MAX] = {'\0'};
   osi_property_get("persist.vendor.qcom.bluetooth.aptxadaptiver2_1_support",
@@ -1715,9 +1715,9 @@ void A2DP_SetAptxADSupport(
           btav_a2dp_codec_index_t codec_index = static_cast<btav_a2dp_codec_index_t>(i);
     switch (codec_index) {
       case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
-        if (((soc_add_on_features_len == 0) || isSplitA2dpSinkSupported) &&
+        if (((soc_add_on_features_len == 0) || isSplitA2dpSourceSupported) &&
             check_mm_supports_offload_codec (offload_enabled_codecs_config,
-                          codec_index)) {
+                                                                codec_index)) {
           log::debug("Setting aptx_adaptive_offload");
           aptx_adaptive_offload = true;
           aptx_adaptive_sw = false;
