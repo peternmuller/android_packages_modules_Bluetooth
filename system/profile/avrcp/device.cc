@@ -978,15 +978,47 @@ void Device::GetElementAttributesResponse(
 
   last_song_info_ = info;
 
+  log::verbose("attributes_requested size: {}", attributes_requested.size());
   if (attributes_requested.size() != 0) {
     for (const auto& attribute : attributes_requested) {
+      log::verbose("requested attribute: {}", AttributeText(attribute));
       if (info.attributes.find(attribute) != info.attributes.end()) {
-        response->AddAttributeEntry(*info.attributes.find(attribute));
+        if (info.attributes.find(attribute)->value().empty()) {
+          log::verbose("empty attribute found");
+          response->AddAttributeEntry(attribute, "unavailable");
+        } else {
+          response->AddAttributeEntry(*info.attributes.find(attribute));
+        }
+      } else {
+        //we send a response even for attributes that we don't have a value for.
+        log::verbose("attribute not found");
+        response->AddAttributeEntry(attribute, "unavailable");
       }
     }
   } else {  // zero attributes requested which means all attributes requested
-    for (const auto& attribute : info.attributes) {
-      response->AddAttributeEntry(attribute);
+    std::vector<Attribute> all_attributes = {Attribute::TITLE,
+                                             Attribute::ARTIST_NAME,
+                                             Attribute::ALBUM_NAME,
+                                             Attribute::TRACK_NUMBER,
+                                             Attribute::TOTAL_NUMBER_OF_TRACKS,
+                                             Attribute::GENRE,
+                                             Attribute::PLAYING_TIME,
+                                             Attribute::DEFAULT_COVER_ART};
+    for (const auto& attribute : all_attributes) {
+      if (info.attributes.find(attribute) != info.attributes.end()) {
+        log::verbose("requested attribute: {}", AttributeText(attribute));
+        if (info.attributes.find(attribute)->value().empty()) {
+          log::verbose("empty attribute found");
+          response->AddAttributeEntry(attribute, "unavailable");
+        } else {
+          response->AddAttributeEntry(*info.attributes.find(attribute));
+        }
+      } else {
+        // If all attributes were requested, we send a response even for attributes that we don't
+        // have a value for.
+        log::verbose("attribute not found");
+        response->AddAttributeEntry(attribute, "unavailable");
+      }
     }
   }
 
@@ -1692,7 +1724,7 @@ void Device::GetVFSListResponse(uint8_t label,
       auto title =
           song.attributes.find(Attribute::TITLE) != song.attributes.end()
               ? song.attributes.find(Attribute::TITLE)->value()
-              : "No Song Info";
+              : std::string();
       MediaElementItem song_item(vfs_ids_.get_uid(song.media_id), title,
                                  std::set<AttributeEntry>());
 
@@ -1735,7 +1767,7 @@ void Device::GetNowPlayingListResponse(
 
     auto title = song.attributes.find(Attribute::TITLE) != song.attributes.end()
                      ? song.attributes.find(Attribute::TITLE)->value()
-                     : "No Song Info";
+                     : std::string();
 
     MediaElementItem item(i + 1, title, std::set<AttributeEntry>());
     if (pkt->GetNumAttributes() == 0x00) {
