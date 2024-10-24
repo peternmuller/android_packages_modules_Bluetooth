@@ -1462,7 +1462,12 @@ class HeadsetStateMachine extends StateMachine {
                     Log.w(TAG, "call is in ringing/present, suspending a2dp/le audio");
                     mSystemInterface.getAudioManager().setA2dpSuspended(true);
                     if (isAtLeastU()) {
-                        mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                      BluetoothDevice btDevice = mAdapterService.getActiveDeviceManager()
+                                                    .fetchLeHearingAidActiveDevice();
+                      if (btDevice == null) {
+                          Log.w(TAG,"no le hearing aid device is active, suspend le audio");
+                         mSystemInterface.getAudioManager().setLeAudioSuspended(true);
+                      }
                     }
                 }
                 // Remove pending connection attempts that were deferred during the pending
