@@ -715,6 +715,12 @@ class LeAudioClientImpl : public LeAudioClient {
           kLogAfSuspendForReconfig + "LocalSource",
           "r_state: " + ToString(audio_receiver_state_) +
               "s_state: " + ToString(audio_sender_state_));
+      if (audio_receiver_state_ == AudioState::IDLE &&
+          (configuration_context_type_ == LeAudioContextType::CONVERSATIONAL ||
+          configuration_context_type_ == LeAudioContextType::GAME)) {
+        log::info("Suspended for both directions if switch to voice or game context");
+        le_audio_sink_hal_client_->SuspendedForReconfiguration();
+      }
       le_audio_source_hal_client_->SuspendedForReconfiguration();
     }
     if (audio_receiver_state_ > AudioState::IDLE) {
@@ -6305,6 +6311,14 @@ class LeAudioClientImpl : public LeAudioClient {
     auto group = aseGroups_.FindById(active_group_id_);
 
     if (audio_sender_state_ >= AudioState::READY_TO_START) {
+      if (audio_receiver_state_ < AudioState::READY_TO_START &&
+          (configuration_context_type_ == LeAudioContextType::CONVERSATIONAL ||
+          configuration_context_type_ == LeAudioContextType::GAME)) {
+        log::info("Reconfiguration complete for both directions if switch to "
+                "voice or game context");
+        previously_active_directions |=
+            bluetooth::le_audio::types::kLeAudioDirectionSource;
+      }
       previously_active_directions |=
           bluetooth::le_audio::types::kLeAudioDirectionSink;
     }
