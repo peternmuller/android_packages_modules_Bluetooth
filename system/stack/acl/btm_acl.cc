@@ -1595,7 +1595,19 @@ bool BTM_IsRemoteVersionReceived(const RawAddress& addr) {
     return false;
   }
 
-  return p_acl->remote_version_received;
+  if (p_acl->remote_version_received) {
+    log::warn("Remote version info on LE transport: {}",
+               p_acl->remote_version_received);
+    return p_acl->remote_version_received;
+  } else {
+    p_acl = internal_.btm_bda_to_acl(addr, BT_TRANSPORT_BR_EDR);
+    if (p_acl == nullptr) {
+      return false;
+    }
+    log::warn("Remote version info is {}", p_acl->remote_version_received);
+    return p_acl->remote_version_received;
+  }
+
 }
 
 /*******************************************************************************
