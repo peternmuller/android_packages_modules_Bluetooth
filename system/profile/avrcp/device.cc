@@ -1121,13 +1121,15 @@ void Device::MessageReceived(uint8_t label, std::shared_ptr<Packet> pkt) {
       }
       log::verbose("fast_forwarding_: {}, fast_rewinding_: {}", fast_forwarding_, fast_rewinding_);
       media_interface_->GetPlayStatus(base::Bind(
-          &Device::PlaybackStatusNotificationResponse,
-          weak_ptr_factory_.GetWeakPtr(), play_status_changed_.second, false));
-
-      if (IsActive()) {
-        media_interface_->SendKeyEvent(pass_through_packet->GetOperationId(),
-                                       pass_through_packet->GetKeyState());
-      }
+          [](base::WeakPtr<Device> d, std::shared_ptr<PassThroughPacket> packet, PlayStatus s) {
+            d->PlaybackStatusNotificationResponse(d->play_status_changed_.second, false, s);
+            if (d->IsActive()) {
+              log::verbose("SendKeyEvent: PT:{}, KEYSTATE:{}", packet->GetOperationId(),
+                  packet->GetKeyState());
+              d->media_interface_->SendKeyEvent(packet->GetOperationId(),
+                  packet->GetKeyState());
+            }
+          }, weak_ptr_factory_.GetWeakPtr(), pass_through_packet));
     } break;
     case Opcode::VENDOR: {
       auto vendor_pkt = Packet::Specialize<VendorPacket>(pkt);
