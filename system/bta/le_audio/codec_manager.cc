@@ -248,11 +248,11 @@ struct codec_manager_impl {
       else
         delay = delays_ms.get(direction);
 
+      log::debug("is_initial: {}, SupportStreamActiveApi: {}",
+            stream_map.is_initial,LeAudioHalVerifier::SupportsStreamActiveApi());
+
       bluetooth::le_audio::offload_config unicast_cfg = {
-          .stream_map = (stream_map.is_initial ||
-                         LeAudioHalVerifier::SupportsStreamActiveApi())
-                            ? stream_map.streams_map_target
-                            : stream_map.streams_map_current,
+          .stream_map = stream_map.streams_map_target,
           // TODO: set the default value 24 for now, would change it if we
           // support mode bits_per_sample
           .codec_id = id,
