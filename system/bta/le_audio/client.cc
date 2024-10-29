@@ -6048,8 +6048,18 @@ class LeAudioClientImpl : public LeAudioClient {
         LeAudioDevice* leAudioDevice = leAudioDevices_.FindByCisConnHdl(
             event->cig_id, event->cis_conn_hdl);
         if (!leAudioDevice) {
-          log::error("no bonded Le Audio Device with CIS: {}",
-                     event->cis_conn_hdl);
+          log::error("no bonded Le Audio Device with CIS: {}, CIG: {}",
+                     event->cis_conn_hdl,event->cig_id);
+          LeAudioDeviceGroup* group = aseGroups_.FindById(event->cig_id);
+          if (group) {
+            if (!group->HaveAllCisesDisconnected()) {
+              log::error("not all cis is disconnected");
+            } else {
+              groupStateMachine_->RemoveCigForGroup(group);
+            }
+          } else {
+            log::error("Invalid cig_id {}", event->cig_id);
+          }
           break;
         }
         LeAudioDeviceGroup* group =
