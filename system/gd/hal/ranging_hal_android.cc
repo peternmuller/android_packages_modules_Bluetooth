@@ -205,7 +205,7 @@ class RangingHalAndroid : public RangingHal {
     hal_raw_data.stepChannels = raw_data.step_channel_;
     hal_raw_data.initiatorData.stepTonePcts.emplace(std::vector<std::optional<StepTonePct>>{});
     hal_raw_data.reflectorData.stepTonePcts.emplace(std::vector<std::optional<StepTonePct>>{});
-    // Add tone data for mode 2
+    // Add tone data for mode 2, mode 3
     for (uint8_t i = 0; i < raw_data.tone_pct_initiator_.size(); i++) {
       StepTonePct step_tone_pct;
       for (uint8_t j = 0; j < raw_data.tone_pct_initiator_[i].size(); j++) {
@@ -228,7 +228,7 @@ class RangingHalAndroid : public RangingHal {
       step_tone_pct.toneQualityIndicator = raw_data.tone_quality_indicator_reflector_[i];
       hal_raw_data.reflectorData.stepTonePcts.value().emplace_back(step_tone_pct);
     }
-    // Add RTT data for mode 1
+    // Add RTT data for mode 1, mode 3
     if (!raw_data.toa_tod_initiators_.empty()) {
       hal_raw_data.toaTodInitiator = std::vector<int32_t>(raw_data.toa_tod_initiators_.begin(),
                                                           raw_data.toa_tod_initiators_.end());
