@@ -95,6 +95,7 @@ import com.android.bluetooth.hfp.HeadsetService;
 import com.android.bluetooth.mcp.McpService;
 import com.android.bluetooth.tbs.TbsGatt;
 import com.android.bluetooth.tbs.TbsService;
+import com.android.bluetooth.tbs.TbsGeneric;
 import com.android.bluetooth.vc.VolumeControlService;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -213,6 +214,8 @@ public class LeAudioService extends ProfileService {
     boolean mIsSourceStreamMonitorModeEnabled = false;
     boolean mLeAudioSuspended = false;
     boolean mUnicastVolumeRetainedForBroadcastTransition = false;
+    private byte[] mCachedArgs = null;
+    private int mCachedOpcode = -1;
 
     @VisibleForTesting TbsService mTbsService;
 
@@ -1977,6 +1980,14 @@ public class LeAudioService extends ProfileService {
         /* Don't expose already exposed active device */
         if (device.equals(mExposedActiveDevice)) {
             Log.d(TAG, " onAudioDevicesAdded: " + device + " is already exposed");
+            Log.d(TAG, " handleAudioDeviceAdded(): mCachedOpcode: " + mCachedOpcode);
+            TbsService tbsService = getTbsService();
+            if (tbsService != null && isSource && mCachedOpcode != -1) {
+                TbsGeneric tbsGeneric = tbsService.getTbsGeneric();
+                if (tbsGeneric != null) {
+                    tbsGeneric.processCallControlOp(device, mCachedOpcode, mCachedArgs);
+                }
+            }
             return true;
         }
 
@@ -2109,7 +2120,7 @@ public class LeAudioService extends ProfileService {
                     continue;
                 }
 
-		byte[] addressBytes = Utils.getBytesFromAddress(address);
+                byte[] addressBytes = Utils.getBytesFromAddress(address);
                 BluetoothDevice device = mAdapterService.getDeviceFromByte(addressBytes);
 
                 mExposedActiveDevice = null;
@@ -4546,6 +4557,21 @@ public class LeAudioService extends ProfileService {
         } finally {
             mGroupReadLock.unlock();
         }
+    }
+
+    public void cacheRemoteCcpOps(int opcode, byte[] args) {
+        mCachedOpcode = opcode;
+        mCachedArgs = Arrays.copyOfRange(args, 0, args.length);
+        Log.d(TAG, "cacheRemoteCcpOps(): mCachedOpcode: " + mCachedOpcode +
+                   ", args Len=" + args.length + ", args: " + args +
+                   ", cachedArgs Len=" + mCachedArgs.length +
+                   ", mCachedArgs: " + mCachedArgs);
+    }
+
+    public void clearCachedRemoteCcpOps() {
+        mCachedOpcode = -1;
+        mCachedArgs = null;
+        Log.d(TAG, "clearCachedRemoteCcpOps(): mCachedOpcode: " + mCachedOpcode);
     }
 
     /**
