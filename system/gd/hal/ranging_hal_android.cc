@@ -205,6 +205,7 @@ class RangingHalAndroid : public RangingHal {
     hal_raw_data.stepChannels = raw_data.step_channel_;
     hal_raw_data.initiatorData.stepTonePcts.emplace(std::vector<std::optional<StepTonePct>>{});
     hal_raw_data.reflectorData.stepTonePcts.emplace(std::vector<std::optional<StepTonePct>>{});
+    // Add tone data for mode 2
     for (uint8_t i = 0; i < raw_data.tone_pct_initiator_.size(); i++) {
       StepTonePct step_tone_pct;
       for (uint8_t j = 0; j < raw_data.tone_pct_initiator_[i].size(); j++) {
@@ -226,6 +227,19 @@ class RangingHalAndroid : public RangingHal {
       }
       step_tone_pct.toneQualityIndicator = raw_data.tone_quality_indicator_reflector_[i];
       hal_raw_data.reflectorData.stepTonePcts.value().emplace_back(step_tone_pct);
+    }
+    // Add RTT data for mode 1
+    if (!raw_data.toa_tod_initiators_.empty()) {
+      hal_raw_data.toaTodInitiator = std::vector<int32_t>(raw_data.toa_tod_initiators_.begin(),
+                                                          raw_data.toa_tod_initiators_.end());
+      hal_raw_data.initiatorData.packetQuality = std::vector<uint8_t>(
+              raw_data.packet_quality_initiator.begin(), raw_data.packet_quality_initiator.end());
+    }
+    if (!raw_data.tod_toa_reflectors_.empty()) {
+      hal_raw_data.todToaReflector = std::vector<int32_t>(raw_data.tod_toa_reflectors_.begin(),
+                                                          raw_data.tod_toa_reflectors_.end());
+      hal_raw_data.reflectorData.packetQuality = std::vector<uint8_t>(
+              raw_data.packet_quality_reflector.begin(), raw_data.packet_quality_reflector.end());
     }
     session_trackers_[connection_handle]->GetSession()->writeRawData(hal_raw_data);
   };
