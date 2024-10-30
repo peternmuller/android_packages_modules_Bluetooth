@@ -524,28 +524,19 @@ struct DistanceMeasurementManager::impl : bluetooth::hal::RangingHalCallback {
             kChannelMapRepetition,
             CsChannelSelectionType::TYPE_3B,
             CsCh3cShape::HAT_SHAPE,
-            kCh3cJump,
-            Enable::DISABLED),
+            kCh3cJump),
         handler_->BindOnce(check_status<LeCsCreateConfigStatusView>));
   }
 
   void send_le_cs_set_procedure_parameters(uint16_t connection_handle) {
     CsPreferredPeerAntenna preferred_peer_antenna;
     hci_layer_->EnqueueCommand(
-        LeCsSetProcedureParametersBuilder::Create(
-            connection_handle,
-            kConfigId,
-            kMaxProcedureLen,
-            kMinProcedureInterval,
-            kMaxProcedureInterval,
-            kMaxProcedureCount,
-            kMinSubeventLen,
-            kMaxSubeventLen,
-            kToneAntennaConfigSelection,
-            CsPhy::LE_1M_PHY,
-            kTxPwrDelta,
-            preferred_peer_antenna),
-        handler_->BindOnceOn(this, &impl::on_cs_set_procedure_parameters));
+            LeCsSetProcedureParametersBuilder::Create(
+                    connection_handle, kConfigId, kMaxProcedureLen, kMinProcedureInterval,
+                    kMaxProcedureInterval, kMaxProcedureCount, kMinSubeventLen, kMaxSubeventLen,
+                    kToneAntennaConfigSelection, CsPhy::LE_1M_PHY, kTxPwrDelta,
+                    preferred_peer_antenna, CsSnrControl::NOT_APPLIED, CsSnrControl::NOT_APPLIED),
+            handler_->BindOnceOn(this, &impl::on_cs_set_procedure_parameters));
   }
 
   void send_le_cs_procedure_enable(uint16_t connection_handle, Enable enable) {
