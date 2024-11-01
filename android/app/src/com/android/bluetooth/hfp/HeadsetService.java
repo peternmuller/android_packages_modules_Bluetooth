@@ -2708,6 +2708,11 @@ public class HeadsetService extends ProfileService {
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public void onAudioStateChangedFromStateMachine(
             BluetoothDevice device, int fromState, int toState) {
+        class Wrapper {
+            boolean isCallIdleAndScoNotManagedbyHal;
+        }
+        var wrapper = new Wrapper();
+        wrapper.isCallIdleAndScoNotManagedbyHal = false;
         synchronized (mStateMachines) {
             if (toState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                 if (fromState != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
@@ -2772,17 +2777,23 @@ public class HeadsetService extends ProfileService {
                     }
                 }
 
-                mStateMachinesThreadHandler.post(() -> {
-                    // Unsuspend A2DP when SCO connection is gone and call state is idle
-                    if (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled()) {
-                        Log.i(TAG, "Resume A2DP when SCO is gone and call state is idle");
-                        mSystemInterface.getAudioManager().setA2dpSuspended(false);
-                        if (isAtLeastU()) {
-                            mSystemInterface.getAudioManager().setLeAudioSuspended(false);
-                        }
-                    }
-                });
+                wrapper.isCallIdleAndScoNotManagedbyHal =
+                       (mSystemInterface.isCallIdle() && !Utils.isScoManagedByAudioEnabled());
             }
+        }
+
+        Log.i(TAG, "isCallIdleAndScoNotManagedbyHal: " + wrapper.isCallIdleAndScoNotManagedbyHal);
+        if (toState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
+            mStateMachinesThreadHandler.post(() -> {
+                // Unsuspend A2DP when SCO connection is gone and call state is idle
+                if (wrapper.isCallIdleAndScoNotManagedbyHal) {
+                    Log.i(TAG, "Resume A2DP when SCO is gone and call state is idle");
+                    mSystemInterface.getAudioManager().setA2dpSuspended(false);
+                    if (isAtLeastU()) {
+                        mSystemInterface.getAudioManager().setLeAudioSuspended(false);
+                    }
+                }
+            });
         }
     }
 
