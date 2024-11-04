@@ -126,6 +126,40 @@ static void queue_int_advance() {
   btif_queue_connect_next();
 }
 
+static void queue_int_advance_by_uuid(uint16_t uuid, const RawAddress& bda) {
+  if (connect_queue.empty()) return;
+  auto node = connect_queue.begin();
+  auto p_head = node;
+
+  if (((p_head->address() == bda) || (bda.IsEmpty()))
+        && (p_head->uuid() == uuid)) {
+      log::warn("Queue advance UUID = {:04X}, bd_addr = {}",
+                p_head->uuid(), p_head->address().ToString().c_str());
+      btif_queue_advance();
+      return;
+  }
+  // Move to next node
+  node++;
+
+  for (; node != connect_queue.end();) {
+    p_head = node;
+    node++;
+
+    if (((p_head->address() == bda) || (bda.IsEmpty()))
+        && (p_head->uuid() == uuid)) {
+      log::warn("Deleting entry from queue UUID = {:04X}, bd_addr = {}",
+                p_head->uuid(), p_head->address().ToString().c_str());
+      connect_queue.erase(p_head);
+      return;
+    }
+  }
+
+  log::warn("No entry found in queue UUID={:04X}, bd_addr={}",
+            p_head->uuid(), p_head->address().ToString().c_str());
+  return;
+
+}
+
 static void queue_int_cleanup(uint16_t uuid) {
   log::info("UUID={:04X}", uuid);
 
@@ -182,6 +216,22 @@ void btif_queue_cleanup(uint16_t uuid) {
  ******************************************************************************/
 void btif_queue_advance() {
   do_in_jni_thread(base::BindOnce(&queue_int_advance));
+}
+
+/*******************************************************************************
+ *
+ * Function         btif_queue_advance_by_uuid
+ *
+ * Description      remove the connected uuid entry from queue,
+ *                  adavance queue if entry found at head of the queue
+ *
+ *
+ * Returns          None
+ *
+ ******************************************************************************/
+void btif_queue_advance_by_uuid(uint16_t uuid, const RawAddress* bda) {
+  do_in_jni_thread(
+      base::BindOnce(&queue_int_advance_by_uuid, uuid, *bda));
 }
 
 bt_status_t btif_queue_connect_next(void) {
