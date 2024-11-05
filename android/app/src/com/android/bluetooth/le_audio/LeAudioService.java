@@ -2295,6 +2295,14 @@ public class LeAudioService extends ProfileService {
              * When adding new device, wait with notification until AudioManager is ready
              * with adding the device.
              */
+            if (isVoipLeaWarEnabled()) {
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null && mCallAudio.isVirtualCallStarted()) {
+                    if (!mCallAudio.stopScoUsingVirtualVoiceCall()) {
+                        Log.w(TAG, "updateActiveDevices: fail to stopScoUsingVirtualVoiceCall");
+                    }
+                }
+            }
             notifyActiveDeviceChanged(null);
         }
 
