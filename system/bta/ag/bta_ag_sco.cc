@@ -1357,6 +1357,7 @@ void bta_ag_sco_open(tBTA_AG_SCB* p_scb, const tBTA_AG_DATA& data) {
 
   if (!bta_ag_check_is_leaudio_in_idle()) {
     log::info("not opening sco, as c-i-g/c-i-ses existing over leaudio");
+    bta_ag_cback_sco(p_scb, BTA_AG_AUDIO_CLOSE_EVT);
     return;
   }
 
