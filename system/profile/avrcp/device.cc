@@ -122,10 +122,22 @@ bool Device::IsInSilenceMode() const {
 }
 
 void Device::HandlePendingPlay() {
+  log::assert_that(media_interface_ != nullptr,
+                   "assert failed: media_interface_ != nullptr");
+  log::verbose("");
+
   media_interface_->GetPlayStatus(base::Bind(
       [](base::WeakPtr<Device> d, PlayStatus s) {
-    if (!d || !bluetooth::headset::IsCallIdle() ||
-        s.state == PlayState::PLAYING || !d->IsActive()) {
+    if (!d) return;
+
+    if (!bluetooth::headset::IsCallIdle()) {
+        log::warn("Ignore passthrough play during active Call");
+        d->IsPendingPlay_ = false;
+        return;
+    }
+
+    if (!d->IsActive() ||
+        s.state == PlayState::PLAYING) {
         d->IsPendingPlay_ = false;
       return;
     }

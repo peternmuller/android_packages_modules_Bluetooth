@@ -223,9 +223,9 @@ AudioContexts GetAudioContextsFromSinkMetadata(
         track.source == AUDIO_SOURCE_CAMCORDER ) {
       track_context = LeAudioContextType::LIVE;
 
-    } else if (track.source == AUDIO_SOURCE_VOICE_COMMUNICATION) {
+    } else if (track.source == AUDIO_SOURCE_VOICE_COMMUNICATION ||
+               track.source == AUDIO_SOURCE_VOICE_CALL) {
       track_context = LeAudioContextType::CONVERSATIONAL;
-
     } else {
       /* Fallback to voice assistant
        * This will handle also a case when the device is
