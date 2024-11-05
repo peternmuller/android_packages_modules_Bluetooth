@@ -464,6 +464,7 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
         if (!PrepareAndSendCodecConfigToTheGroup(group)) {
           group->PrintDebugState();
           ClearGroup(group, true);
+          return false;
         }
         break;
 
@@ -2349,6 +2350,11 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
 
     for (; leAudioDevice;
          leAudioDevice = group->GetNextActiveDevice(leAudioDevice)) {
+      if (!group->cig.AssignCisIds(leAudioDevice)) {
+        log::error("unable to assign CIS IDs");
+        StopStream(group);
+        return false;
+      }
       PrepareAndSendCodecConfigure(group, leAudioDevice);
     }
     return true;

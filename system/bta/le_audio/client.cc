@@ -1075,6 +1075,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     bool result = groupStateMachine_->StartStream(
         group, configuration_context_type, remote_contexts, ccids);
+    log::debug("result: {}", result);
 
     return result;
   }
