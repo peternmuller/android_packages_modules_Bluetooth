@@ -27,6 +27,7 @@ import android.util.Log;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Objects;
@@ -1681,10 +1682,14 @@ public final class BluetoothQualityReport implements Parcelable {
             mSprIntrMiss = bqrBuf.getShort() & 0xFFFF;
             mPlcFillCount = bqrBuf.getShort() & 0xFFFF;
             mPlcDiscardCount = bqrBuf.getShort() & 0xFFFF;
-            mMissedInstanceCount = bqrBuf.getShort() & 0xFFFF;
-            mTxRetransmitSlotCount = bqrBuf.getShort() & 0xFFFF;
-            mRxRetransmitSlotCount = bqrBuf.getShort() & 0xFFFF;
-            mGoodRxFrameCount = bqrBuf.getShort() & 0xFFFF;
+            try {
+                mMissedInstanceCount = bqrBuf.getShort() & 0xFFFF;
+                mTxRetransmitSlotCount = bqrBuf.getShort() & 0xFFFF;
+                mRxRetransmitSlotCount = bqrBuf.getShort() & 0xFFFF;
+                mGoodRxFrameCount = bqrBuf.getShort() & 0xFFFF;
+            } catch (BufferUnderflowException e) {
+                Log.v(TAG, "some fields are not contained");
+            }
         }
 
         private BqrVsScoChoppy(Parcel in) {
