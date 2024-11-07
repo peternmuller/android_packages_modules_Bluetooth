@@ -6904,14 +6904,6 @@ struct LeCsToneDataWithQuality {
   tone_quality_indicator : 8,
 }
 
-struct LeCsMode1Data {
-  packet_quality : 8,
-  packet_nadm : 8,
-  packet_rssi : 8,
-  toa_tod_initiator : 16,
-  packet_antenna : 8,
-}
-
 struct LeCsMode2Data {
   _count_(tone_data) : 8,
   antenna_permutation_index : 8,
