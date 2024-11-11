@@ -2042,6 +2042,19 @@ class LeAudioGroupStateMachineImpl : public LeAudioGroupStateMachine {
       } while ((ase = leAudioDevice->GetNextActiveAse(ase)));
     } while ((leAudioDevice = group->GetNextActiveDevice(leAudioDevice)));
 
+    bool ignore_cis_create = false;
+    for (auto& it : conn_pairs) {
+      if (!it.cis_conn_handle) {
+        log::error("cis handle 0. Is CreateCig skipped ?");
+        ignore_cis_create = true;
+        break;
+      }
+    }
+    if (ignore_cis_create) {
+      log::error("cannot proceed cis create");
+      return false;
+    }
+
     IsoManager::GetInstance()->EstablishCis(
         {.conn_pairs = std::move(conn_pairs)});
 
