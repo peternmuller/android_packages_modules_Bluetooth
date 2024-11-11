@@ -298,7 +298,7 @@ void parseVSMetadata(uint8_t total_len, std::vector<uint8_t> metadata,
             UpdateEncoderParams(cig_id, cis_id, vs_meta_data, 0xFF);
           } else {
             LOG(INFO) << __func__ << ": Cache it untill encoder is up ";
-            ase->metadata = vs_meta_data;
+            ase->vs_metadata = vs_meta_data;
             ase->is_vsmetadata_available = true;
           }
           vs_meta_data.clear();
