@@ -783,17 +783,6 @@ void btif_storage_load_bonded_leaudio() {
     if (btif_config_get_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str,
                             &size)) {
       Uuid p_uuid[BT_MAX_NUM_UUIDS];
-      int adv_audio_size = STORAGE_UUID_STRING_SIZE * BT_MAX_NUM_UUIDS;
-      char adv_audio_uuid[adv_audio_size];
-
-      if (btif_config_get_str(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE, adv_audio_uuid, &adv_audio_size)) {
-        uuid_str[size-1] = ' ';
-        for (int i = size; i < std::min(STORAGE_UUID_STRING_SIZE * BT_MAX_NUM_UUIDS, size + adv_audio_size) ; i++){
-          uuid_str[i] = adv_audio_uuid[i-size];
-        }
-        btif_config_set_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str);
-        btif_config_remove(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE);
-      }
       size_t num_uuids =
           btif_split_uuids_string(uuid_str, p_uuid, BT_MAX_NUM_UUIDS);
 
@@ -803,12 +792,7 @@ void btif_storage_load_bonded_leaudio() {
           break;
         }
       }
-    } else if (btif_config_get_str(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE, uuid_str, &size)) {
-        btif_config_set_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str);
-        btif_config_remove(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE);
-        isLeAudioDevice = true;
     }
-    btif_config_remove(name, BTIF_STORAGE_KEY_DGROUP);
     if (!isLeAudioDevice) {
       continue;
     }

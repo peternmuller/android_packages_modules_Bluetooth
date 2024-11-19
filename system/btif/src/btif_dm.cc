@@ -2223,6 +2223,8 @@ void BTIF_dm_report_inquiry_status_change(tBTM_INQUIRY_STATE status) {
 }
 
 void BTIF_dm_enable() {
+  btif_storage_migrate_lea_uuids_u2v();
+
   BD_NAME bdname;
   bt_status_t status;
   bt_property_t prop;
