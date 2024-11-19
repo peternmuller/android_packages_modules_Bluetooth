@@ -890,6 +890,43 @@ static void remove_devices_with_sample_ltk() {
 
 /*******************************************************************************
  *
+ * Function         btif_storage_migrate_lea_uuids_u2v
+ *
+ * Description      BTIF storage API - Migrate le audio profile uuids
+ *                  from U to V.
+ *
+ ******************************************************************************/
+void btif_storage_migrate_lea_uuids_u2v() {
+  for (const auto& bd_addr : btif_config_get_paired_devices()) {
+    auto name = bd_addr.ToString();
+
+    if (!btif_config_exist(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE))
+      continue;
+    log::info("Remote device:{}", name);
+
+    int size = STORAGE_UUID_STRING_SIZE * BT_MAX_NUM_UUIDS;
+    char uuid_str[size];
+    if (btif_config_get_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str, &size)) {
+      int adv_audio_size = STORAGE_UUID_STRING_SIZE * BT_MAX_NUM_UUIDS;
+      char adv_audio_uuid[adv_audio_size];
+
+      if (btif_config_get_str(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE, adv_audio_uuid, &adv_audio_size)) {
+        uuid_str[size-1] = ' ';
+        for (int i = size; i < std::min(STORAGE_UUID_STRING_SIZE * BT_MAX_NUM_UUIDS, size + adv_audio_size); i++) {
+          uuid_str[i] = adv_audio_uuid[i-size];
+        }
+        btif_config_set_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str);
+      }
+    } else if (btif_config_get_str(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE, uuid_str, &size)) {
+        btif_config_set_str(name, BTIF_STORAGE_KEY_REMOTE_SERVICE, uuid_str);
+    }
+    btif_config_remove(name, BTIF_STORAGE_KEY_ADV_AUDIO_REMOTE_SERVICE);
+    btif_config_remove(name, BTIF_STORAGE_KEY_DGROUP);
+  }
+}
+
+/*******************************************************************************
+ *
  * Function         btif_storage_load_le_devices
  *
  * Description      BTIF storage API - Loads all LE-only and Dual Mode devices
