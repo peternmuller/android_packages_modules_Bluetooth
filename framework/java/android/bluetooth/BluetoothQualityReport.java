@@ -741,7 +741,7 @@ public final class BluetoothQualityReport implements Parcelable {
             mPacketType = bqrBuf.get() & 0xFF;
             mConnectionHandle = bqrBuf.getShort() & 0xFFFF;
             mConnectionRole = bqrBuf.get() & 0xFF;
-            mTxPowerLevel = bqrBuf.get() & 0xFF;
+            mTxPowerLevel = bqrBuf.get();
             mRssi = bqrBuf.get();
             mSnr = bqrBuf.get();
             mUnusedAfhChannelCount = bqrBuf.get() & 0xFF;
