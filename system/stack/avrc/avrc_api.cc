@@ -41,6 +41,7 @@
 #include "stack/include/bt_uuid16.h"
 #include "storage/config_keys.h"
 #include "types/raw_address.h"
+#include "internal_include/stack_config.h"
 
 using namespace bluetooth;
 
@@ -982,9 +983,14 @@ uint16_t AVRC_GetControlProfileVersion() {
 
   uint16_t profile_version = AVRC_REV_1_3;
   char avrcp_version[PROPERTY_VALUE_MAX] = {0};
-  osi_property_get(AVRC_CONTROL_VERSION_PROPERTY, avrcp_version,
-                   strncmp(volume_disabled, "true", 4) == 0 ? AVRC_1_3_STRING
-                                                            : AVRC_1_6_STRING);
+
+  if (!strncmp(volume_disabled, "true", 4)) {
+    osi_property_get(AVRC_CONTROL_VERSION_PROPERTY, avrcp_version, AVRC_1_3_STRING);
+  } else {
+    osi_property_get(AVRC_CONTROL_VERSION_PROPERTY, avrcp_version,
+            stack_config_get_interface()->get_pts_avrcp_test() ? AVRC_1_6_STRING
+                                                               : AVRC_1_4_STRING);
+  }
 
   if (!strncmp(AVRC_1_6_STRING, avrcp_version, sizeof(AVRC_1_6_STRING))) {
     profile_version = AVRC_REV_1_6;
