@@ -336,6 +336,7 @@ public final class BluetoothA2dp implements BluetoothProfile {
             if (DBG) log(Log.getStackTraceString(new Throwable()));
         } else if (isEnabled() && isValidDevice(device)) {
             try {
+                Log.w(TAG, "Going for A2DP Connect");
                 return service.connect(device, mAttributionSource);
             } catch (RemoteException e) {
                 Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));
@@ -374,6 +375,7 @@ public final class BluetoothA2dp implements BluetoothProfile {
             if (DBG) log(Log.getStackTraceString(new Throwable()));
         } else if (isEnabled() && isValidDevice(device)) {
             try {
+                Log.w(TAG, "Going for A2DP Disconnect");
                 return service.disconnect(device, mAttributionSource);
             } catch (RemoteException e) {
                 Log.e(TAG, e.toString() + "\n" + Log.getStackTraceString(new Throwable()));

@@ -147,7 +147,7 @@ public class DistanceMeasurementManagerTest {
                         IDENTITY_ADDRESS,
                         RSSI_FREQUENCY_LOW,
                         DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI);
-        mDistanceMeasurementManager.onDistanceMeasurementStartFail(
+        mDistanceMeasurementManager.onDistanceMeasurementStopped(
                 IDENTITY_ADDRESS,
                 BluetoothStatusCodes.ERROR_DISTANCE_MEASUREMENT_INTERNAL,
                 DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI);
@@ -197,6 +197,7 @@ public class DistanceMeasurementManagerTest {
                 -1,
                 -1,
                 1000L,
+                -1,
                 DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI);
         ArgumentCaptor<DistanceMeasurementResult> result =
                 ArgumentCaptor.forClass(DistanceMeasurementResult.class);
@@ -235,6 +236,7 @@ public class DistanceMeasurementManagerTest {
                 -1,
                 -1,
                 1000L,
+                -1,
                 DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI);
         DistanceMeasurementResult result =
                 new DistanceMeasurementResult.Builder(1.00, 1.00).build();

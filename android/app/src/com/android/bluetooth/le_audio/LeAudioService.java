@@ -2128,9 +2128,17 @@ public class LeAudioService extends ProfileService {
                 if (deviceInfo.isSink()) {
                     mAudioManagerAddedOutDevice = null;
                     if (mBroadcastIdPendingStart.isPresent()) {
-                        Log.d(TAG, "mBroadcastIdPendingStart exist, Start pending broadcast");
-                        startBroadcast(mBroadcastIdPendingStart.get());
-                        mBroadcastIdPendingStart = Optional.empty();
+                        if (isBroadcastAllowedToBeActivateInCurrentAudioMode()) {
+                            Log.d(TAG, "mBroadcastIdPendingStart exist, Start pending broadcast");
+                            startBroadcast(mBroadcastIdPendingStart.get());
+                            mBroadcastIdPendingStart = Optional.empty();
+                        } else {
+                            Log.d(TAG, "Audio mode not allow for broadcast, transition back to unicast");
+                            transitionFromBroadcastToUnicast();
+                            mBroadcastIdDeactivatedForUnicastTransition =
+                                    Optional.of(mBroadcastIdPendingStart.get());
+                            mBroadcastIdPendingStart = Optional.empty();
+                        }
                     }
                     releaseLeAudioStream();
                 }
@@ -3744,6 +3752,14 @@ public class LeAudioService extends ProfileService {
                     break;
                 case LeAudioStackEvent.BROADCAST_STATE_STREAMING:
                     Log.d(TAG, "Broadcast broadcastId: " + broadcastId + " streaming.");
+                    if (!isBroadcastAllowedToBeActivateInCurrentAudioMode()) {
+                        Log.d(TAG, "Audio mode not allow for broadcast, transition from broadcast to unicast");
+                        clearBroadcastTimeoutCallback();
+                        handleUnicastStreamStatusChange(
+                                LeAudioStackEvent.DIRECTION_SINK,
+                                LeAudioStackEvent.STATUS_LOCAL_STREAM_REQUESTED);
+                        break;
+                    }
 
                     // Stream resumed
                     mHandler.post(

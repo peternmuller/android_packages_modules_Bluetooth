@@ -46,7 +46,7 @@ public class DistanceMeasurementManager {
     private static final int RSSI_HIGH_FREQUENCY_INTERVAL_MS = 500;
     private static final int CS_LOW_FREQUENCY_INTERVAL_MS = 5000;
     private static final int CS_MEDIUM_FREQUENCY_INTERVAL_MS = 3000;
-    private static final int CS_HIGH_FREQUENCY_INTERVAL_MS = 1000;
+    private static final int CS_HIGH_FREQUENCY_INTERVAL_MS = 200;
 
     private final AdapterService mAdapterService;
     private HandlerThread mHandlerThread;
@@ -367,52 +367,6 @@ public class DistanceMeasurementManager {
         }
     }
 
-    void onDistanceMeasurementStartFail(String address, int reason, int method) {
-        logd(
-                "onDistanceMeasurementStartFail address:"
-                        + BluetoothUtils.toAnonymizedAddress(address)
-                        + ", method:"
-                        + method);
-        switch (method) {
-            case DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI:
-                handleRssiStartFail(address, reason);
-                break;
-            case DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_CHANNEL_SOUNDING:
-                handleCsStartFail(address, reason);
-                break;
-            default:
-                Log.w(TAG, "onDistanceMeasurementStartFail: invalid method " + method);
-        }
-    }
-
-    void handleRssiStartFail(String address, int reason) {
-        CopyOnWriteArraySet<DistanceMeasurementTracker> set = mRssiTrackers.get(address);
-        if (set == null) {
-            Log.w(TAG, "Can't find rssi tracker");
-            return;
-        }
-        for (DistanceMeasurementTracker tracker : set) {
-            if (!tracker.mStarted) {
-                invokeStartFail(tracker.mCallback, tracker.mDevice, reason);
-            }
-        }
-        set.removeIf(tracker -> !tracker.mStarted);
-    }
-
-    void handleCsStartFail(String address, int reason) {
-        CopyOnWriteArraySet<DistanceMeasurementTracker> set = mCsTrackers.get(address);
-        if (set == null) {
-            Log.w(TAG, "Can't find CS tracker");
-            return;
-        }
-        for (DistanceMeasurementTracker tracker : set) {
-            if (!tracker.mStarted) {
-                invokeStartFail(tracker.mCallback, tracker.mDevice, reason);
-            }
-        }
-        set.removeIf(tracker -> !tracker.mStarted);
-    }
-
     void onDistanceMeasurementStopped(String address, int reason, int method) {
         logd(
                 "onDistanceMeasurementStopped address:"
@@ -443,9 +397,11 @@ public class DistanceMeasurementManager {
             if (tracker.mStarted) {
                 tracker.cancelTimer();
                 invokeOnStopped(tracker.mCallback, tracker.mDevice, reason);
+            } else {
+                invokeStartFail(tracker.mCallback, tracker.mDevice, reason);
             }
         }
-        set.removeIf(tracker -> tracker.mStarted);
+        mRssiTrackers.remove(address);
     }
 
     void handleCsStopped(String address, int reason) {
@@ -458,9 +414,11 @@ public class DistanceMeasurementManager {
             if (tracker.mStarted) {
                 tracker.cancelTimer();
                 invokeOnStopped(tracker.mCallback, tracker.mDevice, reason);
+            } else {
+                invokeStartFail(tracker.mCallback, tracker.mDevice, reason);
             }
         }
-        set.removeIf(tracker -> tracker.mStarted);
+        mCsTrackers.remove(address);
     }
 
     void onDistanceMeasurementResult(
@@ -472,16 +430,22 @@ public class DistanceMeasurementManager {
             int altitudeAngle,
             int errorAltitudeAngle,
             long elapsedRealtimeNanos,
+            int confidenceLevel,
             int method) {
         logd(
                 "onDistanceMeasurementResult "
                         + BluetoothUtils.toAnonymizedAddress(address)
                         + ", centimeter "
-                        + centimeter);
-        DistanceMeasurementResult result =
+                        + centimeter
+                        + ", confidenceLevel "
+                        + confidenceLevel);
+        DistanceMeasurementResult.Builder builder =
                 new DistanceMeasurementResult.Builder(centimeter / 100.0, errorCentimeter / 100.0)
-                        .setMeasurementTimestampNanos(elapsedRealtimeNanos)
-                        .build();
+                        .setMeasurementTimestampNanos(elapsedRealtimeNanos);
+        if (confidenceLevel != -1) {
+            builder.setConfidenceLevel(confidenceLevel / 100.0);
+        }
+        DistanceMeasurementResult result = builder.build();
         switch (method) {
             case DistanceMeasurementMethod.DISTANCE_MEASUREMENT_METHOD_RSSI:
                 handleRssiResult(address, result);
