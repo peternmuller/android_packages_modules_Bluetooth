@@ -30,26 +30,22 @@ struct VendorSpecificCharacteristic {
 
 struct ChannelSoundingRawData {
   uint8_t num_antenna_paths_;
-  std::vector<uint16_t> step_mode_;
   std::vector<uint8_t> step_channel_;
-  std::vector<int8_t> init_packet_rssi_;
-  std::vector<uint8_t> init_packet_quality_;
-  std::vector<int8_t> refl_packet_rssi_;
-  std::vector<uint8_t> refl_packet_quality_;
-  std::vector<int16_t> measured_freq_offset_;
-  std::vector<uint16_t> frequency_compensation_;
   std::vector<std::vector<std::complex<double>>> tone_pct_initiator_;
   std::vector<std::vector<std::complex<double>>> tone_pct_reflector_;
   std::vector<std::vector<uint8_t>> tone_quality_indicator_initiator_;
   std::vector<std::vector<uint8_t>> tone_quality_indicator_reflector_;
-  std::vector<uint8_t> antenna_permutation_index_initiator_;
-  std::vector<uint8_t> antenna_permutation_index_reflector_;
-  std::vector<int16_t> refl_packet_toa_tod_;
-  std::vector<int16_t> init_packet_toa_tod_;
+  std::vector<int8_t> packet_quality_initiator;
+  std::vector<int8_t> packet_quality_reflector;
+  std::vector<int16_t> toa_tod_initiators_;
+  std::vector<int16_t> tod_toa_reflectors_;
 };
 
 struct RangingResult {
   double result_meters_;
+  // A normalized value from 0 (low confidence) to 100 (high confidence) representing the confidence
+  // of estimated distance. The value is -1 when unavailable.
+  int8_t confidence_level_;
 };
 
 class RangingHalCallback {
