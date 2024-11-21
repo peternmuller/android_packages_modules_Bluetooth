@@ -1533,6 +1533,7 @@ public class A2dpService extends ProfileService {
 
         @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
         private A2dpService getService(AttributionSource source) {
+            Log.d(TAG, "getService");
             if (Utils.isInstrumentationTestMode()) {
                 return mService;
             }
@@ -1553,13 +1554,16 @@ public class A2dpService extends ProfileService {
 
         @Override
         public void cleanup() {
+            Log.d(TAG, "cleanup");
             mService = null;
         }
 
         @Override
         public boolean connect(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "connect: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
 
@@ -1568,8 +1572,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public boolean disconnect(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "disconnect: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
 
@@ -1578,8 +1584,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public List<BluetoothDevice> getConnectedDevices(AttributionSource source) {
+            Log.d(TAG, "getConnectedDevices");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return Collections.emptyList();
             }
 
@@ -1589,8 +1597,10 @@ public class A2dpService extends ProfileService {
         @Override
         public List<BluetoothDevice> getDevicesMatchingConnectionStates(
                 int[] states, AttributionSource source) {
+            Log.d(TAG, "getDevicesMatchingConnectionStates");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return Collections.emptyList();
             }
 
@@ -1599,8 +1609,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public int getConnectionState(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "getConnectionState: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return BluetoothProfile.STATE_DISCONNECTED;
             }
 
@@ -1609,8 +1621,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public boolean setActiveDevice(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "setActiveDevice: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
             if (Flags.audioRoutingCentralization()) {
@@ -1628,8 +1642,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public BluetoothDevice getActiveDevice(AttributionSource source) {
+            Log.d(TAG, "getActiveDevice");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return null;
             }
 
@@ -1639,8 +1655,10 @@ public class A2dpService extends ProfileService {
         @Override
         public boolean setConnectionPolicy(
                 BluetoothDevice device, int connectionPolicy, AttributionSource source) {
+            Log.d(TAG, "setConnectionPolicy:: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
 
@@ -1650,8 +1668,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public int getConnectionPolicy(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "getConnectionPolicy: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return BluetoothProfile.CONNECTION_POLICY_UNKNOWN;
             }
 
@@ -1662,13 +1682,16 @@ public class A2dpService extends ProfileService {
         @Override
         public boolean isAvrcpAbsoluteVolumeSupported() {
             // TODO (apanicke): Add a hook here for the AvrcpTargetService.
+            Log.d(TAG, "isAvrcpAbsoluteVolumeSupported");
             return false;
         }
 
         @Override
         public void setAvrcpAbsoluteVolume(int volume, AttributionSource source) {
+            Log.d(TAG, "setAvrcpAbsoluteVolume: " + volume);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return;
             }
 
@@ -1678,8 +1701,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public boolean isA2dpPlaying(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "isA2dpPlaying: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
 
@@ -1688,8 +1713,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public List<BluetoothCodecType> getSupportedCodecTypes(AttributionSource source) {
+            Log.d(TAG, "getSupportedCodecTypes");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return Collections.emptyList();
             }
 
@@ -1700,8 +1727,10 @@ public class A2dpService extends ProfileService {
         @Override
         public BluetoothCodecStatus getCodecStatus(
                 BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "getCodecStatus: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return null;
             }
 
@@ -1713,8 +1742,10 @@ public class A2dpService extends ProfileService {
                 BluetoothDevice device,
                 BluetoothCodecConfig codecConfig,
                 AttributionSource source) {
+            Log.d(TAG, "setCodecConfigPreference: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return;
             }
 
@@ -1737,8 +1768,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public void enableOptionalCodecs(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "enableOptionalCodecs: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return;
             }
 
@@ -1751,8 +1784,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public void disableOptionalCodecs(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "disableOptionalCodecs: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return;
             }
 
@@ -1765,8 +1800,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public int isOptionalCodecsSupported(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "isOptionalCodecsSupported: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return BluetoothA2dp.OPTIONAL_CODECS_SUPPORT_UNKNOWN;
             }
 
@@ -1779,8 +1816,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public int isOptionalCodecsEnabled(BluetoothDevice device, AttributionSource source) {
+            Log.d(TAG, "isOptionalCodecsEnabled: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return BluetoothA2dp.OPTIONAL_CODECS_PREF_UNKNOWN;
             }
 
@@ -1794,8 +1833,10 @@ public class A2dpService extends ProfileService {
         @Override
         public void setOptionalCodecsEnabled(
                 BluetoothDevice device, int value, AttributionSource source) {
+            Log.d(TAG, "setOptionalCodecsEnabled: " + device);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return;
             }
 
@@ -1808,8 +1849,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public int getDynamicBufferSupport(AttributionSource source) {
+            Log.d(TAG, "getDynamicBufferSupport");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return BluetoothA2dp.DYNAMIC_BUFFER_SUPPORT_NONE;
             }
 
@@ -1818,8 +1861,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public BufferConstraints getBufferConstraints(AttributionSource source) {
+            Log.d(TAG, "getBufferConstraints");
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return null;
             }
 
@@ -1828,8 +1873,10 @@ public class A2dpService extends ProfileService {
 
         @Override
         public boolean setBufferLengthMillis(int codec, int value, AttributionSource source) {
+            Log.d(TAG, "setBufferLengthMillis: " + codec);
             A2dpService service = getService(source);
             if (service == null) {
+                Log.w(TAG, "A2dpService is null");
                 return false;
             }
 
@@ -1868,7 +1915,9 @@ public class A2dpService extends ProfileService {
     }
 
     public void switchCodecByBufferSize(BluetoothDevice device, boolean isLowLatency) {
+        Log.d(TAG, "switchCodecByBufferSize: " + device);
         if (getOptionalCodecsEnabled(device) != BluetoothA2dp.OPTIONAL_CODECS_PREF_ENABLED) {
+            Log.w(TAG, "OPTIONAL_CODECS_PREF_ENABLED");
             return;
         }
         mA2dpCodecConfig.switchCodecByBufferSize(
