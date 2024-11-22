@@ -205,6 +205,7 @@ void Device::VendorPacketHandler(uint8_t label,
           active_labels_.erase(label);
           volume_interface_ = nullptr;
           volume_ = VOL_REGISTRATION_FAILED;
+          last_request_volume_ = volume_;
           return;
         }
 
@@ -216,11 +217,23 @@ void Device::VendorPacketHandler(uint8_t label,
         HandleVolumeChanged(label, register_notification);
         break;
       }
-      case CommandPdu::SET_ABSOLUTE_VOLUME:
-        // TODO (apanicke): Add a retry mechanism if the response has a
-        // different volume than the one we set. For now, we don't care
-        // about the response to this message.
+      case CommandPdu::SET_ABSOLUTE_VOLUME: {
+        auto set_absolute_volume =
+            Packet::Specialize<SetAbsoluteVolumeResponse>(pkt);
+        active_labels_.erase(label);
+        volume_label_ = MAX_TRANSACTION_LABEL;
+        if (set_absolute_volume->IsValid()) {
+          volume_ = set_absolute_volume->GetVolume();
+          volume_ &= ~0x80;
+          log::verbose("{}: current volume={}, last request volume={}",
+                       address_, (int)volume_, (int)last_request_volume_);
+          if (last_request_volume_ != volume_) SetVolume(last_request_volume_);
+        } else {
+          log::warn("{}: Response packet is not valid", address_);
+          last_request_volume_ = volume_;
+        }
         break;
+      }
       default:
         log::warn("{}: Unhandled Response: pdu={}", address_,
                   pkt->GetCommandPdu());
@@ -663,6 +676,7 @@ void Device::HandleVolumeChanged(
     // Disable Absolute Volume
     active_labels_.erase(label);
     volume_ = VOL_REGISTRATION_FAILED;
+    last_request_volume_ = volume_;
     log::error("device rejected register Volume changed notification request.");
     log::error("Putting Device in ABSOLUTE_VOLUME rejectlist");
     interop_database_add(INTEROP_DISABLE_ABSOLUTE_VOLUME, &address_, 3);
@@ -681,6 +695,7 @@ void Device::HandleVolumeChanged(
   if (volume_ == VOL_NOT_SUPPORTED) {
     volume_ = pkt->GetVolume();
     volume_ &= ~0x80;  // remove RFA bit
+    last_request_volume_ = volume_;
     volume_interface_->DeviceConnected(
         GetAddress(),
         base::Bind(&Device::SetVolume, weak_ptr_factory_.GetWeakPtr()));
@@ -697,16 +712,26 @@ void Device::HandleVolumeChanged(
 
   volume_ = pkt->GetVolume();
   volume_ &= ~0x80;  // remove RFA bit
+  last_request_volume_ = volume_;
   log::verbose("Volume has changed to {}", (uint32_t)volume_);
   volume_interface_->SetVolume(volume_);
 }
 
 void Device::SetVolume(int8_t volume) {
   // TODO (apanicke): Implement logic for Multi-AVRCP
-  log::verbose("volume={}", (int)volume);
+  log::verbose("request volume={}, last request volume={}, current volume={}",
+               (int)volume, (int)last_request_volume_, (int)volume_);
   if (volume == volume_) {
     log::warn("{}: Ignoring volume change same as current volume level",
               address_);
+    return;
+  }
+
+  last_request_volume_ = volume;
+  if (volume_label_ != MAX_TRANSACTION_LABEL) {
+    log::warn(
+        "{}: There is already a volume command in progress, cache volume={}",
+        address_, (int)last_request_volume_);
     return;
   }
   auto request = SetAbsoluteVolumeRequestBuilder::MakeBuilder(volume);
@@ -716,10 +741,15 @@ void Device::SetVolume(int8_t volume) {
     if (active_labels_.find(i) == active_labels_.end()) {
       active_labels_.insert(i);
       label = i;
+      volume_label_ = label;
       break;
     }
   }
 
+  if (label == MAX_TRANSACTION_LABEL) {
+    log::fatal("{}: Abandon all hope, something went catastrophically wrong",
+               address_);
+  }
   send_message_cb_.Run(label, false, std::move(request));
 
   if (stack_config_get_interface()->get_pts_avrcp_test()) {
@@ -748,9 +778,8 @@ void Device::SetVolume(int8_t volume) {
     auto vol_cmd_release = PassThroughPacketBuilder::MakeBuilder(
          false, false, (volume_ < volume) ? 0x41 : 0x42);
     send_message(label, false, std::move(vol_cmd_release));
+    volume_ = volume;
   }
-
-  volume_ = volume;
 }
 
 void Device::TrackChangedNotificationResponse(uint8_t label, bool interim,
@@ -2085,6 +2114,7 @@ void Device::DeviceDisconnected() {
   // to reset the local volume var to be sure we send the correct value
   // to the remote device on the next connection.
   volume_ = VOL_NOT_SUPPORTED;
+  last_request_volume_ = volume_;
   fast_forwarding_ = false;
   fast_rewinding_ = false;
 }
