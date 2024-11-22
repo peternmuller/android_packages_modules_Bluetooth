@@ -1354,7 +1354,7 @@
         },
         {
             "name": "VND_Two-OneChan-SrcAse-Lc3_48_2_100octs_R31_L100",
-            "codec_config_name": "VND_Two-OneChan-SrcAse-Lc3_48_2_100octs",
+            "codec_config_name": "Two-OneChan-SrcAse-Lc3_48_2",
             "qos_config_name": [
                 "VND_QoS_Config_R31_L100"
             ],
@@ -1363,17 +1363,17 @@
             ]
         },
         {
-            "name": "Two-OneChan-SrcAse-Lc3_48_2_100octs_R31_L100",
-            "codec_config_name": "VND_Two-OneChan-SrcAse-Lc3_48_2_100octs",
+            "name": "Two-OneChan-SrcAse-Lc3_48_2_2",
+            "codec_config_name": "Two-OneChan-SrcAse-Lc3_48_2",
             "qos_config_name": [
-                "VND_QoS_Config_R31_L100"
+                "VND_QoS_Config_R13_L95"
             ]
         },
         {
-            "name": "VND_Two-OneChan-SnkAse-Lc3_48_2-Two-OneChan-SrcAse-Lc3_48_2",
-            "codec_config_name": "VND_Two-OneChan-SnkAse_Two-OneChan-SrcAse-Lc3_48",
+            "name": "Two-OneChan-SnkAse-Lc3_48_2-Two-OneChan-SrcAse-Lc3_48_2_2",
+            "codec_config_name": "Two-OneChan-SnkAse_Two-OneChan-SrcAse-Lc3_48_2",
             "qos_config_name": [
-                "VND_QoS_Config_R31_L100"
+                "VND_QoS_Config_R13_L95"
             ]
         },
         {
@@ -7114,7 +7114,7 @@
             ]
         },
         {
-            "name": "VND_Two-OneChan-SrcAse-Lc3_48_2_100octs",
+            "name": "Two-OneChan-SrcAse-Lc3_48_2",
             "subconfigurations": [
                 {
                     "ase_cnt": 2,
@@ -7168,7 +7168,7 @@
             ]
         },
         {
-            "name": "VND_Two-OneChan-SnkAse_Two-OneChan-SrcAse-Lc3_48",
+            "name": "Two-OneChan-SnkAse_Two-OneChan-SrcAse-Lc3_48_2",
             "subconfigurations": [
                 {
                     "ase_cnt": 2,
@@ -8265,7 +8265,14 @@
             "max_transport_latency": 8
         },
         {
+            "name": "VND_QoS_Config_R13_L95",
+            "target_latency": "HIGH_RELIABILITY",
+            "retransmission_number": 13,
+            "max_transport_latency": 95
+        },
+        {
             "name": "VND_QoS_Config_R13_L100",
+            "target_latency": "HIGH_RELIABILITY",
             "retransmission_number": 13,
             "max_transport_latency": 100
         },
