@@ -186,19 +186,14 @@ void avdt_ccb_hdl_discover_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
         bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
                      true);
         log::verbose("AAC VBR prop value is {}", vbr_supp);
-        int vbr_remote = 0;
-        vbr_remote = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
-        log::verbose("original vbr {}", vbr_remote);
-        if (vbr_supp) {
-          if(vbr_remote) {
-            if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
-              log::verbose("AAC VBR is not supported for this BL remote device");
-              vbr_bl = true;
-            }
-          }
+        int scb_vbr_cap = 0;
+        scb_vbr_cap = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
+        log::verbose("original vbr {}", scb_vbr_cap);
+        if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
+          log::verbose("AAC VBR is not supported for this BL remote device");
+          vbr_bl = true;
         }
-
-        if(vbr_remote) {
+        if(scb_vbr_cap) {
           log::verbose("Device has VBR support");
           if (!vbr_bl) {
             log::verbose("AAC VBR is enabled, show AAC SEP for this peer device");
@@ -286,17 +281,17 @@ void avdt_ccb_hdl_getcap_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
     bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
                     true);
     log::verbose("AAC VBR prop value is {}", vbr_supp);
-    if (vbr_supp) {
-       if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
+
+    if (interop_match_addr(INTEROP_DISABLE_AAC_VBR_CODEC, &p_ccb->peer_addr)) {
          log::verbose("AAC VBR is not supported for this BL remote device");
          vbr_bl = true;
-       }
     }
-    int vbr_remote = 0;
-    vbr_remote = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
-    log::verbose("original vbr {}", vbr_remote);
+
+    int scb_vbr_cap = 0;
+    scb_vbr_cap = p_scb->stream_config.cfg.codec_info[6] & A2DP_AAC_VARIABLE_BIT_RATE_MASK;
+    log::verbose("original vbr {}", scb_vbr_cap);
     if (vbr_bl) {
-      if (vbr_remote == A2DP_AAC_VARIABLE_BIT_RATE_ENABLED) {
+      if (scb_vbr_cap == A2DP_AAC_VARIABLE_BIT_RATE_ENABLED) {
           log::verbose("reset vbr to disabled ");
           p_scb->stream_config.cfg.codec_info[6] &= ~A2DP_AAC_VARIABLE_BIT_RATE_ENABLED;
       }
