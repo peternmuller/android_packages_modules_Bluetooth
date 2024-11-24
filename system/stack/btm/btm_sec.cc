@@ -4153,8 +4153,7 @@ void btm_sec_role_changed(tHCI_STATUS hci_status, const RawAddress& bd_addr,
   }
   if (new_role == HCI_ROLE_CENTRAL && btm_dev_authenticated(p_dev_rec) &&
       !btm_dev_encrypted(p_dev_rec)) {
-    BTM_SetEncryption(p_dev_rec->bd_addr, BT_TRANSPORT_BR_EDR, NULL, NULL,
-                      BTM_BLE_SEC_NONE);
+    btm_sec_check_pending_reqs();
   }
 }
 
