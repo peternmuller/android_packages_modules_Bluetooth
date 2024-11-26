@@ -1213,6 +1213,13 @@ bool BTM_SecIsSecurityPending(const RawAddress& bd_addr) {
           p_dev_rec->sec_rec.sec_state == BTM_SEC_STATE_AUTHENTICATING);
 }
 
+bool BTM_SecIsLeSecurityPending(const RawAddress& bd_addr) {
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bd_addr);
+  return p_dev_rec &&
+         (p_dev_rec->sec_rec.is_security_state_le_encrypting() ||
+          p_dev_rec->sec_rec.sec_state == BTM_SEC_STATE_AUTHENTICATING);
+}
+
 /*******************************************************************************
  * disconnect the ACL link, if it's not done yet.
  ******************************************************************************/

@@ -2295,6 +2295,14 @@ public class LeAudioService extends ProfileService {
              * When adding new device, wait with notification until AudioManager is ready
              * with adding the device.
              */
+            if (isVoipLeaWarEnabled()) {
+                CallAudio mCallAudio = CallAudio.get();
+                if (mCallAudio != null && mCallAudio.isVirtualCallStarted()) {
+                    if (!mCallAudio.stopScoUsingVirtualVoiceCall()) {
+                        Log.w(TAG, "updateActiveDevices: fail to stopScoUsingVirtualVoiceCall");
+                    }
+                }
+            }
             notifyActiveDeviceChanged(null);
         }
 
@@ -2326,11 +2334,20 @@ public class LeAudioService extends ProfileService {
     private boolean setActiveGroupWithDevice(BluetoothDevice device, boolean hasFallbackDevice) {
         int groupId = LE_AUDIO_GROUP_ID_INVALID;
 
-        if (device == null) {
+        if (isVoipLeaWarEnabled()) {
             CallAudio mCallAudio = CallAudio.get();
-            if (mCallAudio != null && mCallAudio.isVirtualCallStarted()) {
-                if (!mCallAudio.stopScoUsingVirtualVoiceCall()) {
-                    Log.w(TAG, "setActiveGroupWithDevice: fail to stopScoUsingVirtualVoiceCall");
+            if (device == null) {
+                if (mCallAudio != null && mCallAudio.isVirtualCallStarted()) {
+                    if (!mCallAudio.stopScoUsingVirtualVoiceCall()) {
+                        Log.w(TAG, "setActiveGroupWithDevice: fail to stopScoUsingVirtualVoiceCall");
+                    }
+                }
+            } else if (mCallAudio != null && device != mCallAudio.getActiveDevice() &&
+                                      mCallAudio.getActiveProfile() == mCallAudio.HFP) {
+                HeadsetService headsetService = mServiceFactory.getHeadsetService();
+                if (headsetService != null && headsetService.isVirtualCallStarted()) {
+                    Log.w(TAG, "setActiveGroupWithDevice: stop VoIP in HFP");
+                    headsetService.stopScoUsingVirtualVoiceCall();
                 }
             }
         }

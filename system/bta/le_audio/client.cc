@@ -1075,6 +1075,7 @@ class LeAudioClientImpl : public LeAudioClient {
 
     bool result = groupStateMachine_->StartStream(
         group, configuration_context_type, remote_contexts, ccids);
+    log::debug("result: {}", result);
 
     return result;
   }
@@ -1164,6 +1165,7 @@ class LeAudioClientImpl : public LeAudioClient {
         log::warn("group {} was about to stream, but got canceled: {}",
                   group_id, ToString(group->GetTargetState()));
         group->SetTargetState(AseState::BTA_LE_AUDIO_ASE_STATE_IDLE);
+        CancelStreamingRequest();
       } else {
         log::warn(", group {} already stopped: {}", group_id,
                   ToString(group->GetState()));
@@ -2487,9 +2489,10 @@ class LeAudioClientImpl : public LeAudioClient {
 
     /* Check if the device is in allow list and update the flag */
     leAudioDevice->UpdateDeviceAllowlistFlag();
-    if (BTM_SecIsSecurityPending(address)) {
+    if (BTM_SecIsLeSecurityPending(address)) {
       /* if security collision happened, wait for encryption done
        * (BTA_GATTC_ENC_CMPL_CB_EVT) */
+      log::warn("{} Security Collision. Security is not completed", address);
       return;
     }
 
@@ -4214,7 +4217,7 @@ class LeAudioClientImpl : public LeAudioClient {
     if (device->GetFirstActiveAse()->is_vsmetadata_available) {
       for (struct bluetooth::le_audio::types::cis& cis : group->cig.cises) {
         UpdateEncoderParams(group_id, cis.id,
-            device->GetFirstActiveAse()->metadata);
+            device->GetFirstActiveAse()->vs_metadata);
         device->GetFirstActiveAse()->is_vsmetadata_available = false;
       }
     }
