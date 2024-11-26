@@ -42,7 +42,7 @@
 #include "bta/include/bta_av_api.h"
 #include "btif/include/btif_av_co.h"
 #include "a2dp_aac_constants.h"
-
+#include "btif/include/btif_config.h"
 using namespace bluetooth;
 
 /*******************************************************************************
@@ -166,12 +166,20 @@ static bool avdt_ccb_check_peer_eligible_for_aac_codec(const AvdtpCcb* p_peer){
 void avdt_ccb_hdl_discover_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
   tAVDT_SEP_INFO sep_info[AVDT_NUM_SEPS];
   AvdtpScb* p_scb = &(p_ccb->scb[0]);
-
+  bool codecs_cached = false;
+  char value[PROPERTY_VALUE_MAX];
   log::verbose("p_ccb index={}", avdt_ccb_to_idx(p_ccb));
 
   p_data->msg.discover_rsp.p_sep_info = sep_info;
   p_data->msg.discover_rsp.num_seps = 0;
-
+  if (p_ccb != NULL) {
+    std::string bdstr = p_ccb->peer_addr.ToString();
+    int size = sizeof(value);
+    if (btif_config_get_str(bdstr, BTIF_STORAGE_KEY_FOR_SUPPORTED_CODECS, value, &size)) {
+      log::verbose("cached remote supported codec -> {}", value);
+      codecs_cached = true;
+    }
+   }
   /* for all allocated scbs */
   for (int i = 0; i < AVDT_NUM_SEPS; i++, p_scb++) {
     if (p_scb->allocated) {
@@ -181,6 +189,33 @@ void avdt_ccb_hdl_discover_cmd(AvdtpCcb* p_ccb, tAVDT_CCB_EVT* p_data) {
     codec_name = A2DP_CodecName(p_scb->stream_config.cfg.codec_info);
 
     log::verbose("codec name {}", codec_name);
+    if (codecs_cached){
+        bool codec_support = false;
+        char *tok = NULL;
+        char *tmp_token = NULL;
+	int size = sizeof(value);
+	std::string bdstr = p_ccb->peer_addr.ToString();
+	btif_config_get_str(bdstr, BTIF_STORAGE_KEY_FOR_SUPPORTED_CODECS, value, &size);
+	log::verbose("print remote supported codec -> {}", value);
+        tok = strtok_r((char*)value, ",", &tmp_token);
+        while (tok != NULL)
+        {
+         log::verbose("tok codec name {}", tok);
+	 if (tmp_token)
+            log::verbose("tmp_token codec name {}", tmp_token);
+         if (strcmp(tok,codec_name) == 0) {
+           codec_support = true;
+           log::verbose("cached codec name {}", codec_name);
+           break;
+         }
+         tok = strtok_r(NULL, ",", &tmp_token);
+       }
+       if (!codec_support) {
+        log::verbose("Not cached codec name {}", codec_name);
+        continue;
+      }
+    }
+
     if (p_scb->stream_config.cfg.codec_info[AVDT_CODEC_TYPE_INDEX] == A2DP_MEDIA_CT_AAC) {
         bool vbr_bl = false;
         bool vbr_supp = osi_property_get_bool("persist.vendor.qcom.bluetooth.aac_vbr_ctl.enabled",
