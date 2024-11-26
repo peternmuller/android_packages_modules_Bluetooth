@@ -1140,6 +1140,7 @@ cc_test {
         ":TestMockStackA2dp",
         ":TestMockStackAcl",
         ":TestMockStackL2cap",
+        ":TestMockBtif",
         "avdt/avdt_ad.cc",
         "avdt/avdt_api.cc",
         "avdt/avdt_ccb.cc",
