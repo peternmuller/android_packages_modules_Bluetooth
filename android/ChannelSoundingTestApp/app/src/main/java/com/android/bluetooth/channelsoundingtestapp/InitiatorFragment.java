@@ -75,7 +75,6 @@ public class InitiatorFragment extends Fragment {
   private Spinner mConnUpSpinner;
   private Button mConnUpButton;
   private TextView mLogText;
-
   private BleConnectionViewModel mBleConnectionViewModel;
   private InitiatorViewModel mInitiatorViewModel;
 
@@ -198,6 +197,10 @@ public class InitiatorFragment extends Fragment {
         mDmMethodArrayAdapter.addAll(mInitiatorViewModel.getSupportedDmMethods());
 
         mButtonCs.setOnClickListener(v -> {
+        if(!mBleConnectionViewModel.isconnected()) {
+            printLog("Do Gatt Connect First");
+            return;
+        }
           String methodName = mSpinnerDmMethod.getSelectedItem().toString();
           String opt_frequency = mSpinnersetfrequency.getSelectedItem().toString();
           String sec_mode_selected = mSpinnerSecurityMode.getSelectedItem().toString();
