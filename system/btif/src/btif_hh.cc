@@ -1085,8 +1085,9 @@ static void btif_hh_upstreams_evt(uint16_t event, char* p_param) {
       p_dev = btif_hh_find_connected_dev_by_handle(p_data->hs_data.handle);
       if (p_dev) {
         BT_HDR* hdr = p_data->hs_data.rsp_data.p_rpt_data;
+        tBTA_HH_STATUS status = p_data->hs_data.status;
 
-        if (hdr) { /* Get report response */
+        if (status == BTA_HH_OK && hdr) { /* Get report response */
           uint8_t* data = (uint8_t*)(hdr + 1) + hdr->offset;
           uint16_t len = hdr->len;
           HAL_CBACK(bt_hh_callbacks, get_report_cb,
