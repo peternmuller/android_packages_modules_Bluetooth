@@ -2408,6 +2408,15 @@ public class LeAudioService extends ProfileService {
             // If broadcast is ongoing and need to update unicast fallback active group
             // we need to update the cached group id and skip changing the active device
             updateFallbackUnicastGroupIdForBroadcast(groupId);
+            if (!isBroadcastAllowedToBeActivateInCurrentAudioMode()
+                    && isBroadcastPlaying
+                    && (groupId != LE_AUDIO_GROUP_ID_INVALID)) {
+                Log.d(TAG, "Audio mode not allow for Broadcast, request unicast activation");
+                /* Request activation of unicast group */
+                handleUnicastStreamStatusChange(
+                        LeAudioStackEvent.DIRECTION_SINK,
+                        LeAudioStackEvent.STATUS_LOCAL_STREAM_REQUESTED);
+            }
             return true;
         }
 
