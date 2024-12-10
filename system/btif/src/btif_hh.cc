@@ -45,6 +45,7 @@
 #include "main/shim/dumpsys.h"
 #include "os/log.h"
 #include "osi/include/allocator.h"
+#include "osi/include/properties.h"
 #include "stack/include/acl_api.h"
 #include "stack/include/bt_hdr.h"
 #include "stack/include/bt_uuid16.h"
@@ -994,6 +995,8 @@ void btif_hh_getreport(btif_hh_uhid_t* p_uhid, bthh_report_type_t r_type,
 static void btif_hh_upstreams_evt(uint16_t event, char* p_param) {
   tBTA_HH* p_data = (tBTA_HH*)p_param;
   btif_hh_device_t* p_dev = NULL;
+  bool pts_hid_vup_enabled =
+  osi_property_get_bool("persist.vendor.bluetooth.pts_hid_vup_enabled", false);
 
   log::verbose("event={} dereg = {}", bta_hh_event_text(event),
                btif_hh_cb.service_dereg_active);
@@ -1326,7 +1329,7 @@ static void btif_hh_upstreams_evt(uint16_t event, char* p_param) {
       log::verbose("--Removing HID bond");
       /* If it is locally initiated VUP or remote device has its major COD as
       Peripheral removed the bond.*/
-      if (p_dev->local_vup || check_cod_hid(&(p_dev->link_spec.addrt.bda))) {
+      if ((p_dev->local_vup || check_cod_hid(&(p_dev->link_spec.addrt.bda))) && !pts_hid_vup_enabled) {
         p_dev->local_vup = false;
         BTA_DmRemoveDevice(p_dev->link_spec.addrt.bda);
       } else {

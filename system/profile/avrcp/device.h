@@ -400,6 +400,8 @@ class Device {
   std::set<uint8_t> active_labels_;
 
   int8_t volume_ = -1;
+  int8_t last_request_volume_ = -1;
+  uint8_t volume_label_ = MAX_TRANSACTION_LABEL;
   bool fast_forwarding_ = false;
   bool fast_rewinding_  = false;
 };

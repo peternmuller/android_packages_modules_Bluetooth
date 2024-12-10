@@ -6571,8 +6571,11 @@ class LeAudioClientImpl : public LeAudioClient {
             stream_setup_start_timestamp_ = 0;
             if (group->IsSuspendedForReconfiguration()) {
               reconfigurationComplete();
-            } else if (status != GroupStreamStatus::IDLE) {
-               CancelStreamingRequest();
+            } else {
+              if (!((status == GroupStreamStatus::IDLE) &&
+                    (active_group_id_ != group->group_id_) &&
+                    (audio_sender_state_ == AudioState::STARTED)))
+                CancelStreamingRequest();
             }
           }
         }

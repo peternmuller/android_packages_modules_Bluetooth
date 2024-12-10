@@ -179,6 +179,16 @@ bt_status_t btif_storage_remove_bonded_device(const RawAddress* remote_bd_addr);
 
 /*******************************************************************************
  *
+ * Function         btif_storage_migrate_lea_uuids_u2v
+ *
+ * Description      BTIF storage API - Migrate le audio profile uuids
+ *                  from U to V.
+ *
+ ******************************************************************************/
+void btif_storage_migrate_lea_uuids_u2v();
+
+/*******************************************************************************
+ *
  * Function         btif_storage_load_le_devices
  *
  * Description      BTIF storage API - Loads all LE-only and Dual Mode devices

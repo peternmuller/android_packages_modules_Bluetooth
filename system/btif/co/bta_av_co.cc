@@ -57,12 +57,12 @@
 #include "types/raw_address.h"
 #include "device/include/interop.h"
 #include "osi/include/properties.h"
-
+#include "btif_config.h"
 using namespace bluetooth;
 
 // SCMS-T protect info
 const uint8_t bta_av_co_cp_scmst[AVDT_CP_INFO_LEN] = {0x02, 0x02, 0x00};
-
+std::string supported_codecs = "";
 // Control block instance
 static const bool kContentProtectEnabled = false;
 static BtaAvCo bta_av_co_cb(kContentProtectEnabled, new BtaAvCoPeerCache());
@@ -257,7 +257,15 @@ tA2DP_STATUS BtaAvCo::ProcessSourceGetConfig(
       log::error("peer {} : no more room for Sink info", p_peer->addr);
     }
   }
-
+  std::string remote_bdstr = p_peer->addr.ToString();
+  if (supported_codecs.empty()) {
+      supported_codecs.append(A2DP_CodecName(p_codec_info));
+      log::verbose(" First codec entry {}",supported_codecs.c_str());
+  } else {
+      supported_codecs.append(",");
+      supported_codecs.append(A2DP_CodecName(p_codec_info));
+      log::verbose(" Next codec entry {}",supported_codecs.c_str());
+ }
   // Check if this is the last Sink get capabilities or all supported codec
   // capabilities are retrieved.
   if ((p_peer->num_rx_sinks != p_peer->num_sinks) &&
@@ -266,6 +274,10 @@ tA2DP_STATUS BtaAvCo::ProcessSourceGetConfig(
   }
   log::verbose("last Sink codec reached for peer {} (local {})", p_peer->addr,
                p_peer->acceptor ? "acceptor" : "initiator");
+
+    //store peer supported codecs in bt_config.conf file
+  btif_config_set_str(remote_bdstr, BTIF_STORAGE_KEY_FOR_SUPPORTED_CODECS, supported_codecs.c_str());
+  supported_codecs.clear();
 
   bta_av_co_store_peer_codectype(p_peer);
 
@@ -1224,7 +1236,7 @@ void DisableVBRCapability(BtaAvCoPeer* p_peer, uint8_t (&sink_codec_cap)[AVDT_CO
         vbr_bl = true;
      }
     }
-    if(vbr_bl) {
+    if(vbr_bl || !vbr_supp) {
       log::verbose("AAC VBR is disabled, remove VBR from selectable capability");
       sink_codec_cap[6] = 0;
     }
