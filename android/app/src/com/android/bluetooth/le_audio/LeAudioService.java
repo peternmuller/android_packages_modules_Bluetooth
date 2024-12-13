@@ -3745,7 +3745,15 @@ public class LeAudioService extends ProfileService {
                         }
                     }
 
-                    transitionFromBroadcastToUnicast();
+                    if (leaudioUseAudioModeListener()
+                            && mBroadcastIdDeactivatedForUnicastTransition.isPresent()
+                            && isBroadcastAllowedToBeActivateInCurrentAudioMode()) {
+                        Log.w(TAG, "Audio mode change to normal, switch back to broadcast");
+                        startBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
+                        mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
+                    } else {
+                        transitionFromBroadcastToUnicast();
+                    }
                     break;
                 case LeAudioStackEvent.BROADCAST_STATE_STOPPING:
                     Log.d(TAG, "Broadcast broadcastId: " + broadcastId + " stopping.");
@@ -4806,7 +4814,8 @@ public class LeAudioService extends ProfileService {
                 if (isBroadcastReadyToBeReActivated()
                         && isAudioModeChangedFromCommunicationToNormal(
                                 previousAudioMode, mCurrentAudioMode)
-                        && (getActiveGroupId() == LE_AUDIO_GROUP_ID_INVALID)) {
+                        && (getActiveGroupId() == LE_AUDIO_GROUP_ID_INVALID)
+                        && !isPlaying(mBroadcastIdDeactivatedForUnicastTransition.get())) {
                     stopBroadcast(mBroadcastIdDeactivatedForUnicastTransition.get());
                     mBroadcastIdDeactivatedForUnicastTransition = Optional.empty();
                     break;
